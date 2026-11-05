@@ -1,0 +1,97 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..120
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..22
+    NODE_GROUP@17..18
+      NODE@17..18
+        IDENT@17..18 "A"
+    WHITESPACE@18..19 " "
+    EDGE@19..22
+      STROKE@19..22 "-->"
+  NEWLINE@22..23 "\n"
+  WHITESPACE@23..27 "    "
+  VERTEX_STMT@27..43
+    NODE_GROUP@27..28
+      NODE@27..28
+        IDENT@27..28 "A"
+    WHITESPACE@28..29 " "
+    EDGE@29..43
+      STROKE@29..32 "-->"
+      EDGE_LABEL@32..43
+        PIPE@32..33 "|"
+        LABEL@33..43
+          TEXT@33..43 "no close B"
+  NEWLINE@43..44 "\n"
+  WHITESPACE@44..48 "    "
+  VERTEX_STMT@48..63
+    NODE_GROUP@48..49
+      NODE@48..49
+        IDENT@48..49 "A"
+    WHITESPACE@49..50 " "
+    EDGE@50..63
+      STROKE_OPEN@50..52 "--"
+      EDGE_LABEL@52..63
+        LABEL@52..63
+          TEXT@52..63 " no close B"
+  NEWLINE@63..64 "\n"
+  WHITESPACE@64..68 "    "
+  VERTEX_STMT@68..81
+    NODE_GROUP@68..69
+      NODE@68..69
+        IDENT@68..69 "A"
+    WHITESPACE@69..70 " "
+    EDGE@70..77
+      STROKE_OPEN@70..72 "--"
+      EDGE_LABEL@72..77
+        LABEL@72..77
+          TEXT@72..77 " bad "
+    ERROR@77..81
+      ERROR_TOKEN@77..81 "-- B"
+  NEWLINE@81..82 "\n"
+  WHITESPACE@82..86 "    "
+  VERTEX_STMT@86..95
+    NODE_GROUP@86..95
+      NODE@86..87
+        IDENT@86..87 "A"
+      WHITESPACE@87..88 " "
+      AMP@88..89 "&"
+      WHITESPACE@89..90 " "
+      ERROR@90..95
+        ERROR_TOKEN@90..95 "--> B"
+  NEWLINE@95..96 "\n"
+  WHITESPACE@96..100 "    "
+  VERTEX_STMT@100..109
+    NODE_GROUP@100..101
+      NODE@100..101
+        IDENT@100..101 "A"
+    WHITESPACE@101..102 " "
+    EDGE@102..105
+      STROKE@102..105 "-->"
+    WHITESPACE@105..106 " "
+    NODE_GROUP@106..109
+      NODE@106..109
+        IDENT@106..109 "end"
+  NEWLINE@109..110 "\n"
+  WHITESPACE@110..114 "    "
+  ERROR@114..119
+    ERROR_TOKEN@114..119 "--> B"
+  NEWLINE@119..120 "\n"
+--- diagnostics ---
+22..22: expected a node after the edge
+32..33: unclosed `|`: expected `|`
+43..43: expected a node after the edge
+50..52: unclosed edge label: expected a closing stroke such as `-->`
+63..63: expected a node after the edge
+70..72: unclosed edge label: expected a closing stroke such as `-->`
+77..81: expected a node after the edge
+90..95: expected a node after `&`
+106..109: `end` is reserved and cannot be a node id
+114..119: expected a statement

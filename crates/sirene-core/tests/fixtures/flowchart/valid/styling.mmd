@@ -1,0 +1,13 @@
+flowchart LR
+    A:::someclass --> B
+    C[label]:::other
+    classDef someclass fill:#f96
+    classDef a,b stroke:#333,stroke-width:4px;
+    classDef animate stroke-dasharray: 9\,5,animation: dash 25s linear infinite;
+    class A,B other
+    style A fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5
+    linkStyle 0 stroke:#ff3,stroke-width:4px,color:red;
+    linkStyle 1,2 color:blue;
+    linkStyle default interpolate basis
+    linkStyle 3 interpolate cardinal stroke:green
+    linkStyle default stroke:gray

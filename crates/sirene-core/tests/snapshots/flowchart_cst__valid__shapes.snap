@@ -1,0 +1,182 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..362
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..27
+    NODE_GROUP@17..27
+      NODE@17..27
+        IDENT@17..21 "rect"
+        SHAPE@21..27
+          SHAPE_OPEN@21..22 "["
+          LABEL@22..26
+            TEXT@22..26 "rect"
+          SHAPE_CLOSE@26..27 "]"
+  NEWLINE@27..28 "\n"
+  WHITESPACE@28..32 "    "
+  VERTEX_STMT@32..44
+    NODE_GROUP@32..44
+      NODE@32..44
+        IDENT@32..37 "round"
+        SHAPE@37..44
+          SHAPE_OPEN@37..38 "("
+          LABEL@38..43
+            TEXT@38..43 "round"
+          SHAPE_CLOSE@43..44 ")"
+  NEWLINE@44..45 "\n"
+  WHITESPACE@45..49 "    "
+  VERTEX_STMT@49..67
+    NODE_GROUP@49..67
+      NODE@49..67
+        IDENT@49..56 "stadium"
+        SHAPE@56..67
+          SHAPE_OPEN@56..58 "(["
+          LABEL@58..65
+            TEXT@58..65 "stadium"
+          SHAPE_CLOSE@65..67 "])"
+  NEWLINE@67..68 "\n"
+  WHITESPACE@68..72 "    "
+  VERTEX_STMT@72..96
+    NODE_GROUP@72..96
+      NODE@72..96
+        IDENT@72..82 "subroutine"
+        SHAPE@82..96
+          SHAPE_OPEN@82..84 "[["
+          LABEL@84..94
+            TEXT@84..94 "subroutine"
+          SHAPE_CLOSE@94..96 "]]"
+  NEWLINE@96..97 "\n"
+  WHITESPACE@97..101 "    "
+  VERTEX_STMT@101..121
+    NODE_GROUP@101..121
+      NODE@101..121
+        IDENT@101..109 "cylinder"
+        SHAPE@109..121
+          SHAPE_OPEN@109..111 "[("
+          LABEL@111..119
+            TEXT@111..119 "cylinder"
+          SHAPE_CLOSE@119..121 ")]"
+  NEWLINE@121..122 "\n"
+  WHITESPACE@122..126 "    "
+  VERTEX_STMT@126..142
+    NODE_GROUP@126..142
+      NODE@126..142
+        IDENT@126..132 "circle"
+        SHAPE@132..142
+          SHAPE_OPEN@132..134 "(("
+          LABEL@134..140
+            TEXT@134..140 "circle"
+          SHAPE_CLOSE@140..142 "))"
+  NEWLINE@142..143 "\n"
+  WHITESPACE@143..147 "    "
+  VERTEX_STMT@147..169
+    NODE_GROUP@147..169
+      NODE@147..169
+        IDENT@147..150 "dbl"
+        SHAPE@150..169
+          SHAPE_OPEN@150..153 "((("
+          LABEL@153..166
+            TEXT@153..166 "double circle"
+          SHAPE_CLOSE@166..169 ")))"
+  NEWLINE@169..170 "\n"
+  WHITESPACE@170..174 "    "
+  VERTEX_STMT@174..192
+    NODE_GROUP@174..192
+      NODE@174..192
+        IDENT@174..181 "ellipse"
+        SHAPE@181..192
+          SHAPE_OPEN@181..183 "(-"
+          LABEL@183..190
+            TEXT@183..190 "ellipse"
+          SHAPE_CLOSE@190..192 "-)"
+  NEWLINE@192..193 "\n"
+  WHITESPACE@193..197 "    "
+  VERTEX_STMT@197..205
+    NODE_GROUP@197..205
+      NODE@197..205
+        IDENT@197..200 "odd"
+        SHAPE@200..205
+          SHAPE_OPEN@200..201 ">"
+          LABEL@201..204
+            TEXT@201..204 "odd"
+          SHAPE_CLOSE@204..205 "]"
+  NEWLINE@205..206 "\n"
+  WHITESPACE@206..210 "    "
+  VERTEX_STMT@210..226
+    NODE_GROUP@210..226
+      NODE@210..226
+        IDENT@210..217 "diamond"
+        SHAPE@217..226
+          SHAPE_OPEN@217..218 "{"
+          LABEL@218..225
+            TEXT@218..225 "diamond"
+          SHAPE_CLOSE@225..226 "}"
+  NEWLINE@226..227 "\n"
+  WHITESPACE@227..231 "    "
+  VERTEX_STMT@231..249
+    NODE_GROUP@231..249
+      NODE@231..249
+        IDENT@231..238 "hexagon"
+        SHAPE@238..249
+          SHAPE_OPEN@238..240 "{{"
+          LABEL@240..247
+            TEXT@240..247 "hexagon"
+          SHAPE_CLOSE@247..249 "}}"
+  NEWLINE@249..250 "\n"
+  WHITESPACE@250..254 "    "
+  VERTEX_STMT@254..273
+    NODE_GROUP@254..273
+      NODE@254..273
+        IDENT@254..259 "leanR"
+        SHAPE@259..273
+          SHAPE_OPEN@259..261 "[/"
+          LABEL@261..271
+            TEXT@261..271 "lean right"
+          SHAPE_CLOSE@271..273 "/]"
+  NEWLINE@273..274 "\n"
+  WHITESPACE@274..278 "    "
+  VERTEX_STMT@278..296
+    NODE_GROUP@278..296
+      NODE@278..296
+        IDENT@278..283 "leanL"
+        SHAPE@283..296
+          SHAPE_OPEN@283..285 "[\\"
+          LABEL@285..294
+            TEXT@285..294 "lean left"
+          SHAPE_CLOSE@294..296 "\\]"
+  NEWLINE@296..297 "\n"
+  WHITESPACE@297..301 "    "
+  VERTEX_STMT@301..318
+    NODE_GROUP@301..318
+      NODE@301..318
+        IDENT@301..305 "trap"
+        SHAPE@305..318
+          SHAPE_OPEN@305..307 "[/"
+          LABEL@307..316
+            TEXT@307..316 "trapezoid"
+          SHAPE_CLOSE@316..318 "\\]"
+  NEWLINE@318..319 "\n"
+  WHITESPACE@319..323 "    "
+  VERTEX_STMT@323..352
+    NODE_GROUP@323..352
+      NODE@323..352
+        IDENT@323..330 "invTrap"
+        SHAPE@330..352
+          SHAPE_OPEN@330..332 "[\\"
+          LABEL@332..350
+            TEXT@332..350 "inverted trapezoid"
+          SHAPE_CLOSE@350..352 "/]"
+  NEWLINE@352..353 "\n"
+  WHITESPACE@353..357 "    "
+  VERTEX_STMT@357..361
+    NODE_GROUP@357..361
+      NODE@357..361
+        IDENT@357..361 "bare"
+  NEWLINE@361..362 "\n"
+--- diagnostics ---

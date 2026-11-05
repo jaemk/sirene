@@ -1,0 +1,22 @@
+flowchart LR
+    c1-->a2
+    subgraph one
+        a1-->a2
+    end
+    subgraph ide1 [titled one]
+        direction TB
+        subgraph inner["quoted title"]
+            direction RL
+            i1 --> f1
+        end
+    end
+    subgraph Title With Spaces
+        x
+    end
+    subgraph "Only a string"
+        y
+    end
+    subgraph
+        z
+    end
+    one --> ide1 --> c1

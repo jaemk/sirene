@@ -1,0 +1,24 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..28
+  HEADER@0..15
+    GRAPH_KW@0..13 "flowchart-elk"
+    WHITESPACE@13..14 " "
+    DIR@14..15 ">"
+  NEWLINE@15..16 "\n"
+  WHITESPACE@16..20 "    "
+  VERTEX_STMT@20..27
+    NODE_GROUP@20..21
+      NODE@20..21
+        IDENT@20..21 "A"
+    WHITESPACE@21..22 " "
+    EDGE@22..25
+      STROKE@22..25 "-->"
+    WHITESPACE@25..26 " "
+    NODE_GROUP@26..27
+      NODE@26..27
+        IDENT@26..27 "B"
+  NEWLINE@27..28 "\n"
+--- diagnostics ---

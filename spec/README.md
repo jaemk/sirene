@@ -11,7 +11,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Feature | Status | Spec |
 |---------|--------|------|
 | Workspace | done | [workspace.md](workspace.md) |
-| Flowchart Parser | pending | [flowchart-parser.md](flowchart-parser.md) |
+| Flowchart Parser | done | [flowchart-parser.md](flowchart-parser.md) |
 | Layout | research | [layout.md](layout.md) |
 | ASCII Renderer | pending | [ascii-renderer.md](ascii-renderer.md) |
 | CLI | pending | [cli.md](cli.md) |
@@ -19,6 +19,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | GUI Shell | research | [gui-shell.md](gui-shell.md) |
 | WYSIWYG Editing | research | [wysiwyg-editing.md](wysiwyg-editing.md) |
 | macOS Packaging | research | [macos-packaging.md](macos-packaging.md) |
+| Flowchart Model | pending | [flowchart-model.md](flowchart-model.md) |
 
 ## Conventions
 

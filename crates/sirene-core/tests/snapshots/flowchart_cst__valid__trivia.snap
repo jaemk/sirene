@@ -1,0 +1,63 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..238
+  FRONTMATTER@0..45 "---\ntitle: Trivia\ncon ..."
+  NEWLINE@45..46 "\n"
+  DIRECTIVE@46..93 "%%{init: {\"flowchart\" ..."
+  NEWLINE@93..94 "\n"
+  COMMENT@94..124 "%% a comment before t ..."
+  NEWLINE@124..125 "\n"
+  HEADER@125..137
+    GRAPH_KW@125..134 "flowchart"
+    WHITESPACE@134..135 " "
+    DIR@135..137 "LR"
+  NEWLINE@137..138 "\n"
+  WHITESPACE@138..142 "    "
+  COMMENT@142..164 "%% an indented comment"
+  NEWLINE@164..165 "\n"
+  WHITESPACE@165..169 "    "
+  VERTEX_STMT@169..176
+    NODE_GROUP@169..170
+      NODE@169..170
+        IDENT@169..170 "A"
+    WHITESPACE@170..171 " "
+    EDGE@171..174
+      STROKE@171..174 "-->"
+    WHITESPACE@174..175 " "
+    NODE_GROUP@175..176
+      NODE@175..176
+        IDENT@175..176 "B"
+  SEMI@176..177 ";"
+  VERTEX_STMT@177..184
+    NODE_GROUP@177..178
+      NODE@177..178
+        IDENT@177..178 "B"
+    WHITESPACE@178..179 " "
+    EDGE@179..182
+      STROKE@179..182 "-->"
+    WHITESPACE@182..183 " "
+    NODE_GROUP@183..184
+      NODE@183..184
+        IDENT@183..184 "C"
+  SEMI@184..185 ";"
+  NEWLINE@185..186 "\n"
+  NEWLINE@186..187 "\n"
+  WHITESPACE@187..191 "    "
+  DIRECTIVE@191..225 "%%{ multi\n      line  ..."
+  NEWLINE@225..226 "\n"
+  WHITESPACE@226..230 "    "
+  VERTEX_STMT@230..237
+    NODE_GROUP@230..231
+      NODE@230..231
+        IDENT@230..231 "C"
+    WHITESPACE@231..232 " "
+    EDGE@232..235
+      STROKE@232..235 "-->"
+    WHITESPACE@235..236 " "
+    NODE_GROUP@236..237
+      NODE@236..237
+        IDENT@236..237 "D"
+  NEWLINE@237..238 "\n"
+--- diagnostics ---

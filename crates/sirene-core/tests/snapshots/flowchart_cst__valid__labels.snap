@@ -1,0 +1,102 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..253
+  HEADER@0..8
+    GRAPH_KW@0..5 "graph"
+    WHITESPACE@5..6 " "
+    DIR@6..8 "TD"
+  NEWLINE@8..9 "\n"
+  WHITESPACE@9..13 "    "
+  VERTEX_STMT@13..49
+    NODE_GROUP@13..49
+      NODE@13..49
+        IDENT@13..16 "id1"
+        SHAPE@16..49
+          SHAPE_OPEN@16..17 "["
+          LABEL@17..48
+            STRING@17..48 "\"This is the (text) i ..."
+          SHAPE_CLOSE@48..49 "]"
+  NEWLINE@49..50 "\n"
+  WHITESPACE@50..54 "    "
+  VERTEX_STMT@54..107
+    NODE_GROUP@54..80
+      NODE@54..80
+        IDENT@54..55 "A"
+        SHAPE@55..80
+          SHAPE_OPEN@55..56 "["
+          LABEL@56..79
+            STRING@56..79 "\"A double quote:#quot;\""
+          SHAPE_CLOSE@79..80 "]"
+    WHITESPACE@80..81 " "
+    EDGE@81..84
+      STROKE@81..84 "-->"
+    WHITESPACE@84..85 " "
+    NODE_GROUP@85..107
+      NODE@85..107
+        IDENT@85..86 "B"
+        SHAPE@86..107
+          SHAPE_OPEN@86..87 "["
+          LABEL@87..106
+            STRING@87..106 "\"A dec char:#9829;\""
+          SHAPE_CLOSE@106..107 "]"
+  NEWLINE@107..108 "\n"
+  WHITESPACE@108..112 "    "
+  VERTEX_STMT@112..141
+    NODE_GROUP@112..141
+      NODE@112..141
+        IDENT@112..114 "md"
+        SHAPE@114..141
+          SHAPE_OPEN@114..115 "["
+          LABEL@115..140
+            MD_STRING@115..140 "\"`**bold** and _itali ..."
+          SHAPE_CLOSE@140..141 "]"
+  NEWLINE@141..142 "\n"
+  WHITESPACE@142..146 "    "
+  VERTEX_STMT@146..172
+    NODE_GROUP@146..172
+      NODE@146..172
+        IDENT@146..149 "uni"
+        SHAPE@149..172
+          SHAPE_OPEN@149..150 "["
+          LABEL@150..171
+            TEXT@150..171 "Ünïcödé 🐟 text"
+          SHAPE_CLOSE@171..172 "]"
+  NEWLINE@172..173 "\n"
+  WHITESPACE@173..177 "    "
+  VERTEX_STMT@177..200
+    NODE_GROUP@177..200
+      NODE@177..200
+        IDENT@177..182 "multi"
+        SHAPE@182..200
+          SHAPE_OPEN@182..183 "["
+          LABEL@183..199
+            TEXT@183..199 "first\n    second"
+          SHAPE_CLOSE@199..200 "]"
+  NEWLINE@200..201 "\n"
+  WHITESPACE@201..205 "    "
+  VERTEX_STMT@205..227
+    NODE_GROUP@205..227
+      NODE@205..227
+        IDENT@205..211 "spaced"
+        SHAPE@211..227
+          SHAPE_OPEN@211..212 "["
+          LABEL@212..226
+            TEXT@212..226 " padded label "
+          SHAPE_CLOSE@226..227 "]"
+  NEWLINE@227..228 "\n"
+  WHITESPACE@228..232 "    "
+  VERTEX_STMT@232..252
+    NODE_GROUP@232..240
+      NODE@232..240
+        IDENT@232..240 "endpoint"
+    WHITESPACE@240..241 " "
+    EDGE@241..244
+      STROKE@241..244 "-->"
+    WHITESPACE@244..245 " "
+    NODE_GROUP@245..252
+      NODE@245..252
+        IDENT@245..252 "classes"
+  NEWLINE@252..253 "\n"
+--- diagnostics ---

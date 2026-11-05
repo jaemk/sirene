@@ -1,0 +1,11 @@
+flowchart TD
+    A@{ shape: manual-file, label: "File {Handling}" }
+    B@{ shape: docs } --> C@{ shape: hex, label: "x" } & D
+    A e1@==> B
+    e1@{ animate: true }
+    one@{ view: collapsed }
+    E:::cls@{ shape: rounded }
+    F@{
+      shape: doc
+      label: "multi line"
+    }

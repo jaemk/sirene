@@ -1,0 +1,167 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..375
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..24
+    NODE_GROUP@17..19
+      NODE@17..19
+        IDENT@17..19 "c1"
+    EDGE@19..22
+      STROKE@19..22 "-->"
+    NODE_GROUP@22..24
+      NODE@22..24
+        IDENT@22..24 "a2"
+  NEWLINE@24..25 "\n"
+  WHITESPACE@25..29 "    "
+  SUBGRAPH@29..65
+    SUBGRAPH_HEADER@29..41
+      SUBGRAPH_KW@29..37 "subgraph"
+      WHITESPACE@37..38 " "
+      IDENT@38..41 "one"
+    NEWLINE@41..42 "\n"
+    WHITESPACE@42..50 "        "
+    VERTEX_STMT@50..57
+      NODE_GROUP@50..52
+        NODE@50..52
+          IDENT@50..52 "a1"
+      EDGE@52..55
+        STROKE@52..55 "-->"
+      NODE_GROUP@55..57
+        NODE@55..57
+          IDENT@55..57 "a2"
+    NEWLINE@57..58 "\n"
+    WHITESPACE@58..62 "    "
+    END_KW@62..65 "end"
+  NEWLINE@65..66 "\n"
+  WHITESPACE@66..70 "    "
+  SUBGRAPH@70..223
+    SUBGRAPH_HEADER@70..96
+      SUBGRAPH_KW@70..78 "subgraph"
+      WHITESPACE@78..79 " "
+      IDENT@79..83 "ide1"
+      WHITESPACE@83..84 " "
+      SHAPE@84..96
+        SHAPE_OPEN@84..85 "["
+        LABEL@85..95
+          TEXT@85..95 "titled one"
+        SHAPE_CLOSE@95..96 "]"
+    NEWLINE@96..97 "\n"
+    WHITESPACE@97..105 "        "
+    DIRECTION_STMT@105..117
+      DIRECTION_KW@105..114 "direction"
+      WHITESPACE@114..115 " "
+      DIR@115..117 "TB"
+    NEWLINE@117..118 "\n"
+    WHITESPACE@118..126 "        "
+    SUBGRAPH@126..215
+      SUBGRAPH_HEADER@126..156
+        SUBGRAPH_KW@126..134 "subgraph"
+        WHITESPACE@134..135 " "
+        IDENT@135..140 "inner"
+        SHAPE@140..156
+          SHAPE_OPEN@140..141 "["
+          LABEL@141..155
+            STRING@141..155 "\"quoted title\""
+          SHAPE_CLOSE@155..156 "]"
+      NEWLINE@156..157 "\n"
+      WHITESPACE@157..169 "            "
+      DIRECTION_STMT@169..181
+        DIRECTION_KW@169..178 "direction"
+        WHITESPACE@178..179 " "
+        DIR@179..181 "RL"
+      NEWLINE@181..182 "\n"
+      WHITESPACE@182..194 "            "
+      VERTEX_STMT@194..203
+        NODE_GROUP@194..196
+          NODE@194..196
+            IDENT@194..196 "i1"
+        WHITESPACE@196..197 " "
+        EDGE@197..200
+          STROKE@197..200 "-->"
+        WHITESPACE@200..201 " "
+        NODE_GROUP@201..203
+          NODE@201..203
+            IDENT@201..203 "f1"
+      NEWLINE@203..204 "\n"
+      WHITESPACE@204..212 "        "
+      END_KW@212..215 "end"
+    NEWLINE@215..216 "\n"
+    WHITESPACE@216..220 "    "
+    END_KW@220..223 "end"
+  NEWLINE@223..224 "\n"
+  WHITESPACE@224..228 "    "
+  SUBGRAPH@228..272
+    SUBGRAPH_HEADER@228..254
+      SUBGRAPH_KW@228..236 "subgraph"
+      WHITESPACE@236..237 " "
+      LABEL@237..254
+        TEXT@237..254 "Title With Spaces"
+    NEWLINE@254..255 "\n"
+    WHITESPACE@255..263 "        "
+    VERTEX_STMT@263..264
+      NODE_GROUP@263..264
+        NODE@263..264
+          IDENT@263..264 "x"
+    NEWLINE@264..265 "\n"
+    WHITESPACE@265..269 "    "
+    END_KW@269..272 "end"
+  NEWLINE@272..273 "\n"
+  WHITESPACE@273..277 "    "
+  SUBGRAPH@277..319
+    SUBGRAPH_HEADER@277..301
+      SUBGRAPH_KW@277..285 "subgraph"
+      WHITESPACE@285..286 " "
+      LABEL@286..301
+        STRING@286..301 "\"Only a string\""
+    NEWLINE@301..302 "\n"
+    WHITESPACE@302..310 "        "
+    VERTEX_STMT@310..311
+      NODE_GROUP@310..311
+        NODE@310..311
+          IDENT@310..311 "y"
+    NEWLINE@311..312 "\n"
+    WHITESPACE@312..316 "    "
+    END_KW@316..319 "end"
+  NEWLINE@319..320 "\n"
+  WHITESPACE@320..324 "    "
+  SUBGRAPH@324..350
+    SUBGRAPH_HEADER@324..332
+      SUBGRAPH_KW@324..332 "subgraph"
+    NEWLINE@332..333 "\n"
+    WHITESPACE@333..341 "        "
+    VERTEX_STMT@341..342
+      NODE_GROUP@341..342
+        NODE@341..342
+          IDENT@341..342 "z"
+    NEWLINE@342..343 "\n"
+    WHITESPACE@343..347 "    "
+    END_KW@347..350 "end"
+  NEWLINE@350..351 "\n"
+  WHITESPACE@351..355 "    "
+  VERTEX_STMT@355..374
+    NODE_GROUP@355..358
+      NODE@355..358
+        IDENT@355..358 "one"
+    WHITESPACE@358..359 " "
+    EDGE@359..362
+      STROKE@359..362 "-->"
+    WHITESPACE@362..363 " "
+    NODE_GROUP@363..367
+      NODE@363..367
+        IDENT@363..367 "ide1"
+    WHITESPACE@367..368 " "
+    EDGE@368..371
+      STROKE@368..371 "-->"
+    WHITESPACE@371..372 " "
+    NODE_GROUP@372..374
+      NODE@372..374
+        IDENT@372..374 "c1"
+  NEWLINE@374..375 "\n"
+--- diagnostics ---

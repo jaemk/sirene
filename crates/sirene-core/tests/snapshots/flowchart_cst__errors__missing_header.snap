@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..8
+  VERTEX_STMT@0..7
+    NODE_GROUP@0..1
+      NODE@0..1
+        IDENT@0..1 "A"
+    WHITESPACE@1..2 " "
+    EDGE@2..5
+      STROKE@2..5 "-->"
+    WHITESPACE@5..6 " "
+    NODE_GROUP@6..7
+      NODE@6..7
+        IDENT@6..7 "B"
+  NEWLINE@7..8 "\n"
+--- diagnostics ---
+0..7: expected `flowchart` or `graph` header

@@ -1,0 +1,144 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..533
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..36
+    NODE_GROUP@17..30
+      NODE@17..30
+        IDENT@17..18 "A"
+        CLASS_SHORTHAND@18..30
+          TRIPLE_COLON@18..21 ":::"
+          IDENT@21..30 "someclass"
+    WHITESPACE@30..31 " "
+    EDGE@31..34
+      STROKE@31..34 "-->"
+    WHITESPACE@34..35 " "
+    NODE_GROUP@35..36
+      NODE@35..36
+        IDENT@35..36 "B"
+  NEWLINE@36..37 "\n"
+  WHITESPACE@37..41 "    "
+  VERTEX_STMT@41..57
+    NODE_GROUP@41..57
+      NODE@41..57
+        IDENT@41..42 "C"
+        SHAPE@42..49
+          SHAPE_OPEN@42..43 "["
+          LABEL@43..48
+            TEXT@43..48 "label"
+          SHAPE_CLOSE@48..49 "]"
+        CLASS_SHORTHAND@49..57
+          TRIPLE_COLON@49..52 ":::"
+          IDENT@52..57 "other"
+  NEWLINE@57..58 "\n"
+  WHITESPACE@58..62 "    "
+  CLASSDEF_STMT@62..90
+    CLASSDEF_KW@62..70 "classDef"
+    WHITESPACE@70..71 " "
+    ID_LIST@71..80
+      IDENT@71..80 "someclass"
+    WHITESPACE@80..81 " "
+    STYLE_TEXT@81..90 "fill:#f96"
+  NEWLINE@90..91 "\n"
+  WHITESPACE@91..95 "    "
+  CLASSDEF_STMT@95..136
+    CLASSDEF_KW@95..103 "classDef"
+    WHITESPACE@103..104 " "
+    ID_LIST@104..107
+      IDENT@104..105 "a"
+      COMMA@105..106 ","
+      IDENT@106..107 "b"
+    WHITESPACE@107..108 " "
+    STYLE_TEXT@108..136 "stroke:#333,stroke-wi ..."
+  SEMI@136..137 ";"
+  NEWLINE@137..138 "\n"
+  WHITESPACE@138..142 "    "
+  CLASSDEF_STMT@142..217
+    CLASSDEF_KW@142..150 "classDef"
+    WHITESPACE@150..151 " "
+    ID_LIST@151..158
+      IDENT@151..158 "animate"
+    WHITESPACE@158..159 " "
+    STYLE_TEXT@159..217 "stroke-dasharray: 9\\, ..."
+  SEMI@217..218 ";"
+  NEWLINE@218..219 "\n"
+  WHITESPACE@219..223 "    "
+  CLASS_STMT@223..238
+    CLASS_KW@223..228 "class"
+    WHITESPACE@228..229 " "
+    ID_LIST@229..232
+      IDENT@229..230 "A"
+      COMMA@230..231 ","
+      IDENT@231..232 "B"
+    WHITESPACE@232..233 " "
+    IDENT@233..238 "other"
+  NEWLINE@238..239 "\n"
+  WHITESPACE@239..243 "    "
+  STYLE_STMT@243..322
+    STYLE_KW@243..248 "style"
+    WHITESPACE@248..249 " "
+    IDENT@249..250 "A"
+    WHITESPACE@250..251 " "
+    STYLE_TEXT@251..322 "fill:#bbf,stroke:#f66 ..."
+  NEWLINE@322..323 "\n"
+  WHITESPACE@323..327 "    "
+  LINKSTYLE_STMT@327..377
+    LINKSTYLE_KW@327..336 "linkStyle"
+    WHITESPACE@336..337 " "
+    ID_LIST@337..338
+      NUMBER@337..338 "0"
+    WHITESPACE@338..339 " "
+    STYLE_TEXT@339..377 "stroke:#ff3,stroke-wi ..."
+  SEMI@377..378 ";"
+  NEWLINE@378..379 "\n"
+  WHITESPACE@379..383 "    "
+  LINKSTYLE_STMT@383..407
+    LINKSTYLE_KW@383..392 "linkStyle"
+    WHITESPACE@392..393 " "
+    ID_LIST@393..396
+      NUMBER@393..394 "1"
+      COMMA@394..395 ","
+      NUMBER@395..396 "2"
+    WHITESPACE@396..397 " "
+    STYLE_TEXT@397..407 "color:blue"
+  SEMI@407..408 ";"
+  NEWLINE@408..409 "\n"
+  WHITESPACE@409..413 "    "
+  LINKSTYLE_STMT@413..448
+    LINKSTYLE_KW@413..422 "linkStyle"
+    WHITESPACE@422..423 " "
+    DEFAULT_KW@423..430 "default"
+    WHITESPACE@430..431 " "
+    INTERPOLATE_KW@431..442 "interpolate"
+    WHITESPACE@442..443 " "
+    IDENT@443..448 "basis"
+  NEWLINE@448..449 "\n"
+  WHITESPACE@449..453 "    "
+  LINKSTYLE_STMT@453..498
+    LINKSTYLE_KW@453..462 "linkStyle"
+    WHITESPACE@462..463 " "
+    ID_LIST@463..464
+      NUMBER@463..464 "3"
+    WHITESPACE@464..465 " "
+    INTERPOLATE_KW@465..476 "interpolate"
+    WHITESPACE@476..477 " "
+    IDENT@477..485 "cardinal"
+    WHITESPACE@485..486 " "
+    STYLE_TEXT@486..498 "stroke:green"
+  NEWLINE@498..499 "\n"
+  WHITESPACE@499..503 "    "
+  LINKSTYLE_STMT@503..532
+    LINKSTYLE_KW@503..512 "linkStyle"
+    WHITESPACE@512..513 " "
+    DEFAULT_KW@513..520 "default"
+    WHITESPACE@520..521 " "
+    STYLE_TEXT@521..532 "stroke:gray"
+  NEWLINE@532..533 "\n"
+--- diagnostics ---

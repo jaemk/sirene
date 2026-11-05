@@ -1,0 +1,61 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..90
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..29
+    NODE_GROUP@17..29
+      NODE@17..29
+        IDENT@17..18 "A"
+        SHAPE@18..29
+          SHAPE_OPEN@18..19 "["
+          LABEL@19..29
+            TEXT@19..29 "half typed"
+  NEWLINE@29..30 "\n"
+  WHITESPACE@30..34 "    "
+  VERTEX_STMT@34..47
+    NODE_GROUP@34..47
+      NODE@34..47
+        IDENT@34..35 "B"
+        SHAPE@35..47
+          SHAPE_OPEN@35..36 "("
+          LABEL@36..47
+            TEXT@36..47 "wrong close"
+  ERROR@47..54
+    ERROR_TOKEN@47..54 "] --> C"
+  NEWLINE@54..55 "\n"
+  WHITESPACE@55..59 "    "
+  VERTEX_STMT@59..77
+    NODE_GROUP@59..77
+      NODE@59..77
+        IDENT@59..60 "D"
+        SHAPE@60..77
+          SHAPE_OPEN@60..61 "["
+          LABEL@61..77
+            STRING@61..77 "\"unclosed string"
+  NEWLINE@77..78 "\n"
+  WHITESPACE@78..82 "    "
+  VERTEX_STMT@82..89
+    NODE_GROUP@82..83
+      NODE@82..83
+        IDENT@82..83 "E"
+    WHITESPACE@83..84 " "
+    EDGE@84..87
+      STROKE@84..87 "-->"
+    WHITESPACE@87..88 " "
+    NODE_GROUP@88..89
+      NODE@88..89
+        IDENT@88..89 "F"
+  NEWLINE@89..90 "\n"
+--- diagnostics ---
+18..19: unclosed `[`: expected `]`
+35..36: unclosed `(`: expected `)`
+47..54: expected newline or `;`
+61..62: unclosed string: expected `"`
+60..61: unclosed `[`: expected `]`

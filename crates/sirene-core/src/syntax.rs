@@ -1,0 +1,158 @@
+//! Syntax kinds and rowan tree types shared by all diagram parsers.
+
+macro_rules! syntax_kinds {
+    ($($name:ident),* $(,)?) => {
+        /// Kind of a token or node in the lossless syntax tree.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[repr(u16)]
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        pub enum SyntaxKind {
+            $($name),*
+        }
+
+        impl SyntaxKind {
+            const ALL: &'static [SyntaxKind] = &[$(SyntaxKind::$name),*];
+        }
+    };
+}
+
+syntax_kinds! {
+    // Trivia and separators.
+    WHITESPACE,
+    NEWLINE,
+    COMMENT,
+    DIRECTIVE,
+    FRONTMATTER,
+    SEMI,
+
+    // Keywords.
+    GRAPH_KW,
+    SUBGRAPH_KW,
+    END_KW,
+    DIRECTION_KW,
+    CLASSDEF_KW,
+    CLASS_KW,
+    STYLE_KW,
+    LINKSTYLE_KW,
+    CLICK_KW,
+    HREF_KW,
+    CALL_KW,
+    DEFAULT_KW,
+    INTERPOLATE_KW,
+    ACC_TITLE_KW,
+    ACC_DESCR_KW,
+
+    // Other tokens.
+    DIR,
+    IDENT,
+    NUMBER,
+    COMMA,
+    COLON,
+    AMP,
+    TRIPLE_COLON,
+    AT,
+    SHAPE_OPEN,
+    SHAPE_CLOSE,
+    TEXT,
+    STRING,
+    MD_STRING,
+    PIPE,
+    STROKE,
+    STROKE_OPEN,
+    META_OPEN,
+    META_BODY,
+    META_CLOSE,
+    STYLE_TEXT,
+    L_PAREN,
+    R_PAREN,
+    CALLBACK_ARGS,
+    L_BRACE,
+    R_BRACE,
+    ACC_TEXT,
+    LINK_TARGET,
+    ERROR_TOKEN,
+
+    // Nodes.
+    ROOT,
+    HEADER,
+    VERTEX_STMT,
+    NODE_GROUP,
+    NODE,
+    SHAPE,
+    LABEL,
+    CLASS_SHORTHAND,
+    METADATA,
+    EDGE,
+    EDGE_ID,
+    EDGE_LABEL,
+    SUBGRAPH,
+    SUBGRAPH_HEADER,
+    DIRECTION_STMT,
+    CLASSDEF_STMT,
+    CLASS_STMT,
+    STYLE_STMT,
+    LINKSTYLE_STMT,
+    CLICK_STMT,
+    ACC_TITLE_STMT,
+    ACC_DESCR_STMT,
+    ID_LIST,
+    ERROR,
+}
+
+impl SyntaxKind {
+    /// Whether this kind is whitespace, a newline, a comment, or a directive.
+    pub fn is_trivia(self) -> bool {
+        matches!(self, WHITESPACE | NEWLINE | COMMENT | DIRECTIVE)
+    }
+}
+
+use SyntaxKind::*;
+
+impl From<SyntaxKind> for rowan::SyntaxKind {
+    fn from(kind: SyntaxKind) -> Self {
+        Self(kind as u16)
+    }
+}
+
+/// The rowan language tag for Mermaid syntax trees.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Mermaid {}
+
+impl rowan::Language for Mermaid {
+    type Kind = SyntaxKind;
+
+    fn kind_from_raw(raw: rowan::SyntaxKind) -> SyntaxKind {
+        SyntaxKind::ALL[usize::from(raw.0)]
+    }
+
+    fn kind_to_raw(kind: SyntaxKind) -> rowan::SyntaxKind {
+        kind.into()
+    }
+}
+
+pub type SyntaxNode = rowan::SyntaxNode<Mermaid>;
+pub type SyntaxToken = rowan::SyntaxToken<Mermaid>;
+pub type SyntaxElement = rowan::SyntaxElement<Mermaid>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rowan::Language;
+
+    #[test]
+    fn raw_kinds_round_trip() {
+        for &kind in SyntaxKind::ALL {
+            assert_eq!(Mermaid::kind_from_raw(Mermaid::kind_to_raw(kind)), kind);
+        }
+    }
+
+    #[test]
+    fn trivia_kinds() {
+        assert!(WHITESPACE.is_trivia());
+        assert!(NEWLINE.is_trivia());
+        assert!(COMMENT.is_trivia());
+        assert!(DIRECTIVE.is_trivia());
+        assert!(!SEMI.is_trivia());
+        assert!(!IDENT.is_trivia());
+    }
+}

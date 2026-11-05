@@ -1,0 +1,35 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..40
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    ERROR@10..12
+      ERROR_TOKEN@10..12 "XY"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..24
+    NODE_GROUP@17..18
+      NODE@17..18
+        IDENT@17..18 "A"
+    WHITESPACE@18..19 " "
+    EDGE@19..22
+      STROKE@19..22 "-->"
+    WHITESPACE@22..23 " "
+    NODE_GROUP@23..24
+      NODE@23..24
+        IDENT@23..24 "B"
+  NEWLINE@24..25 "\n"
+  VERTEX_STMT@25..34
+    NODE_GROUP@25..34
+      NODE@25..34
+        IDENT@25..34 "flowchart"
+  WHITESPACE@34..35 " "
+  ERROR@35..39
+    ERROR_TOKEN@35..39 "LR A"
+  NEWLINE@39..40 "\n"
+--- diagnostics ---
+10..12: expected a direction: TB, TD, BT, RL, or LR
+35..39: expected newline or `;`

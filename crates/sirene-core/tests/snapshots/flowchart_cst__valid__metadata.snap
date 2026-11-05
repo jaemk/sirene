@@ -1,0 +1,106 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..283
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "TD"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..67
+    NODE_GROUP@17..67
+      NODE@17..67
+        IDENT@17..18 "A"
+        METADATA@18..67
+          META_OPEN@18..20 "@{"
+          META_BODY@20..66 " shape: manual-file,  ..."
+          META_CLOSE@66..67 "}"
+  NEWLINE@67..68 "\n"
+  WHITESPACE@68..72 "    "
+  VERTEX_STMT@72..126
+    NODE_GROUP@72..89
+      NODE@72..89
+        IDENT@72..73 "B"
+        METADATA@73..89
+          META_OPEN@73..75 "@{"
+          META_BODY@75..88 " shape: docs "
+          META_CLOSE@88..89 "}"
+    WHITESPACE@89..90 " "
+    EDGE@90..93
+      STROKE@90..93 "-->"
+    WHITESPACE@93..94 " "
+    NODE_GROUP@94..126
+      NODE@94..122
+        IDENT@94..95 "C"
+        METADATA@95..122
+          META_OPEN@95..97 "@{"
+          META_BODY@97..121 " shape: hex, label: \"x\" "
+          META_CLOSE@121..122 "}"
+      WHITESPACE@122..123 " "
+      AMP@123..124 "&"
+      WHITESPACE@124..125 " "
+      NODE@125..126
+        IDENT@125..126 "D"
+  NEWLINE@126..127 "\n"
+  WHITESPACE@127..131 "    "
+  VERTEX_STMT@131..141
+    NODE_GROUP@131..132
+      NODE@131..132
+        IDENT@131..132 "A"
+    WHITESPACE@132..133 " "
+    EDGE@133..139
+      EDGE_ID@133..136
+        IDENT@133..135 "e1"
+        AT@135..136 "@"
+      STROKE@136..139 "==>"
+    WHITESPACE@139..140 " "
+    NODE_GROUP@140..141
+      NODE@140..141
+        IDENT@140..141 "B"
+  NEWLINE@141..142 "\n"
+  WHITESPACE@142..146 "    "
+  VERTEX_STMT@146..166
+    NODE_GROUP@146..166
+      NODE@146..166
+        IDENT@146..148 "e1"
+        METADATA@148..166
+          META_OPEN@148..150 "@{"
+          META_BODY@150..165 " animate: true "
+          META_CLOSE@165..166 "}"
+  NEWLINE@166..167 "\n"
+  WHITESPACE@167..171 "    "
+  VERTEX_STMT@171..194
+    NODE_GROUP@171..194
+      NODE@171..194
+        IDENT@171..174 "one"
+        METADATA@174..194
+          META_OPEN@174..176 "@{"
+          META_BODY@176..193 " view: collapsed "
+          META_CLOSE@193..194 "}"
+  NEWLINE@194..195 "\n"
+  WHITESPACE@195..199 "    "
+  VERTEX_STMT@199..225
+    NODE_GROUP@199..225
+      NODE@199..225
+        IDENT@199..200 "E"
+        CLASS_SHORTHAND@200..206
+          TRIPLE_COLON@200..203 ":::"
+          IDENT@203..206 "cls"
+        METADATA@206..225
+          META_OPEN@206..208 "@{"
+          META_BODY@208..224 " shape: rounded "
+          META_CLOSE@224..225 "}"
+  NEWLINE@225..226 "\n"
+  WHITESPACE@226..230 "    "
+  VERTEX_STMT@230..282
+    NODE_GROUP@230..282
+      NODE@230..282
+        IDENT@230..231 "F"
+        METADATA@231..282
+          META_OPEN@231..233 "@{"
+          META_BODY@233..281 "\n      shape: doc\n    ..."
+          META_CLOSE@281..282 "}"
+  NEWLINE@282..283 "\n"
+--- diagnostics ---

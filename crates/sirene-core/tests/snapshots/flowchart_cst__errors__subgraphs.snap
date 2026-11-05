@@ -1,0 +1,50 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..93
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  ERROR@17..20
+    END_KW@17..20 "end"
+  NEWLINE@20..21 "\n"
+  WHITESPACE@21..25 "    "
+  SUBGRAPH@25..93
+    SUBGRAPH_HEADER@25..37
+      SUBGRAPH_KW@25..33 "subgraph"
+      WHITESPACE@33..34 " "
+      IDENT@34..37 "one"
+    NEWLINE@37..38 "\n"
+    WHITESPACE@38..46 "        "
+    DIRECTION_STMT@46..55
+      DIRECTION_KW@46..55 "direction"
+    NEWLINE@55..56 "\n"
+    WHITESPACE@56..64 "        "
+    DIRECTION_STMT@64..76
+      DIRECTION_KW@64..73 "direction"
+      WHITESPACE@73..74 " "
+      ERROR@74..76
+        ERROR_TOKEN@74..76 "XY"
+    NEWLINE@76..77 "\n"
+    WHITESPACE@77..85 "        "
+    VERTEX_STMT@85..92
+      NODE_GROUP@85..86
+        NODE@85..86
+          IDENT@85..86 "A"
+      WHITESPACE@86..87 " "
+      EDGE@87..90
+        STROKE@87..90 "-->"
+      WHITESPACE@90..91 " "
+      NODE_GROUP@91..92
+        NODE@91..92
+          IDENT@91..92 "B"
+    NEWLINE@92..93 "\n"
+--- diagnostics ---
+17..20: `end` without a matching `subgraph`
+55..55: expected a direction: TB, TD, BT, RL, or LR
+74..76: expected a direction: TB, TD, BT, RL, or LR
+25..33: unclosed `subgraph`: expected `end`

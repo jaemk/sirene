@@ -1,0 +1,111 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..117
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "TD"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..39
+    NODE_GROUP@17..25
+      NODE@17..25
+        IDENT@17..18 "A"
+        SHAPE@18..25
+          SHAPE_OPEN@18..19 "["
+          LABEL@19..24
+            TEXT@19..24 "Start"
+          SHAPE_CLOSE@24..25 "]"
+    WHITESPACE@25..26 " "
+    EDGE@26..29
+      STROKE@26..29 "-->"
+    WHITESPACE@29..30 " "
+    NODE_GROUP@30..39
+      NODE@30..39
+        IDENT@30..31 "B"
+        SHAPE@31..39
+          SHAPE_OPEN@31..32 "{"
+          LABEL@32..38
+            TEXT@32..38 "Is it?"
+          SHAPE_CLOSE@38..39 "}"
+  NEWLINE@39..40 "\n"
+  WHITESPACE@40..44 "    "
+  VERTEX_STMT@44..60
+    NODE_GROUP@44..45
+      NODE@44..45
+        IDENT@44..45 "B"
+    WHITESPACE@45..46 " "
+    EDGE@46..54
+      STROKE@46..49 "-->"
+      EDGE_LABEL@49..54
+        PIPE@49..50 "|"
+        LABEL@50..53
+          TEXT@50..53 "Yes"
+        PIPE@53..54 "|"
+    WHITESPACE@54..55 " "
+    NODE_GROUP@55..60
+      NODE@55..60
+        IDENT@55..56 "C"
+        SHAPE@56..60
+          SHAPE_OPEN@56..57 "["
+          LABEL@57..59
+            TEXT@57..59 "OK"
+          SHAPE_CLOSE@59..60 "]"
+  NEWLINE@60..61 "\n"
+  WHITESPACE@61..65 "    "
+  VERTEX_STMT@65..81
+    NODE_GROUP@65..66
+      NODE@65..66
+        IDENT@65..66 "C"
+    WHITESPACE@66..67 " "
+    EDGE@67..70
+      STROKE@67..70 "-->"
+    WHITESPACE@70..71 " "
+    NODE_GROUP@71..81
+      NODE@71..81
+        IDENT@71..72 "D"
+        SHAPE@72..81
+          SHAPE_OPEN@72..73 "["
+          LABEL@73..80
+            TEXT@73..80 "Rethink"
+          SHAPE_CLOSE@80..81 "]"
+  NEWLINE@81..82 "\n"
+  WHITESPACE@82..86 "    "
+  VERTEX_STMT@86..93
+    NODE_GROUP@86..87
+      NODE@86..87
+        IDENT@86..87 "D"
+    WHITESPACE@87..88 " "
+    EDGE@88..91
+      STROKE@88..91 "-->"
+    WHITESPACE@91..92 " "
+    NODE_GROUP@92..93
+      NODE@92..93
+        IDENT@92..93 "B"
+  NEWLINE@93..94 "\n"
+  WHITESPACE@94..98 "    "
+  VERTEX_STMT@98..116
+    NODE_GROUP@98..99
+      NODE@98..99
+        IDENT@98..99 "B"
+    WHITESPACE@99..100 " "
+    EDGE@100..109
+      STROKE@100..105 "---->"
+      EDGE_LABEL@105..109
+        PIPE@105..106 "|"
+        LABEL@106..108
+          TEXT@106..108 "No"
+        PIPE@108..109 "|"
+    WHITESPACE@109..110 " "
+    NODE_GROUP@110..116
+      NODE@110..116
+        IDENT@110..111 "E"
+        SHAPE@111..116
+          SHAPE_OPEN@111..112 "["
+          LABEL@112..115
+            TEXT@112..115 "End"
+          SHAPE_CLOSE@115..116 "]"
+  NEWLINE@116..117 "\n"
+--- diagnostics ---

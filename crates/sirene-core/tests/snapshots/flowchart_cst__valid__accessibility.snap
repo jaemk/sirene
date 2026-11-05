@@ -1,0 +1,47 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..155
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  ACC_TITLE_STMT@17..40
+    ACC_TITLE_KW@17..25 "accTitle"
+    COLON@25..26 ":"
+    WHITESPACE@26..27 " "
+    ACC_TEXT@27..40 "Big decisions"
+  NEWLINE@40..41 "\n"
+  WHITESPACE@41..45 "    "
+  ACC_DESCR_STMT@45..80
+    ACC_DESCR_KW@45..53 "accDescr"
+    WHITESPACE@53..54 " "
+    COLON@54..55 ":"
+    WHITESPACE@55..56 " "
+    ACC_TEXT@56..80 "Bob's burger's flowchart"
+  NEWLINE@80..81 "\n"
+  WHITESPACE@81..85 "    "
+  ACC_DESCR_STMT@85..142
+    ACC_DESCR_KW@85..93 "accDescr"
+    WHITESPACE@93..94 " "
+    L_BRACE@94..95 "{"
+    ACC_TEXT@95..141 "\n        A multi-line ..."
+    R_BRACE@141..142 "}"
+  NEWLINE@142..143 "\n"
+  WHITESPACE@143..147 "    "
+  VERTEX_STMT@147..154
+    NODE_GROUP@147..148
+      NODE@147..148
+        IDENT@147..148 "A"
+    WHITESPACE@148..149 " "
+    EDGE@149..152
+      STROKE@149..152 "-->"
+    WHITESPACE@152..153 " "
+    NODE_GROUP@153..154
+      NODE@153..154
+        IDENT@153..154 "B"
+  NEWLINE@154..155 "\n"
+--- diagnostics ---

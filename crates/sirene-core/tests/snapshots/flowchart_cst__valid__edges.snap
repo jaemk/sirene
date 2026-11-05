@@ -1,0 +1,429 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..512
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..22
+    NODE_GROUP@17..18
+      NODE@17..18
+        IDENT@17..18 "A"
+    EDGE@18..21
+      STROKE@18..21 "-->"
+    NODE_GROUP@21..22
+      NODE@21..22
+        IDENT@21..22 "B"
+  NEWLINE@22..23 "\n"
+  WHITESPACE@23..27 "    "
+  VERTEX_STMT@27..34
+    NODE_GROUP@27..28
+      NODE@27..28
+        IDENT@27..28 "A"
+    WHITESPACE@28..29 " "
+    EDGE@29..32
+      STROKE@29..32 "---"
+    WHITESPACE@32..33 " "
+    NODE_GROUP@33..34
+      NODE@33..34
+        IDENT@33..34 "B"
+  NEWLINE@34..35 "\n"
+  WHITESPACE@35..39 "    "
+  VERTEX_STMT@39..46
+    NODE_GROUP@39..40
+      NODE@39..40
+        IDENT@39..40 "A"
+    EDGE@40..45
+      STROKE@40..45 "---->"
+    NODE_GROUP@45..46
+      NODE@45..46
+        IDENT@45..46 "B"
+  NEWLINE@46..47 "\n"
+  WHITESPACE@47..51 "    "
+  VERTEX_STMT@51..58
+    NODE_GROUP@51..52
+      NODE@51..52
+        IDENT@51..52 "A"
+    WHITESPACE@52..53 " "
+    EDGE@53..56
+      STROKE@53..56 "--x"
+    WHITESPACE@56..57 " "
+    NODE_GROUP@57..58
+      NODE@57..58
+        IDENT@57..58 "B"
+  NEWLINE@58..59 "\n"
+  WHITESPACE@59..63 "    "
+  VERTEX_STMT@63..70
+    NODE_GROUP@63..64
+      NODE@63..64
+        IDENT@63..64 "A"
+    WHITESPACE@64..65 " "
+    EDGE@65..68
+      STROKE@65..68 "--o"
+    WHITESPACE@68..69 " "
+    NODE_GROUP@69..70
+      NODE@69..70
+        IDENT@69..70 "B"
+  NEWLINE@70..71 "\n"
+  WHITESPACE@71..75 "    "
+  VERTEX_STMT@75..83
+    NODE_GROUP@75..76
+      NODE@75..76
+        IDENT@75..76 "A"
+    WHITESPACE@76..77 " "
+    EDGE@77..81
+      STROKE@77..81 "<-->"
+    WHITESPACE@81..82 " "
+    NODE_GROUP@82..83
+      NODE@82..83
+        IDENT@82..83 "B"
+  NEWLINE@83..84 "\n"
+  WHITESPACE@84..88 "    "
+  VERTEX_STMT@88..96
+    NODE_GROUP@88..89
+      NODE@88..89
+        IDENT@88..89 "A"
+    WHITESPACE@89..90 " "
+    EDGE@90..94
+      STROKE@90..94 "x--x"
+    WHITESPACE@94..95 " "
+    NODE_GROUP@95..96
+      NODE@95..96
+        IDENT@95..96 "B"
+  NEWLINE@96..97 "\n"
+  WHITESPACE@97..101 "    "
+  VERTEX_STMT@101..109
+    NODE_GROUP@101..102
+      NODE@101..102
+        IDENT@101..102 "A"
+    WHITESPACE@102..103 " "
+    EDGE@103..107
+      STROKE@103..107 "o--o"
+    WHITESPACE@107..108 " "
+    NODE_GROUP@108..109
+      NODE@108..109
+        IDENT@108..109 "B"
+  NEWLINE@109..110 "\n"
+  WHITESPACE@110..114 "    "
+  VERTEX_STMT@114..121
+    NODE_GROUP@114..115
+      NODE@114..115
+        IDENT@114..115 "A"
+    WHITESPACE@115..116 " "
+    EDGE@116..119
+      STROKE@116..119 "==>"
+    WHITESPACE@119..120 " "
+    NODE_GROUP@120..121
+      NODE@120..121
+        IDENT@120..121 "B"
+  NEWLINE@121..122 "\n"
+  WHITESPACE@122..126 "    "
+  VERTEX_STMT@126..133
+    NODE_GROUP@126..127
+      NODE@126..127
+        IDENT@126..127 "A"
+    WHITESPACE@127..128 " "
+    EDGE@128..131
+      STROKE@128..131 "==="
+    WHITESPACE@131..132 " "
+    NODE_GROUP@132..133
+      NODE@132..133
+        IDENT@132..133 "B"
+  NEWLINE@133..134 "\n"
+  WHITESPACE@134..138 "    "
+  VERTEX_STMT@138..147
+    NODE_GROUP@138..139
+      NODE@138..139
+        IDENT@138..139 "A"
+    WHITESPACE@139..140 " "
+    EDGE@140..145
+      STROKE@140..145 "====>"
+    WHITESPACE@145..146 " "
+    NODE_GROUP@146..147
+      NODE@146..147
+        IDENT@146..147 "B"
+  NEWLINE@147..148 "\n"
+  WHITESPACE@148..152 "    "
+  VERTEX_STMT@152..160
+    NODE_GROUP@152..153
+      NODE@152..153
+        IDENT@152..153 "A"
+    WHITESPACE@153..154 " "
+    EDGE@154..158
+      STROKE@154..158 "<==>"
+    WHITESPACE@158..159 " "
+    NODE_GROUP@159..160
+      NODE@159..160
+        IDENT@159..160 "B"
+  NEWLINE@160..161 "\n"
+  WHITESPACE@161..165 "    "
+  VERTEX_STMT@165..171
+    NODE_GROUP@165..166
+      NODE@165..166
+        IDENT@165..166 "A"
+    EDGE@166..170
+      STROKE@166..170 "-.->"
+    NODE_GROUP@170..171
+      NODE@170..171
+        IDENT@170..171 "B"
+  NEWLINE@171..172 "\n"
+  WHITESPACE@172..176 "    "
+  VERTEX_STMT@176..183
+    NODE_GROUP@176..177
+      NODE@176..177
+        IDENT@176..177 "A"
+    WHITESPACE@177..178 " "
+    EDGE@178..181
+      STROKE@178..181 "-.-"
+    WHITESPACE@181..182 " "
+    NODE_GROUP@182..183
+      NODE@182..183
+        IDENT@182..183 "B"
+  NEWLINE@183..184 "\n"
+  WHITESPACE@184..188 "    "
+  VERTEX_STMT@188..198
+    NODE_GROUP@188..189
+      NODE@188..189
+        IDENT@188..189 "A"
+    WHITESPACE@189..190 " "
+    EDGE@190..196
+      STROKE@190..196 "-...->"
+    WHITESPACE@196..197 " "
+    NODE_GROUP@197..198
+      NODE@197..198
+        IDENT@197..198 "B"
+  NEWLINE@198..199 "\n"
+  WHITESPACE@199..203 "    "
+  VERTEX_STMT@203..212
+    NODE_GROUP@203..204
+      NODE@203..204
+        IDENT@203..204 "A"
+    WHITESPACE@204..205 " "
+    EDGE@205..210
+      STROKE@205..210 "<-.->"
+    WHITESPACE@210..211 " "
+    NODE_GROUP@211..212
+      NODE@211..212
+        IDENT@211..212 "B"
+  NEWLINE@212..213 "\n"
+  WHITESPACE@213..217 "    "
+  VERTEX_STMT@217..224
+    NODE_GROUP@217..218
+      NODE@217..218
+        IDENT@217..218 "A"
+    WHITESPACE@218..219 " "
+    EDGE@219..222
+      STROKE@219..222 "~~~"
+    WHITESPACE@222..223 " "
+    NODE_GROUP@223..224
+      NODE@223..224
+        IDENT@223..224 "B"
+  NEWLINE@224..225 "\n"
+  WHITESPACE@225..229 "    "
+  VERTEX_STMT@229..238
+    NODE_GROUP@229..230
+      NODE@229..230
+        IDENT@229..230 "A"
+    WHITESPACE@230..231 " "
+    EDGE@231..236
+      STROKE@231..236 "~~~~~"
+    WHITESPACE@236..237 " "
+    NODE_GROUP@237..238
+      NODE@237..238
+        IDENT@237..238 "B"
+  NEWLINE@238..239 "\n"
+  WHITESPACE@239..243 "    "
+  VERTEX_STMT@243..260
+    NODE_GROUP@243..244
+      NODE@243..244
+        IDENT@243..244 "A"
+    EDGE@244..259
+      STROKE@244..247 "---"
+      EDGE_LABEL@247..259
+        PIPE@247..248 "|"
+        LABEL@248..258
+          TEXT@248..258 "open label"
+        PIPE@258..259 "|"
+    NODE_GROUP@259..260
+      NODE@259..260
+        IDENT@259..260 "B"
+  NEWLINE@260..261 "\n"
+  WHITESPACE@261..265 "    "
+  VERTEX_STMT@265..283
+    NODE_GROUP@265..266
+      NODE@265..266
+        IDENT@265..266 "A"
+    EDGE@266..282
+      STROKE@266..269 "-->"
+      EDGE_LABEL@269..282
+        PIPE@269..270 "|"
+        LABEL@270..281
+          TEXT@270..281 "arrow label"
+        PIPE@281..282 "|"
+    NODE_GROUP@282..283
+      NODE@282..283
+        IDENT@282..283 "B"
+  NEWLINE@283..284 "\n"
+  WHITESPACE@284..288 "    "
+  VERTEX_STMT@288..304
+    NODE_GROUP@288..289
+      NODE@288..289
+        IDENT@288..289 "A"
+    WHITESPACE@289..290 " "
+    EDGE@290..302
+      STROKE@290..293 "-->"
+      WHITESPACE@293..294 " "
+      EDGE_LABEL@294..302
+        PIPE@294..295 "|"
+        LABEL@295..301
+          TEXT@295..301 "spaced"
+        PIPE@301..302 "|"
+    WHITESPACE@302..303 " "
+    NODE_GROUP@303..304
+      NODE@303..304
+        IDENT@303..304 "B"
+  NEWLINE@304..305 "\n"
+  WHITESPACE@305..309 "    "
+  VERTEX_STMT@309..324
+    NODE_GROUP@309..310
+      NODE@309..310
+        IDENT@309..310 "A"
+    EDGE@310..323
+      STROKE_OPEN@310..312 "--"
+      EDGE_LABEL@312..320
+        LABEL@312..320
+          TEXT@312..320 " inline "
+      STROKE@320..323 "-->"
+    NODE_GROUP@323..324
+      NODE@323..324
+        IDENT@323..324 "B"
+  NEWLINE@324..325 "\n"
+  WHITESPACE@325..329 "    "
+  VERTEX_STMT@329..353
+    NODE_GROUP@329..330
+      NODE@329..330
+        IDENT@329..330 "A"
+    WHITESPACE@330..331 " "
+    EDGE@331..351
+      STROKE_OPEN@331..333 "--"
+      EDGE_LABEL@333..346
+        LABEL@333..346
+          TEXT@333..346 " inline long "
+      STROKE@346..351 "---->"
+    WHITESPACE@351..352 " "
+    NODE_GROUP@352..353
+      NODE@352..353
+        IDENT@352..353 "B"
+  NEWLINE@353..354 "\n"
+  WHITESPACE@354..358 "    "
+  VERTEX_STMT@358..380
+    NODE_GROUP@358..359
+      NODE@358..359
+        IDENT@358..359 "A"
+    WHITESPACE@359..360 " "
+    EDGE@360..378
+      STROKE_OPEN@360..362 "=="
+      EDGE_LABEL@362..375
+        LABEL@362..375
+          TEXT@362..375 " thick label "
+      STROKE@375..378 "==>"
+    WHITESPACE@378..379 " "
+    NODE_GROUP@379..380
+      NODE@379..380
+        IDENT@379..380 "B"
+  NEWLINE@380..381 "\n"
+  WHITESPACE@381..385 "    "
+  VERTEX_STMT@385..408
+    NODE_GROUP@385..386
+      NODE@385..386
+        IDENT@385..386 "A"
+    WHITESPACE@386..387 " "
+    EDGE@387..406
+      STROKE_OPEN@387..389 "-."
+      EDGE_LABEL@389..403
+        LABEL@389..403
+          TEXT@389..403 " dotted label "
+      STROKE@403..406 ".->"
+    WHITESPACE@406..407 " "
+    NODE_GROUP@407..408
+      NODE@407..408
+        IDENT@407..408 "B"
+  NEWLINE@408..409 "\n"
+  WHITESPACE@409..413 "    "
+  VERTEX_STMT@413..440
+    NODE_GROUP@413..414
+      NODE@413..414
+        IDENT@413..414 "A"
+    WHITESPACE@414..415 " "
+    EDGE@415..438
+      STROKE_OPEN@415..417 "--"
+      EDGE_LABEL@417..435
+        LABEL@417..435
+          WHITESPACE@417..418 " "
+          STRING@418..434 "\"quoted -- text\""
+          WHITESPACE@434..435 " "
+      STROKE@435..438 "-->"
+    WHITESPACE@438..439 " "
+    NODE_GROUP@439..440
+      NODE@439..440
+        IDENT@439..440 "B"
+  NEWLINE@440..441 "\n"
+  WHITESPACE@441..445 "    "
+  VERTEX_STMT@445..469
+    NODE_GROUP@445..446
+      NODE@445..446
+        IDENT@445..446 "A"
+    WHITESPACE@446..447 " "
+    EDGE@447..467
+      STROKE@447..450 "-->"
+      EDGE_LABEL@450..467
+        PIPE@450..451 "|"
+        LABEL@451..466
+          STRING@451..466 "\"quoted |pipe|\""
+        PIPE@466..467 "|"
+    WHITESPACE@467..468 " "
+    NODE_GROUP@468..469
+      NODE@468..469
+        IDENT@468..469 "B"
+  NEWLINE@469..470 "\n"
+  WHITESPACE@470..474 "    "
+  VERTEX_STMT@474..484
+    NODE_GROUP@474..475
+      NODE@474..475
+        IDENT@474..475 "A"
+    WHITESPACE@475..476 " "
+    EDGE@476..482
+      EDGE_ID@476..479
+        IDENT@476..478 "e1"
+        AT@478..479 "@"
+      STROKE@479..482 "-->"
+    WHITESPACE@482..483 " "
+    NODE_GROUP@483..484
+      NODE@483..484
+        IDENT@483..484 "B"
+  NEWLINE@484..485 "\n"
+  WHITESPACE@485..489 "    "
+  VERTEX_STMT@489..511
+    NODE_GROUP@489..490
+      NODE@489..490
+        IDENT@489..490 "A"
+    WHITESPACE@490..491 " "
+    EDGE@491..509
+      EDGE_ID@491..494
+        IDENT@491..493 "e2"
+        AT@493..494 "@"
+      STROKE_OPEN@494..496 "--"
+      EDGE_LABEL@496..506
+        LABEL@496..506
+          TEXT@496..506 " labelled "
+      STROKE@506..509 "-->"
+    WHITESPACE@509..510 " "
+    NODE_GROUP@510..511
+      NODE@510..511
+        IDENT@510..511 "B"
+  NEWLINE@511..512 "\n"
+--- diagnostics ---

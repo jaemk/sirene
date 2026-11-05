@@ -1,0 +1,149 @@
+//! Property tests for the flowchart parser: round-trip on arbitrary input (FLOWCH-1) and
+//! diagnostic-free parsing of generated valid documents.
+
+use proptest::prelude::*;
+use sirene_core::flowchart;
+
+/// Strings biased toward Mermaid syntax characters so the parser's branches get exercised.
+fn mermaid_ish() -> impl Strategy<Value = String> {
+    #[rustfmt::skip]
+    let pieces = prop::sample::select(vec![
+        "flowchart", "graph", " LR", " TD", "\n", "\r\n", ";", " ", "\t", "A", "B", "end",
+        "subgraph ", "direction ", "classDef ", "class ", "style ", "linkStyle ", "click ",
+        "accTitle", "accDescr", ":", "{", "}", "[", "]", "(", ")", "|", "\"", "`", "-->", "---",
+        "--", "-.", ".->", "==>", "==", "~~~", "<", ">", "x", "o", "&", ":::", "@{", "@", ",",
+        "%%", "%%{", "}%%", "---\n", "#quot;", "/", "\\", "-", ".", "=", "0", "1", "é", "🐟",
+        "href ", "call ", "default ", "interpolate ",
+    ]);
+    prop::collection::vec(pieces, 0..64).prop_map(|v| v.concat())
+}
+
+#[derive(Debug, Clone)]
+struct Node {
+    id: String,
+    shape: Option<(&'static str, &'static str)>,
+    label: String,
+}
+
+fn node() -> impl Strategy<Value = Node> {
+    let shapes = prop::sample::select(vec![
+        ("[", "]"),
+        ("(", ")"),
+        ("([", "])"),
+        ("[[", "]]"),
+        ("[(", ")]"),
+        ("((", "))"),
+        ("(((", ")))"),
+        (">", "]"),
+        ("{", "}"),
+        ("{{", "}}"),
+        ("[/", "/]"),
+        ("[\\", "\\]"),
+        ("[/", "\\]"),
+        ("[\\", "/]"),
+    ]);
+    (
+        "[a-z][a-z0-9_]{0,6}",
+        prop::option::of(shapes),
+        "[A-Za-z0-9 ]{1,12}",
+    )
+        .prop_filter("keyword id", |(id, _, _)| {
+            !["end", "class", "style", "click", "subgraph", "direction"].contains(&id.as_str())
+        })
+        .prop_map(|(id, shape, label)| Node { id, shape, label })
+}
+
+impl Node {
+    fn render(&self) -> String {
+        match self.shape {
+            Some((open, close)) => format!("{}{open}{}{close}", self.id, self.label),
+            None => self.id.clone(),
+        }
+    }
+}
+
+fn edge() -> impl Strategy<Value = String> {
+    let strokes = prop::sample::select(vec![
+        "-->", "---", "--x", "--o", "<-->", "==>", "===", "-.->", "-.-", "~~~", "---->",
+    ]);
+    let labelled = prop::sample::select(vec![("-- ", " -->"), ("== ", " ==>"), ("-. ", " .->")]);
+    prop_oneof![
+        strokes.clone().prop_map(|s| format!(" {s} ")),
+        (strokes, "[A-Za-z ]{1,10}").prop_map(|(s, l)| format!(" {s}|{l}| ")),
+        (labelled, "[A-Za-z]{1,10}").prop_map(|((o, c), l)| format!(" {o}{l}{c} ")),
+    ]
+}
+
+fn statement() -> impl Strategy<Value = String> {
+    prop_oneof![
+        (node(), prop::collection::vec((edge(), node()), 0..4)).prop_map(|(first, rest)| {
+            let mut s = first.render();
+            for (e, n) in rest {
+                s.push_str(&e);
+                s.push_str(&n.render());
+            }
+            s
+        }),
+        "[a-z]{1,6}".prop_map(|c| format!("classDef {c} fill:#f96,stroke:#333")),
+        "[a-z]{1,6}".prop_map(|c| format!("style {c} fill:#f96")),
+        prop::sample::select(vec!["TB", "TD", "BT", "RL", "LR"])
+            .prop_map(|d| format!("direction {d}")),
+    ]
+}
+
+fn document() -> impl Strategy<Value = String> {
+    (
+        prop::sample::select(vec!["flowchart", "graph"]),
+        prop::sample::select(vec!["", " LR", " TD", " BT", " RL", " TB"]),
+        prop::collection::vec(statement(), 0..12),
+        prop::collection::vec(statement(), 0..4),
+    )
+        .prop_map(|(kw, dir, top, nested)| {
+            let mut s = format!("{kw}{dir}\n");
+            for stmt in top {
+                s.push_str("    ");
+                s.push_str(&stmt);
+                s.push('\n');
+            }
+            if !nested.is_empty() {
+                s.push_str("    subgraph group\n");
+                for stmt in nested {
+                    s.push_str("        ");
+                    s.push_str(&stmt);
+                    s.push('\n');
+                }
+                s.push_str("    end\n");
+            }
+            s
+        })
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(2000))]
+
+    #[test]
+    fn round_trips_arbitrary_text(src in any::<String>()) {
+        prop_assert_eq!(flowchart::parse(&src).syntax().to_string(), src);
+    }
+
+    #[test]
+    fn round_trips_mermaid_like_text(src in mermaid_ish()) {
+        let parse = flowchart::parse(&src);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        for d in parse.diagnostics() {
+            prop_assert!(usize::from(d.range.end()) <= src.len());
+        }
+    }
+
+    #[test]
+    fn generated_documents_parse_cleanly(src in document()) {
+        let parse = flowchart::parse(&src);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        prop_assert!(
+            parse.diagnostics().is_empty(),
+            "{:?}\n{}",
+            parse.diagnostics(),
+            src
+        );
+    }
+}

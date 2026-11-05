@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..52
+  DIRECTIVE@0..26 "%%{init: {\"theme\": \"d ..."
+  NEWLINE@26..27 "\n"
+  HEADER@27..39
+    GRAPH_KW@27..36 "flowchart"
+    WHITESPACE@36..37 " "
+    DIR@37..39 "LR"
+  NEWLINE@39..40 "\n"
+  WHITESPACE@40..44 "    "
+  VERTEX_STMT@44..51
+    NODE_GROUP@44..45
+      NODE@44..45
+        IDENT@44..45 "A"
+    WHITESPACE@45..46 " "
+    EDGE@46..49
+      STROKE@46..49 "-->"
+    WHITESPACE@49..50 " "
+    NODE_GROUP@50..51
+      NODE@50..51
+        IDENT@50..51 "B"
+  NEWLINE@51..52 "\n"
+--- diagnostics ---
+0..3: unclosed directive: expected `}%%`

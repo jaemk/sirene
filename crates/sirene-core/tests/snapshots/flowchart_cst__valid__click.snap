@@ -1,0 +1,111 @@
+---
+source: crates/sirene-core/tests/flowchart_cst.rs
+expression: out
+---
+ROOT@0..354
+  HEADER@0..12
+    GRAPH_KW@0..9 "flowchart"
+    WHITESPACE@9..10 " "
+    DIR@10..12 "LR"
+  NEWLINE@12..13 "\n"
+  WHITESPACE@13..17 "    "
+  VERTEX_STMT@17..22
+    NODE_GROUP@17..18
+      NODE@17..18
+        IDENT@17..18 "A"
+    EDGE@18..21
+      STROKE@18..21 "-->"
+    NODE_GROUP@21..22
+      NODE@21..22
+        IDENT@21..22 "B"
+  NEWLINE@22..23 "\n"
+  WHITESPACE@23..27 "    "
+  CLICK_STMT@27..68
+    CLICK_KW@27..32 "click"
+    WHITESPACE@32..33 " "
+    IDENT@33..34 "A"
+    WHITESPACE@34..35 " "
+    IDENT@35..43 "callback"
+    WHITESPACE@43..44 " "
+    STRING@44..68 "\"Tooltip for a callback\""
+  NEWLINE@68..69 "\n"
+  WHITESPACE@69..73 "    "
+  CLICK_STMT@73..122
+    CLICK_KW@73..78 "click"
+    WHITESPACE@78..79 " "
+    IDENT@79..80 "B"
+    WHITESPACE@80..81 " "
+    STRING@81..105 "\"https://www.github.com\""
+    WHITESPACE@105..106 " "
+    STRING@106..122 "\"This is a link\""
+  NEWLINE@122..123 "\n"
+  WHITESPACE@123..127 "    "
+  CLICK_STMT@127..169
+    CLICK_KW@127..132 "click"
+    WHITESPACE@132..133 " "
+    IDENT@133..134 "C"
+    WHITESPACE@134..135 " "
+    CALL_KW@135..139 "call"
+    WHITESPACE@139..140 " "
+    IDENT@140..148 "callback"
+    L_PAREN@148..149 "("
+    CALLBACK_ARGS@149..158 "\"arg1\", 2"
+    R_PAREN@158..159 ")"
+    WHITESPACE@159..160 " "
+    STRING@160..169 "\"Tooltip\""
+  NEWLINE@169..170 "\n"
+  WHITESPACE@170..174 "    "
+  CLICK_STMT@174..197
+    CLICK_KW@174..179 "click"
+    WHITESPACE@179..180 " "
+    IDENT@180..181 "D"
+    WHITESPACE@181..182 " "
+    CALL_KW@182..186 "call"
+    WHITESPACE@186..187 " "
+    IDENT@187..195 "callback"
+    L_PAREN@195..196 "("
+    R_PAREN@196..197 ")"
+  NEWLINE@197..198 "\n"
+  WHITESPACE@198..202 "    "
+  CLICK_STMT@202..253
+    CLICK_KW@202..207 "click"
+    WHITESPACE@207..208 " "
+    IDENT@208..209 "E"
+    WHITESPACE@209..210 " "
+    HREF_KW@210..214 "href"
+    WHITESPACE@214..215 " "
+    STRING@215..239 "\"https://www.github.com\""
+    WHITESPACE@239..240 " "
+    STRING@240..246 "\"Open\""
+    WHITESPACE@246..247 " "
+    LINK_TARGET@247..253 "_blank"
+  NEWLINE@253..254 "\n"
+  WHITESPACE@254..258 "    "
+  CLICK_STMT@258..295
+    CLICK_KW@258..263 "click"
+    WHITESPACE@263..264 " "
+    IDENT@264..265 "F"
+    WHITESPACE@265..266 " "
+    HREF_KW@266..270 "href"
+    WHITESPACE@270..271 " "
+    STRING@271..295 "\"https://www.github.com\""
+  NEWLINE@295..296 "\n"
+  WHITESPACE@296..300 "    "
+  CLICK_STMT@300..338
+    CLICK_KW@300..305 "click"
+    WHITESPACE@305..306 " "
+    IDENT@306..307 "G"
+    WHITESPACE@307..308 " "
+    STRING@308..332 "\"https://www.github.com\""
+    WHITESPACE@332..333 " "
+    LINK_TARGET@333..338 "_self"
+  NEWLINE@338..339 "\n"
+  WHITESPACE@339..343 "    "
+  CLICK_STMT@343..353
+    CLICK_KW@343..348 "click"
+    WHITESPACE@348..349 " "
+    IDENT@349..350 "H"
+    WHITESPACE@350..351 " "
+    IDENT@351..353 "cb"
+  NEWLINE@353..354 "\n"
+--- diagnostics ---

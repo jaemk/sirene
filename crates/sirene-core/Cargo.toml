@@ -8,3 +8,10 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+rowan = "0.17.0"
+
+[dev-dependencies]
+insta = "1.49.0"
+proptest = "1.11.0"
