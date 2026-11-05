@@ -1,0 +1,10 @@
+[package]
+name = "sirene-core"
+description = "Mermaid parsing, diagram model, and layout for sirene"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
