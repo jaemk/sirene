@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+node A rect "A"
+--- diagnostics ---
+Error 22..22: expected a node after the edge
+Error 32..33: unclosed `|`: expected `|`
+Error 43..43: expected a node after the edge
+Error 50..52: unclosed edge label: expected a closing stroke such as `-->`
+Error 63..63: expected a node after the edge
+Error 70..72: unclosed edge label: expected a closing stroke such as `-->`
+Error 77..81: expected a node after the edge
+Error 90..95: expected a node after `&`
+Error 106..109: `end` is reserved and cannot be a node id
+Error 114..119: expected a statement

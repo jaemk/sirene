@@ -1,0 +1,31 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+accDescr "never closed"
+node A rect "A" click=Callback { name: "cb", args: ["unclosed"] } meta=[("shape", "rect")]
+node B rect "B"
+edge 0 A -> B Normal None/Some(Point) len=1
+edge 1 A -> B Normal None/Some(Point) len=1
+--- diagnostics ---
+Error 25..32: expected newline or `;`
+Error 45..82: expected newline or `;`
+Error 91..91: expected a class name after `:::`
+Error 97..99: unclosed `@{`: expected `}`
+Error 124..124: expected a class name
+Error 146..146: expected style declarations
+Error 158..158: expected a class name
+Error 168..168: expected a node id
+Error 178..178: expected a node id
+Error 190..190: expected style declarations
+Error 204..204: expected `default` or link indexes
+Error 232..232: expected a curve name
+Error 242..242: expected a node id
+Error 254..254: expected a callback, `call`, `href`, or a URL string
+Error 271..271: expected a URL string
+Error 288..288: expected a callback name
+Error 308..309: unclosed `(`: expected `)`
+Error 330..333: expected a callback, `call`, `href`, or a URL string
+Error 347..348: unclosed `{`: expected `}`
+Error 366..374: expected a statement

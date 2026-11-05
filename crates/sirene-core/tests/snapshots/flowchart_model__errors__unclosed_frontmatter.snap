@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction TopBottom
+node title rect "title"
+node flowchart rect "flowchart"
+node A rect "A"
+node B rect "B"
+edge 0 A -> B Normal None/Some(Point) len=1
+--- diagnostics ---
+Error 0..3: unclosed frontmatter: expected a closing `---` line
+Error 4..23: expected `flowchart` or `graph` header
+Error 9..23: expected newline or `;`
+Error 34..36: expected newline or `;`

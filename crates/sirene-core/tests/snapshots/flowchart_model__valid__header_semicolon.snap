@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction TopBottom
+node A rect "A"
+node B rect "B"
+edge 0 A -> B Normal None/Some(Point) len=1
+--- diagnostics ---

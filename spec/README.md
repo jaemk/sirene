@@ -19,7 +19,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | GUI Shell | research | [gui-shell.md](gui-shell.md) |
 | WYSIWYG Editing | research | [wysiwyg-editing.md](wysiwyg-editing.md) |
 | macOS Packaging | research | [macos-packaging.md](macos-packaging.md) |
-| Flowchart Model | pending | [flowchart-model.md](flowchart-model.md) |
+| Flowchart Model | done | [flowchart-model.md](flowchart-model.md) |
 
 ## Conventions
 

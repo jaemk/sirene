@@ -1,0 +1,29 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction TopBottom
+node A rect "A"
+node B rect "B"
+node C rect "C"
+node a rect "a"
+node b rect "b"
+node c rect "c"
+node d rect "d"
+node D rect "D"
+node X rect "x"
+node Y rounded "y"
+node Z diam "z"
+edge 0 A -> B Normal None/Some(Point) len=1 label="text"
+edge 1 B -> C Normal None/Some(Point) len=1 label="text2"
+edge 2 a -> b Normal None/Some(Point) len=1
+edge 3 a -> c Normal None/Some(Point) len=1
+edge 4 b -> d Normal None/Some(Point) len=1
+edge 5 c -> d Normal None/Some(Point) len=1
+edge 6 A -> C Normal None/Some(Point) len=1
+edge 7 A -> D Normal None/Some(Point) len=1
+edge 8 B -> C Normal None/Some(Point) len=1
+edge 9 B -> D Normal None/Some(Point) len=1
+edge 10 X -> Z Normal None/Some(Point) len=1
+edge 11 Y -> Z Normal None/Some(Point) len=1
+--- diagnostics ---

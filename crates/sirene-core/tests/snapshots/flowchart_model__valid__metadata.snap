@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction TopBottom
+node A flip-tri "File {Handling}" md meta=[("shape", "manual-file"), ("label", "File {Handling}")]
+node B docs "B" meta=[("shape", "docs")]
+node C hex "x" md meta=[("shape", "hex"), ("label", "x")]
+node D rect "D"
+node one rect "one" meta=[("view", "collapsed")]
+node E rounded "E" classes=cls meta=[("shape", "rounded")]
+node F doc "multi line" md meta=[("shape", "doc"), ("label", "multi line")]
+edge 0 B -> C Normal None/Some(Point) len=1
+edge 1 B -> D Normal None/Some(Point) len=1
+edge 2 A -> B Thick None/Some(Point) len=1 id=e1 animate
+--- diagnostics ---

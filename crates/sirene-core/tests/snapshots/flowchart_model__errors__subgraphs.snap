@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+node A rect "A"
+node B rect "B"
+edge 0 A -> B Normal None/Some(Point) len=1
+subgraph one "one" dir=None members=[A,B]
+--- diagnostics ---
+Error 17..20: `end` without a matching `subgraph`
+Error 25..33: unclosed `subgraph`: expected `end`
+Error 55..55: expected a direction: TB, TD, BT, RL, or LR
+Error 74..76: expected a direction: TB, TD, BT, RL, or LR

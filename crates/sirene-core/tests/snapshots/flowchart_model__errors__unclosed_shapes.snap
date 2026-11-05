@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+node A rect "half typed"
+node B rounded "wrong close"
+node D rect "unclosed string"
+node E rect "E"
+node F rect "F"
+edge 0 E -> F Normal None/Some(Point) len=1
+--- diagnostics ---
+Error 18..19: unclosed `[`: expected `]`
+Error 35..36: unclosed `(`: expected `)`
+Error 47..54: expected newline or `;`
+Error 60..61: unclosed `[`: expected `]`
+Error 61..62: unclosed string: expected `"`

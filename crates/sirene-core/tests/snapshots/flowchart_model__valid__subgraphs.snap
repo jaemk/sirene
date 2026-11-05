@@ -1,0 +1,25 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+node c1 rect "c1"
+node a2 rect "a2"
+node a1 rect "a1"
+node i1 rect "i1"
+node f1 rect "f1"
+node x rect "x"
+node y rect "y"
+node z rect "z"
+edge 0 c1 -> a2 Normal None/Some(Point) len=1
+edge 1 a1 -> a2 Normal None/Some(Point) len=1
+edge 2 i1 -> f1 Normal None/Some(Point) len=1
+edge 3 one -> ide1 Normal None/Some(Point) len=1
+edge 4 ide1 -> c1 Normal None/Some(Point) len=1
+subgraph one "one" dir=None members=[a1,a2]
+subgraph ide1 "titled one" dir=Some(TopBottom) members=[inner]
+subgraph inner "quoted title" dir=Some(RightLeft) members=[i1,f1]
+subgraph subGraph3 "Title With Spaces" dir=None members=[x]
+subgraph subGraph4 "Only a string" dir=None members=[y]
+subgraph subGraph5 "" dir=None members=[z]
+--- diagnostics ---

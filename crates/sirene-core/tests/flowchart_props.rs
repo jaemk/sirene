@@ -2,7 +2,8 @@
 //! diagnostic-free parsing of generated valid documents.
 
 use proptest::prelude::*;
-use sirene_core::flowchart;
+use sirene_core::flowchart::{self, Flowchart};
+use sirene_core::{Severity, TextSize};
 
 /// Strings biased toward Mermaid syntax characters so the parser's branches get exercised.
 fn mermaid_ish() -> impl Strategy<Value = String> {
@@ -118,12 +119,42 @@ fn document() -> impl Strategy<Value = String> {
         })
 }
 
+/// Structural invariants of any lowered model (FLOWMO-4, FLOWMO-8, FLOWMO-10).
+fn check_model(c: &Flowchart) -> Result<(), TestCaseError> {
+    let mut ids: Vec<&str> = c.nodes.iter().map(|n| n.id.as_str()).collect();
+    ids.extend(c.subgraphs.iter().map(|s| s.id.as_str()));
+    let count = ids.len();
+    ids.sort_unstable();
+    ids.dedup();
+    prop_assert_eq!(ids.len(), count, "node and subgraph ids must be unique");
+    let known = |id: &str| ids.binary_search(&id).is_ok();
+    for e in &c.edges {
+        prop_assert!(known(&e.from) && known(&e.to), "dangling edge {:?}", e);
+        prop_assert!((1..=10).contains(&e.length));
+    }
+    let mut members = Vec::new();
+    for s in &c.subgraphs {
+        for m in &s.members {
+            prop_assert!(known(m), "unknown member {} of {}", m, s.id);
+            prop_assert_ne!(m, &s.id);
+            members.push(m.as_str());
+        }
+    }
+    let count = members.len();
+    members.sort_unstable();
+    members.dedup();
+    prop_assert_eq!(members.len(), count, "a member belongs to one subgraph");
+    Ok(())
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2000))]
 
     #[test]
     fn round_trips_arbitrary_text(src in any::<String>()) {
-        prop_assert_eq!(flowchart::parse(&src).syntax().to_string(), src);
+        let parse = flowchart::parse(&src);
+        prop_assert_eq!(parse.syntax().to_string(), src);
+        check_model(&parse.lower().flowchart)?;
     }
 
     #[test]
@@ -132,6 +163,11 @@ proptest! {
         prop_assert_eq!(parse.syntax().to_string(), src.clone());
         for d in parse.diagnostics() {
             prop_assert!(usize::from(d.range.end()) <= src.len());
+        }
+        let lowered = parse.lower();
+        check_model(&lowered.flowchart)?;
+        for d in &lowered.diagnostics {
+            prop_assert!(d.range.end() <= TextSize::of(src.as_str()));
         }
     }
 
@@ -145,5 +181,14 @@ proptest! {
             parse.diagnostics(),
             src
         );
+        // Generated `style` and top-level `direction` statements may draw warnings.
+        let lowered = parse.lower();
+        prop_assert!(
+            lowered.diagnostics.iter().all(|d| d.severity == Severity::Warning),
+            "{:?}\n{}",
+            lowered.diagnostics,
+            src
+        );
+        check_model(&lowered.flowchart)?;
     }
 }

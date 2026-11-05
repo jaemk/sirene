@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+defaultCurve "basis"
+defaultEdgeStyle stroke:gray
+node A rect "A" classes=someclass,other style=fill:#bbf;stroke:#f66;stroke-width:2px;color:#fff;stroke-dasharray:5 5
+node B rect "B" classes=other
+node D rect "D"
+node E rect "E"
+node F rect "F"
+node C rect "label" classes=other
+edge 0 A -> B Normal None/Some(Point) len=1 style=stroke:#ff3;stroke-width:4px;color:red
+edge 1 B -> D Normal None/Some(Point) len=1 style=color:blue
+edge 2 D -> E Normal None/Some(Point) len=1 style=color:blue
+edge 3 E -> F Normal None/Some(Point) len=1 style=stroke:green curve=cardinal
+classDef someclass fill:#f96
+classDef a stroke:#333;stroke-width:4px
+classDef b stroke:#333;stroke-width:4px
+classDef animate stroke-dasharray:9,5;animation:dash 25s linear infinite
+--- diagnostics ---

@@ -2,14 +2,14 @@
 source: crates/sirene-core/tests/flowchart_cst.rs
 expression: out
 ---
-ROOT@0..533
+ROOT@0..551
   HEADER@0..12
     GRAPH_KW@0..9 "flowchart"
     WHITESPACE@9..10 " "
     DIR@10..12 "LR"
   NEWLINE@12..13 "\n"
   WHITESPACE@13..17 "    "
-  VERTEX_STMT@17..36
+  VERTEX_STMT@17..54
     NODE_GROUP@17..30
       NODE@17..30
         IDENT@17..18 "A"
@@ -23,122 +23,143 @@ ROOT@0..533
     NODE_GROUP@35..36
       NODE@35..36
         IDENT@35..36 "B"
-  NEWLINE@36..37 "\n"
-  WHITESPACE@37..41 "    "
-  VERTEX_STMT@41..57
-    NODE_GROUP@41..57
-      NODE@41..57
-        IDENT@41..42 "C"
-        SHAPE@42..49
-          SHAPE_OPEN@42..43 "["
-          LABEL@43..48
-            TEXT@43..48 "label"
-          SHAPE_CLOSE@48..49 "]"
-        CLASS_SHORTHAND@49..57
-          TRIPLE_COLON@49..52 ":::"
-          IDENT@52..57 "other"
-  NEWLINE@57..58 "\n"
-  WHITESPACE@58..62 "    "
-  CLASSDEF_STMT@62..90
-    CLASSDEF_KW@62..70 "classDef"
-    WHITESPACE@70..71 " "
-    ID_LIST@71..80
-      IDENT@71..80 "someclass"
-    WHITESPACE@80..81 " "
-    STYLE_TEXT@81..90 "fill:#f96"
-  NEWLINE@90..91 "\n"
-  WHITESPACE@91..95 "    "
-  CLASSDEF_STMT@95..136
-    CLASSDEF_KW@95..103 "classDef"
-    WHITESPACE@103..104 " "
-    ID_LIST@104..107
-      IDENT@104..105 "a"
-      COMMA@105..106 ","
-      IDENT@106..107 "b"
-    WHITESPACE@107..108 " "
-    STYLE_TEXT@108..136 "stroke:#333,stroke-wi ..."
-  SEMI@136..137 ";"
-  NEWLINE@137..138 "\n"
-  WHITESPACE@138..142 "    "
-  CLASSDEF_STMT@142..217
-    CLASSDEF_KW@142..150 "classDef"
-    WHITESPACE@150..151 " "
-    ID_LIST@151..158
-      IDENT@151..158 "animate"
-    WHITESPACE@158..159 " "
-    STYLE_TEXT@159..217 "stroke-dasharray: 9\\, ..."
-  SEMI@217..218 ";"
-  NEWLINE@218..219 "\n"
-  WHITESPACE@219..223 "    "
-  CLASS_STMT@223..238
-    CLASS_KW@223..228 "class"
-    WHITESPACE@228..229 " "
-    ID_LIST@229..232
-      IDENT@229..230 "A"
-      COMMA@230..231 ","
-      IDENT@231..232 "B"
-    WHITESPACE@232..233 " "
-    IDENT@233..238 "other"
-  NEWLINE@238..239 "\n"
-  WHITESPACE@239..243 "    "
-  STYLE_STMT@243..322
-    STYLE_KW@243..248 "style"
-    WHITESPACE@248..249 " "
-    IDENT@249..250 "A"
+    WHITESPACE@36..37 " "
+    EDGE@37..40
+      STROKE@37..40 "-->"
+    WHITESPACE@40..41 " "
+    NODE_GROUP@41..42
+      NODE@41..42
+        IDENT@41..42 "D"
+    WHITESPACE@42..43 " "
+    EDGE@43..46
+      STROKE@43..46 "-->"
+    WHITESPACE@46..47 " "
+    NODE_GROUP@47..48
+      NODE@47..48
+        IDENT@47..48 "E"
+    WHITESPACE@48..49 " "
+    EDGE@49..52
+      STROKE@49..52 "-->"
+    WHITESPACE@52..53 " "
+    NODE_GROUP@53..54
+      NODE@53..54
+        IDENT@53..54 "F"
+  NEWLINE@54..55 "\n"
+  WHITESPACE@55..59 "    "
+  VERTEX_STMT@59..75
+    NODE_GROUP@59..75
+      NODE@59..75
+        IDENT@59..60 "C"
+        SHAPE@60..67
+          SHAPE_OPEN@60..61 "["
+          LABEL@61..66
+            TEXT@61..66 "label"
+          SHAPE_CLOSE@66..67 "]"
+        CLASS_SHORTHAND@67..75
+          TRIPLE_COLON@67..70 ":::"
+          IDENT@70..75 "other"
+  NEWLINE@75..76 "\n"
+  WHITESPACE@76..80 "    "
+  CLASSDEF_STMT@80..108
+    CLASSDEF_KW@80..88 "classDef"
+    WHITESPACE@88..89 " "
+    ID_LIST@89..98
+      IDENT@89..98 "someclass"
+    WHITESPACE@98..99 " "
+    STYLE_TEXT@99..108 "fill:#f96"
+  NEWLINE@108..109 "\n"
+  WHITESPACE@109..113 "    "
+  CLASSDEF_STMT@113..154
+    CLASSDEF_KW@113..121 "classDef"
+    WHITESPACE@121..122 " "
+    ID_LIST@122..125
+      IDENT@122..123 "a"
+      COMMA@123..124 ","
+      IDENT@124..125 "b"
+    WHITESPACE@125..126 " "
+    STYLE_TEXT@126..154 "stroke:#333,stroke-wi ..."
+  SEMI@154..155 ";"
+  NEWLINE@155..156 "\n"
+  WHITESPACE@156..160 "    "
+  CLASSDEF_STMT@160..235
+    CLASSDEF_KW@160..168 "classDef"
+    WHITESPACE@168..169 " "
+    ID_LIST@169..176
+      IDENT@169..176 "animate"
+    WHITESPACE@176..177 " "
+    STYLE_TEXT@177..235 "stroke-dasharray: 9\\, ..."
+  SEMI@235..236 ";"
+  NEWLINE@236..237 "\n"
+  WHITESPACE@237..241 "    "
+  CLASS_STMT@241..256
+    CLASS_KW@241..246 "class"
+    WHITESPACE@246..247 " "
+    ID_LIST@247..250
+      IDENT@247..248 "A"
+      COMMA@248..249 ","
+      IDENT@249..250 "B"
     WHITESPACE@250..251 " "
-    STYLE_TEXT@251..322 "fill:#bbf,stroke:#f66 ..."
-  NEWLINE@322..323 "\n"
-  WHITESPACE@323..327 "    "
-  LINKSTYLE_STMT@327..377
-    LINKSTYLE_KW@327..336 "linkStyle"
-    WHITESPACE@336..337 " "
-    ID_LIST@337..338
-      NUMBER@337..338 "0"
-    WHITESPACE@338..339 " "
-    STYLE_TEXT@339..377 "stroke:#ff3,stroke-wi ..."
-  SEMI@377..378 ";"
-  NEWLINE@378..379 "\n"
-  WHITESPACE@379..383 "    "
-  LINKSTYLE_STMT@383..407
-    LINKSTYLE_KW@383..392 "linkStyle"
-    WHITESPACE@392..393 " "
-    ID_LIST@393..396
-      NUMBER@393..394 "1"
-      COMMA@394..395 ","
-      NUMBER@395..396 "2"
-    WHITESPACE@396..397 " "
-    STYLE_TEXT@397..407 "color:blue"
-  SEMI@407..408 ";"
-  NEWLINE@408..409 "\n"
-  WHITESPACE@409..413 "    "
-  LINKSTYLE_STMT@413..448
-    LINKSTYLE_KW@413..422 "linkStyle"
-    WHITESPACE@422..423 " "
-    DEFAULT_KW@423..430 "default"
-    WHITESPACE@430..431 " "
-    INTERPOLATE_KW@431..442 "interpolate"
-    WHITESPACE@442..443 " "
-    IDENT@443..448 "basis"
-  NEWLINE@448..449 "\n"
-  WHITESPACE@449..453 "    "
-  LINKSTYLE_STMT@453..498
-    LINKSTYLE_KW@453..462 "linkStyle"
-    WHITESPACE@462..463 " "
-    ID_LIST@463..464
-      NUMBER@463..464 "3"
-    WHITESPACE@464..465 " "
-    INTERPOLATE_KW@465..476 "interpolate"
-    WHITESPACE@476..477 " "
-    IDENT@477..485 "cardinal"
-    WHITESPACE@485..486 " "
-    STYLE_TEXT@486..498 "stroke:green"
-  NEWLINE@498..499 "\n"
-  WHITESPACE@499..503 "    "
-  LINKSTYLE_STMT@503..532
-    LINKSTYLE_KW@503..512 "linkStyle"
-    WHITESPACE@512..513 " "
-    DEFAULT_KW@513..520 "default"
-    WHITESPACE@520..521 " "
-    STYLE_TEXT@521..532 "stroke:gray"
-  NEWLINE@532..533 "\n"
+    IDENT@251..256 "other"
+  NEWLINE@256..257 "\n"
+  WHITESPACE@257..261 "    "
+  STYLE_STMT@261..340
+    STYLE_KW@261..266 "style"
+    WHITESPACE@266..267 " "
+    IDENT@267..268 "A"
+    WHITESPACE@268..269 " "
+    STYLE_TEXT@269..340 "fill:#bbf,stroke:#f66 ..."
+  NEWLINE@340..341 "\n"
+  WHITESPACE@341..345 "    "
+  LINKSTYLE_STMT@345..395
+    LINKSTYLE_KW@345..354 "linkStyle"
+    WHITESPACE@354..355 " "
+    ID_LIST@355..356
+      NUMBER@355..356 "0"
+    WHITESPACE@356..357 " "
+    STYLE_TEXT@357..395 "stroke:#ff3,stroke-wi ..."
+  SEMI@395..396 ";"
+  NEWLINE@396..397 "\n"
+  WHITESPACE@397..401 "    "
+  LINKSTYLE_STMT@401..425
+    LINKSTYLE_KW@401..410 "linkStyle"
+    WHITESPACE@410..411 " "
+    ID_LIST@411..414
+      NUMBER@411..412 "1"
+      COMMA@412..413 ","
+      NUMBER@413..414 "2"
+    WHITESPACE@414..415 " "
+    STYLE_TEXT@415..425 "color:blue"
+  SEMI@425..426 ";"
+  NEWLINE@426..427 "\n"
+  WHITESPACE@427..431 "    "
+  LINKSTYLE_STMT@431..466
+    LINKSTYLE_KW@431..440 "linkStyle"
+    WHITESPACE@440..441 " "
+    DEFAULT_KW@441..448 "default"
+    WHITESPACE@448..449 " "
+    INTERPOLATE_KW@449..460 "interpolate"
+    WHITESPACE@460..461 " "
+    IDENT@461..466 "basis"
+  NEWLINE@466..467 "\n"
+  WHITESPACE@467..471 "    "
+  LINKSTYLE_STMT@471..516
+    LINKSTYLE_KW@471..480 "linkStyle"
+    WHITESPACE@480..481 " "
+    ID_LIST@481..482
+      NUMBER@481..482 "3"
+    WHITESPACE@482..483 " "
+    INTERPOLATE_KW@483..494 "interpolate"
+    WHITESPACE@494..495 " "
+    IDENT@495..503 "cardinal"
+    WHITESPACE@503..504 " "
+    STYLE_TEXT@504..516 "stroke:green"
+  NEWLINE@516..517 "\n"
+  WHITESPACE@517..521 "    "
+  LINKSTYLE_STMT@521..550
+    LINKSTYLE_KW@521..530 "linkStyle"
+    WHITESPACE@530..531 " "
+    DEFAULT_KW@531..538 "default"
+    WHITESPACE@538..539 " "
+    STYLE_TEXT@539..550 "stroke:gray"
+  NEWLINE@550..551 "\n"
 --- diagnostics ---

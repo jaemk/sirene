@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction TopBottom
+node A rect "Start"
+node B diam "Is it?"
+node C rect "OK"
+node D rect "Rethink"
+node E rect "End"
+edge 0 A -> B Normal None/Some(Point) len=1
+edge 1 B -> C Normal None/Some(Point) len=1 label="Yes"
+edge 2 C -> D Normal None/Some(Point) len=1
+edge 3 D -> B Normal None/Some(Point) len=1
+edge 4 B -> E Normal None/Some(Point) len=3 label="No"
+--- diagnostics ---

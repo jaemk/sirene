@@ -1,0 +1,37 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+node A rect "A"
+node B rect "B"
+edge 0 A -> B Normal None/Some(Point) len=1
+edge 1 A -> B Normal None/None len=1
+edge 2 A -> B Normal None/Some(Point) len=3
+edge 3 A -> B Normal None/Some(Cross) len=1
+edge 4 A -> B Normal None/Some(Circle) len=1
+edge 5 A -> B Normal Some(Point)/Some(Point) len=1
+edge 6 A -> B Normal Some(Cross)/Some(Cross) len=1
+edge 7 A -> B Normal Some(Circle)/Some(Circle) len=1
+edge 8 A -> B Thick None/Some(Point) len=1
+edge 9 A -> B Thick None/None len=1
+edge 10 A -> B Thick None/Some(Point) len=3
+edge 11 A -> B Thick Some(Point)/Some(Point) len=1
+edge 12 A -> B Dotted None/Some(Point) len=1
+edge 13 A -> B Dotted None/None len=1
+edge 14 A -> B Dotted None/Some(Point) len=3
+edge 15 A -> B Dotted Some(Point)/Some(Point) len=1
+edge 16 A -> B Invisible None/None len=1
+edge 17 A -> B Invisible None/None len=3
+edge 18 A -> B Normal None/None len=1 label="open label"
+edge 19 A -> B Normal None/Some(Point) len=1 label="arrow label"
+edge 20 A -> B Normal None/Some(Point) len=1 label="spaced"
+edge 21 A -> B Normal None/Some(Point) len=1 label="inline"
+edge 22 A -> B Normal None/Some(Point) len=3 label="inline long"
+edge 23 A -> B Thick None/Some(Point) len=1 label="thick label"
+edge 24 A -> B Dotted None/Some(Point) len=1 label="dotted label"
+edge 25 A -> B Normal None/Some(Point) len=1 label="quoted -- text"
+edge 26 A -> B Normal None/Some(Point) len=1 label="quoted |pipe|"
+edge 27 A -> B Normal None/Some(Point) len=1 id=e1
+edge 28 A -> B Normal None/Some(Point) len=1 id=e2 label="labelled"
+--- diagnostics ---

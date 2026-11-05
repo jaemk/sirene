@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction TopBottom
+node id1 rect "This is the (text) in the box"
+node A rect "A double quote:\""
+node B rect "A dec char:♥"
+node md rect "**bold** and _italic_" md
+node uni rect "Ünïcödé 🐟 text"
+node multi rect "first\nsecond"
+node spaced rect "padded label"
+node endpoint rect "endpoint"
+node classes rect "classes"
+edge 0 A -> B Normal None/Some(Point) len=1
+edge 1 endpoint -> classes Normal None/Some(Point) len=1
+--- diagnostics ---

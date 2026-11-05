@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+node A rect "A" click=Callback { name: "callback", args: [] } tooltip="Tooltip for a callback"
+node B rect "B" click=Link { url: "https://www.github.com", target: None } tooltip="This is a link"
+node C rect "C" click=Callback { name: "callback", args: ["arg1", "2"] } tooltip="Tooltip"
+node D rect "D" click=Callback { name: "callback", args: [] }
+node E rect "E" click=Link { url: "https://www.github.com", target: Some("_blank") } tooltip="Open"
+node F rect "F" click=Link { url: "https://www.github.com", target: None }
+node G rect "G" click=Link { url: "https://www.github.com", target: Some("_self") }
+node H rect "H" click=Callback { name: "cb", args: [] }
+edge 0 A -> B Normal None/Some(Point) len=1
+--- diagnostics ---

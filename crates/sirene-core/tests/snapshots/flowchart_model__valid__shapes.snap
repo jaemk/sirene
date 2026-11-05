@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/flowchart_model.rs
+expression: render(&src)
+---
+direction LeftRight
+node rect rect "rect"
+node round rounded "round"
+node stadium stadium "stadium"
+node subroutine fr-rect "subroutine"
+node cylinder cyl "cylinder"
+node circle circle "circle"
+node dbl dbl-circ "double circle"
+node ellipse ellipse "ellipse"
+node odd odd "odd"
+node diamond diam "diamond"
+node hexagon hex "hexagon"
+node leanR lean-r "lean right"
+node leanL lean-l "lean left"
+node trap trap-b "trapezoid"
+node invTrap trap-t "inverted trapezoid"
+node bare rect "bare"
+--- diagnostics ---
