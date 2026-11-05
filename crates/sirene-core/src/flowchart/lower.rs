@@ -400,6 +400,13 @@ impl Lowerer {
             if *m == id {
                 continue;
             }
+            if self.nested_in(&id, std::slice::from_ref(m)) {
+                self.warning(
+                    header.text_range(),
+                    format!("subgraph `{m}` cannot be nested in its own descendant `{id}`"),
+                );
+                continue;
+            }
             match self.owner(m) {
                 Some(owner) => {
                     if owner != id && !self.nested_in(&owner, &members) {

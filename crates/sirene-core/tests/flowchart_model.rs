@@ -546,6 +546,22 @@ fn repeated_subgraph_id_merges() {
 }
 
 #[test]
+fn repeated_subgraph_id_cannot_contain_its_ancestor() {
+    let src = "flowchart\nsubgraph a\nsubgraph b\nend\nend\nsubgraph b\na\nC\nend\n";
+    let lowered = lower(src);
+    let c = &lowered.flowchart;
+    assert_eq!(c.subgraph("a").unwrap().members, ["b"]);
+    assert_eq!(c.subgraph("b").unwrap().members, ["C"]);
+    assert_eq!(
+        messages(src),
+        [(
+            Severity::Warning,
+            "subgraph `a` cannot be nested in its own descendant `b`".into()
+        )]
+    );
+}
+
+#[test]
 fn subgraph_is_not_its_own_member() {
     let c = chart("flowchart\nsubgraph s\ns --> A\nend\n");
     assert_eq!(c.subgraph("s").unwrap().members, ["A"]);

@@ -132,7 +132,8 @@ order their `end`s appear:
 
 - a member already belonging to an earlier-resolved subgraph stays there and is dropped from this
   one; when that earlier subgraph is not nested inside this one, the drop is a warning;
-- a subgraph is never its own member;
+- a subgraph is never its own member, and a subgraph that already contains this one (at any
+  depth) is dropped with a warning;
 - a second subgraph with an existing id adds its members to the first and keeps the first's
   title and direction.
 

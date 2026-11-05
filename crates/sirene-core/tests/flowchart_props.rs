@@ -144,6 +144,16 @@ fn check_model(c: &Flowchart) -> Result<(), TestCaseError> {
     members.sort_unstable();
     members.dedup();
     prop_assert_eq!(members.len(), count, "a member belongs to one subgraph");
+    for s in &c.subgraphs {
+        let mut current = c.parent(&s.id);
+        let mut depth = 0;
+        while let Some(p) = current {
+            prop_assert_ne!(&p.id, &s.id, "subgraph nesting has a cycle");
+            depth += 1;
+            prop_assert!(depth <= c.subgraphs.len(), "subgraph nesting has a cycle");
+            current = c.parent(&p.id);
+        }
+    }
     Ok(())
 }
 
