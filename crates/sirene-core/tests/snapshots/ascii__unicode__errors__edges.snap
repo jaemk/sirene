@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart LR\n    A -->\n    A -->|no close B\n    A -- no close B\n    A -- bad -- B\n    A & --> B\n    A --> end\n    --> B\n"
+---
+┌───┐
+│ A │
+└───┘

@@ -1,0 +1,21 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart TD\n    A@{ shape: manual-file, label: \"File {Handling}\" }\n    B@{ shape: docs } --> C@{ shape: hex, label: \"x\" } & D\n    A e1@==> B\n    e1@{ animate: true }\n    one@{ view: collapsed }\n    E:::cls@{ shape: rounded }\n    F@{\n      shape: doc\n      label: \"multi line\"\n    }\n"
+---
+┌─────────────────┐   ┌─────┐   ╭───╮   ┌────────────┐
+│ File {Handling} │   │ one │   │ E │   │ multi line │
+└────────┬────────┘   └─────┘   ╰───╯   └────────────┘
+         ┃
+         ▼
+       ┌───┐
+       │ B │
+       └┬─┬┘
+        │ │
+      ┌─┘ └─┐
+      │     │
+      │     │
+     ┌┘     └┐
+     ▼       ▼
+   ╱───╲   ┌───┐
+   < x >   │ D │
+   ╲───╱   └───┘

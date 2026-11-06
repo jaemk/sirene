@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart LR\n    end\n    subgraph one\n        direction\n        direction XY\n        A --> B\n"
+---
+┌─ one ────────────┐
+│  ┌───┐    ┌───┐  │
+│  │ A ├───►│ B │  │
+│  └───┘    └───┘  │
+└──────────────────┘

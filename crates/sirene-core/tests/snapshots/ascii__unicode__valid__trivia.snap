@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "---\ntitle: Trivia\nconfig:\n  theme: forest\n---\n%%{init: {\"flowchart\": {\"curve\": \"linear\"}} }%%\n%% a comment before the header\nflowchart LR\n    %% an indented comment\n    A --> B;B --> C;\n\n    %%{ multi\n      line directive }%%\n    C --> D\n"
+---
+             Trivia
+
+┌───┐    ┌───┐    ┌───┐    ┌───┐
+│ A ├───►│ B ├───►│ C ├───►│ D │
+└───┘    └───┘    └───┘    └───┘

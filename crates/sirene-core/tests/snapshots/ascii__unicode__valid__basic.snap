@@ -1,0 +1,37 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart TD\n    A[Start] --> B{Is it?}\n    B -->|Yes| C[OK]\n    C --> D[Rethink]\n    D --> B\n    B ---->|No| E[End]\n"
+---
+     ┌───────┐
+     │ Start │
+     └───┬───┘
+         │
+         ▼
+    ╱────────╲
+    │ Is it? │
+    ╲─┬────┬─╱
+      │  ▲ │
+    ┌─┘  │ └────┐
+    │    │      │
+   Yes   │      │
+    │    │      │
+   ┌┘    │      │
+   ▼     │      │
+┌────┐   │      │
+│ OK │   │      │
+└──┬─┘   │      │
+   │     │      │
+   └┐    │      │
+    │    │      │
+    │    │     No
+    │    │      │
+    └┐   │      │
+     ▼   │      │
+  ┌──────┴──┐   │
+  │ Rethink │   │
+  └─────────┘   │
+                │
+                ▼
+             ┌─────┐
+             │ End │
+             └─────┘

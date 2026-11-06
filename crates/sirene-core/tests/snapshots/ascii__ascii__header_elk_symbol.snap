@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart-elk >\n    A --> B\n"
+---
++---+    +---+
+| A +--->| B |
++---+    +---+

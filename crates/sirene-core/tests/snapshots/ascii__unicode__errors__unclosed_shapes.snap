@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart LR\n    A[half typed\n    B(wrong close] --> C\n    D[\"unclosed string\n    E --> F\n"
+---
+  ┌────────────┐
+  │ half typed │
+  └────────────┘
+
+  ╭─────────────╮
+  │ wrong close │
+  ╰─────────────╯
+
+┌─────────────────┐
+│ unclosed string │
+└─────────────────┘
+
+       ┌───┐           ┌───┐
+       │ E ├──────────►│ F │
+       └───┘           └───┘

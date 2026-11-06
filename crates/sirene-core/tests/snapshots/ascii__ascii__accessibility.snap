@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart LR\n    accTitle: Big decisions\n    accDescr : Bob's burger's flowchart\n    accDescr {\n        A multi-line\n        description\n    }\n    A --> B\n"
+---
++---+    +---+
+| A +--->| B |
++---+    +---+

@@ -11,6 +11,7 @@ workspace = true
 
 [dependencies]
 rowan = "0.17.0"
+unicode-width = "0.2.3"
 
 [dev-dependencies]
 insta = "1.49.0"

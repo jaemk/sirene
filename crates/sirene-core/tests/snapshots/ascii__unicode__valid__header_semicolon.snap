@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "graph TD;A-->B;\n"
+---
+┌───┐
+│ A │
+└─┬─┘
+  │
+  ▼
+┌───┐
+│ B │
+└───┘

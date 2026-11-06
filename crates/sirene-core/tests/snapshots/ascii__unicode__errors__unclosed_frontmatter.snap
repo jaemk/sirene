@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "---\ntitle: never closed\nflowchart LR\n    A --> B\n"
+---
+┌───────┐   ┌───────────┐   ┌───┐
+│ title │   │ flowchart │   │ A │
+└───────┘   └───────────┘   └─┬─┘
+                              │
+                              ▼
+                            ┌───┐
+                            │ B │
+                            └───┘

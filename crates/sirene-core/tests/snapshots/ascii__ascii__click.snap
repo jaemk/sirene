@@ -1,0 +1,31 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart LR\n    A-->B\n    C & D & E & F & G & H\n    click A callback \"Tooltip for a callback\"\n    click B \"https://www.github.com\" \"This is a link\"\n    click C call callback(\"arg1\", 2) \"Tooltip\"\n    click D call callback()\n    click E href \"https://www.github.com\" \"Open\" _blank\n    click F href \"https://www.github.com\"\n    click G \"https://www.github.com\" _self\n    click H cb\n"
+---
++---+    +---+
+| A +--->| B |
++---+    +---+
+
++---+
+| C |
++---+
+
++---+
+| D |
++---+
+
++---+
+| E |
++---+
+
++---+
+| F |
++---+
+
++---+
+| G |
++---+
+
++---+
+| H |
++---+

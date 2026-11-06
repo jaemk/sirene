@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart XY\n    A --> B\nflowchart LR A\n"
+---
+┌───┐   ┌───────────┐
+│ A │   │ flowchart │
+└─┬─┘   └───────────┘
+  │
+  ▼
+┌───┐
+│ B │
+└───┘

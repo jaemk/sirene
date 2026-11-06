@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "A --> B\n"
+---
+┌───┐
+│ A │
+└─┬─┘
+  │
+  ▼
+┌───┐
+│ B │
+└───┘

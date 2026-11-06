@@ -1,0 +1,68 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart LR\n    rect[rect]\n    round(round)\n    stadium([stadium])\n    subroutine[[subroutine]]\n    cylinder[(cylinder)]\n    circle((circle))\n    dbl(((double circle)))\n    ellipse(-ellipse-)\n    odd>odd]\n    diamond{diamond}\n    hexagon{{hexagon}}\n    leanR[/lean right/]\n    leanL[\\lean left\\]\n    trap[/trapezoid\\]\n    invTrap[\\inverted trapezoid/]\n    bare\n"
+---
+       ┌──────┐
+       │ rect │
+       └──────┘
+
+      ╭───────╮
+      │ round │
+      ╰───────╯
+
+     ╭─────────╮
+     ( stadium )
+     ╰─────────╯
+
+   ┌┬────────────┬┐
+   ││ subroutine ││
+   └┴────────────┴┘
+
+     ╭──────────╮
+     ├──────────┤
+     │ cylinder │
+     ╰──────────╯
+
+      ╭────────╮
+      ( circle )
+      ╰────────╯
+
+  ╔═══════════════╗
+  ║ double circle ║
+  ╚═══════════════╝
+
+     ╭─────────╮
+     ( ellipse )
+     ╰─────────╯
+
+       ┌─────┐
+       > odd │
+       └─────┘
+
+     ╱─────────╲
+     │ diamond │
+     ╲─────────╱
+
+     ╱─────────╲
+     < hexagon >
+     ╲─────────╱
+
+    ┌────────────┐
+    ╱ lean right ╱
+    └────────────┘
+
+    ┌───────────┐
+    ╲ lean left ╲
+    └───────────┘
+
+    ┌───────────┐
+    ╱ trapezoid ╲
+    └───────────┘
+
+┌────────────────────┐
+╲ inverted trapezoid ╱
+└────────────────────┘
+
+       ┌──────┐
+       │ bare │
+       └──────┘

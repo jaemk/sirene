@@ -1,5 +1,6 @@
 //! Mermaid flowchart parsing and lowering.
 
+mod graph;
 mod lower;
 mod model;
 mod parser;
@@ -9,6 +10,7 @@ mod text;
 
 use rowan::GreenNode;
 
+pub use graph::Measure;
 pub use model::{
     Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Metadata, Node, Shape, Stroke,
     Style, Subgraph,

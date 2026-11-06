@@ -1,0 +1,11 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart LR\n    A:::someclass --> B --> D --> E --> F\n    C[label]:::other\n    classDef someclass fill:#f96\n    classDef a,b stroke:#333,stroke-width:4px;\n    classDef animate stroke-dasharray: 9\\,5,animation: dash 25s linear infinite;\n    class A,B other\n    style A fill:#bbf,stroke:#f66,stroke-width:2px,color:#fff,stroke-dasharray: 5 5\n    linkStyle 0 stroke:#ff3,stroke-width:4px,color:red;\n    linkStyle 1,2 color:blue;\n    linkStyle default interpolate basis\n    linkStyle 3 interpolate cardinal stroke:green\n    linkStyle default stroke:gray\n"
+---
+  +---+      +---+    +---+    +---+    +---+
+  | A +----->| B +--->| D +--->| E +--->| F |
+  +---+      +---+    +---+    +---+    +---+
+
++-------+
+| label |
++-------+

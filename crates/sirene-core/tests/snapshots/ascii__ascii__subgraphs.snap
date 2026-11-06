@@ -1,0 +1,29 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart LR\n    c1-->a2\n    subgraph one\n        a1-->a2\n    end\n    subgraph ide1 [titled one]\n        direction TB\n        subgraph inner[\"quoted title\"]\n            direction RL\n            i1 --> f1\n        end\n    end\n    subgraph Title With Spaces\n        x\n    end\n    subgraph \"Only a string\"\n        y\n    end\n    subgraph\n        z\n    end\n    one --> ide1 --> c1\n"
+---
+                             +- one ---------------+
+                           +-+-----------+ +----+  |
+                           | |           +>| a2 |  |
+        +----+          +--+ |  +----+   +>|    |  +-+    +- titled one -------------+
+        | c1 +----------+    |  | a1 +---+ +----+  | +--+ |  +- quoted title -----+  |
+        |    |<---------+    |  +----+             |    +>|  |  +----+    +----+  |  |
+        +----+          |    +---------------------+      |  |  | f1 |<---+ i1 |  |  |
+                        |                               +-+  |  +----+    +----+  |  |
++- Title With Spaces -+ +-------------------------------+ |  +--------------------+  |
+|        +---+        |                                   +--------------------------+
+|        | x |        |
+|        +---+        |
++---------------------+
+
+  +- Only a string -+
+  |      +---+      |
+  |      | y |      |
+  |      +---+      |
+  +-----------------+
+
+      +---------+
+      |  +---+  |
+      |  | z |  |
+      |  +---+  |
+      +---------+

@@ -12,9 +12,9 @@ can be built). Keep each row's status current with `spec.py set`.
 |---------|--------|------|
 | Workspace | done | [workspace.md](workspace.md) |
 | Flowchart Parser | done | [flowchart-parser.md](flowchart-parser.md) |
-| Layout | research | [layout.md](layout.md) |
-| ASCII Renderer | pending | [ascii-renderer.md](ascii-renderer.md) |
-| CLI | pending | [cli.md](cli.md) |
+| Layout | done | [layout.md](layout.md) |
+| ASCII Renderer | done | [ascii-renderer.md](ascii-renderer.md) |
+| CLI | done | [cli.md](cli.md) |
 | Display List | pending | [display-list.md](display-list.md) |
 | GUI Shell | research | [gui-shell.md](gui-shell.md) |
 | WYSIWYG Editing | research | [wysiwyg-editing.md](wysiwyg-editing.md) |

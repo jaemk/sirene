@@ -2,8 +2,23 @@
 //! diagnostic-free parsing of generated valid documents.
 
 use proptest::prelude::*;
+use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::flowchart::{self, Flowchart};
 use sirene_core::{Severity, TextSize};
+
+/// Rendering never panics and ends every line with a newline (ASCIIR-1).
+fn check_render(c: &Flowchart) -> Result<(), TestCaseError> {
+    for charset in [Charset::Unicode, Charset::Ascii] {
+        let out = ascii::render(c, &Options { charset });
+        prop_assert!(out.is_empty() || out.ends_with('\n'));
+        prop_assert!(
+            !out.lines().any(|l| l.ends_with(' ')),
+            "trailing space in\n{}",
+            out
+        );
+    }
+    Ok(())
+}
 
 /// Strings biased toward Mermaid syntax characters so the parser's branches get exercised.
 fn mermaid_ish() -> impl Strategy<Value = String> {
@@ -176,6 +191,7 @@ proptest! {
         }
         let lowered = parse.lower();
         check_model(&lowered.flowchart)?;
+        check_render(&lowered.flowchart)?;
         for d in &lowered.diagnostics {
             prop_assert!(d.range.end() <= TextSize::of(src.as_str()));
         }
@@ -200,5 +216,6 @@ proptest! {
             src
         );
         check_model(&lowered.flowchart)?;
+        check_render(&lowered.flowchart)?;
     }
 }

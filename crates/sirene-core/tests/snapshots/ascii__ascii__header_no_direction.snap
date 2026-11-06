@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/ascii.rs
+expression: "flowchart\nA"
+---
++---+
+| A |
++---+
