@@ -4,7 +4,9 @@ mod canvas;
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::flowchart::{Arrow, Edge, Flowchart, Label, Measure, Node, Shape, Stroke, Subgraph};
+use crate::flowchart::{
+    Arrow, Edge, Flowchart, Label, Measure, Node, Shape, Stroke, Subgraph, clean,
+};
 use crate::layout::{self, Config, Point, Rect, Size, Spacing};
 use canvas::{Canvas, DOWN, Glyph, LEFT, Line, RIGHT, UP, glyph};
 
@@ -149,21 +151,9 @@ fn width(s: &str) -> i32 {
     UnicodeWidthStr::width(s) as i32
 }
 
-/// Replaces control characters, which have no width, with spaces.
-fn clean(s: &str) -> String {
-    s.chars()
-        .map(|c| if c.is_control() { ' ' } else { c })
-        .collect()
-}
-
 /// Display lines of a label, with markdown emphasis markers dropped (ASCIIR-3).
 fn lines(label: &Label) -> Vec<String> {
-    let text = if label.markdown {
-        label.text.replace("**", "").replace('*', "")
-    } else {
-        label.text.clone()
-    };
-    text.split('\n').map(clean).collect()
+    label.lines()
 }
 
 fn title(s: &Subgraph) -> String {

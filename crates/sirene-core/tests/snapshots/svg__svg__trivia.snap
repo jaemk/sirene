@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/svg.rs
+expression: "---\ntitle: Trivia\nconfig:\n  theme: forest\n---\n%%{init: {\"flowchart\": {\"curve\": \"linear\"}} }%%\n%% a comment before the header\nflowchart LR\n    %% an indented comment\n    A --> B;B --> C;\n\n    %%{ multi\n      line directive }%%\n    C --> D\n"
+---
+<svg xmlns="http://www.w3.org/2000/svg" width="311" height="100" viewBox="0 0 311 100" font-family="trebuchet ms, verdana, arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="155.5" y="26" font-size="16.8" text-anchor="middle" dominant-baseline="central" fill="#333333">Trivia</text>
+<path d="M98 66 L89 70.5 L89 61.5 Z" fill="#333333"/>
+<path d="M49 66 L90 66" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M180 66 L171 70.5 L171 61.5 Z" fill="#333333"/>
+<path d="M131 66 L172 66" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M262 66 L253 70.5 L253 61.5 Z" fill="#333333"/>
+<path d="M213 66 L254 66" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M16 48 L49 48 L49 84 L16 84 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="32.5" y="66" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">A</text>
+<path d="M98 48 L131 48 L131 84 L98 84 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="114.5" y="66" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">B</text>
+<path d="M180 48 L213 48 L213 84 L180 84 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="196.5" y="66" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">C</text>
+<path d="M262 48 L295 48 L295 84 L262 84 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="278.5" y="66" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">D</text>
+</svg>

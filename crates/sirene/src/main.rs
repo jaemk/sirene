@@ -3,15 +3,26 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use sirene_core::Severity;
 use sirene_core::ascii::{self, Charset, Options};
-use sirene_core::{Severity, flowchart};
+use sirene_core::flowchart::{self, Lowered};
+use sirene_core::scene::{self, Approx, Theme};
 
 /// Mermaid diagram editor and viewer.
+///
+/// With no command, opens each FILE in a viewer window, or an empty window.
 #[derive(Debug, Parser)]
-#[command(name = "sirene", version, about)]
+#[command(
+    name = "sirene",
+    version,
+    about,
+    args_conflicts_with_subcommands = true
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
+    /// Mermaid files to view.
+    files: Vec<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -24,6 +35,14 @@ enum Command {
         #[arg(long, value_enum, default_value_t = CharsetArg::Unicode)]
         charset: CharsetArg,
     },
+    /// Print a diagram as SVG.
+    Svg {
+        /// Mermaid file to read; stdin when omitted or `-`.
+        file: Option<PathBuf>,
+        /// Colors to draw with.
+        #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
+        theme: ThemeArg,
+    },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -34,15 +53,34 @@ enum CharsetArg {
     Ascii,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ThemeArg {
+    Light,
+    Dark,
+}
+
 fn main() -> ExitCode {
-    match Cli::parse().command {
-        None => ExitCode::SUCCESS,
+    let cli = Cli::parse();
+    match cli.command {
+        None => {
+            sirene_gui::run(cli.files);
+            ExitCode::SUCCESS
+        }
         Some(Command::Ascii { file, charset }) => {
             let charset = match charset {
                 CharsetArg::Unicode => Charset::Unicode,
                 CharsetArg::Ascii => Charset::Ascii,
             };
-            print_ascii(file, charset)
+            print_with(file, |l| ascii::render(&l.flowchart, &Options { charset }))
+        }
+        Some(Command::Svg { file, theme }) => {
+            let theme = match theme {
+                ThemeArg::Light => Theme::LIGHT,
+                ThemeArg::Dark => Theme::DARK,
+            };
+            print_with(file, |l| {
+                scene::svg::write(&scene::flowchart(&l.flowchart, &Approx, &theme))
+            })
         }
     }
 }
@@ -66,7 +104,8 @@ fn read(file: Option<PathBuf>) -> Result<(String, String), String> {
     }
 }
 
-fn print_ascii(file: Option<PathBuf>, charset: Charset) -> ExitCode {
+/// Reports diagnostics on stderr and prints `render`'s output, failing if there were errors.
+fn print_with(file: Option<PathBuf>, render: impl FnOnce(&Lowered) -> String) -> ExitCode {
     let (name, src) = match read(file) {
         Ok(read) => read,
         Err(message) => {
@@ -87,10 +126,7 @@ fn print_ascii(file: Option<PathBuf>, charset: Charset) -> ExitCode {
         };
         eprintln!("{name}:{line}:{col}: {severity}: {}", d.message);
     }
-    print!(
-        "{}",
-        ascii::render(&lowered.flowchart, &Options { charset })
-    );
+    print!("{}", render(&lowered));
     if failed {
         ExitCode::FAILURE
     } else {

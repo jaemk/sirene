@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/svg.rs
+expression: "flowchart TD\n    A@{ shape: manual-file, label: \"File {Handling}\" }\n    B@{ shape: docs } --> C@{ shape: hex, label: \"x\" } & D\n    A e1@==> B\n    e1@{ animate: true }\n    one@{ view: collapsed }\n    E:::cls@{ shape: rounded }\n    F@{\n      shape: doc\n      label: \"multi line\"\n    }\n"
+---
+<svg xmlns="http://www.w3.org/2000/svg" width="592" height="260" viewBox="0 0 592 260" font-family="trebuchet ms, verdana, arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<path d="M117 208 L112.5 199 L121.5 199 Z" fill="#333333"/>
+<path d="M150 165 L150 165 C150 176 133 176 133 186.5 L133 186.5 C133 197 117 197 117 200 L117 200" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M190 208 L185.5 199 L194.5 199 Z" fill="#333333"/>
+<path d="M157 165 L157 165 C157 176 174 176 174 186.5 L174 186.5 C174 197 190 197 190 200 L190 200" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M154 129 L147.25 115.5 L160.75 115.5 Z" fill="#333333"/>
+<path d="M154 88 L154 116.5" fill="none" stroke="#333333" stroke-width="3.5"/>
+<path d="M16 16 L292 16 L154 88 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="154" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">File {Handling}</text>
+<path d="M137 129 L170 129 L170 165 L137 165 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="153.5" y="147" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">B</text>
+<path d="M100 208 L133 208 L142 226 L133 244 L100 244 L91 226 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="116.5" y="226" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">x</text>
+<path d="M173 208 L206 208 L206 244 L173 244 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="189.5" y="226" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">D</text>
+<path d="M323 34 L373 34 L373 70 L323 70 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="348" y="52" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">one</text>
+<path d="M410 34 L431 34 A6 6 0 0 1 437 40 L437 64 A6 6 0 0 1 431 70 L410 70 A6 6 0 0 1 404 64 L404 40 A6 6 0 0 1 410 34 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="420.5" y="52" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">E</text>
+<path d="M468 34 L576 34 L576 70 L468 70 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="522" y="52" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">multi line</text>
+</svg>

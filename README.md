@@ -15,6 +15,14 @@ $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
 
 `sirene ascii FILE` reads a file; `--charset ascii` uses only ASCII characters.
 
+```
+sirene diagram.mmd           # open in a viewer window; reloads when the file changes
+sirene svg diagram.mmd       # print SVG (--theme light|dark)
+```
+
+On Linux, building needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan development
+packages (see `.github/workflows/ci.yml`).
+
 ## Development
 
 ```

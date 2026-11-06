@@ -6,10 +6,11 @@ Cargo workspace layout, toolchain, CI, and the coverage gate.
 
 The repository root is a virtual Cargo workspace. Member crates live under `crates/`:
 
-- `sirene-core`: parsing, diagram model, edit API, layout. No GUI or terminal dependencies.
-- `sirene`: the `sirene` binary (CLI entrypoint, and later the GUI launcher).
-
-Later crates (`sirene-render`, `sirene-gui`) are added by the specs that introduce them.
+- `sirene-core`: parsing, diagram model, layout, ASCII and display-list drawing, SVG. No GUI or
+  terminal dependencies.
+- `sirene-gui`: the gpui viewer (`gui-shell.md`). Only paints display lists; no layout or
+  drawing logic.
+- `sirene`: the `sirene` binary (CLI entrypoint and GUI launcher).
 
 ## WORKSP-2
 
@@ -40,4 +41,5 @@ that drops below the threshold fails.
 ## WORKSP-7
 
 CI (GitHub Actions) runs on pushes to `main` and on pull requests, on both `ubuntu-latest` and
-`macos-latest`.
+`macos-latest`. On Linux, gpui needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan
+development packages installed first.

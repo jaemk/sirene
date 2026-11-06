@@ -4,6 +4,7 @@
 use proptest::prelude::*;
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::flowchart::{self, Flowchart};
+use sirene_core::scene::{self, Approx, Primitive, Pt, Segment, Theme};
 use sirene_core::{Severity, TextSize};
 
 /// Rendering never panics and ends every line with a newline (ASCIIR-1).
@@ -16,6 +17,34 @@ fn check_render(c: &Flowchart) -> Result<(), TestCaseError> {
             "trailing space in\n{}",
             out
         );
+    }
+    check_scene(c)
+}
+
+/// Every coordinate in a drawing is finite and inside the scene (DISPLA-1).
+fn check_scene(c: &Flowchart) -> Result<(), TestCaseError> {
+    let s = scene::flowchart(c, &Approx, &Theme::LIGHT);
+    let inside = |p: &Pt| {
+        p.x.is_finite()
+            && p.y.is_finite()
+            && (-0.01..=s.width + 0.01).contains(&p.x)
+            && (-0.01..=s.height + 0.01).contains(&p.y)
+    };
+    for e in &s.elements {
+        match &e.primitive {
+            Primitive::Path { segments, .. } => {
+                for seg in segments {
+                    let ok = match seg {
+                        Segment::Move(p) | Segment::Line(p) => inside(p),
+                        Segment::Arc { to, .. } => inside(to),
+                        Segment::Cubic { c1, c2, to } => inside(c1) && inside(c2) && inside(to),
+                        Segment::Close => true,
+                    };
+                    prop_assert!(ok, "{:?} outside {}x{}", seg, s.width, s.height);
+                }
+            }
+            Primitive::Text { center, .. } => prop_assert!(inside(center), "{:?}", center),
+        }
     }
     Ok(())
 }

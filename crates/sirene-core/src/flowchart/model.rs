@@ -47,6 +47,24 @@ impl Label {
             markdown: false,
         }
     }
+
+    /// Display lines: markdown emphasis markers dropped and control characters replaced with
+    /// spaces.
+    pub fn lines(&self) -> Vec<String> {
+        let text = if self.markdown {
+            self.text.replace("**", "").replace('*', "")
+        } else {
+            self.text.clone()
+        };
+        text.split('\n').map(clean).collect()
+    }
+}
+
+/// Replaces control characters, which have no width, with spaces.
+pub fn clean(s: &str) -> String {
+    s.chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect()
 }
 
 /// One CSS-like style declaration, e.g. `fill: #f96` (FLOWMO-12).

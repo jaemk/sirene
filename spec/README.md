@@ -15,8 +15,8 @@ can be built). Keep each row's status current with `spec.py set`.
 | Layout | done | [layout.md](layout.md) |
 | ASCII Renderer | done | [ascii-renderer.md](ascii-renderer.md) |
 | CLI | done | [cli.md](cli.md) |
-| Display List | pending | [display-list.md](display-list.md) |
-| GUI Shell | research | [gui-shell.md](gui-shell.md) |
+| Display List | done | [display-list.md](display-list.md) |
+| GUI Shell | done | [gui-shell.md](gui-shell.md) |
 | WYSIWYG Editing | research | [wysiwyg-editing.md](wysiwyg-editing.md) |
 | macOS Packaging | research | [macos-packaging.md](macos-packaging.md) |
 | Flowchart Model | done | [flowchart-model.md](flowchart-model.md) |

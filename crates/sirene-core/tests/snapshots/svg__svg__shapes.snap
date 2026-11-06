@@ -1,0 +1,43 @@
+---
+source: crates/sirene-core/tests/svg.rs
+expression: "flowchart LR\n    rect[rect]\n    round(round)\n    stadium([stadium])\n    subroutine[[subroutine]]\n    cylinder[(cylinder)]\n    circle((circle))\n    dbl(((double circle)))\n    ellipse(-ellipse-)\n    odd>odd]\n    diamond{diamond}\n    hexagon{{hexagon}}\n    leanR[/lean right/]\n    leanL[\\lean left\\]\n    trap[/trapezoid\\]\n    invTrap[\\inverted trapezoid/]\n    bare\n"
+---
+<svg xmlns="http://www.w3.org/2000/svg" width="226" height="1119" viewBox="0 0 226 1119" font-family="trebuchet ms, verdana, arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<path d="M84 16 L142 16 L142 52 L84 52 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">rect</text>
+<path d="M86 73 L140 73 A6 6 0 0 1 146 79 L146 103 A6 6 0 0 1 140 109 L86 109 A6 6 0 0 1 80 103 L80 79 A6 6 0 0 1 86 73 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="91" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">round</text>
+<path d="M80 130 L145 130 A18 18 0 0 1 163 148 L163 148 A18 18 0 0 1 145 166 L80 166 A18 18 0 0 1 62 148 L62 148 A18 18 0 0 1 80 130 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="112.5" y="148" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">stadium</text>
+<path d="M51 187 L175 187 L175 223 L51 223 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<path d="M59 187 L59 223" fill="none" stroke="#9370db" stroke-width="1"/>
+<path d="M167 187 L167 223" fill="none" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="205" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">subroutine</text>
+<path d="M67 253.2 A46 9.2 0 0 1 159 253.2 L159 289.8 A46 9.2 0 0 1 67 289.8 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<path d="M67 253.2 A46 9.2 0 0 0 159 253.2" fill="none" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="276.1" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">cylinder</text>
+<path d="M77 355.5 A35.5 35.5 0 0 1 148 355.5 A35.5 35.5 0 0 1 77 355.5 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="112.5" y="355.5" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">circle</text>
+<path d="M44 481 A69 69 0 0 1 182 481 A69 69 0 0 1 44 481 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<path d="M49 481 A64 64 0 0 1 177 481 A64 64 0 0 1 49 481 Z" fill="none" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="481" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">double circle</text>
+<path d="M62 591 A50.5 20 0 0 1 163 591 A50.5 20 0 0 1 62 591 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="112.5" y="591" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">ellipse</text>
+<path d="M83 632 L142 632 L142 668 L83 668 L92 650 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="112.5" y="650" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">odd</text>
+<path d="M113 689 L184 725 L113 761 L42 725 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="725" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">diamond</text>
+<path d="M71 782 L154 782 L163 800 L154 818 L71 818 L62 800 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="112.5" y="800" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">hexagon</text>
+<path d="M68 839 L176 839 L158 875 L50 875 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="857" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">lean right</text>
+<path d="M54 896 L154 896 L172 932 L72 932 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="914" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">lean left</text>
+<path d="M72 953 L154 953 L172 989 L54 989 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="971" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">trapezoid</text>
+<path d="M16 1010 L210 1010 L192 1046 L34 1046 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="1028" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">inverted trapezoid</text>
+<path d="M84 1067 L142 1067 L142 1103 L84 1103 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="113" y="1085" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">bare</text>
+</svg>

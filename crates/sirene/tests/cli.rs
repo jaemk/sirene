@@ -28,11 +28,6 @@ fn prints_help() {
         ));
 }
 
-#[test]
-fn runs_without_arguments() {
-    sirene().assert().success();
-}
-
 fn fixture(name: &str) -> String {
     format!(
         "{}/../sirene-core/tests/fixtures/flowchart/valid/{name}.mmd",
@@ -145,6 +140,39 @@ fn ascii_read_failures() {
         .assert()
         .failure()
         .stderr(predicate::str::starts_with("error: cannot read <stdin>: "));
+}
+
+#[test]
+fn svg_output() {
+    let out = sirene()
+        .args(["svg", &fixture("accessibility")])
+        .assert()
+        .success()
+        .stderr("")
+        .get_output()
+        .stdout
+        .clone();
+    let svg = String::from_utf8(out).unwrap();
+    assert!(
+        svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\""),
+        "{svg}"
+    );
+    assert!(svg.contains(">A</text>"), "{svg}");
+    assert!(svg.contains("fill=\"#ffffff\""), "{svg}");
+    assert!(svg.ends_with("</svg>\n"), "{svg}");
+    sirene()
+        .args(["svg", "--theme", "dark", "-"])
+        .write_stdin("flowchart\nA\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fill=\"#1e1e1e\""));
+    sirene()
+        .args(["svg", "-"])
+        .write_stdin("flowchart\nlinkStyle 3 color:red\n")
+        .assert()
+        .failure()
+        .stdout(predicate::str::starts_with("<svg"))
+        .stderr(predicate::str::contains(": error: "));
 }
 
 #[test]

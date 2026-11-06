@@ -1,0 +1,57 @@
+---
+source: crates/sirene-core/tests/svg.rs
+expression: "flowchart TB\n    A -- text --> B -- text2 --> C\n    a --> b & c--> d\n    A & B--> C & D\n    X[x] & Y(y) --> Z{z}\n"
+---
+<svg xmlns="http://www.w3.org/2000/svg" width="398" height="342" viewBox="0 0 398 342" font-family="trebuchet ms, verdana, arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<path d="M82 148 L77.5 139 L86.5 139 Z" fill="#333333"/>
+<path d="M122 52 L122 55 A8 8 0 0 1 114 63 L87 63 A8 8 0 0 0 79 71 L79 105 C79 119 82 119 82 133 L82 140" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M78 290 L73.5 281 L82.5 281 Z" fill="#333333"/>
+<path d="M77 184 L77 205 A8 8 0 0 1 69 213 L49 213 A8 8 0 0 0 41 221 L41 261 A8 8 0 0 0 49 269 L71.5 269 A6.5 6.5 0 0 1 78 275.5 L78 282" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M203 148 L198.5 139 L207.5 139 Z" fill="#333333"/>
+<path d="M231 52 L231 52 C231 63 217 63 217 77 L217 105 C217 119 203 119 203 133 L203 140" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M267 148 L262.5 139 L271.5 139 Z" fill="#333333"/>
+<path d="M238 52 L238 52 C238 63 252 63 252 77 L252 105 C252 119 267 119 267 133 L267 140" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M231 290 L226.5 281 L235.5 281 Z" fill="#333333"/>
+<path d="M203 184 L203 199 C203 213 217 213 217 227 L217 255 C217 269 231 269 231 282 L231 282" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M238 290 L233.5 281 L242.5 281 Z" fill="#333333"/>
+<path d="M267 184 L267 199 C267 213 252 213 252 227 L252 255 C252 269 238 269 238 282 L238 282" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M87 290 L82.5 281 L91.5 281 Z" fill="#333333"/>
+<path d="M127 52 L127 59 C127 73 131 73 131 87 L131 105 C131 119 129 119 129 133 L129 271 A8 8 0 0 1 121 279 L88.5 279 A1.5 1.5 0 0 0 87 280.5 L87 282" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M150 290 L145.5 281 L154.5 281 Z" fill="#333333"/>
+<path d="M131 52 L131 52 C131 63 145 63 145 77 L145 255 C145 269 150 269 150 282 L150 282" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M83 290 L78.5 281 L87.5 281 Z" fill="#333333"/>
+<path d="M82 184 L82 209 C82 223 97 223 97 237 L97 255 C97 269 83 269 83 282 L83 282" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M143 290 L138.5 281 L147.5 281 Z" fill="#333333"/>
+<path d="M86 184 L86 205 A8 8 0 0 0 94 213 L104 213 A8 8 0 0 1 112 221 L112 261 A8 8 0 0 0 120 269 L136.5 269 A6.5 6.5 0 0 1 143 275.5 L143 282" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M329 139.66 L324.5 130.66 L333.5 130.66 Z" fill="#333333"/>
+<path d="M302 52 L302 52 C302 63 315 63 315 77 L315 105 C315 119 329 119 329 131.66 L329 131.66" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M340 139.66 L335.5 130.66 L344.5 130.66 Z" fill="#333333"/>
+<path d="M366 52 L366 52 C366 63 353 63 353 77 L353 105 C353 119 340 119 340 131.66 L340 131.66" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M110 16 L143 16 L143 52 L110 52 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="126.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">A</text>
+<path d="M65 148 L98 148 L98 184 L65 184 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="81.5" y="166" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">B</text>
+<path d="M66 290 L99 290 L99 326 L66 326 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="82.5" y="308" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">C</text>
+<path d="M218 16 L251 16 L251 52 L218 52 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="234.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">a</text>
+<path d="M186 148 L219 148 L219 184 L186 184 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="202.5" y="166" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">b</text>
+<path d="M250 148 L283 148 L283 184 L250 184 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="266.5" y="166" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">c</text>
+<path d="M218 290 L251 290 L251 326 L218 326 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="234.5" y="308" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">d</text>
+<path d="M130 290 L163 290 L163 326 L130 326 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="146.5" y="308" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">D</text>
+<path d="M285 16 L318 16 L318 52 L285 52 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="301.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">x</text>
+<path d="M355 16 L376 16 A6 6 0 0 1 382 22 L382 46 A6 6 0 0 1 376 52 L355 52 A6 6 0 0 1 349 46 L349 22 A6 6 0 0 1 355 16 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="365.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">y</text>
+<path d="M334.5 130 L355 166 L334.5 202 L314 166 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="334.5" y="166" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">z</text>
+<path d="M58 84 L100 84 L100 108 L58 108 Z" fill="#e8e8e8"/>
+<text x="79" y="96" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">text</text>
+<path d="M16 234 L66 234 L66 258 L16 258 Z" fill="#e8e8e8"/>
+<text x="41" y="246" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">text2</text>
+</svg>

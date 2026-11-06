@@ -13,7 +13,7 @@ use rowan::GreenNode;
 pub use graph::Measure;
 pub use model::{
     Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Metadata, Node, Shape, Stroke,
-    Style, Subgraph,
+    Style, Subgraph, clean,
 };
 
 use crate::diagnostic::Diagnostic;

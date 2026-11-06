@@ -16,3 +16,4 @@ all = { level = "warn", priority = -1 }
 
 [workspace.dependencies]
 sirene-core = { path = "crates/sirene-core" }
+sirene-gui = { path = "crates/sirene-gui" }

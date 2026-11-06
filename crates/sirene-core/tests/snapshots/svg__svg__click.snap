@@ -1,0 +1,25 @@
+---
+source: crates/sirene-core/tests/svg.rs
+expression: "flowchart LR\n    A-->B\n    C & D & E & F & G & H\n    click A callback \"Tooltip for a callback\"\n    click B \"https://www.github.com\" \"This is a link\"\n    click C call callback(\"arg1\", 2) \"Tooltip\"\n    click D call callback()\n    click E href \"https://www.github.com\" \"Open\" _blank\n    click F href \"https://www.github.com\"\n    click G \"https://www.github.com\" _self\n    click H cb\n"
+---
+<svg xmlns="http://www.w3.org/2000/svg" width="147" height="410" viewBox="0 0 147 410" font-family="trebuchet ms, verdana, arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<path d="M98 34 L89 38.5 L89 29.5 Z" fill="#333333"/>
+<path d="M49 34 L90 34" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M16 16 L49 16 L49 52 L16 52 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="32.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">A</text>
+<path d="M98 16 L131 16 L131 52 L98 52 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="114.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">B</text>
+<path d="M16 73 L49 73 L49 109 L16 109 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="32.5" y="91" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">C</text>
+<path d="M16 130 L49 130 L49 166 L16 166 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="32.5" y="148" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">D</text>
+<path d="M16 187 L49 187 L49 223 L16 223 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="32.5" y="205" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">E</text>
+<path d="M16 244 L49 244 L49 280 L16 280 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="32.5" y="262" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">F</text>
+<path d="M16 301 L49 301 L49 337 L16 337 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="32.5" y="319" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">G</text>
+<path d="M16 358 L49 358 L49 394 L16 394 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="32.5" y="376" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">H</text>
+</svg>

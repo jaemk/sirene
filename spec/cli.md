@@ -4,7 +4,9 @@ The `sirene` binary.
 
 ## CLI-1 No subcommand
 
-`sirene` with no subcommand exits 0. (It will open the GUI.)
+`sirene [FILE...]` with no subcommand opens each FILE in a viewer window, or one empty window
+when no FILE is given (`gui-shell.md`). It exits 0 when the last window closes. A FILE named like
+a subcommand is given with a path prefix, e.g. `./ascii`.
 
 ## CLI-2 `sirene ascii`
 
@@ -22,3 +24,10 @@ printed even when there are errors. The exit status is 1 when there is an error 
 ## CLI-4 Read failures
 
 When FILE cannot be read, sirene prints `error: cannot read FILE: REASON` to stderr and exits 1.
+
+## CLI-5 `sirene svg`
+
+`sirene svg [FILE]` reads a flowchart as `sirene ascii` does and prints it to stdout as a
+standalone SVG document (`display-list.md`), with text measured by the monospace estimate.
+`--theme light|dark` picks the colors; the default is `light`. Diagnostics and exit status
+follow CLI-3 and CLI-4.
