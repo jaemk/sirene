@@ -73,17 +73,17 @@ pub fn render(chart: &Flowchart, options: &Options) -> String {
         }
     };
     for (e, route) in chart.edges.iter().zip(&layout.edges) {
-        if let Some(route) = route {
-            if e.stroke != Stroke::Invisible {
-                draw_edge(
-                    &mut canvas,
-                    e,
-                    &route.points,
-                    rect_of(&e.from),
-                    rect_of(&e.to),
-                    route.label,
-                );
-            }
+        if let Some(route) = route
+            && e.stroke != Stroke::Invisible
+        {
+            draw_edge(
+                &mut canvas,
+                e,
+                &route.points,
+                rect_of(&e.from),
+                rect_of(&e.to),
+                route.label,
+            );
         }
     }
     for (n, r) in chart.nodes.iter().zip(&layout.nodes) {
@@ -91,10 +91,10 @@ pub fn render(chart: &Flowchart, options: &Options) -> String {
     }
     for (e, route) in chart.edges.iter().zip(&layout.edges) {
         let label = route.as_ref().and_then(|r| r.label).zip(e.label.as_ref());
-        if let Some((r, l)) = label {
-            if e.stroke != Stroke::Invisible {
-                draw_lines(&mut canvas, &lines(l), r.x, r.w, r.y);
-            }
+        if let Some((r, l)) = label
+            && e.stroke != Stroke::Invisible
+        {
+            draw_lines(&mut canvas, &lines(l), r.x, r.w, r.y);
         }
     }
     for (s, r) in chart.subgraphs.iter().zip(&layout.titles) {

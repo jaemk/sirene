@@ -8,8 +8,8 @@ The repository root is a virtual Cargo workspace. Member crates live under `crat
 
 - `sirene-core`: parsing, diagram model, layout, ASCII and display-list drawing, SVG. No GUI or
   terminal dependencies.
-- `sirene-gui`: the gpui viewer (`gui-shell.md`). Only paints display lists; no layout or
-  drawing logic.
+- `sirene-gui`: the GPUI Kit editor (`gui-shell.md`, `wysiwyg-editing.md`). Only paints
+  display lists; no layout or drawing logic.
 - `sirene`: the `sirene` binary (CLI entrypoint and GUI launcher).
 
 ## WORKSP-2
@@ -25,7 +25,8 @@ inherited by members.
 ## WORKSP-4
 
 `rust-toolchain.toml` pins the `stable` channel with `rustfmt`, `clippy`, and
-`llvm-tools-preview`.
+`llvm-tools-preview`. The workspace `rust-version` is the newest one any locked dependency
+declares (1.92, from GPUI Kit's tree).
 
 ## WORKSP-5
 

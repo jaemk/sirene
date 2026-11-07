@@ -123,11 +123,11 @@ fn tighten(ranks: &mut [i32], dag: &[RankEdge]) {
             } else {
                 None
             };
-            if let Some(t) = target {
-                if t != ranks[v] {
-                    ranks[v] = t;
-                    changed = true;
-                }
+            if let Some(t) = target
+                && t != ranks[v]
+            {
+                ranks[v] = t;
+                changed = true;
             }
         }
         if !changed {

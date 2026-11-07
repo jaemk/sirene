@@ -114,11 +114,11 @@ impl Canvas {
                 c.text = Some(ch);
                 c.tail = false;
             }
-            if w == 2 {
-                if let Some(c) = self.cell(x + 1, y) {
-                    c.text = None;
-                    c.tail = true;
-                }
+            if w == 2
+                && let Some(c) = self.cell(x + 1, y)
+            {
+                c.text = None;
+                c.tail = true;
             }
             x += w;
         }

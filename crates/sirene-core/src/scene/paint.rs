@@ -226,13 +226,13 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
 
     for (i, (e, route)) in chart.edges.iter().zip(&layout.edges).enumerate() {
         let label = route.as_ref().and_then(|r| r.label).zip(e.label.as_ref());
-        if let Some((r, l)) = label {
-            if e.stroke != Line::Invisible {
-                let b = at(r);
-                p.path(Owner::Edge(i), rect(b), Some(theme.edge_label_fill), None);
-                let color = edge_styles[i].color.unwrap_or(theme.text);
-                p.lines(Owner::Edge(i), &l.lines(), b.center(), color);
-            }
+        if let Some((r, l)) = label
+            && e.stroke != Line::Invisible
+        {
+            let b = at(r);
+            p.path(Owner::Edge(i), rect(b), Some(theme.edge_label_fill), None);
+            let color = edge_styles[i].color.unwrap_or(theme.text);
+            p.lines(Owner::Edge(i), &l.lines(), b.center(), color);
         }
     }
 

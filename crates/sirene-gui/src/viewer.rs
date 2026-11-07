@@ -1,19 +1,25 @@
-//! A window's view of one diagram (GUISHE-2).
+//! A window's document: the source pane beside the drawing (GUISHE-2, WYSIWY-1..6).
 
 use std::cell::Cell;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
 
+use gpui::base::input::{Diagnostic, DiagnosticSeverity};
+use gpui::component::input::{Editor, EditorState, InputEvent, Position, RopeExt};
+use gpui::component::{Theme as KitTheme, ThemeMode};
 use gpui::{
-    Bounds, Context, FocusHandle, PathPromptOptions, Pixels, Point, Render, ScrollWheelEvent,
-    Subscription, Task, Window, WindowAppearance, canvas, div, prelude::*, px,
+    Bounds, Context, Entity, FocusHandle, Pixels, Point, PromptLevel, Render, ScrollEvent,
+    Subscription, Task, Window, WindowAppearance, canvas, div, prelude::*, px, relative,
 };
+use sirene_core::Severity;
 use sirene_core::scene::{self, Scene, Theme};
 
-use crate::document::Document;
+use crate::document::{Disk, Document};
 use crate::paint::{self, Metrics, Placement};
-use crate::{ActualSize, CloseWindow, FitWindow, Open, Reload, ZoomIn, ZoomOut};
+use crate::{
+    ActualSize, CloseWindow, FitWindow, Open, Reload, Save, SaveAs, ToggleSource, ZoomIn, ZoomOut,
+};
 
 /// How often the file is checked for changes.
 pub const POLL: Duration = Duration::from_millis(500);
@@ -23,6 +29,9 @@ const ZOOM_STEP: f32 = 1.25;
 
 pub struct Viewer {
     pub doc: Document,
+    /// The source pane's editor.
+    pub source: Entity<EditorState>,
+    pub show_source: bool,
     pub zoom: f32,
     /// Offset of the drawing from its resting place.
     pub pan: Point<Pixels>,
@@ -32,7 +41,7 @@ pub struct Viewer {
     viewport: Rc<Cell<Bounds<Pixels>>>,
     focus: FocusHandle,
     _watch: Task<()>,
-    _appearance: Subscription,
+    _subscriptions: Vec<Subscription>,
 }
 
 /// Where a drawing lands in `bounds`: centered when it fits, else at the top left, then moved
@@ -52,52 +61,123 @@ fn is_dark(a: WindowAppearance) -> bool {
 
 impl Viewer {
     pub fn new(doc: Document, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let focus = cx.focus_handle();
-        window.focus(&focus);
-        window.set_window_title(&doc.name());
-        let watch = cx.spawn(async move |this, cx| {
-            while this.update(cx, |v, cx| v.poll(cx)).is_ok() {
-                cx.background_executor().timer(POLL).await;
+        let text = doc.source.clone();
+        let source = cx.new(|cx| EditorState::new(window, cx).default_value(text));
+        let edits = cx.subscribe_in(&source, window, |v, _, e: &InputEvent, window, cx| {
+            if let InputEvent::Change = e {
+                v.edited(window, cx);
             }
         });
         let appearance = cx.observe_window_appearance(window, |v, window, cx| {
             v.set_dark(is_dark(window.appearance()), cx);
         });
-        Self {
+        let watch = cx.spawn_in(window, async move |this, cx| {
+            while this
+                .update_in(cx, |v, window, cx| v.poll(window, cx))
+                .is_ok()
+            {
+                cx.background_executor().timer(POLL).await;
+            }
+        });
+        let this = cx.entity().downgrade();
+        window.on_window_should_close(cx, move |window, cx| {
+            this.update(cx, |v, cx| v.should_close(window, cx))
+                .unwrap_or(true)
+        });
+        source.update(cx, |s, cx| s.focus(window, cx));
+        let dark = is_dark(window.appearance());
+        KitTheme::change(theme_mode(dark), Some(window), cx);
+        let mut viewer = Self {
             doc,
+            source,
+            show_source: true,
             zoom: 1.0,
             pan: Point::default(),
-            dark: is_dark(window.appearance()),
+            dark,
             scene: None,
             viewport: Rc::default(),
-            focus,
+            focus: cx.focus_handle(),
             _watch: watch,
-            _appearance: appearance,
+            _subscriptions: vec![edits, appearance],
+        };
+        viewer.refresh(window, cx);
+        viewer
+    }
+
+    /// Takes the editor's text after an edit (WYSIWY-2).
+    fn edited(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let text = self.source.read(cx).value().to_string();
+        if self.doc.set_source(text) {
+            self.refresh(window, cx);
         }
     }
 
-    /// Reloads the document if its file changed.
-    pub fn poll(&mut self, cx: &mut Context<Self>) {
-        if self.doc.reload() {
-            self.scene = None;
+    /// Redraws after the document changed: drawing, diagnostics, and title.
+    fn refresh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.scene = None;
+        let problems = &self.doc.problems;
+        self.source.update(cx, |s, cx| {
+            let text = s.text().clone();
+            if let Some(set) = s.diagnostics_mut() {
+                set.reset(&text);
+                for p in problems {
+                    let start = text.offset_to_position(p.range.start);
+                    let mut end = text.offset_to_position(p.range.end);
+                    if end == start {
+                        end.character += 1;
+                    }
+                    let severity = match p.severity {
+                        Severity::Error => DiagnosticSeverity::Error,
+                        Severity::Warning => DiagnosticSeverity::Warning,
+                    };
+                    set.push(
+                        Diagnostic::new(start..end, p.message.clone()).with_severity(severity),
+                    );
+                }
+            }
             cx.notify();
+        });
+        window.set_window_title(&self.doc.title());
+        cx.notify();
+    }
+
+    /// Puts the document's text in the editor, keeping the cursor line where it still exists.
+    fn load_source(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let text = self.doc.source.clone();
+        self.source.update(cx, |s, cx| {
+            if s.value().as_ref() == text {
+                return;
+            }
+            let line = s.cursor_position().line;
+            s.set_value(text, window, cx);
+            let last = s.text().lines_len().saturating_sub(1) as u32;
+            s.set_cursor_position(Position::new(line.min(last), 0), window, cx);
+        });
+        self.refresh(window, cx);
+    }
+
+    /// Checks the file for changes (WYSIWY-5).
+    pub fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match self.doc.poll() {
+            Disk::Unchanged => {}
+            Disk::Reloaded => self.load_source(window, cx),
+            Disk::Conflict => cx.notify(),
         }
     }
 
     /// Shows `doc` in place of the current document.
     pub fn set_document(&mut self, doc: Document, window: &mut Window, cx: &mut Context<Self>) {
-        window.set_window_title(&doc.name());
         self.doc = doc;
-        self.scene = None;
         self.zoom = 1.0;
         self.pan = Point::default();
-        cx.notify();
+        self.load_source(window, cx);
     }
 
     pub fn set_dark(&mut self, dark: bool, cx: &mut Context<Self>) {
         if dark != self.dark {
             self.dark = dark;
             self.scene = None;
+            KitTheme::change(theme_mode(dark), None, cx);
             cx.notify();
         }
     }
@@ -151,27 +231,120 @@ impl Viewer {
         }
     }
 
-    fn reload(&mut self, _: &Reload, _: &mut Window, cx: &mut Context<Self>) {
-        self.poll(cx);
+    /// Re-reads the file, dropping unsaved edits.
+    fn reload(&mut self, _: &Reload, window: &mut Window, cx: &mut Context<Self>) {
+        self.doc.reload();
+        self.load_source(window, cx);
     }
 
-    fn close(&mut self, _: &CloseWindow, window: &mut Window, _: &mut Context<Self>) {
-        window.remove_window();
+    fn toggle_source(&mut self, _: &ToggleSource, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_source = !self.show_source;
+        if self.show_source {
+            self.source.update(cx, |s, cx| s.focus(window, cx));
+        } else {
+            window.focus(&self.focus, cx);
+        }
+        cx.notify();
     }
 
-    /// An empty window shows the first chosen file itself; otherwise the app opens new
-    /// windows.
+    /// Saves to the file, asking for one first when there is none (WYSIWY-4). Resolves to
+    /// whether the document was written.
+    pub fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Task<bool> {
+        if self.doc.path.is_none() {
+            return self.save_as(window, cx);
+        }
+        let saved = self.doc.save().is_ok();
+        self.refresh(window, cx);
+        Task::ready(saved)
+    }
+
+    /// Asks for a path and saves there.
+    pub fn save_as(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Task<bool> {
+        let dir = self.doc.path.as_deref().and_then(Path::parent).map_or_else(
+            || std::env::current_dir().unwrap_or_default(),
+            Path::to_owned,
+        );
+        let name = match &self.doc.path {
+            Some(_) => self.doc.name(),
+            None => "diagram.mmd".to_owned(),
+        };
+        let chosen = cx.prompt_for_new_path(&dir, Some(&name));
+        cx.spawn_in(window, async move |this, cx| {
+            let Ok(Ok(Some(path))) = chosen.await else {
+                return false;
+            };
+            this.update_in(cx, |v, window, cx| {
+                let saved = v.doc.save_as(path).is_ok();
+                v.refresh(window, cx);
+                saved
+            })
+            .unwrap_or(false)
+        })
+    }
+
+    fn save_action(&mut self, _: &Save, window: &mut Window, cx: &mut Context<Self>) {
+        self.save(window, cx).detach();
+    }
+
+    fn save_as_action(&mut self, _: &SaveAs, window: &mut Window, cx: &mut Context<Self>) {
+        self.save_as(window, cx).detach();
+    }
+
+    /// Asks whether to save unsaved edits (WYSIWY-6). Resolves to whether the window may
+    /// close.
+    pub fn confirm_close(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Task<bool> {
+        if !self.doc.is_edited() {
+            return Task::ready(true);
+        }
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            &format!("Save changes to {}?", self.doc.name()),
+            Some("Your changes will be lost if you don't save them."),
+            &["Save", "Don't Save", "Cancel"],
+            cx,
+        );
+        cx.spawn_in(window, async move |this, cx| match answer.await {
+            Ok(0) => match this.update_in(cx, |v, window, cx| v.save(window, cx)) {
+                Ok(saved) => saved.await,
+                Err(_) => false,
+            },
+            Ok(1) => true,
+            _ => false,
+        })
+    }
+
+    /// Closes the window once unsaved edits are dealt with.
+    fn close_when_confirmed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let confirmed = self.confirm_close(window, cx);
+        cx.spawn_in(window, async move |_, cx| {
+            if confirmed.await {
+                let _ = cx.update(|window, _| window.remove_window());
+            }
+        })
+        .detach();
+    }
+
+    fn close(&mut self, _: &CloseWindow, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_when_confirmed(window, cx);
+    }
+
+    /// The platform asks before closing the window, e.g. from its title bar.
+    pub fn should_close(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if !self.doc.is_edited() {
+            return true;
+        }
+        self.close_when_confirmed(window, cx);
+        false
+    }
+
+    /// An unedited Untitled window shows the first chosen file itself; otherwise the app opens
+    /// new windows.
     fn open(&mut self, _: &Open, window: &mut Window, cx: &mut Context<Self>) {
-        if self.doc.path.is_some() {
+        if !self.is_blank() {
             cx.propagate();
             return;
         }
-        let chosen = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: true,
-            prompt: None,
-        });
+        let chosen = cx.prompt_for_paths(crate::open_options());
         cx.spawn_in(window, async move |this, cx| {
             if let Ok(Ok(Some(paths))) = chosen.await {
                 let _ = this.update_in(cx, |v, window, cx| v.show_paths(&paths, window, cx));
@@ -180,10 +353,15 @@ impl Viewer {
         .detach();
     }
 
-    /// Shows the first path here when this window is empty, and opens the rest in new windows.
+    /// Whether this window shows an unedited Untitled document.
+    pub fn is_blank(&self) -> bool {
+        self.doc.path.is_none() && !self.doc.is_edited()
+    }
+
+    /// Shows the first path here when this window is blank, and opens the rest in new windows.
     pub fn show_paths(&mut self, paths: &[PathBuf], window: &mut Window, cx: &mut Context<Self>) {
         let rest = match paths.split_first() {
-            Some((first, rest)) if self.doc.path.is_none() => {
+            Some((first, rest)) if self.is_blank() => {
                 self.set_document(Document::open(first), window, cx);
                 rest
             }
@@ -192,9 +370,9 @@ impl Viewer {
         crate::open_paths(rest, cx);
     }
 
-    fn scroll(&mut self, e: &ScrollWheelEvent, _: &mut Window, cx: &mut Context<Self>) {
+    fn scroll(&mut self, e: &ScrollEvent, _: &mut Window, cx: &mut Context<Self>) {
         let delta = e.delta.pixel_delta(px(20.0));
-        if e.modifiers.secondary() {
+        if e.modifiers.secondary(cx) {
             let factor = (-f32::from(delta.y) / 200.0).exp();
             self.set_zoom(self.zoom * factor, cx);
         } else {
@@ -204,7 +382,15 @@ impl Viewer {
     }
 
     pub fn status(&self) -> String {
-        self.doc.status().unwrap_or_else(|| self.doc.name())
+        self.doc.status()
+    }
+}
+
+fn theme_mode(dark: bool) -> ThemeMode {
+    if dark {
+        ThemeMode::Dark
+    } else {
+        ThemeMode::Light
     }
 }
 
@@ -215,12 +401,13 @@ impl Render for Viewer {
         let (zoom, pan) = (self.zoom, self.pan);
         let viewport = self.viewport.clone();
         let font = window.text_style().font();
-        let empty = self.doc.path.is_none();
-        let area = div()
+        let rule = paint::color(theme.cluster_stroke);
+        let drawing = div()
             .id("drawing")
             .flex_1()
+            .h_full()
             .overflow_hidden()
-            .on_scroll_wheel(cx.listener(Self::scroll))
+            .on_scroll(cx.listener(Self::scroll))
             .child(
                 canvas(
                     move |bounds, _, _| viewport.set(bounds),
@@ -231,13 +418,19 @@ impl Render for Viewer {
                 )
                 .size_full(),
             );
-        let area = if empty {
-            area.flex()
-                .items_center()
-                .justify_center()
-                .child("Open a Mermaid file to view it.")
+        let body = div().flex().flex_row().flex_1().min_h_0().w_full();
+        let body = if self.show_source {
+            body.child(
+                div()
+                    .id("source")
+                    .w(relative(0.4))
+                    .h_full()
+                    .border_r_1()
+                    .border_color(rule)
+                    .child(Editor::new(&self.source).bordered(false).size_full()),
+            )
         } else {
-            area
+            body
         };
         div()
             .track_focus(&self.focus)
@@ -247,6 +440,9 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::actual_size))
             .on_action(cx.listener(Self::fit_window))
             .on_action(cx.listener(Self::reload))
+            .on_action(cx.listener(Self::toggle_source))
+            .on_action(cx.listener(Self::save_action))
+            .on_action(cx.listener(Self::save_as_action))
             .on_action(cx.listener(Self::close))
             .on_action(cx.listener(Self::open))
             .size_full()
@@ -254,7 +450,7 @@ impl Render for Viewer {
             .flex_col()
             .bg(paint::color(theme.background))
             .text_color(paint::color(theme.text))
-            .child(area)
+            .child(body.child(drawing))
             .child(
                 div()
                     .flex()
@@ -264,7 +460,7 @@ impl Render for Viewer {
                     .py_1()
                     .text_sm()
                     .border_t_1()
-                    .border_color(paint::color(theme.cluster_stroke))
+                    .border_color(rule)
                     .child(self.status())
                     .child(format!("{:.0}%", self.zoom * 100.0)),
             )

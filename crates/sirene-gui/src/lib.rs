@@ -1,4 +1,5 @@
-//! The sirene viewer: one window per diagram file (GUISHE-*).
+//! The sirene editor: one window per diagram file, with its source beside the drawing
+//! (GUISHE-*, WYSIWY-*).
 
 pub mod document;
 pub mod paint;
@@ -8,8 +9,8 @@ use std::path::PathBuf;
 
 use futures::StreamExt;
 use gpui::{
-    App, Application, Bounds, KeyBinding, Menu, MenuItem, PathPromptOptions, TitlebarOptions,
-    WindowBounds, WindowHandle, WindowOptions, actions, prelude::*, px, size,
+    AnyWindowHandle, App, Bounds, Entity, KeyBinding, Menu, MenuItem, PathPromptOptions, QuitMode,
+    Task, TitlebarOptions, Window, WindowBounds, WindowOptions, actions, prelude::*, px, size,
 };
 
 use document::Document;
@@ -26,10 +27,18 @@ actions!(
         ActualSize,
         /// Zoom so the whole drawing fits the window.
         FitWindow,
-        /// Re-read the file now.
+        /// Re-read the file now, dropping unsaved edits.
         Reload,
+        /// Open a window with a new document.
+        New,
         /// Choose files to open.
         Open,
+        /// Write the document to its file.
+        Save,
+        /// Write the document to a chosen file.
+        SaveAs,
+        /// Show or hide the source pane.
+        ToggleSource,
         /// Close the focused window.
         CloseWindow,
         /// Quit the application.
@@ -37,99 +46,177 @@ actions!(
     ]
 );
 
-/// Key bindings; `secondary` is Cmd on macOS and Ctrl elsewhere (GUISHE-5).
+/// A keystroke with the secondary modifier: Cmd on macOS, Ctrl elsewhere.
+macro_rules! secondary {
+    ($key:literal) => {
+        if cfg!(target_os = "macos") {
+            concat!("cmd-", $key)
+        } else {
+            concat!("ctrl-", $key)
+        }
+    };
+}
+
+/// Key bindings (GUISHE-5).
 pub fn key_bindings() -> Vec<KeyBinding> {
     vec![
-        KeyBinding::new("secondary-=", ZoomIn, None),
-        KeyBinding::new("secondary-+", ZoomIn, None),
-        KeyBinding::new("secondary--", ZoomOut, None),
-        KeyBinding::new("secondary-0", ActualSize, None),
-        KeyBinding::new("secondary-9", FitWindow, None),
-        KeyBinding::new("secondary-r", Reload, None),
-        KeyBinding::new("secondary-o", Open, None),
-        KeyBinding::new("secondary-w", CloseWindow, None),
-        KeyBinding::new("secondary-q", Quit, None),
+        KeyBinding::new(secondary!("="), ZoomIn, None),
+        KeyBinding::new(secondary!("+"), ZoomIn, None),
+        KeyBinding::new(secondary!("-"), ZoomOut, None),
+        KeyBinding::new(secondary!("0"), ActualSize, None),
+        KeyBinding::new(secondary!("9"), FitWindow, None),
+        KeyBinding::new(secondary!("r"), Reload, None),
+        KeyBinding::new(secondary!("n"), New, None),
+        KeyBinding::new(secondary!("o"), Open, None),
+        KeyBinding::new(secondary!("s"), Save, None),
+        KeyBinding::new(secondary!("shift-s"), SaveAs, None),
+        KeyBinding::new(secondary!("e"), ToggleSource, None),
+        KeyBinding::new(secondary!("w"), CloseWindow, None),
+        KeyBinding::new(secondary!("q"), Quit, None),
     ]
+}
+
+fn menu(name: &str, items: Vec<MenuItem>) -> Menu {
+    Menu {
+        name: name.to_owned().into(),
+        items,
+        disabled: false,
+    }
 }
 
 pub fn menus() -> Vec<Menu> {
     vec![
-        Menu {
-            name: "sirene".into(),
-            items: vec![MenuItem::action("Quit sirene", Quit)],
-        },
-        Menu {
-            name: "File".into(),
-            items: vec![
+        menu("sirene", vec![MenuItem::action("Quit sirene", Quit)]),
+        menu(
+            "File",
+            vec![
+                MenuItem::action("New", New),
                 MenuItem::action("Open...", Open),
+                MenuItem::separator(),
+                MenuItem::action("Save", Save),
+                MenuItem::action("Save As...", SaveAs),
                 MenuItem::action("Reload", Reload),
                 MenuItem::separator(),
                 MenuItem::action("Close Window", CloseWindow),
             ],
-        },
-        Menu {
-            name: "View".into(),
-            items: vec![
+        ),
+        menu(
+            "View",
+            vec![
+                MenuItem::action("Show or Hide Source", ToggleSource),
+                MenuItem::separator(),
                 MenuItem::action("Zoom In", ZoomIn),
                 MenuItem::action("Zoom Out", ZoomOut),
                 MenuItem::action("Actual Size", ActualSize),
                 MenuItem::action("Fit Window", FitWindow),
             ],
-        },
+        ),
     ]
 }
 
-/// Registers key bindings, menus, and app-wide actions.
+/// Initializes GPUI Kit and registers key bindings, menus, and app-wide actions.
 pub fn init(cx: &mut App) {
+    gpui::init(cx);
     cx.bind_keys(key_bindings());
     cx.set_menus(menus());
-    cx.on_action(|_: &Quit, cx| cx.quit());
+    cx.on_action(|_: &Quit, cx| {
+        let quit = confirm_quit(cx);
+        cx.spawn(async move |cx| {
+            if quit.await {
+                cx.update(|cx| cx.quit());
+            }
+        })
+        .detach();
+    });
+    cx.on_action(|_: &New, cx| {
+        open_or_report(Document::untitled(), cx);
+    });
     cx.on_action(|_: &Open, cx| prompt_open(cx));
 }
 
 /// Opens a window showing `doc`.
-pub fn open_window(doc: Document, cx: &mut App) -> anyhow::Result<WindowHandle<Viewer>> {
+pub fn open_window(
+    doc: Document,
+    cx: &mut App,
+) -> anyhow::Result<(AnyWindowHandle, Entity<Viewer>)> {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
             None,
-            size(px(960.0), px(720.0)),
+            size(px(1200.0), px(760.0)),
             cx,
         ))),
         titlebar: Some(TitlebarOptions {
-            title: Some(doc.name().into()),
+            title: Some(doc.title().into()),
             ..Default::default()
         }),
         app_id: Some("sirene".into()),
         ..Default::default()
     };
-    cx.open_window(options, |window, cx| {
+    gpui::open_window(options, cx, |window, cx| {
         cx.new(|cx| Viewer::new(doc, window, cx))
     })
 }
 
+fn open_or_report(doc: Document, cx: &mut App) {
+    let name = doc.name();
+    if let Err(e) = open_window(doc, cx) {
+        eprintln!("error: cannot open a window for {name}: {e}");
+    }
+}
+
 /// Asks for files and opens each in a new window.
 pub fn prompt_open(cx: &mut App) {
-    let chosen = cx.prompt_for_paths(PathPromptOptions {
-        files: true,
-        directories: false,
-        multiple: true,
-        prompt: None,
-    });
+    let chosen = cx.prompt_for_paths(open_options());
     cx.spawn(async move |cx| {
         if let Ok(Ok(Some(paths))) = chosen.await {
-            let _ = cx.update(|cx| open_paths(&paths, cx));
+            cx.update(|cx| open_paths(&paths, cx));
         }
     })
     .detach();
 }
 
+pub(crate) fn open_options() -> PathPromptOptions {
+    PathPromptOptions {
+        files: true,
+        directories: false,
+        multiple: true,
+        prompt: None,
+    }
+}
+
 /// Opens each path in a new window.
 pub fn open_paths(paths: &[PathBuf], cx: &mut App) {
     for p in paths {
-        if let Err(e) = open_window(Document::open(p), cx) {
-            eprintln!("error: cannot open a window for {}: {e}", p.display());
-        }
+        open_or_report(Document::open(p), cx);
     }
+}
+
+/// The editor in `window`, if it shows one.
+pub fn viewer_in(window: &Window, cx: &App) -> Option<Entity<Viewer>> {
+    gpui::base::Root::read(window, cx)
+        .view()
+        .clone()
+        .downcast::<Viewer>()
+        .ok()
+}
+
+/// Asks each window with unsaved edits whether to save them, stopping at the first Cancel
+/// (WYSIWY-6). Resolves to whether the app may quit.
+pub fn confirm_quit(cx: &mut App) -> Task<bool> {
+    let windows = cx.windows();
+    cx.spawn(async move |cx| {
+        for handle in windows {
+            let asked = handle.update(cx, |_, window, cx| {
+                viewer_in(window, cx).map(|v| v.update(cx, |v, cx| v.confirm_close(window, cx)))
+            });
+            if let Ok(Some(asked)) = asked
+                && !asked.await
+            {
+                return false;
+            }
+        }
+        true
+    })
 }
 
 /// The local path of a `file://` URL, percent-decoded.
@@ -162,34 +249,27 @@ pub fn url_path(url: &str) -> Option<PathBuf> {
     String::from_utf8(out).ok().map(PathBuf::from)
 }
 
-/// Runs the app, opening a window per path, or one empty window when there are none
+/// Runs the app, opening a window per path, or a new document when there are none
 /// (GUISHE-1). Files the platform asks to open, e.g. from Finder, open in new windows.
 pub fn run(paths: Vec<PathBuf>) {
     let (tx, mut rx) = futures::channel::mpsc::unbounded::<Vec<String>>();
-    let app = Application::new();
+    let app = gpui::application()
+        .with_assets(gpui::assets::Assets)
+        .with_quit_mode(QuitMode::LastWindowClosed);
     app.on_open_urls(move |urls| {
         let _ = tx.unbounded_send(urls);
     });
     app.run(move |cx| {
         init(cx);
         if paths.is_empty() {
-            if let Err(e) = open_window(Document::empty(), cx) {
-                eprintln!("error: cannot open a window: {e}");
-                cx.quit();
-            }
+            open_or_report(Document::untitled(), cx);
         } else {
             open_paths(&paths, cx);
         }
         cx.spawn(async move |cx| {
             while let Some(urls) = rx.next().await {
                 let paths: Vec<PathBuf> = urls.iter().filter_map(|u| url_path(u)).collect();
-                let _ = cx.update(|cx| open_paths(&paths, cx));
-            }
-        })
-        .detach();
-        cx.on_window_closed(|cx| {
-            if cx.windows().is_empty() {
-                cx.quit();
+                cx.update(|cx| open_paths(&paths, cx));
             }
         })
         .detach();
@@ -221,8 +301,12 @@ mod tests {
     #[test]
     fn every_action_has_a_menu_item_and_key() {
         let menus = menus();
-        let items: usize = menus.iter().map(|m| m.items.len()).sum();
-        assert_eq!(items, 9);
-        assert_eq!(key_bindings().len(), 9);
+        let items = menus
+            .iter()
+            .flat_map(|m| &m.items)
+            .filter(|i| !matches!(i, MenuItem::Separator))
+            .count();
+        assert_eq!(items, 12);
+        assert_eq!(key_bindings().len(), 13);
     }
 }

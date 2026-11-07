@@ -1,18 +1,18 @@
 # GUI Shell
 
-The gpui viewer (`crates/sirene-gui`): one window per diagram file. Tests:
+The app window (`crates/sirene-gui`): one window per diagram file. Tests:
 `crates/sirene-gui/tests/viewer.rs` and the unit tests in `document.rs` and `lib.rs`.
 
 ## GUISHE-1 Launching
 
-`sirene_gui::run(paths)` starts the app and opens one window per path, or one empty window when
-there are none. Files the platform asks the app to open (`file://` URLs, e.g. from Finder) open
+`sirene_gui::run(paths)` starts the app and opens one window per path, or one new document
+(WYSIWY-7) when there are none. Files the platform asks the app to open (`file://` URLs, e.g. from Finder) open
 in new windows. The app quits when its last window closes.
 
 ## GUISHE-2 Viewer
 
 A window shows its diagram drawn from the display list (`display-list.md`), with labels measured
-by gpui's text system, over a status bar. The drawing is centered when it fits and starts at the
+by gpui's text system, right of the source pane (WYSIWY-1) and over a status bar. The drawing is centered when it fits and starts at the
 top left when it does not. Scrolling pans; scrolling with the secondary modifier zooms. Zoom is
 clamped to 10%-800%. The window title is the file name, or `Untitled`.
 
@@ -39,11 +39,16 @@ the zoom.
 | ActualSize | secondary-0 | 100%, no pan |
 | FitWindow | secondary-9 | zoom so the drawing fits, no pan |
 | Reload | secondary-r | re-read the file |
-| Open | secondary-o | choose files; an empty window shows the first, others open new windows |
-| CloseWindow | secondary-w | close the window |
-| Quit | secondary-q | quit |
+| New | secondary-n | open a new document (WYSIWY-7) |
+| Open | secondary-o | choose files; an unedited Untitled window shows the first, others open new windows |
+| Save | secondary-s | save (WYSIWY-4) |
+| SaveAs | secondary-shift-s | save to a chosen path (WYSIWY-4) |
+| CloseWindow | secondary-w | close the window (WYSIWY-6) |
+| Quit | secondary-q | quit (WYSIWY-6) |
+| ToggleSource | secondary-e | show or hide the source pane (WYSIWY-1) |
 
-The same actions are in the app menus (sirene, File, View).
+The same actions are in the app menus (sirene, File, View). The window is built on GPUI Kit
+(`gpui-kit`: gpui-pre, gpui-base, gpui-component), whose light or dark theme follows GUISHE-6.
 
 ## GUISHE-6 Appearance
 
@@ -52,6 +57,7 @@ otherwise, and redraws when the appearance changes.
 
 ## GUISHE-7 Status bar
 
-The status bar shows the read error, or the first error (else first warning) as
-`LINE:COL: SEVERITY: MESSAGE` with `(+N more)` when there are others, or the file name when there
-are no problems; and the zoom as a percentage.
+The status bar shows the first of: a save error (WYSIWY-4), a change on disk under unsaved edits
+(WYSIWY-5), the read error, the first error (else first warning) as `LINE:COL: SEVERITY: MESSAGE`
+with `(+N more)` when there are others, or the window title (WYSIWY-3); and the zoom as a
+percentage.

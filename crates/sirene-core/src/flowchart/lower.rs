@@ -16,10 +16,10 @@ use crate::syntax::{SyntaxNode, SyntaxToken};
 pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
     let mut l = Lowerer::default();
     for el in root.children_with_tokens() {
-        if el.kind() == FRONTMATTER {
-            if let Some(t) = el.as_token() {
-                l.chart.title = text::frontmatter_title(t.text());
-            }
+        if el.kind() == FRONTMATTER
+            && let Some(t) = el.as_token()
+        {
+            l.chart.title = text::frontmatter_title(t.text());
         }
     }
     if let Some(dir) = child(root, HEADER).and_then(|h| token(&h, DIR)) {
@@ -234,11 +234,11 @@ impl Lowerer {
             }
             return None;
         }
-        if let Some(entries) = &meta {
-            if let Some(sg) = self.subgraphs.iter_mut().find(|s| s.id == id) {
-                merge_metadata(&mut sg.metadata, entries.clone());
-                return None;
-            }
+        if let Some(entries) = &meta
+            && let Some(sg) = self.subgraphs.iter_mut().find(|s| s.id == id)
+        {
+            merge_metadata(&mut sg.metadata, entries.clone());
+            return None;
         }
         let i = self.node_entry(&id);
         self.chart.nodes[i].mentions.push(syntax.text_range());

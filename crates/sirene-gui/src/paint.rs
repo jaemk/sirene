@@ -1,7 +1,8 @@
 //! Painting scenes with gpui (GUISHE-4).
 
 use gpui::{
-    App, Font, Hsla, PathBuilder, Pixels, Point, Rgba, SharedString, TextRun, Window, point, px,
+    App, Font, Hsla, PathBuilder, Pixels, Point, Rgba, SharedString, TextAlign, TextRun, Window,
+    point, px,
 };
 use sirene_core::scene::{Color, Primitive, Pt, Scene, Segment, TextMetrics};
 
@@ -95,10 +96,10 @@ pub fn paint(scene: &Scene, at: &Placement, font: &Font, window: &mut Window, cx
                 fill,
                 stroke,
             } => {
-                if let Some(c) = fill {
-                    if let Ok(path) = build(PathBuilder::fill(), segments, at).build() {
-                        window.paint_path(path, color(*c));
-                    }
+                if let Some(c) = fill
+                    && let Ok(path) = build(PathBuilder::fill(), segments, at).build()
+                {
+                    window.paint_path(path, color(*c));
                 }
                 if let Some(s) = stroke {
                     let mut b = PathBuilder::stroke(px(s.width * at.zoom));
@@ -126,7 +127,7 @@ pub fn paint(scene: &Scene, at: &Placement, font: &Font, window: &mut Window, cx
                 let line_height = size * 1.3;
                 let mid = at.map(*center);
                 let origin = point(mid.x - shaped.width / 2.0, mid.y - line_height / 2.0);
-                let _ = shaped.paint(origin, line_height, window, cx);
+                let _ = shaped.paint(origin, line_height, TextAlign::Left, None, window, cx);
             }
         }
     }

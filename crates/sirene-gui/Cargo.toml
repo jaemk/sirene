@@ -1,6 +1,6 @@
 [package]
 name = "sirene-gui"
-description = "gpui viewer for sirene"
+description = "gpui viewer and editor for sirene"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,11 +9,12 @@ license.workspace = true
 [dependencies]
 anyhow = "1"
 futures = "0.3"
-gpui = "=0.2.2"
+# GPUI Kit: gpui-pre, its platform, gpui-base, and gpui-component, under one name.
+gpui = { package = "gpui-kit", version = "=0.9.0" }
 sirene-core.workspace = true
 
 [dev-dependencies]
-gpui = { version = "=0.2.2", features = ["test-support"] }
+gpui = { package = "gpui-kit", version = "=0.9.0", features = ["test-support"] }
 tempfile = "3"
 
 [lints]

@@ -16,7 +16,7 @@ $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
 `sirene ascii FILE` reads a file; `--charset ascii` uses only ASCII characters.
 
 ```
-sirene diagram.mmd           # open in a viewer window; reloads when the file changes
+sirene diagram.mmd           # edit the source beside a live drawing; follows changes on disk
 sirene svg diagram.mmd       # print SVG (--theme light|dark)
 ```
 

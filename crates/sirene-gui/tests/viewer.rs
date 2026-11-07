@@ -1,47 +1,15 @@
-//! The viewer in gpui's headless test platform (GUISHE-*).
+//! The window's drawing in gpui's headless test platform (GUISHE-*).
 
-use std::path::{Path, PathBuf};
+mod common;
 
+use common::{SECONDARY, open, texts, write};
 use gpui::{
-    Entity, Modifiers, ScrollDelta, ScrollWheelEvent, TestAppContext, TouchPhase,
-    VisualTestContext, point, px,
+    Modifiers, ScrollDelta, ScrollEvent, TestAppContext, TouchPhase, VisualTestContext, point, px,
 };
 use sirene_core::scene::{Primitive, Segment, Theme};
 use sirene_gui::document::Document;
-use sirene_gui::viewer::{MAX_ZOOM, MIN_ZOOM, POLL, Viewer};
+use sirene_gui::viewer::{MAX_ZOOM, MIN_ZOOM, POLL};
 use sirene_gui::{ActualSize, CloseWindow, FitWindow, Reload};
-
-/// The platform's secondary modifier, as written in keystrokes.
-const SECONDARY: &str = if cfg!(target_os = "macos") {
-    "cmd"
-} else {
-    "ctrl"
-};
-
-fn write(dir: &Path, name: &str, src: &str) -> PathBuf {
-    let path = dir.join(name);
-    std::fs::write(&path, src).expect("write fixture");
-    path
-}
-
-fn open(cx: &mut TestAppContext, doc: Document) -> (Entity<Viewer>, &mut VisualTestContext) {
-    cx.update(sirene_gui::init);
-    let (viewer, cx) = cx.add_window_view(|window, cx| Viewer::new(doc, window, cx));
-    cx.run_until_parked();
-    (viewer, cx)
-}
-
-fn texts(viewer: &Entity<Viewer>, cx: &mut VisualTestContext) -> Vec<String> {
-    let scene = cx.update(|window, cx| viewer.update(cx, |v, _| v.scene(window)));
-    scene
-        .elements
-        .iter()
-        .filter_map(|e| match &e.primitive {
-            Primitive::Text { text, .. } => Some(text.clone()),
-            Primitive::Path { .. } => None,
-        })
-        .collect()
-}
 
 #[gpui::test]
 fn shows_a_file(cx: &mut TestAppContext) {
@@ -57,10 +25,10 @@ fn shows_a_file(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-fn empty_window(cx: &mut TestAppContext) {
-    let (viewer, cx) = open(cx, Document::empty());
+fn new_documents_start_with_a_flowchart(cx: &mut TestAppContext) {
+    let (viewer, cx) = open(cx, Document::untitled());
     assert_eq!(cx.window_title().as_deref(), Some("Untitled"));
-    assert!(texts(&viewer, cx).is_empty());
+    assert_eq!(texts(&viewer, cx), ["A", "B"]);
 }
 
 #[gpui::test]
@@ -100,18 +68,21 @@ fn zoom_keys(cx: &mut TestAppContext) {
 #[gpui::test]
 fn scrolling_pans_and_zooms(cx: &mut TestAppContext) {
     let (viewer, cx) = open(cx, Document::from_source(None, "flowchart\nA\n".into()));
-    let scroll = |modifiers| ScrollWheelEvent {
-        position: point(px(50.0), px(50.0)),
+    // Over the drawing, which is right of the source pane.
+    let scroll = |modifiers| ScrollEvent {
+        position: point(px(900.0), px(300.0)),
         delta: ScrollDelta::Pixels(point(px(3.0), px(-40.0))),
         modifiers,
         touch_phase: TouchPhase::Moved,
+        ..Default::default()
     };
     cx.simulate_event(scroll(Modifiers::default()));
     viewer.read_with(cx, |v, _| {
         assert_eq!(v.pan, point(px(3.0), px(-40.0)));
         assert_eq!(v.zoom, 1.0);
     });
-    cx.simulate_event(scroll(Modifiers::secondary_key()));
+    let secondary = cx.update(|_, cx| Modifiers::secondary_key(cx));
+    cx.simulate_event(scroll(secondary));
     viewer.read_with(cx, |v, _| {
         assert_eq!(v.pan, point(px(3.0), px(-40.0)));
         assert!((v.zoom - 0.2f32.exp()).abs() < 1e-4, "{}", v.zoom);
@@ -131,10 +102,8 @@ fn fit_window(cx: &mut TestAppContext) {
     let (viewer, cx) = open(cx, Document::from_source(None, wide));
     cx.dispatch_action(FitWindow);
     let (zoom, width) = cx.update(|window, cx| {
-        let view = window.viewport_size();
-        viewer.update(cx, |v, _| {
-            (v.zoom, v.scene(window).width / f32::from(view.width))
-        })
+        let pane = window.viewport_size().width * 0.6;
+        viewer.update(cx, |v, _| (v.zoom, v.scene(window).width / f32::from(pane)))
     });
     assert!(zoom < 1.0, "{zoom}");
     assert!((zoom * width - 1.0).abs() < 0.2, "{zoom} {width}");
@@ -148,37 +117,8 @@ fn follows_the_appearance(cx: &mut TestAppContext) {
     assert_eq!(background, Theme::DARK.background);
     viewer.update(cx, |v, cx| v.set_dark(true, cx));
     viewer.read_with(cx, |v, _| assert_eq!(v.theme(), Theme::DARK));
-}
-
-#[gpui::test]
-fn open_fills_an_empty_window_first(cx: &mut TestAppContext) {
-    let dir = tempfile::tempdir().unwrap();
-    let a = write(dir.path(), "a.mmd", "flowchart\nA\n");
-    let b = write(dir.path(), "b.mmd", "flowchart\nB\n");
-    let (viewer, vcx) = open(cx, Document::empty());
-    vcx.update(|window, cx| {
-        viewer.update(cx, |v, cx| {
-            v.show_paths(&[a.clone(), b.clone()], window, cx)
-        })
-    });
-    vcx.run_until_parked();
-    assert_eq!(vcx.window_title().as_deref(), Some("a.mmd"));
-    assert_eq!(vcx.update(|_, cx| cx.windows().len()), 2);
-    // A window that shows a file opens every path in a new window.
-    vcx.update(|window, cx| {
-        viewer.update(cx, |v, cx| {
-            v.show_paths(std::slice::from_ref(&b), window, cx)
-        })
-    });
-    assert_eq!(vcx.update(|_, cx| cx.windows().len()), 3);
-}
-
-#[gpui::test]
-fn close_window(cx: &mut TestAppContext) {
-    let (_viewer, vcx) = open(cx, Document::empty());
-    vcx.dispatch_action(CloseWindow);
-    vcx.run_until_parked();
-    assert!(cx.windows().is_empty());
+    let kit_dark = cx.update(|_, cx| gpui::component::Theme::global(cx).is_dark());
+    assert!(kit_dark);
 }
 
 /// Arcs, cubic jogs, and dashed strokes all reach the painter.
@@ -201,6 +141,14 @@ fn paints_every_segment_kind(cx: &mut TestAppContext) {
     )));
     cx.dispatch_action(FitWindow);
     cx.run_until_parked();
+}
+
+#[gpui::test]
+fn close_window(cx: &mut TestAppContext) {
+    let (_viewer, vcx) = open(cx, Document::untitled());
+    vcx.dispatch_action(CloseWindow);
+    vcx.run_until_parked();
+    assert!(cx.windows().is_empty());
 }
 
 #[gpui::test]
