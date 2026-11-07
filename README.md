@@ -20,6 +20,10 @@ sirene diagram.mmd           # edit the source beside a live drawing; follows ch
 sirene svg diagram.mmd       # print SVG (--theme light|dark)
 ```
 
+On the drawing: click to select (shift-click for more), double-click or enter to edit a label,
+drag from one node to another to connect them, secondary-shift-n to add a node, backspace to
+delete. Each change is written to the source as an ordinary text edit.
+
 On Linux, building needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan development
 packages (see `.github/workflows/ci.yml`).
 

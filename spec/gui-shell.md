@@ -46,8 +46,14 @@ the zoom.
 | CloseWindow | secondary-w | close the window (WYSIWY-6) |
 | Quit | secondary-q | quit (WYSIWY-6) |
 | ToggleSource | secondary-e | show or hide the source pane (WYSIWY-1) |
+| AddNode | secondary-shift-n | add a node (WYSIWY-11) |
+| Rename | enter on the drawing | edit the selected item's label (WYSIWY-10) |
+| Delete | backspace or delete on the drawing | delete the selection (WYSIWY-12) |
+| Deselect | escape on the drawing | clear the selection (WYSIWY-9) |
+| Undo | secondary-z on the drawing | undo a drawing change (WYSIWY-13) |
+| Redo | secondary-shift-z on the drawing | redo a drawing change (WYSIWY-13) |
 
-The same actions are in the app menus (sirene, File, View). The window is built on GPUI Kit
+The same actions are in the app menus (sirene, File, Edit, View). The window is built on GPUI Kit
 (`gpui-kit`: gpui-pre, gpui-base, gpui-component), whose light or dark theme follows GUISHE-6.
 
 ## GUISHE-6 Appearance

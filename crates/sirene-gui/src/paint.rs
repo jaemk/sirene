@@ -4,7 +4,7 @@ use gpui::{
     App, Font, Hsla, PathBuilder, Pixels, Point, Rgba, SharedString, TextAlign, TextRun, Window,
     point, px,
 };
-use sirene_core::scene::{Color, Primitive, Pt, Scene, Segment, TextMetrics};
+use sirene_core::scene::{Color, Owner, Primitive, Pt, Scene, Segment, TextMetrics};
 
 /// Text measured by the window's text system.
 pub struct Metrics<'a> {
@@ -85,6 +85,27 @@ fn build(mut b: PathBuilder, segments: &[Segment], at: &Placement) -> PathBuilde
         }
     }
     b
+}
+
+/// Outlines the paths drawn for `owners` in `color`, 2.5px wide at any zoom (WYSIWY-9).
+pub fn outline(scene: &Scene, owners: &[Owner], at: &Placement, color: Hsla, window: &mut Window) {
+    for e in scene.elements.iter().filter(|e| owners.contains(&e.owner)) {
+        if let Primitive::Path { segments, .. } = &e.primitive
+            && let Ok(path) = build(PathBuilder::stroke(px(2.5)), segments, at).build()
+        {
+            window.paint_path(path, color);
+        }
+    }
+}
+
+/// A 2px line from `from` to `to` (WYSIWY-11).
+pub fn line(from: Point<Pixels>, to: Point<Pixels>, color: Hsla, window: &mut Window) {
+    let mut b = PathBuilder::stroke(px(2.0));
+    b.move_to(from);
+    b.line_to(to);
+    if let Ok(path) = b.build() {
+        window.paint_path(path, color);
+    }
 }
 
 /// Paints `scene` at `at`, with text in `font`.

@@ -1,5 +1,6 @@
 //! Backend-independent drawing of diagrams as paths and text (DISPLA-*).
 
+mod hit;
 mod paint;
 mod shapes;
 mod style;
@@ -148,6 +149,8 @@ pub struct Theme {
     pub edge_label_fill: Color,
     pub cluster_fill: Color,
     pub cluster_stroke: Color,
+    /// Selection outlines and other editing marks.
+    pub accent: Color,
 }
 
 impl Theme {
@@ -162,6 +165,7 @@ impl Theme {
         edge_label_fill: Color::rgb(0xe8e8e8),
         cluster_fill: Color::rgb(0xffffde),
         cluster_stroke: Color::rgb(0xaaaa33),
+        accent: Color::rgb(0x2563eb),
     };
 
     pub const DARK: Theme = Theme {
@@ -175,6 +179,7 @@ impl Theme {
         edge_label_fill: Color::rgb(0x3a3a3a),
         cluster_fill: Color::rgb(0x2a2a24),
         cluster_stroke: Color::rgb(0x8a8a5c),
+        accent: Color::rgb(0x60a5fa),
     };
 }
 

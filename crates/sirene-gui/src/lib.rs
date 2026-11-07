@@ -2,6 +2,7 @@
 //! (GUISHE-*, WYSIWY-*).
 
 pub mod document;
+pub mod drawing;
 pub mod paint;
 pub mod viewer;
 
@@ -43,6 +44,18 @@ actions!(
         CloseWindow,
         /// Quit the application.
         Quit,
+        /// Add a node, connected from the selected node.
+        AddNode,
+        /// Edit the label of the selected item.
+        Rename,
+        /// Delete the selected nodes and edges.
+        Delete,
+        /// Clear the selection.
+        Deselect,
+        /// Undo the last change made on the drawing.
+        Undo,
+        /// Redo the last change undone on the drawing.
+        Redo,
     ]
 );
 
@@ -73,6 +86,13 @@ pub fn key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new(secondary!("e"), ToggleSource, None),
         KeyBinding::new(secondary!("w"), CloseWindow, None),
         KeyBinding::new(secondary!("q"), Quit, None),
+        KeyBinding::new(secondary!("shift-n"), AddNode, None),
+        KeyBinding::new("enter", Rename, Some("Drawing")),
+        KeyBinding::new("backspace", Delete, Some("Drawing")),
+        KeyBinding::new("delete", Delete, Some("Drawing")),
+        KeyBinding::new("escape", Deselect, Some("Drawing")),
+        KeyBinding::new(secondary!("z"), Undo, Some("Drawing")),
+        KeyBinding::new(secondary!("shift-z"), Redo, Some("Drawing")),
     ]
 }
 
@@ -98,6 +118,18 @@ pub fn menus() -> Vec<Menu> {
                 MenuItem::action("Reload", Reload),
                 MenuItem::separator(),
                 MenuItem::action("Close Window", CloseWindow),
+            ],
+        ),
+        menu(
+            "Edit",
+            vec![
+                MenuItem::action("Undo", Undo),
+                MenuItem::action("Redo", Redo),
+                MenuItem::separator(),
+                MenuItem::action("Add Node", AddNode),
+                MenuItem::action("Rename", Rename),
+                MenuItem::action("Delete", Delete),
+                MenuItem::action("Deselect", Deselect),
             ],
         ),
         menu(
@@ -306,7 +338,7 @@ mod tests {
             .flat_map(|m| &m.items)
             .filter(|i| !matches!(i, MenuItem::Separator))
             .count();
-        assert_eq!(items, 12);
-        assert_eq!(key_bindings().len(), 13);
+        assert_eq!(items, 18);
+        assert_eq!(key_bindings().len(), 20);
     }
 }

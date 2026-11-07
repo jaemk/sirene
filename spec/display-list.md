@@ -31,8 +31,9 @@ scene, so labels fit the font that renders them. `Approx` estimates 0.6 em per t
 
 ## DISPLA-5 Themes
 
-`Theme` holds the font size, line height, and colors. `Theme::LIGHT` follows mermaid's default
-theme; `Theme::DARK` is a dark variant.
+`Theme` holds the font size, line height, and colors, including an accent color for editing marks
+such as selection outlines. `Theme::LIGHT` follows mermaid's default theme; `Theme::DARK` is a dark
+variant.
 
 ## DISPLA-6 Styles
 
@@ -64,3 +65,11 @@ the drawing.
 `path` per path element, and one `text` per text element (anchored at its center). Numbers have
 at most two decimals; translucent colors use `fill-opacity`/`stroke-opacity`; text is
 XML-escaped.
+
+## DISPLA-10 Hit testing
+
+`Scene::hit(point, slop)` returns the owner of the topmost element drawn at a point: a filled path
+that contains it (even-odd), or a stroked path within `slop` plus half the stroke width. Text and
+the diagram's own elements (its title) are never hit, so a label hits the shape or label
+background under it. `Scene::bounds(owner)` is the bounding box of an owner's paths. Tests: unit
+tests in `crates/sirene-core/src/scene/hit.rs`.

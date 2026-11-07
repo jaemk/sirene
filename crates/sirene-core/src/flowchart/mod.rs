@@ -1,5 +1,6 @@
 //! Mermaid flowchart parsing and lowering.
 
+pub mod edit;
 mod graph;
 mod lower;
 mod model;

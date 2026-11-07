@@ -6,16 +6,18 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::base::input::{Diagnostic, DiagnosticSeverity};
-use gpui::component::input::{Editor, EditorState, InputEvent, Position, RopeExt};
+use gpui::component::input::{Editor, EditorState, Escape, Input, InputEvent, Position, RopeExt};
 use gpui::component::{Theme as KitTheme, ThemeMode};
 use gpui::{
-    Bounds, Context, Entity, FocusHandle, Pixels, Point, PromptLevel, Render, ScrollEvent,
-    Subscription, Task, Window, WindowAppearance, canvas, div, prelude::*, px, relative,
+    Bounds, Context, Entity, FocusHandle, MouseButton, Pixels, Point, PromptLevel, Render,
+    ScrollEvent, Subscription, Task, Window, WindowAppearance, canvas, div, prelude::*, px,
+    relative,
 };
 use sirene_core::Severity;
-use sirene_core::scene::{self, Scene, Theme};
+use sirene_core::scene::{self, Owner, Scene, Theme};
 
 use crate::document::{Disk, Document};
+use crate::drawing::{Drag, Item, LabelEdit};
 use crate::paint::{self, Metrics, Placement};
 use crate::{
     ActualSize, CloseWindow, FitWindow, Open, Reload, Save, SaveAs, ToggleSource, ZoomIn, ZoomOut,
@@ -36,17 +38,31 @@ pub struct Viewer {
     /// Offset of the drawing from its resting place.
     pub pan: Point<Pixels>,
     pub dark: bool,
+    /// Selected nodes and edges, in selection order (WYSIWY-9).
+    pub selection: Vec<Item>,
+    /// The open label field (WYSIWY-10).
+    pub label: Option<LabelEdit>,
+    pub(crate) drag: Option<Drag>,
+    /// Drawing changes as (before, after) texts, for Undo and Redo (WYSIWY-13).
+    pub(crate) history: Vec<(String, String)>,
+    pub(crate) future: Vec<(String, String)>,
     scene: Option<Rc<Scene>>,
     /// The drawing area from the last paint.
-    viewport: Rc<Cell<Bounds<Pixels>>>,
+    pub(crate) viewport: Rc<Cell<Bounds<Pixels>>>,
     focus: FocusHandle,
+    pub(crate) drawing_focus: FocusHandle,
     _watch: Task<()>,
     _subscriptions: Vec<Subscription>,
 }
 
 /// Where a drawing lands in `bounds`: centered when it fits, else at the top left, then moved
 /// by `pan`.
-fn place(scene: &Scene, zoom: f32, pan: Point<Pixels>, bounds: Bounds<Pixels>) -> Placement {
+pub(crate) fn place(
+    scene: &Scene,
+    zoom: f32,
+    pan: Point<Pixels>,
+    bounds: Bounds<Pixels>,
+) -> Placement {
     let free_x = (bounds.size.width - px(scene.width * zoom)).max(px(0.0));
     let free_y = (bounds.size.height - px(scene.height * zoom)).max(px(0.0));
     Placement {
@@ -94,9 +110,15 @@ impl Viewer {
             zoom: 1.0,
             pan: Point::default(),
             dark,
+            selection: Vec::new(),
+            label: None,
+            drag: None,
+            history: Vec::new(),
+            future: Vec::new(),
             scene: None,
             viewport: Rc::default(),
             focus: cx.focus_handle(),
+            drawing_focus: cx.focus_handle(),
             _watch: watch,
             _subscriptions: vec![edits, appearance],
         };
@@ -105,7 +127,7 @@ impl Viewer {
     }
 
     /// Takes the editor's text after an edit (WYSIWY-2).
-    fn edited(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn edited(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let text = self.source.read(cx).value().to_string();
         if self.doc.set_source(text) {
             self.refresh(window, cx);
@@ -115,6 +137,7 @@ impl Viewer {
     /// Redraws after the document changed: drawing, diagnostics, and title.
     fn refresh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.scene = None;
+        self.prune();
         let problems = &self.doc.problems;
         self.source.update(cx, |s, cx| {
             let text = s.text().clone();
@@ -170,6 +193,10 @@ impl Viewer {
         self.doc = doc;
         self.zoom = 1.0;
         self.pan = Point::default();
+        self.selection.clear();
+        self.label = None;
+        self.history.clear();
+        self.future.clear();
         self.load_source(window, cx);
     }
 
@@ -242,7 +269,7 @@ impl Viewer {
         if self.show_source {
             self.source.update(cx, |s, cx| s.focus(window, cx));
         } else {
-            window.focus(&self.focus, cx);
+            window.focus(&self.drawing_focus, cx);
         }
         cx.notify();
     }
@@ -402,22 +429,55 @@ impl Render for Viewer {
         let viewport = self.viewport.clone();
         let font = window.text_style().font();
         let rule = paint::color(theme.cluster_stroke);
+        let accent = paint::color(theme.accent);
+        let selected: Vec<Owner> = self
+            .selection
+            .iter()
+            .filter_map(|i| self.owner(i))
+            .collect();
+        let band = self.rubber_band(window);
+        let field = self.label_field(window, px(160.0));
         let drawing = div()
             .id("drawing")
+            .track_focus(&self.drawing_focus)
+            .key_context("Drawing")
+            .on_action(cx.listener(Self::delete))
+            .on_action(cx.listener(Self::rename))
+            .on_action(cx.listener(Self::deselect))
+            .on_action(cx.listener(Self::undo))
+            .on_action(cx.listener(Self::redo))
+            .relative()
             .flex_1()
             .h_full()
             .overflow_hidden()
             .on_scroll(cx.listener(Self::scroll))
+            .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
+            .on_mouse_move(cx.listener(Self::mouse_move))
+            .on_mouse_up(MouseButton::Left, cx.listener(Self::mouse_up))
+            .on_mouse_up_out(MouseButton::Left, cx.listener(Self::mouse_up))
             .child(
                 canvas(
                     move |bounds, _, _| viewport.set(bounds),
                     move |bounds, (), window, cx| {
                         let at = place(&scene, zoom, pan, bounds);
                         paint::paint(&scene, &at, &font, window, cx);
+                        paint::outline(&scene, &selected, &at, accent, window);
+                        if let Some((from, to)) = band {
+                            paint::line(from, to, accent, window);
+                        }
                     },
                 )
                 .size_full(),
-            );
+            )
+            .children(field.map(|(input, at, width)| {
+                div()
+                    .absolute()
+                    .left(at.x)
+                    .top(at.y)
+                    .w(width)
+                    .on_action(cx.listener(|v, _: &Escape, window, cx| v.cancel_label(window, cx)))
+                    .child(Input::new(&input))
+            }));
         let body = div().flex().flex_row().flex_1().min_h_0().w_full();
         let body = if self.show_source {
             body.child(
@@ -445,6 +505,7 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::save_as_action))
             .on_action(cx.listener(Self::close))
             .on_action(cx.listener(Self::open))
+            .on_action(cx.listener(Self::add_node))
             .size_full()
             .flex()
             .flex_col()

@@ -1,0 +1,11 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc c39982dc9b434087c86ef4313eff75ecf9d22ee75875f3ba1958bbff91ee40c2 # shrinks to text = "`"
+cc 51e9c0bd68e86831dc44a8b1cbbcef63c2a561591192420f8e99cf53f7e41771 # shrinks to src = "flowchart LR\n    linkStyle 0,1 color:red\n    A --> A\n", nodes = ["A"], edges = []
+cc f08f94b368f94af51dfb6eece257076874e301a27716112558ec5ef43d07c93d # shrinks to text = "`", inline = false
+cc cf870a1aa05b1b656c65f5491b029a1083d173d1e7e44086df02d7cc2f8e2112 # shrinks to text = "`", shape = ("[", "]"), markdown = false
+cc 5a9b9e8d26c46491c866b8a33f8af68824ee570e37cad52d6afe03adcd3d9817 # shrinks to src = "flowchart LR\n    A --> C --> B\n    class B,C hot\n    A --> B\n", nodes = [], edges = [1]
