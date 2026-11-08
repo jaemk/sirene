@@ -43,7 +43,8 @@ that drops below the threshold fails.
 
 CI (GitHub Actions) runs on pushes to `main` and on pull requests, on both `ubuntu-latest` and
 `macos-latest`. On Linux, gpui needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan
-development packages installed first.
+development packages installed first. An `audit` job runs `cargo audit` against `Cargo.lock` on
+the same triggers and weekly, with the ignores in `.cargo/audit.toml`.
 
 ## WORKSP-8 Releases
 
