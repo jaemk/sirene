@@ -233,34 +233,91 @@ fn parse(source: &str) -> (Flowchart, Vec<Problem>) {
 }
 
 /// Writes `text` to a temporary file beside `path`, then renames it over `path`. A symlink is
-/// followed, so the link stays and its target changes; the file keeps its permissions; and the
-/// text is on disk before the rename.
+/// followed, so the link stays and its target changes; the file keeps its permissions, owner, and
+/// group; and the text is on disk before the rename. A read-only file is refused. When the owner
+/// cannot be kept (another user's file), the file is written in place instead.
 fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    write_atomic_with(path, text, keep_owner)
+}
+
+/// Gives `file` the owner and group in `meta`, when they differ.
+#[cfg(unix)]
+fn keep_owner(file: &std::fs::File, meta: &std::fs::Metadata) -> std::io::Result<()> {
+    use std::os::unix::fs::MetadataExt;
+
+    let own = file.metadata()?;
+    if (own.uid(), own.gid()) == (meta.uid(), meta.gid()) {
+        return Ok(());
+    }
+    std::os::unix::fs::fchown(file, Some(meta.uid()), Some(meta.gid()))
+}
+
+#[cfg(not(unix))]
+fn keep_owner(_: &std::fs::File, _: &std::fs::Metadata) -> std::io::Result<()> {
+    Ok(())
+}
+
+fn write_atomic_with(
+    path: &Path,
+    text: &str,
+    keep_owner: impl Fn(&std::fs::File, &std::fs::Metadata) -> std::io::Result<()>,
+) -> std::io::Result<()> {
     use std::io::Write;
 
     let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
+    let meta = std::fs::metadata(&path).ok();
+    if meta.as_ref().is_some_and(|m| m.permissions().readonly()) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "the file is read-only",
+        ));
+    }
     let name = path
         .file_name()
         .map_or_else(|| "file".into(), |n| n.to_string_lossy().into_owned());
     let tmp = path.with_file_name(format!(".{name}.sirene-save"));
     // A leftover temporary file, or anything planted there, is replaced, never written through.
     let _ = std::fs::remove_file(&tmp);
-    let result = (|| {
+    // `Ok(false)`: the owner cannot be kept.
+    let staged = (|| {
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&tmp)?;
-        if let Ok(meta) = std::fs::metadata(&path) {
+        if let Some(meta) = &meta {
             file.set_permissions(meta.permissions())?;
+            if keep_owner(&file, meta).is_err() {
+                return Ok(false);
+            }
         }
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
-        std::fs::rename(&tmp, &path)
+        Ok(true)
     })();
+    let result = match staged {
+        Ok(true) => std::fs::rename(&tmp, &path),
+        Ok(false) => {
+            let _ = std::fs::remove_file(&tmp);
+            write_in_place(&path, text)
+        }
+        Err(e) => Err(e),
+    };
     if result.is_err() {
         let _ = std::fs::remove_file(&tmp);
     }
     result
+}
+
+/// Overwrites `path` itself, keeping its inode and so its owner.
+fn write_in_place(path: &Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(path)?;
+    file.write_all(text.as_bytes())?;
+    file.sync_all()
 }
 
 #[cfg(test)]
@@ -419,6 +476,58 @@ mod tests {
         names.sort();
         assert_eq!(names, ["link.mmd", "real.mmd", "victim"]);
         assert_eq!(d.poll(), Disk::Unchanged);
+    }
+
+    /// A read-only file is refused and left alone.
+    #[test]
+    fn read_only_files_are_not_saved() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.mmd");
+        std::fs::write(&path, "flowchart LR\nA\n").unwrap();
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&path, perms).unwrap();
+        let mut d = Document::open(&path);
+        d.set_source("flowchart LR\nA --> B\n".into());
+        let err = d.save().unwrap_err();
+        assert_eq!(
+            err,
+            format!("cannot write {}: the file is read-only", path.display())
+        );
+        assert!(d.is_edited());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "flowchart LR\nA\n");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    /// When the owner cannot be kept, the file is overwritten in place: same inode, so same
+    /// owner, and no temporary file left.
+    #[cfg(unix)]
+    #[test]
+    fn saves_in_place_when_the_owner_cannot_be_kept() {
+        use std::os::unix::fs::MetadataExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.mmd");
+        std::fs::write(&path, "flowchart LR\nA --> B --> C\n").unwrap();
+        let inode = std::fs::metadata(&path).unwrap().ino();
+        let refuse = |_: &std::fs::File, _: &std::fs::Metadata| {
+            Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+        };
+        write_atomic_with(&path, "flowchart LR\nA\n", refuse).unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "flowchart LR\nA\n");
+        assert_eq!(std::fs::metadata(&path).unwrap().ino(), inode);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+
+        // A normal save replaces the inode, keeping the owner.
+        write_atomic(&path, "flowchart LR\nB\n").unwrap();
+        let meta = std::fs::metadata(&path).unwrap();
+        assert_ne!(meta.ino(), inode);
+        let dir_meta = std::fs::metadata(dir.path()).unwrap();
+        assert_eq!((meta.uid(), meta.gid()), (dir_meta.uid(), dir_meta.gid()));
+
+        // The in-place write's own failure is reported.
+        let gone = dir.path().join("gone").join("a.mmd");
+        assert!(write_in_place(&gone, "x").is_err());
     }
 
     #[test]
