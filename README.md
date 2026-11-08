@@ -52,7 +52,7 @@ sirene png diagram.mmd       # write diagram.png (--scale 2, --theme, -o FILE)
 
 `svg`, `png`, and `ascii` never open a window. `--no-default-features` builds a CLI-only
 binary that does not link the GUI. PNG text uses the
-embedded Noto Sans (`crates/sirene-core/fonts`, SIL OFL 1.1), so images are the same on every
+embedded Noto Sans faces (`crates/sirene-core/fonts`, SIL OFL 1.1), so images are the same on every
 machine.
 
 On the drawing: click to select (shift-click for more), double-click or enter to edit a label,

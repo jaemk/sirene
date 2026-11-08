@@ -2,8 +2,12 @@
 
 use super::shapes::{self, BoxF, Outline};
 use super::style::{self, Resolved};
-use super::{Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, Theme};
-use crate::flowchart::{Arrow, Edge, Flowchart, Label, Measure, Node, Stroke as Line, Subgraph};
+use super::{
+    Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
+};
+use crate::flowchart::{
+    Arrow, Edge, Flowchart, Label, Measure, Node, Shape, Span, Stroke as Line, Subgraph,
+};
 use crate::layout::{self, Config, Rect, Size, Spacing};
 
 /// Spacing in pixels.
@@ -56,20 +60,118 @@ fn cells(v: f32) -> i32 {
     v.ceil() as i32 + 1
 }
 
+/// Labels wider than this wrap at spaces, as in mermaid.
+const WRAP: f32 = 200.0;
+/// One-line labels of diamond-like shapes wider than this wrap to keep the shape compact.
+const SQUARE_WRAP: f32 = 120.0;
+
+fn style_of(s: &Span) -> TextStyle {
+    TextStyle {
+        bold: s.bold,
+        italic: s.italic,
+    }
+}
+
+/// Appends `text` in the style of `like` to `line`, merging it into the last span when the style
+/// matches.
+fn push_span(line: &mut Vec<Span>, text: &str, like: &Span) {
+    match line.last_mut() {
+        Some(s) if s.bold == like.bold && s.italic == like.italic => s.text.push_str(text),
+        _ => line.push(Span {
+            text: text.to_owned(),
+            ..like.clone()
+        }),
+    }
+}
+
 impl<M: TextMetrics> Px<'_, M> {
-    fn text_size(&self, lines: &[String]) -> (f32, f32) {
-        let w = lines
-            .iter()
-            .map(|l| self.metrics.width(l, self.theme.font_size))
-            .fold(0.0, f32::max);
+    fn width(&self, text: &str, style: TextStyle) -> f32 {
+        self.metrics.styled_width(text, self.theme.font_size, style)
+    }
+
+    fn line_width(&self, line: &[Span]) -> f32 {
+        line.iter().map(|s| self.width(&s.text, style_of(s))).sum()
+    }
+
+    fn text_size(&self, lines: &[Vec<Span>]) -> (f32, f32) {
+        let w = lines.iter().map(|l| self.line_width(l)).fold(0.0, f32::max);
         (w, lines.len() as f32 * self.theme.line_height)
+    }
+
+    /// `lines` with each line wider than `max` broken at spaces; a word wider than `max` keeps
+    /// a line of its own.
+    fn wrap(&self, lines: &[Vec<Span>], max: f32) -> Vec<Vec<Span>> {
+        let mut out = Vec::new();
+        for line in lines {
+            if self.line_width(line) <= max {
+                out.push(line.clone());
+                continue;
+            }
+            // Words, each a run of spans without spaces.
+            let mut words: Vec<Vec<Span>> = vec![Vec::new()];
+            for span in line {
+                for (k, part) in span.text.split(' ').enumerate() {
+                    if k > 0 && !words.last().is_some_and(Vec::is_empty) {
+                        words.push(Vec::new());
+                    }
+                    if !part.is_empty() {
+                        push_span(words.last_mut().expect("one word"), part, span);
+                    }
+                }
+            }
+            let space = self.width(" ", TextStyle::default());
+            let mut cur: Vec<Span> = Vec::new();
+            let mut cur_w = 0.0;
+            for word in words.into_iter().filter(|w| !w.is_empty()) {
+                let ww = self.line_width(&word);
+                if !cur.is_empty() && cur_w + space + ww > max {
+                    out.push(std::mem::take(&mut cur));
+                    cur_w = 0.0;
+                }
+                if !cur.is_empty() {
+                    push_span(&mut cur, " ", &Span::default());
+                    cur_w += space;
+                }
+                for s in &word {
+                    push_span(&mut cur, &s.text, s);
+                }
+                cur_w += ww;
+            }
+            out.push(cur);
+        }
+        out
+    }
+
+    /// A label's lines as drawn: wrapped at `WRAP`, and for a diamond-like `shape` at the width
+    /// that makes the smallest shape.
+    fn label_lines(&self, label: &Label, shape: Option<Shape>) -> Vec<Vec<Span>> {
+        let lines = label.spans();
+        let mut best = self.wrap(&lines, WRAP);
+        if let Some(shape) = shape.filter(|&s| shapes::grows_square(s))
+            && let [line] = lines.as_slice()
+            && self.line_width(line) > SQUARE_WRAP
+        {
+            let area = |ls: &[Vec<Span>]| {
+                let (tw, th) = self.text_size(ls);
+                let (w, h) = shapes::size(shape, tw, th);
+                w * h
+            };
+            let total = self.line_width(line);
+            for k in 2..=4 {
+                let candidate = self.wrap(&lines, total / k as f32);
+                if area(&candidate) < area(&best) {
+                    best = candidate;
+                }
+            }
+        }
+        best
     }
 }
 
 impl<M: TextMetrics> Measure for Px<'_, M> {
     fn node(&self, node: &Node) -> Size {
         let (tw, th) = if shapes::has_label(node.shape) {
-            self.text_size(&node.label.lines())
+            self.text_size(&self.label_lines(&node.label, Some(node.shape)))
         } else {
             (0.0, 0.0)
         };
@@ -78,7 +180,7 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
     }
 
     fn edge_label(&self, label: &Label) -> Option<Size> {
-        let (tw, th) = self.text_size(&label.lines());
+        let (tw, th) = self.text_size(&self.label_lines(label, None));
         (tw > 0.0).then(|| Size::new(cells(tw + 8.0), cells(th + 4.0)))
     }
 
@@ -127,6 +229,7 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
 
     let mut p = Painter {
         theme,
+        metrics,
         elements: Vec::new(),
     };
     if let Some(t) = title {
@@ -136,6 +239,7 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
             Pt::new(width / 2.0, MARGIN + theme.line_height / 2.0),
             theme.font_size * 1.2,
             theme.text,
+            TextStyle::default(),
         );
     }
 
@@ -158,7 +262,7 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
         if let Some(t) = layout.titles[i] {
             p.lines(
                 Owner::Cluster(i),
-                &[subgraph_title(s)],
+                &[vec![Span::plain(subgraph_title(s))]],
                 at(t).center(),
                 text_color(&r, theme),
             );
@@ -223,7 +327,8 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
         let mut classes = vec!["default"];
         classes.extend(n.classes.iter().map(String::as_str));
         let s = style::resolve(&[], &classes, &n.styles, &chart.classes);
-        p.node(i, n, &s, at(r), o);
+        let lines = px.label_lines(&n.label, Some(n.shape));
+        p.node(i, n, &lines, &s, at(r), o);
     }
 
     for (i, (e, route)) in chart.edges.iter().zip(&layout.edges).enumerate() {
@@ -234,7 +339,7 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
             let b = at(r);
             p.path(Owner::Edge(i), rect(b), Some(theme.edge_label_fill), None);
             let color = edge_styles[i].color.unwrap_or(theme.text);
-            p.lines(Owner::Edge(i), &l.lines(), b.center(), color);
+            p.lines(Owner::Edge(i), &px.label_lines(l, None), b.center(), color);
         }
     }
 
@@ -305,6 +410,7 @@ fn stroke(r: &Resolved, color: Color, width: f32, dash: Option<(f32, f32)>) -> S
 
 struct Painter<'a> {
     theme: &'a Theme,
+    metrics: &'a dyn TextMetrics,
     elements: Vec<Element>,
 }
 
@@ -330,7 +436,15 @@ impl Painter<'_> {
         );
     }
 
-    fn text(&mut self, owner: Owner, text: String, center: Pt, size: f32, color: Color) {
+    fn text(
+        &mut self,
+        owner: Owner,
+        text: String,
+        center: Pt,
+        size: f32,
+        color: Color,
+        style: TextStyle,
+    ) {
         self.push(
             owner,
             Primitive::Text {
@@ -338,23 +452,47 @@ impl Painter<'_> {
                 center,
                 size,
                 color,
+                style,
             },
         );
     }
 
-    /// Lines of text centered as a block on `center`.
-    fn lines(&mut self, owner: Owner, lines: &[String], center: Pt, color: Color) {
-        let lh = self.theme.line_height;
+    /// Lines of styled spans centered as a block on `center`, one text run per span.
+    fn lines(&mut self, owner: Owner, lines: &[Vec<Span>], center: Pt, color: Color) {
+        let (lh, size) = (self.theme.line_height, self.theme.font_size);
+        let width = |text: &str, style| self.metrics.styled_width(text, size, style);
         let top = center.y - lh * (lines.len() as f32 - 1.0) / 2.0;
-        for (k, l) in lines.iter().enumerate() {
-            if !l.trim().is_empty() {
-                let at = Pt::new(center.x, top + lh * k as f32);
-                self.text(owner, l.clone(), at, self.theme.font_size, color);
+        let mut runs = Vec::new();
+        for (k, line) in lines.iter().enumerate() {
+            let y = top + lh * k as f32;
+            let total: f32 = line.iter().map(|s| width(&s.text, style_of(s))).sum();
+            let mut x = center.x - total / 2.0;
+            for span in line {
+                let style = style_of(span);
+                let trimmed = span.text.trim();
+                if !trimmed.is_empty() {
+                    let lead = &span.text[..span.text.len() - span.text.trim_start().len()];
+                    let left = x + width(lead, style);
+                    let mid = left + width(trimmed, style) / 2.0;
+                    runs.push((trimmed.to_owned(), Pt::new(mid, y), style));
+                }
+                x += width(&span.text, style);
             }
+        }
+        for (text, at, style) in runs {
+            self.text(owner, text, at, size, color, style);
         }
     }
 
-    fn node(&mut self, i: usize, node: &Node, s: &Resolved, b: BoxF, o: Outline) {
+    fn node(
+        &mut self,
+        i: usize,
+        node: &Node,
+        lines: &[Vec<Span>],
+        s: &Resolved,
+        b: BoxF,
+        o: Outline,
+    ) {
         let owner = Owner::Node(i);
         let theme = self.theme;
         let line = stroke(s, theme.node_stroke, 1.0, None);
@@ -379,7 +517,7 @@ impl Painter<'_> {
         }
         if shapes::has_label(node.shape) {
             let center = shapes::text_box(node.shape, b).center();
-            self.lines(owner, &node.label.lines(), center, text_color(s, theme));
+            self.lines(owner, lines, center, text_color(s, theme));
         }
     }
 

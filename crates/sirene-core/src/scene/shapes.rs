@@ -107,6 +107,12 @@ fn cylinder_ry(w: f32) -> f32 {
     (w * 0.1).clamp(5.0, 12.0)
 }
 
+/// Shapes whose size doubles the label's in both directions, so a long one-line label makes a
+/// wide flat shape and wrapping it makes a smaller one.
+pub(super) fn grows_square(shape: Shape) -> bool {
+    matches!(geo(shape), Geo::Diamond | Geo::Triangle | Geo::Flipped)
+}
+
 /// The size of a node whose label measures `tw` by `th`.
 pub(super) fn size(shape: Shape, tw: f32, th: f32) -> (f32, f32) {
     let (w0, h0) = (tw + 2.0 * PAD_X, th + 2.0 * PAD_Y);

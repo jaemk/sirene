@@ -1,15 +1,27 @@
 //! Painting scenes with gpui (GUISHE-4).
 
 use gpui::{
-    App, Font, Hsla, PathBuilder, Pixels, Point, Rgba, SharedString, TextAlign, TextRun, Window,
-    point, px,
+    App, Font, FontStyle, FontWeight, Hsla, PathBuilder, Pixels, Point, Rgba, SharedString,
+    TextAlign, TextRun, Window, point, px,
 };
-use sirene_core::scene::{Color, Owner, Primitive, Pt, Scene, Segment, TextMetrics};
+use sirene_core::scene::{Color, Owner, Primitive, Pt, Scene, Segment, TextMetrics, TextStyle};
 
 /// Text measured by the window's text system.
 pub struct Metrics<'a> {
     pub window: &'a Window,
     pub font: Font,
+}
+
+/// `font` in the weight and slant of `style`.
+pub fn styled(font: &Font, style: TextStyle) -> Font {
+    let mut f = font.clone();
+    if style.bold {
+        f.weight = FontWeight::BOLD;
+    }
+    if style.italic {
+        f.style = FontStyle::Italic;
+    }
+    f
 }
 
 fn run(text: &str, font: &Font, color: Hsla) -> TextRun {
@@ -25,10 +37,14 @@ fn run(text: &str, font: &Font, color: Hsla) -> TextRun {
 
 impl TextMetrics for Metrics<'_> {
     fn width(&self, text: &str, size: f32) -> f32 {
+        self.styled_width(text, size, TextStyle::default())
+    }
+
+    fn styled_width(&self, text: &str, size: f32, style: TextStyle) -> f32 {
         let shaped = self.window.text_system().shape_line(
             SharedString::from(text.to_owned()),
             px(size),
-            &[run(text, &self.font, Hsla::default())],
+            &[run(text, &styled(&self.font, style), Hsla::default())],
             None,
         );
         f32::from(shaped.width)
@@ -137,12 +153,13 @@ pub fn paint(scene: &Scene, at: &Placement, font: &Font, window: &mut Window, cx
                 center,
                 size,
                 color: c,
+                style,
             } => {
                 let size = px(size * at.zoom);
                 let shaped = window.text_system().shape_line(
                     SharedString::from(text.clone()),
                     size,
-                    &[run(text, font, color(*c))],
+                    &[run(text, &styled(font, *style), color(*c))],
                     None,
                 );
                 let line_height = size * 1.3;

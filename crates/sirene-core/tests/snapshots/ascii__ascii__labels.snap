@@ -2,12 +2,12 @@
 source: crates/sirene-core/tests/ascii.rs
 expression: "graph TD\n    id1[\"This is the (text) in the box\"]\n    A[\"A double quote:#quot;\"] --> B[\"A dec char:#9829;\"]\n    md[\"`**bold** and _italic_`\"]\n    uni[Ünïcödé 🐟 text]\n    multi[first\n    second]\n    spaced[ padded label ]\n    endpoint --> classes\n"
 ---
-+-------------------------------+   +------------------+   +-------------------+   +-----------------+   +--------+   +--------------+   +----------+
-| This is the (text) in the box |   | A double quote:" |   | bold and _italic_ |   | Ünïcödé 🐟 text |   | first  |   | padded label |   | endpoint |
-+-------------------------------+   +---------+--------+   +-------------------+   +-----------------+   | second |   +--------------+   +-----+----+
-                                              |                                                          +--------+                            |
-                                              |                                                                                                |
-                                              v                                                                                                v
-                                      +--------------+                                                                                    +---------+
-                                      | A dec char:♥ |                                                                                    | classes |
-                                      +--------------+                                                                                    +---------+
++-------------------------------+   +------------------+   +-----------------+   +-----------------+   +--------+   +--------------+   +----------+
+| This is the (text) in the box |   | A double quote:" |   | bold and italic |   | Ünïcödé 🐟 text |   | first  |   | padded label |   | endpoint |
++-------------------------------+   +---------+--------+   +-----------------+   +-----------------+   | second |   +--------------+   +-----+----+
+                                              |                                                        +--------+                            |
+                                              |                                                                                              |
+                                              v                                                                                              v
+                                      +--------------+                                                                                  +---------+
+                                      | A dec char:♥ |                                                                                  | classes |
+                                      +--------------+                                                                                  +---------+

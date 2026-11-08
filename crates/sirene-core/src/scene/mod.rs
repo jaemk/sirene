@@ -102,13 +102,21 @@ pub enum Primitive {
         fill: Option<Color>,
         stroke: Option<Stroke>,
     },
-    /// One line of text, centered on `center` both ways.
+    /// A run of text on one line, centered on `center` both ways.
     Text {
         text: String,
         center: Pt,
         size: f32,
         color: Color,
+        style: TextStyle,
     },
+}
+
+/// Font weight and slant of a text run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TextStyle {
+    pub bold: bool,
+    pub italic: bool,
 }
 
 /// The diagram element a primitive belongs to (DISPLA-3).
@@ -140,6 +148,12 @@ pub struct Scene {
 pub trait TextMetrics {
     /// The advance width of one line of `text` at `size` pixels.
     fn width(&self, text: &str, size: f32) -> f32;
+
+    /// The advance width of `text` in `style`; the regular width unless overridden.
+    fn styled_width(&self, text: &str, size: f32, style: TextStyle) -> f32 {
+        let _ = style;
+        self.width(text, size)
+    }
 }
 
 /// Monospace estimate: 0.6 em per terminal column, so wide characters count double.

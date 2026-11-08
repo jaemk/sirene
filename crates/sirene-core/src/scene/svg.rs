@@ -45,10 +45,21 @@ pub fn write(scene: &Scene) -> String {
                 center,
                 size,
                 color,
+                style,
             } => {
+                let weight = if style.bold {
+                    " font-weight=\"bold\""
+                } else {
+                    ""
+                };
+                let slant = if style.italic {
+                    " font-style=\"italic\""
+                } else {
+                    ""
+                };
                 let _ = writeln!(
                     out,
-                    "<text x=\"{}\" y=\"{}\" font-size=\"{}\" text-anchor=\"middle\" \
+                    "<text x=\"{}\" y=\"{}\" font-size=\"{}\"{weight}{slant} text-anchor=\"middle\" \
                      dominant-baseline=\"central\"{}>{}</text>",
                     num(center.x),
                     num(center.y),

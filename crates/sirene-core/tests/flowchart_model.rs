@@ -9,6 +9,44 @@ use sirene_core::flowchart::{
     self, Arrow, Click, Direction, Edge, Flowchart, Label, Lowered, Shape, Stroke, Style,
 };
 
+/// Markdown labels split into styled spans; plain labels are one span per line.
+#[test]
+fn label_spans() {
+    let md = |t: &str| Label {
+        text: t.into(),
+        markdown: true,
+    };
+    let show = |l: &Label| -> Vec<String> {
+        l.spans()
+            .iter()
+            .map(|line| {
+                line.iter()
+                    .map(|s| {
+                        let mark = match (s.bold, s.italic) {
+                            (true, true) => "BI:",
+                            (true, false) => "B:",
+                            (false, true) => "I:",
+                            (false, false) => "",
+                        };
+                        format!("[{mark}{}]", s.text)
+                    })
+                    .collect()
+            })
+            .collect()
+    };
+    assert_eq!(show(&md("**bold** and *it*")), ["[B:bold][ and ][I:it]"]);
+    assert_eq!(
+        show(&md("__b__ _i_ ***both***")),
+        ["[B:b][ ][I:i][ ][BI:both]"]
+    );
+    assert_eq!(show(&md("snake_case_name")), ["[snake_case_name]"]);
+    assert_eq!(show(&md("2 * 3 = 6")), ["[2 * 3 = 6]"]);
+    assert_eq!(show(&md("a **b\nc** d")), ["[a **b]", "[c** d]"]);
+    assert_eq!(show(&md("")), ["[]"]);
+    assert_eq!(show(&Label::plain("**not md**")), ["[**not md**]"]);
+    assert_eq!(md("**bold** _it_").lines(), ["bold it"]);
+}
+
 fn lower(src: &str) -> Lowered {
     flowchart::parse(src).lower()
 }
