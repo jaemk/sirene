@@ -3,9 +3,10 @@
 use proptest::prelude::*;
 use sirene_core::Severity;
 use sirene_core::flowchart::edit::{
-    Line, MAX_LENGTH, TextEdit, add_edge, add_node, delete, group, keep_together, label_source,
-    move_edge, move_node, move_to_subgraph, reverse_edge, set_direction, set_edge_label,
-    set_edge_line, set_node_label, set_node_shape, ungroup,
+    Line, MAX_LENGTH, TextEdit, add_edge, add_node, apply_class, delete, fresh_class_name, group,
+    keep_together, label_source, move_edge, move_node, move_to_subgraph, remove_class,
+    reverse_edge, set_class_style, set_direction, set_edge_label, set_edge_line, set_node_label,
+    set_node_shape, ungroup,
 };
 use sirene_core::flowchart::{self, Arrow, Direction, Flowchart, Shape, Stroke};
 
@@ -353,6 +354,69 @@ fn directions() {
         applied(src, set_direction(src, Some("s"), Direction::RightLeft)),
         "flowchart TD\n  subgraph s\n      direction RL\n  end\n"
     );
+}
+
+#[test]
+fn class_styles() {
+    let src = "flowchart TD\n    A --> B\n";
+    // A new class gets a `classDef`; later properties go in it, replaced in place.
+    let out = applied(src, set_class_style(src, "hot", "fill", Some("#f00")));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B\n    classDef hot fill:#f00\n"
+    );
+    let out = applied(&out, set_class_style(&out, "hot", "stroke", Some("#900")));
+    let out = applied(&out, set_class_style(&out, "hot", "fill", Some("#ff0000")));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B\n    classDef hot fill:#ff0000,stroke:#900\n"
+    );
+    assert_eq!(chart(&out).classes[0].styles.len(), 2);
+    assert_eq!(set_class_style(&out, "hot", "stroke", Some("#900")), None);
+    // Removing properties; the last one takes the statement with it.
+    let out = applied(&out, set_class_style(&out, "hot", "fill", None));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B\n    classDef hot stroke:#900\n"
+    );
+    assert_eq!(
+        applied(&out, set_class_style(&out, "hot", "stroke", None)),
+        src
+    );
+    assert_eq!(set_class_style(src, "cold", "fill", None), None);
+    // A `classDef` naming several classes is left alone; an unparsable declaration is kept.
+    let shared = "flowchart TD\n    classDef a,b fill:#fff\n    classDef a color:red,junk\n";
+    assert_eq!(
+        applied(shared, set_class_style(shared, "a", "stroke", Some("#000"))),
+        "flowchart TD\n    classDef a,b fill:#fff\n    classDef a color:red,stroke:#000,junk\n"
+    );
+    // Names not taken.
+    assert_eq!(fresh_class_name(src), "style1");
+    assert_eq!(
+        fresh_class_name("flowchart TD\n    classDef style1 fill:#fff\n    style2\n"),
+        "style3"
+    );
+}
+
+#[test]
+fn applying_classes() {
+    let src = "flowchart TD\n    A:::hot --> B\n    C\n    class A,B,C hot\n    class C cold\n";
+    assert_eq!(apply_class(src, &["A", "B"], "hot"), None);
+    assert_eq!(apply_class(src, &["Z"], "hot"), None);
+    assert_eq!(
+        applied(src, apply_class(src, &["A", "B"], "cold")),
+        format!("{src}    class A,B cold\n")
+    );
+    // Removing takes ids out of `class` lists and drops `:::` shorthands.
+    let out = applied(src, remove_class(src, &["A", "C"], "hot"));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B\n    C\n    class B hot\n    class C cold\n"
+    );
+    assert!(chart(&out).node("A").unwrap().classes.is_empty());
+    let out = applied(&out, remove_class(&out, &["C"], "cold"));
+    assert_eq!(out, "flowchart TD\n    A --> B\n    C\n    class B hot\n");
+    assert_eq!(remove_class(&out, &["A"], "hot"), None);
 }
 
 #[test]

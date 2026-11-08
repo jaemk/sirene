@@ -336,6 +336,132 @@ pub fn add_edge(src: &str, from: &str, to: &str) -> TextEdit {
     Doc::new(src).append(&format!("{from} --> {to}"))
 }
 
+/// Sets `property` of class `name` to `value`, or removes it when `value` is `None`, in the
+/// class's last `classDef` naming only it, or in a new `classDef` at the end. A `classDef` left
+/// with no declarations is removed. `None` when nothing changes.
+pub fn set_class_style(
+    src: &str,
+    name: &str,
+    property: &str,
+    value: Option<&str>,
+) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let def = doc
+        .root
+        .descendants()
+        .filter(|n| n.kind() == CLASSDEF_STMT)
+        .filter(|n| {
+            child(n, ID_LIST).is_some_and(|l| {
+                let ids: Vec<SyntaxToken> = tokens(&l).filter(|t| t.kind() == IDENT).collect();
+                matches!(ids.as_slice(), [t] if t.text() == name)
+            })
+        })
+        .last();
+    let Some(def) = def else {
+        let value = value?;
+        return Some(doc.append(&format!("classDef {name} {property}:{value}")));
+    };
+    let text = token(&def, STYLE_TEXT)?;
+    let (decls, invalid) = text::styles(text.text());
+    let mut out: Vec<String> = Vec::new();
+    let mut set = false;
+    for d in &decls {
+        if d.property != property {
+            out.push(format!("{}:{}", d.property, d.value));
+        } else if let (Some(v), false) = (value, set) {
+            out.push(format!("{property}:{v}"));
+            set = true;
+        }
+    }
+    if let (Some(v), false) = (value, set) {
+        out.push(format!("{property}:{v}"));
+    }
+    out.extend(invalid);
+    let new = out.join(",");
+    if new == text.text().trim() {
+        return None;
+    }
+    let edit = if out.is_empty() {
+        doc.remove(&def)
+    } else {
+        (span(text.text_range()), new)
+    };
+    doc.finish(vec![edit])
+}
+
+/// Gives each node of `ids` class `name` with a `class` statement at the end, skipping nodes
+/// that have it. `None` when every node has it or none exists.
+pub fn apply_class(src: &str, ids: &[&str], name: &str) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let missing: Vec<&str> = ids
+        .iter()
+        .copied()
+        .filter(|id| {
+            doc.chart
+                .node(id)
+                .is_some_and(|n| !n.classes.iter().any(|c| c == name))
+        })
+        .collect();
+    if missing.is_empty() {
+        return None;
+    }
+    Some(doc.append(&format!("class {} {name}", missing.join(","))))
+}
+
+/// Takes class `name` off each node of `ids`: drops them from `class` statements naming it
+/// (removing a statement left empty) and removes their `:::name` shorthands. `None` when
+/// nothing changes.
+pub fn remove_class(src: &str, ids: &[&str], name: &str) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let mut edits = Vec::new();
+    for n in doc.root.descendants() {
+        match n.kind() {
+            CLASS_STMT => {
+                let named = tokens(&n)
+                    .filter(|t| t.kind() == IDENT)
+                    .last()
+                    .is_some_and(|t| t.text() == name);
+                let Some(list) = child(&n, ID_LIST).filter(|_| named) else {
+                    continue;
+                };
+                let all: Vec<String> = tokens(&list)
+                    .filter(|t| t.kind() == IDENT)
+                    .map(|t| t.text().to_owned())
+                    .collect();
+                let kept: Vec<&str> = all
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|i| !ids.contains(i))
+                    .collect();
+                if kept.is_empty() {
+                    edits.push(doc.remove(&n));
+                } else if kept.len() < all.len() {
+                    edits.push((span(list.text_range()), kept.join(",")));
+                }
+            }
+            NODE if token(&n, IDENT).is_some_and(|t| ids.contains(&t.text())) => {
+                if let Some(short) = child(&n, CLASS_SHORTHAND)
+                    && token(&short, IDENT).is_some_and(|t| t.text() == name)
+                {
+                    edits.push((span(short.text_range()), String::new()));
+                }
+            }
+            _ => {}
+        }
+    }
+    doc.finish(edits)
+}
+
+/// The first `styleN` not used as a class name nor named in the source.
+pub fn fresh_class_name(src: &str) -> String {
+    let doc = Doc::new(src);
+    let named = doc.named();
+    (1..)
+        .map(|n| format!("style{n}"))
+        .find(|c| !named.contains(c) && !doc.chart.classes.iter().any(|d| d.name == *c))
+        .expect("names are unbounded")
+}
+
 /// Adds an invisible edge (`~~~`) from `a` to `b`, which lays them out like linked nodes without
 /// drawing a line.
 pub fn keep_together(src: &str, a: &str, b: &str) -> TextEdit {

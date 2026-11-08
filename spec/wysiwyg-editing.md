@@ -208,3 +208,26 @@ Later for one edge, which stays selected. Move To acts on each selected node in 
 change. Tests: `crates/sirene-gui/tests/layout_hints.rs`, and `directions`, `keeping_together`,
 `grouping`, `ungrouping`, `moving_into_subgraphs`, and `moving_statements` in
 `crates/sirene-core/tests/flowchart_edit.rs`.
+
+## WYSIWY-17 Styles panel
+
+Styling from the drawing writes classes, not one-off `style` statements:
+
+- `set_class_style`: sets or removes one property of a class in its last `classDef` that names
+  only that class, keeping the other declarations (and any without `:`) in order; appends
+  `classDef NAME PROPERTY:VALUE` when there is none; removes a `classDef` left empty.
+- `apply_class`: appends `class IDS NAME` for the nodes that do not have the class yet.
+- `remove_class`: drops the nodes from `class` statements naming the class, removing a statement
+  left empty, and removes their `:::NAME` shorthands.
+- `fresh_class_name`: the first `styleN` not used.
+
+ToggleStyles (View > Show or Hide Styles, secondary-i) shows a 240px panel right of the drawing.
+It lists the document's classes, each with a checkbox (checked when every selected node has the
+class; checking applies it to the selected nodes, unchecking removes it), a swatch of its fill
+and stroke, and Edit. New Class defines `styleN` with `fill:#e8f1fb,stroke:#3b6ea5`, applies it
+to the selected nodes, and edits it, as one change. The class being edited (on showing the
+panel, the first class of the selected nodes) has Fill, Stroke, and Text color pickers (written
+as `#rrggbb`, or `#rrggbbaa` when translucent; clearing one removes the property), Width 1 to
+4 (`stroke-width:Npx`), and Line Solid or Dashed (`stroke-dasharray:5 5`). Each change is one
+drawing change (WYSIWY-13). Tests: `crates/sirene-gui/tests/styles.rs`, and `class_styles` and
+`applying_classes` in `crates/sirene-core/tests/flowchart_edit.rs`.

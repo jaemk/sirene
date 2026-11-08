@@ -79,6 +79,9 @@ elsewhere). The full key table is in `spec/gui-shell.md` (GUISHE-5).
 - Layout hints, from the right-click menu: the direction of the diagram or a subgraph, Group
   (secondary-g) and Ungroup, Move To a subgraph (or drag a node onto one), Keep Together (an
   invisible `~~~` edge), and Move Earlier or Later (alt-up, alt-down) to reorder statements.
+- View > Show or Hide Styles (secondary-i) opens a panel of the document's classes: check one
+  to give it to the selected nodes, or edit a class's fill, stroke, text color, width, and
+  dashes. It writes `classDef` and `class` statements.
 - Scroll or drag empty space to pan, secondary-scroll to zoom; the arrow keys pan (shift for
   further), tab steps through nodes, secondary-8 zooms to the selection, secondary-9 fits the
   window, secondary-0 is 100%.

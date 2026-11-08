@@ -9,6 +9,7 @@ pub mod navigation;
 pub mod paint;
 pub mod settings;
 pub mod shape_bar;
+pub mod styles;
 pub mod viewer;
 
 use std::path::{Path, PathBuf};
@@ -103,6 +104,8 @@ actions!(
         MoveEarlier,
         /// Swap the selected item's statement with the one after it.
         MoveLater,
+        /// Show or hide the styles panel.
+        ToggleStyles,
     ]
 );
 
@@ -218,6 +221,7 @@ pub fn key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new(secondary!("s"), Save, None),
         KeyBinding::new(secondary!("shift-s"), SaveAs, None),
         KeyBinding::new(secondary!("e"), ToggleSource, None),
+        KeyBinding::new(secondary!("i"), ToggleStyles, None),
         KeyBinding::new(secondary!("w"), CloseWindow, None),
         KeyBinding::new(secondary!("q"), Quit, None),
         KeyBinding::new(secondary!("shift-n"), AddNode, None),
@@ -318,6 +322,7 @@ pub fn menus(recent: &[PathBuf]) -> Vec<Menu> {
             "View",
             vec![
                 MenuItem::action("Show or Hide Source", ToggleSource),
+                MenuItem::action("Show or Hide Styles", ToggleStyles),
                 MenuItem::submenu(menu(
                     "Appearance",
                     vec![
@@ -739,11 +744,11 @@ mod tests {
                 .flat_map(|m| actions(&m.items))
                 .collect()
         };
-        assert_eq!(all(&[]).len(), 44);
+        assert_eq!(all(&[]).len(), 45);
         let recent = [PathBuf::from("/a.mmd"), PathBuf::from("/b/c.mmd")];
         let names = all(&recent);
-        assert_eq!(names.len(), 46);
+        assert_eq!(names.len(), 47);
         assert!(names.contains(&"/b/c.mmd".to_owned()));
-        assert_eq!(key_bindings().len(), 37);
+        assert_eq!(key_bindings().len(), 38);
     }
 }
