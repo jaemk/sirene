@@ -52,6 +52,27 @@ The `gui` feature of the `sirene` crate is on by default. Built without it
 subcommands work as above, and running with no subcommand prints
 `error: built without the GUI; see sirene --help` and exits 1.
 
+## CLI-9 Directories
+
+`sirene svg DIR` and `sirene png DIR` render every `.mmd` and `.mermaid` file under DIR, recursing
+into subdirectories but skipping hidden entries and symlinked directories, in path order. Each is
+written as `.svg` or `.png` beside it, or with `-o OUTDIR` to the same relative path under OUTDIR
+(directories are created as needed). Diagnostics follow CLI-3 for each file; one file's errors
+fail the run without stopping the others. A DIR with no diagrams is an error
+(`error: no .mmd or .mermaid files in DIR`), as is a directory given to `sirene ascii`
+(`error: DIR is a directory; ascii reads one file`). Tests: `directories` in
+`crates/sirene/tests/cli.rs`.
+
+## CLI-10 Watching
+
+`-w, --watch` on `ascii`, `svg`, and `png` renders as usual, then keeps running until interrupted:
+every 500ms it renders again each input whose modification time or length changed, and in a
+directory, each diagram that appeared. It prints `watching PATH (Ctrl-C to stop)` to stderr at
+start, then `wrote OUTPUT` (or `printed FILE` for stdout) after each render, along with any
+diagnostics and read or write errors; none of these stop the watch. Watching stdin is an error
+(`error: --watch needs a FILE or directory, not stdin`). Tests: `watch_needs_a_path`,
+`watch_renders_changes`, and `watch_a_file` in `crates/sirene/tests/cli.rs`.
+
 ## CLI-8 Verbose output
 
 `-v, --verbose`, before or after the subcommand, prints a line to stderr for each step, as

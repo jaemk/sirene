@@ -411,6 +411,188 @@ fn output_does_not_overwrite_the_input() {
     assert_eq!(std::fs::read_to_string(src).unwrap(), text);
 }
 
+/// A directory renders each `.mmd` and `.mermaid` file under it, beside it or under `--output`.
+#[test]
+fn directories() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("in");
+    std::fs::create_dir_all(dir.join("sub")).unwrap();
+    std::fs::create_dir_all(dir.join(".hidden")).unwrap();
+    std::fs::write(dir.join("a.mmd"), "flowchart\nA --> B\n").unwrap();
+    std::fs::write(dir.join("sub/b.mermaid"), "flowchart\nC\n").unwrap();
+    std::fs::write(dir.join(".hidden/c.mmd"), "flowchart\nD\n").unwrap();
+    std::fs::write(dir.join("notes.txt"), "not a diagram").unwrap();
+
+    sirene()
+        .args(["png", "--quality", "draft"])
+        .arg(&dir)
+        .assert()
+        .success()
+        .stdout("")
+        .stderr("");
+    png_size(&std::fs::read(dir.join("a.png")).unwrap());
+    png_size(&std::fs::read(dir.join("sub/b.png")).unwrap());
+    assert!(!dir.join(".hidden/c.png").exists());
+    assert!(!dir.join("notes.png").exists());
+
+    let out = tmp.path().join("out");
+    sirene()
+        .arg("svg")
+        .arg(&dir)
+        .arg("-o")
+        .arg(&out)
+        .assert()
+        .success()
+        .stdout("");
+    for svg in ["a.svg", "sub/b.svg"] {
+        let text = std::fs::read_to_string(out.join(svg)).unwrap();
+        assert!(text.starts_with("<svg"), "{svg}");
+    }
+
+    // An error in one file fails the run but still writes the others.
+    std::fs::write(dir.join("a.mmd"), "flowchart\nA\nlinkStyle 4 color:red\n").unwrap();
+    sirene()
+        .arg("svg")
+        .arg(&dir)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("a.mmd:3:"));
+    assert!(dir.join("sub/b.svg").exists());
+
+    let empty = tmp.path().join("empty");
+    std::fs::create_dir(&empty).unwrap();
+    sirene()
+        .arg("svg")
+        .arg(&empty)
+        .assert()
+        .failure()
+        .stderr(format!(
+            "error: no .mmd or .mermaid files in {}\n",
+            empty.display()
+        ));
+    sirene()
+        .arg("ascii")
+        .arg(&dir)
+        .assert()
+        .failure()
+        .stderr(format!(
+            "error: {} is a directory; ascii reads one file\n",
+            dir.display()
+        ));
+}
+
+#[test]
+fn watch_needs_a_path() {
+    for cmd in ["ascii", "svg", "png"] {
+        sirene()
+            .args([cmd, "--watch", "-"])
+            .write_stdin("flowchart\nA\n")
+            .assert()
+            .failure()
+            .stderr("error: --watch needs a FILE or directory, not stdin\n");
+    }
+}
+
+/// Kills the child when dropped, so a failed assertion does not leave it running.
+struct Running(std::process::Child);
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// Waits up to 30 seconds for `ok`.
+fn eventually(what: &str, mut ok: impl FnMut() -> bool) {
+    let start = std::time::Instant::now();
+    while !ok() {
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(30),
+            "timed out waiting for {what}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+/// `--watch` renders at start, then again whenever a file changes or appears, until killed.
+#[test]
+fn watch_renders_changes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    std::fs::write(dir.join("a.mmd"), "flowchart\nA\n").unwrap();
+    let child = std::process::Command::new(assert_cmd::cargo::cargo_bin("sirene"))
+        .args(["svg", "--watch"])
+        .arg(dir)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut child = Running(child);
+    let svg = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap_or_default();
+
+    eventually("a.svg", || svg("a.svg").contains(">A</text>"));
+    std::fs::write(dir.join("a.mmd"), "flowchart\nA --> Changed\n").unwrap();
+    eventually("a.svg to change", || {
+        svg("a.svg").contains(">Changed</text>")
+    });
+    std::fs::create_dir(dir.join("new")).unwrap();
+    std::fs::write(dir.join("new/b.mmd"), "flowchart\nB\n").unwrap();
+    eventually("new/b.svg", || svg("new/b.svg").contains(">B</text>"));
+    // A file with errors is still written, and the error reported.
+    std::fs::write(
+        dir.join("a.mmd"),
+        "flowchart\nBroken\nlinkStyle 4 color:red\n",
+    )
+    .unwrap();
+    eventually("a.svg to change again", || {
+        svg("a.svg").contains(">Broken</text>")
+    });
+    assert!(child.0.try_wait().unwrap().is_none(), "watch exited");
+
+    let _ = child.0.kill();
+    let mut err = String::new();
+    std::io::Read::read_to_string(child.0.stderr.as_mut().unwrap(), &mut err).unwrap();
+    assert!(
+        err.starts_with(&format!("watching {} (Ctrl-C to stop)\n", dir.display())),
+        "{err}"
+    );
+    let a = dir.join("a.svg");
+    let wrote_a = format!("wrote {}\n", a.display());
+    assert!(err.matches(&wrote_a).count() >= 3, "{err}");
+    assert!(
+        err.contains(&format!("wrote {}\n", dir.join("new/b.svg").display())),
+        "{err}"
+    );
+    assert!(err.contains("a.mmd:3:"), "{err}");
+}
+
+/// Watching one file prints it again on each change.
+#[test]
+fn watch_a_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("d.mmd");
+    let out = tmp.path().join("d.txt");
+    std::fs::write(&src, "flowchart\nOne\n").unwrap();
+    let child = std::process::Command::new(assert_cmd::cargo::cargo_bin("sirene"))
+        .args(["ascii", "-w"])
+        .arg(&src)
+        .stdout(std::fs::File::create(&out).unwrap())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let _child = Running(child);
+    let text = || std::fs::read_to_string(&out).unwrap_or_default();
+    eventually("the first drawing", || text().contains("One"));
+    std::fs::write(&src, "flowchart\nTwo\n").unwrap();
+    eventually("the second drawing", || text().contains("Two"));
+    // A missing file is reported, and drawn again once it is back.
+    std::fs::remove_file(&src).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(700));
+    std::fs::write(&src, "flowchart\nThree\n").unwrap();
+    eventually("the third drawing", || text().contains("Three"));
+}
+
 #[cfg(not(feature = "gui"))]
 #[test]
 fn no_gui() {
