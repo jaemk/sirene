@@ -60,7 +60,9 @@ machine.
 
 On the drawing: click to select (shift-click for more), double-click or enter to edit a label,
 drag from one node to another to connect them, secondary-shift-n to add a node, backspace to
-delete. Each change is written to the source as an ordinary text edit.
+delete. Each change is written to the source as an ordinary text edit. Arrow keys pan, tab
+steps through nodes, secondary-8 zooms to the selection, File > Export writes PNG or SVG, and
+secondary-shift-c copies the drawing as an image.
 
 `examples/` has diagrams to try (`sirene examples/architecture.mmd`, or
 `cargo run -p sirene -- examples/shapes.mmd` from a checkout); a test keeps them free of

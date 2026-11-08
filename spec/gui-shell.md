@@ -58,6 +58,9 @@ the zoom.
 | Pan | arrow keys on the drawing, shift for further | move the drawing (GUISHE-8) |
 | SelectAll | secondary-a on the drawing | select every node and edge (GUISHE-8) |
 | SelectNext, SelectPrevious | tab, shift-tab on the drawing | select the next or previous node (GUISHE-8) |
+| ExportPng | secondary-shift-e | export as PNG (GUISHE-9) |
+| ExportSvg | (menu) | export as SVG (GUISHE-9) |
+| CopyImage | secondary-shift-c | copy the drawing as an image (GUISHE-9) |
 
 The same actions are in the app menus (sirene, File, Edit, View). The window is built on GPUI Kit
 (`gpui-kit`: gpui-pre, gpui-base, gpui-component), whose light or dark theme follows GUISHE-6.
@@ -86,3 +89,13 @@ after or before the last selected node in source order, wrapping around (the fir
 when no node is selected), and pan to center it when any of it is outside the drawing area.
 While a label is being edited these keys go to its field. Tests:
 `crates/sirene-gui/tests/navigation.rs`.
+
+## GUISHE-9 Export and copy
+
+ExportPng and ExportSvg ask for a path (in the document's directory, or the working directory for
+Untitled, named after the document with `.png` or `.svg`, else `diagram`) and write the drawing
+there in the window's theme: PNG as `sirene png` writes it at fine quality (DISPLA-12), SVG as
+`sirene svg` does. CopyImage puts the drawing on the clipboard as a PNG at normal quality. The
+status bar shows `exported PATH`, `copied the drawing as an image`, or the error (`cannot write
+PATH: REASON`) until the document next changes; a cancelled dialog changes nothing. Tests:
+`crates/sirene-gui/tests/export.rs`.
