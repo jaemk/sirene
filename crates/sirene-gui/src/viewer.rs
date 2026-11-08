@@ -273,7 +273,10 @@ impl Viewer {
         );
         cx.spawn_in(window, async move |this, cx| {
             if let Ok(0) = answer.await {
+                log::debug!("reload: discarding unsaved edits");
                 let _ = this.update_in(cx, |v, window, cx| v.reload_now(window, cx));
+            } else {
+                log::debug!("reload cancelled");
             }
         })
         .detach();
@@ -311,10 +314,15 @@ impl Viewer {
             cx,
         );
         cx.spawn_in(window, async move |this, cx| match answer.await {
-            Ok(0) => this
-                .update_in(cx, |v, window, cx| v.write_file(window, cx))
-                .unwrap_or(false),
-            _ => false,
+            Ok(0) => {
+                log::debug!("save: overwriting the changes made on disk");
+                this.update_in(cx, |v, window, cx| v.write_file(window, cx))
+                    .unwrap_or(false)
+            }
+            _ => {
+                log::debug!("save cancelled");
+                false
+            }
         })
     }
 
@@ -338,8 +346,10 @@ impl Viewer {
         let chosen = cx.prompt_for_new_path(&dir, Some(&name));
         cx.spawn_in(window, async move |this, cx| {
             let Ok(Ok(Some(path))) = chosen.await else {
+                log::debug!("save as cancelled");
                 return false;
             };
+            log::debug!("save as {}", path.display());
             this.update_in(cx, |v, window, cx| {
                 let saved = v.doc.save_as(path).is_ok();
                 v.refresh(window, cx);
@@ -371,12 +381,21 @@ impl Viewer {
             cx,
         );
         cx.spawn_in(window, async move |this, cx| match answer.await {
-            Ok(0) => match this.update_in(cx, |v, window, cx| v.save(window, cx)) {
-                Ok(saved) => saved.await,
-                Err(_) => false,
-            },
-            Ok(1) => true,
-            _ => false,
+            Ok(0) => {
+                log::debug!("close: saving first");
+                match this.update_in(cx, |v, window, cx| v.save(window, cx)) {
+                    Ok(saved) => saved.await,
+                    Err(_) => false,
+                }
+            }
+            Ok(1) => {
+                log::debug!("close: discarding unsaved edits");
+                true
+            }
+            _ => {
+                log::debug!("close cancelled");
+                false
+            }
         })
     }
 
@@ -385,6 +404,7 @@ impl Viewer {
         let confirmed = self.confirm_close(window, cx);
         cx.spawn_in(window, async move |_, cx| {
             if confirmed.await {
+                log::debug!("closing the window");
                 let _ = cx.update(|window, _| window.remove_window());
             }
         })

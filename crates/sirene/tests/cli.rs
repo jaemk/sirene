@@ -28,6 +28,67 @@ fn prints_help() {
         ));
 }
 
+/// `--verbose` (before or after the command) reports each step on stderr and leaves stdout
+/// alone; without it nothing extra is printed.
+#[test]
+fn verbose_reports_each_step() {
+    for args in [["-v", "ascii"], ["ascii", "--verbose"]] {
+        let out = sirene()
+            .args(args)
+            .write_stdin("flowchart TD\nA --> B\n")
+            .assert()
+            .success()
+            .stdout(AB)
+            .get_output()
+            .stderr
+            .clone();
+        let err = String::from_utf8(out).unwrap();
+        for step in [
+            "sirene: sirene ",
+            "reading <stdin>",
+            "read <stdin>: 21 bytes",
+            "sirene_core::flowchart: parsed 21 bytes, 2 lines",
+            "lowered 2 nodes, 1 edges",
+            "sirene_core::layout: laid out 2 nodes",
+            "rendered ",
+            "writing <stdout>",
+            "exit with success",
+        ] {
+            assert!(err.contains(step), "missing {step:?} in\n{err}");
+        }
+        assert!(err.lines().all(|l| l.starts_with('[')), "{err}");
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let src = dir.path().join("d.mmd");
+    std::fs::write(&src, "flowchart\nA --> B\n").unwrap();
+    let out = sirene()
+        .args(["png", "-v"])
+        .arg(&src)
+        .assert()
+        .success()
+        .get_output()
+        .stderr
+        .clone();
+    let err = String::from_utf8(out).unwrap();
+    for step in [
+        "no --output; writing next to the input as",
+        "drew a ",
+        "sirene_core::scene::png: encoded a ",
+        "d.png",
+    ] {
+        assert!(err.contains(step), "missing {step:?} in\n{err}");
+    }
+
+    sirene()
+        .args(["-v", "ascii", "missing.mmd"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("reading missing.mmd"))
+        .stderr(predicate::str::contains("error: cannot read missing.mmd"))
+        .stderr(predicate::str::contains("exit with failure"));
+}
+
 fn fixture(name: &str) -> String {
     format!(
         "{}/../sirene-core/tests/fixtures/flowchart/valid/{name}.mmd",

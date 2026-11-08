@@ -22,6 +22,7 @@ gui = ["dep:sirene-gui"]
 
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
+log = { version = "0.4.35", features = ["std"] }
 sirene-core = { workspace = true, features = ["png"] }
 sirene-gui = { workspace = true, optional = true }
 

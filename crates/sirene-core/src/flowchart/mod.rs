@@ -49,6 +49,14 @@ impl Parse {
         let mut diagnostics = self.diagnostics.clone();
         diagnostics.extend(lowering);
         diagnostics.sort_by_key(|d| d.range.start());
+        log::debug!(
+            "lowered {} nodes, {} edges, {} subgraphs, {} class definitions; {} diagnostics",
+            flowchart.nodes.len(),
+            flowchart.edges.len(),
+            flowchart.subgraphs.len(),
+            flowchart.classes.len(),
+            diagnostics.len()
+        );
         Lowered {
             flowchart,
             diagnostics,
@@ -66,5 +74,11 @@ pub struct Lowered {
 /// Parses flowchart source. Never fails; problems are reported as diagnostics.
 pub fn parse(src: &str) -> Parse {
     let (green, diagnostics) = parser::parse(src);
+    log::debug!(
+        "parsed {} bytes, {} lines; {} syntax diagnostics",
+        src.len(),
+        src.lines().count(),
+        diagnostics.len()
+    );
     Parse { green, diagnostics }
 }

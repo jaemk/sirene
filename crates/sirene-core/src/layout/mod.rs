@@ -166,7 +166,19 @@ pub struct Layout {
 
 /// Lays out `graph`.
 pub fn layout(graph: &Graph, config: &Config) -> Layout {
-    Builder::new(graph, config).run()
+    let start = std::time::Instant::now();
+    let out = Builder::new(graph, config).run();
+    log::debug!(
+        "laid out {} nodes, {} clusters, {} edges ({} routed) in {}x{} cells, {:.1?}",
+        graph.nodes.len(),
+        graph.clusters.len(),
+        graph.edges.len(),
+        out.edges.iter().filter(|e| e.is_some()).count(),
+        out.size.w,
+        out.size.h,
+        start.elapsed()
+    );
+    out
 }
 
 fn horizontal(d: Direction) -> bool {

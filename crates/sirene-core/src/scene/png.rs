@@ -104,5 +104,10 @@ pub fn write(scene: &Scene, scale: f32) -> Result<Vec<u8>, String> {
         Transform::from_scale(scale, scale),
         &mut pixmap.as_mut(),
     );
-    pixmap.encode_png().map_err(|e| e.to_string())
+    let bytes = pixmap.encode_png().map_err(|e| e.to_string())?;
+    log::debug!(
+        "encoded a {w}x{h} PNG at scale {scale}, {} bytes",
+        bytes.len()
+    );
+    Ok(bytes)
 }

@@ -49,3 +49,16 @@ The `gui` feature of the `sirene` crate is on by default. Built without it
 (`--no-default-features`), the binary does not link the GUI or its system libraries, the
 subcommands work as above, and running with no subcommand prints
 `error: built without the GUI; see sirene --help` and exits 1.
+
+## CLI-8 Verbose output
+
+`-v, --verbose`, before or after the subcommand, prints a line to stderr for each step, as
+`[ELAPSEDms] TARGET: MESSAGE` where TARGET is the module that logged it: the version and
+parsed command; reading the input (path or `<stdin>`, size); parsing and lowering (sizes, item
+and diagnostic counts, time); layout (counts, size in cells, time); the scene and PNG encoding;
+the bytes rendered and where they are written; and the exit status. In the GUI it also reports
+opening files and windows, a file already open, ignored `file://` URLs, changes found on disk,
+reloads, saves (including writing in place when the owner cannot be kept), and the answers to
+the Reload, Overwrite, Save, and Quit questions. Only sirene's own crates log; stdout is
+unchanged, and without the flag nothing extra is printed. Tests: `verbose_reports_each_step`
+in `crates/sirene/tests/cli.rs` and `arguments` in `crates/sirene/src/main.rs`.

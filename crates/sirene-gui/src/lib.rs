@@ -191,18 +191,19 @@ pub fn open_window(
 
 fn open_or_report(doc: Document, cx: &mut App) {
     let name = doc.name();
-    if let Err(e) = open_window(doc, cx) {
-        eprintln!("error: cannot open a window for {name}: {e}");
+    match open_window(doc, cx) {
+        Ok(_) => log::debug!("opened a window for {name}"),
+        Err(e) => eprintln!("error: cannot open a window for {name}: {e}"),
     }
 }
 
 /// Asks for files and opens each in a new window.
 pub fn prompt_open(cx: &mut App) {
     let chosen = cx.prompt_for_paths(open_options());
-    cx.spawn(async move |cx| {
-        if let Ok(Ok(Some(paths))) = chosen.await {
-            cx.update(|cx| open_paths(&paths, cx));
-        }
+    cx.spawn(async move |cx| match chosen.await {
+        Ok(Ok(Some(paths))) => cx.update(|cx| open_paths(&paths, cx)),
+        Ok(Err(e)) => log::debug!("the open dialog failed: {e}"),
+        _ => log::debug!("open cancelled"),
     })
     .detach();
 }
@@ -219,7 +220,12 @@ pub(crate) fn open_options() -> PathPromptOptions {
 /// Opens each path in a new window, or brings forward the window already showing it.
 pub fn open_paths(paths: &[PathBuf], cx: &mut App) {
     for p in paths {
-        if !focus_existing(p, cx) {
+        if focus_existing(p, cx) {
+            log::debug!(
+                "{} is already open; brought its window forward",
+                p.display()
+            );
+        } else {
             open_or_report(Document::open(p), cx);
         }
     }
@@ -269,18 +275,24 @@ pub fn confirm_quit(cx: &mut App) -> Task<bool> {
             if let Ok(Some(asked)) = asked
                 && !asked.await
             {
+                log::debug!("quit cancelled");
                 return false;
             }
         }
+        log::debug!("quitting");
         true
     })
 }
 
 /// The local path of a `file://` URL, percent-decoded. A URL naming another host has none.
 pub fn url_path(url: &str) -> Option<PathBuf> {
-    let rest = url.strip_prefix("file://")?;
+    let Some(rest) = url.strip_prefix("file://") else {
+        log::debug!("ignoring {url}: not a file:// URL");
+        return None;
+    };
     let slash = rest.find('/')?;
     if !matches!(&rest[..slash], "" | "localhost") {
+        log::debug!("ignoring {url}: it names another host");
         return None;
     }
     let rest = &rest[slash..];
@@ -329,10 +341,12 @@ pub fn run(paths: Vec<PathBuf>) {
         .with_assets(gpui::assets::Assets)
         .with_quit_mode(QuitMode::LastWindowClosed);
     app.on_open_urls(move |urls| {
+        log::debug!("the platform asked to open {urls:?}");
         let _ = tx.unbounded_send(urls);
     });
     app.run(move |cx| {
         init(cx);
+        log::debug!("app started; opening {paths:?}");
         if paths.is_empty() {
             open_or_report(Document::untitled(), cx);
         } else {

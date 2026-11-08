@@ -1,6 +1,7 @@
 use std::io::{IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::time::Instant;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use sirene_core::Severity;
@@ -13,17 +14,53 @@ use sirene_core::scene::{self, Approx, Theme};
 ///
 /// With no command, opens each FILE in a viewer window, or an empty window.
 #[derive(Debug, Parser)]
-#[command(
-    name = "sirene",
-    version,
-    about,
-    args_conflicts_with_subcommands = true
-)]
+#[command(name = "sirene", version, about)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
     /// Mermaid files to view.
     files: Vec<PathBuf>,
+    /// Print what each step does, with timings, to stderr.
+    #[arg(short, long, global = true)]
+    verbose: bool,
+}
+
+/// Writes log records to stderr as `[elapsed] target: message` (`--verbose`).
+struct Stderr {
+    start: Instant,
+}
+
+impl log::Log for Stderr {
+    fn enabled(&self, _: &log::Metadata) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::Record) {
+        // Only our own crates; gpui and its dependencies log a lot at debug level.
+        if !record.target().starts_with("sirene") {
+            return;
+        }
+        let ms = self.start.elapsed().as_secs_f64() * 1000.0;
+        let _ = writeln!(
+            std::io::stderr().lock(),
+            "[{ms:8.1}ms] {}: {}",
+            record.target(),
+            record.args()
+        );
+    }
+
+    fn flush(&self) {}
+}
+
+fn verbose(on: bool) {
+    if on
+        && log::set_boxed_logger(Box::new(Stderr {
+            start: Instant::now(),
+        }))
+        .is_ok()
+    {
+        log::set_max_level(log::LevelFilter::Debug);
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -88,6 +125,27 @@ impl ThemeArg {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    verbose(cli.verbose);
+    log::debug!(
+        "sirene {} ({}, {}): {:?}",
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        cli.command
+            .as_ref()
+            .map_or_else(|| format!("open {:?}", cli.files), |c| format!("{c:?}"))
+    );
+    let code = run(cli);
+    let status = if code == ExitCode::SUCCESS {
+        "success"
+    } else {
+        "failure"
+    };
+    log::debug!("exit with {status}");
+    code
+}
+
+fn run(cli: Cli) -> ExitCode {
     match cli.command {
         None => gui(cli.files),
         Some(Command::Ascii { file, charset }) => {
@@ -114,9 +172,14 @@ fn main() -> ExitCode {
             output,
         }) => {
             let output = output.or_else(|| {
-                file.as_ref()
+                let default = file
+                    .as_ref()
                     .filter(|f| f.as_os_str() != "-")
-                    .map(|f| f.with_extension("png"))
+                    .map(|f| f.with_extension("png"));
+                if let Some(d) = &default {
+                    log::debug!("no --output; writing next to the input as {}", d.display());
+                }
+                default
             });
             if output.is_none() && std::io::stdout().is_terminal() {
                 eprintln!("error: refusing to write a PNG to a terminal; use --output");
@@ -132,12 +195,14 @@ fn main() -> ExitCode {
 
 #[cfg(feature = "gui")]
 fn gui(files: Vec<PathBuf>) -> ExitCode {
+    log::debug!("starting the GUI");
     sirene_gui::run(files);
     ExitCode::SUCCESS
 }
 
 #[cfg(not(feature = "gui"))]
 fn gui(_: Vec<PathBuf>) -> ExitCode {
+    log::debug!("this binary was built without the `gui` feature");
     eprintln!("error: built without the GUI; see sirene --help");
     ExitCode::FAILURE
 }
@@ -155,11 +220,13 @@ fn read(file: Option<PathBuf>) -> Result<(String, String), String> {
     match file.filter(|f| f.as_os_str() != "-") {
         Some(path) => {
             let name = path.display().to_string();
+            log::debug!("reading {name}");
             std::fs::read_to_string(&path)
                 .map(|src| (name.clone(), src))
                 .map_err(|e| format!("cannot read {name}: {e}"))
         }
         None => {
+            log::debug!("reading <stdin>");
             let mut src = String::new();
             std::io::stdin()
                 .read_to_string(&mut src)
@@ -192,7 +259,10 @@ fn render_with(
             return ExitCode::FAILURE;
         }
     };
+    log::debug!("read {name}: {} bytes", src.len());
+    let start = Instant::now();
     let lowered = flowchart::parse(&src).lower();
+    log::debug!("parsed and lowered in {:.1?}", start.elapsed());
     let mut failed = false;
     for d in &lowered.diagnostics {
         let (line, col) = d.line_col(&src);
@@ -205,13 +275,20 @@ fn render_with(
         };
         eprintln!("{name}:{line}:{col}: {severity}: {}", d.message);
     }
-    let written = render(&lowered).and_then(|bytes| match &output {
-        Some(path) => {
-            std::fs::write(path, bytes).map_err(|e| format!("cannot write {}: {e}", path.display()))
+    let start = Instant::now();
+    let written = render(&lowered).and_then(|bytes| {
+        log::debug!("rendered {} bytes in {:.1?}", bytes.len(), start.elapsed());
+        let target = output
+            .as_ref()
+            .map_or_else(|| "<stdout>".to_owned(), |p| p.display().to_string());
+        log::debug!("writing {target}");
+        match &output {
+            Some(path) => std::fs::write(path, bytes)
+                .map_err(|e| format!("cannot write {}: {e}", path.display())),
+            None => std::io::stdout()
+                .write_all(&bytes)
+                .map_err(|e| format!("cannot write <stdout>: {e}")),
         }
-        None => std::io::stdout()
-            .write_all(&bytes)
-            .map_err(|e| format!("cannot write <stdout>: {e}")),
     });
     if let Err(message) = written {
         eprintln!("error: {message}");
@@ -221,5 +298,42 @@ fn render_with(
         ExitCode::FAILURE
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(std::iter::once("sirene").chain(args.iter().copied())).unwrap()
+    }
+
+    /// `--verbose` goes anywhere, and files and commands parse as before.
+    #[test]
+    fn arguments() {
+        for args in [
+            &["-v", "ascii"][..],
+            &["ascii", "-v"],
+            &["--verbose", "ascii"],
+        ] {
+            let cli = parse(args);
+            assert!(cli.verbose, "{args:?}");
+            assert!(
+                matches!(cli.command, Some(Command::Ascii { .. })),
+                "{args:?}"
+            );
+        }
+        let cli = parse(&["a.mmd", "b.mmd"]);
+        assert!(cli.command.is_none() && !cli.verbose);
+        assert_eq!(cli.files, [PathBuf::from("a.mmd"), PathBuf::from("b.mmd")]);
+        let cli = parse(&["-v", "a.mmd"]);
+        assert!(cli.command.is_none() && cli.verbose);
+        assert_eq!(cli.files, [PathBuf::from("a.mmd")]);
+        let cli = parse(&[]);
+        assert!(cli.command.is_none() && cli.files.is_empty());
+        // A file named like a command needs a path that is not one.
+        let cli = parse(&["./ascii"]);
+        assert_eq!(cli.files, [PathBuf::from("./ascii")]);
     }
 }

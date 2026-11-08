@@ -50,6 +50,8 @@ sirene svg diagram.mmd       # print SVG (--theme light|dark, -o FILE)
 sirene png diagram.mmd       # write diagram.png (--scale 2, --theme, -o FILE)
 ```
 
+`-v`/`--verbose`, before or after the command, prints each step (reading, parsing, layout,
+rendering, writing, and in the GUI opening, reloading, and saving files) with timings to stderr.
 `svg`, `png`, and `ascii` never open a window. `--no-default-features` builds a CLI-only
 binary that does not link the GUI. PNG text uses the
 embedded Noto Sans faces (`crates/sirene-core/fonts`, SIL OFL 1.1), so images are the same on every
