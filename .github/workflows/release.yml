@@ -55,10 +55,65 @@ jobs:
           echo "should_publish=true" >> "$GITHUB_OUTPUT"
         fi
 
-  publish:
+  # Everything that can fail runs before `publish`, because a crates.io upload
+  # cannot be undone or overwritten.
+
+  # Package and build-check every crate together, each against the packaged
+  # crates before it, so a crate that would fail its own `cargo publish`
+  # verification fails here instead of after its dependencies are uploaded.
+  verify:
     needs: check
+    if: github.event_name == 'workflow_dispatch' || needs.check.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - run: >
+        sudo apt-get update && sudo apt-get install -y
+        libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
+        libfontconfig1-dev libfreetype-dev libvulkan-dev
+    - run: rustup show
+    - run: cargo package --workspace --exclude xtask --locked
+
+  # Build the macOS app now and keep it as an artifact; `publish` attaches it to
+  # the release once the release exists.
+  macos:
+    needs: check
+    if: github.event_name == 'workflow_dispatch' || needs.check.outputs.should_publish == 'true'
+    runs-on: macos-latest
+    env:
+      TAG: v${{ needs.check.outputs.version }}
+      ZIP: Sirene-v${{ needs.check.outputs.version }}.zip
+    steps:
+    - uses: actions/checkout@v6
+    # rust-toolchain.toml selects the channel; add both architectures.
+    - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+    - run: cargo build --release --locked --package sirene --target aarch64-apple-darwin
+    - run: cargo build --release --locked --package sirene --target x86_64-apple-darwin
+    - run: >
+        lipo -create -output target/sirene
+        target/aarch64-apple-darwin/release/sirene
+        target/x86_64-apple-darwin/release/sirene
+    - run: cargo xtask bundle --binary target/sirene --out target/bundle
+    - run: mkdir target/release-assets
+    - run: ditto -c -k --keepParent target/bundle/Sirene.app "target/release-assets/$ZIP"
+    - run: >
+        cargo xtask cask
+        --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$ZIP"
+        --sha256 "$(shasum -a 256 "target/release-assets/$ZIP" | cut -d ' ' -f 1)"
+        --homepage "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+        > target/release-assets/sirene.rb
+    - run: cat target/release-assets/sirene.rb
+    - uses: actions/upload-artifact@v4
+      with:
+        name: macos-release-assets
+        path: target/release-assets/
+        if-no-files-found: error
+
+  publish:
+    needs: [check, verify, macos]
     # Ask for release-environment approval only when there is a new version (or
-    # on a manual dispatch, to re-run a release that failed partway).
+    # on a manual dispatch, to re-run a release that failed partway), and only
+    # after `verify` and `macos` have passed.
     if: github.event_name == 'workflow_dispatch' || needs.check.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     environment: release
@@ -93,34 +148,11 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: bash bin/tag-release.sh
-
-  macos:
-    needs: [check, publish]
-    runs-on: macos-latest
-    permissions:
-      contents: write     # release assets
-    env:
-      TAG: v${{ needs.check.outputs.version }}
-      ZIP: Sirene-v${{ needs.check.outputs.version }}.zip
-    steps:
-    - uses: actions/checkout@v6
-    # rust-toolchain.toml selects the channel; add both architectures.
-    - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-    - run: cargo build --release --locked --package sirene --target aarch64-apple-darwin
-    - run: cargo build --release --locked --package sirene --target x86_64-apple-darwin
-    - run: >
-        lipo -create -output target/sirene
-        target/aarch64-apple-darwin/release/sirene
-        target/x86_64-apple-darwin/release/sirene
-    - run: cargo xtask bundle --binary target/sirene --out target/bundle
-    - run: ditto -c -k --keepParent target/bundle/Sirene.app "target/$ZIP"
-    - run: >
-        cargo xtask cask
-        --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$ZIP"
-        --sha256 "$(shasum -a 256 "target/$ZIP" | cut -d ' ' -f 1)"
-        --homepage "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-        > target/sirene.rb
-    - run: cat target/sirene.rb
-    - run: gh release upload "$TAG" --clobber "target/$ZIP" target/sirene.rb
+    - uses: actions/download-artifact@v4
+      with:
+        name: macos-release-assets
+        path: release-assets
+    - name: Attach the macOS app and cask to the release
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: gh release upload "v${{ needs.check.outputs.version }}" --clobber release-assets/*

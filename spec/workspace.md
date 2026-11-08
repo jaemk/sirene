@@ -53,12 +53,14 @@ push to `main` (and by hand):
 1. `check`: `bin/check-versions.sh` requires every dependency between publishable members to pin
    exactly that member's version, and no stable crate to depend on a pre-release; then the job
    publishes only when the `sirene` version is not on crates.io.
-2. `publish`, in the `release` environment (approval required): `bin/publish.sh` publishes
-   `sirene-core`, `sirene-gui`, then `sirene`, treating an already-published version as a skip
-   and any other failure as fatal; then `bin/tag-release.sh` tags and creates a GitHub release
-   for each crate's current version that lacks one (`vX.Y.Z` for `sirene`, `NAME-vX.Y.Z` for the
-   others).
-3. `macos`: builds the app for `vX.Y.Z` (MACOSP-6) and attaches it to that release.
+2. Before anything is uploaded, since a crates.io publish cannot be undone or overwritten:
+   `verify` runs `cargo package --workspace`, which build-checks each crate against the packaged
+   crates before it, and `macos` builds the app and cask (MACOSP-6) as a workflow artifact.
+3. `publish`, only after both pass and in the `release` environment (approval required):
+   `bin/publish.sh` publishes `sirene-core`, `sirene-gui`, then `sirene`, treating an
+   already-published version as a skip and any other failure as fatal; `bin/tag-release.sh`
+   tags and creates a GitHub release for each crate's current version that lacks one (`vX.Y.Z`
+   for `sirene`, `NAME-vX.Y.Z` for the others); then the macOS artifact is attached to `vX.Y.Z`.
 
 crates.io authentication is trusted publishing (`rust-lang/crates-io-auth-action`). A crate's
 first version cannot be published that way, so while the `CARGO_REGISTRY_TOKEN` secret is set

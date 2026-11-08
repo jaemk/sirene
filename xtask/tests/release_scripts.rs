@@ -252,3 +252,110 @@ fn publish_fails_the_release_on_any_other_error() {
     assert!(stdout(&out).contains("3 failed"));
     assert!(stderr(&out).contains("Release failed"));
 }
+
+/// Runs `tag-release.sh` with stub `git` and `gh` that log their arguments.
+/// `existing` lists the tags that already have a remote tag and a release.
+fn tag_release_with_stubs(existing: &[&str]) -> (Output, String) {
+    let dir = scratch_dir();
+    let bin = dir.path().join("stub-bin");
+    std::fs::create_dir_all(&bin).expect("create stub bin dir");
+    let log = dir.path().join("calls.log");
+    let known = existing.join(" ");
+    let stubs = [
+        (
+            "git",
+            format!(
+                r#"#!/bin/bash
+echo "git $*" >> "{log}"
+case "$1" in
+  ls-remote) for t in {known}; do [ "refs/tags/$t" = "$4" ] && printf 'sha\trefs/tags/%s\n' "$t"; done ;;
+  rev-parse) exit 1 ;;
+esac
+exit 0
+"#,
+                log = log.display()
+            ),
+        ),
+        (
+            "gh",
+            format!(
+                r#"#!/bin/bash
+echo "gh $*" >> "{log}"
+if [ "$2" = view ]; then
+  for t in {known}; do [ "$t" = "$3" ] && exit 0; done
+  exit 1
+fi
+exit 0
+"#,
+                log = log.display()
+            ),
+        ),
+    ];
+    use std::os::unix::fs::PermissionsExt;
+    for (name, body) in stubs {
+        let path = bin.join(name);
+        std::fs::write(&path, body).expect("write stub");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
+            .expect("make stub executable");
+    }
+    let path = std::env::var("PATH").unwrap_or_default();
+    let out = Command::new("bash")
+        .arg(repo_root().join("bin").join("tag-release.sh"))
+        .current_dir(repo_root())
+        .env("PATH", format!("{}:{path}", bin.display()))
+        .env_remove("GITHUB_ACTIONS")
+        .output()
+        .expect("failed to run bin/tag-release.sh");
+    let calls = std::fs::read_to_string(&log).unwrap_or_default();
+    (out, calls)
+}
+
+/// Every crate gets a tag and release; only the root crate's may be "Latest".
+#[test]
+fn tag_release_marks_only_the_root_release_latest() {
+    let version = env!("CARGO_PKG_VERSION");
+    let (out, calls) = tag_release_with_stubs(&[]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    for (tag, latest) in [
+        (format!("v{version}"), true),
+        (format!("sirene-core-v{version}"), false),
+        (format!("sirene-gui-v{version}"), false),
+    ] {
+        assert!(
+            calls.contains(&format!("git tag -a {tag} -m Release {tag}\n")),
+            "{calls}"
+        );
+        assert!(
+            calls.contains(&format!("git push origin {tag}\n")),
+            "{calls}"
+        );
+        assert!(
+            calls.contains(&format!(
+                "gh release create {tag} --generate-notes --title {tag} --latest={latest}\n"
+            )),
+            "{calls}"
+        );
+    }
+}
+
+/// Tags that already have a tag and release are left alone.
+#[test]
+fn tag_release_skips_existing_releases() {
+    let version = env!("CARGO_PKG_VERSION");
+    let root = format!("v{version}");
+    let (out, calls) = tag_release_with_stubs(&[&root]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(
+        stdout(&out).contains(&format!("Tag {root} and its GitHub release already exist")),
+        "{}",
+        stdout(&out)
+    );
+    assert!(
+        !calls.contains(&format!("git push origin {root}\n")),
+        "{calls}"
+    );
+    assert!(
+        calls.contains(&format!("git push origin sirene-core-v{version}\n")),
+        "{calls}"
+    );
+}

@@ -53,8 +53,8 @@ cargo xtask cask --url URL --sha256 HEX --homepage URL
 ## Releasing
 
 Bump `version` in the root `Cargo.toml` (and the matching `[workspace.dependencies]` pins) and
-merge to `main`. `.github/workflows/release.yml` sees the new version is not on crates.io and,
-after approval in the `release` environment, publishes `sirene-core`, `sirene-gui`, and
-`sirene`, tags `vX.Y.Z`, creates the GitHub release, and attaches a universal `Sirene.app` zip
-and a Homebrew cask. The app is not signed. See `spec/workspace.md` (WORKSP-8) and
+merge to `main`. `.github/workflows/release.yml` sees the new version is not on crates.io,
+verifies all three crates and builds a universal `Sirene.app` zip and Homebrew cask, then, after
+approval in the `release` environment, publishes `sirene-core`, `sirene-gui`, and `sirene`,
+tags `vX.Y.Z`, creates the GitHub release, and attaches the zip and cask. The app is not signed. See `spec/workspace.md` (WORKSP-8) and
 `spec/macos-packaging.md`.

@@ -36,6 +36,7 @@ release_exists() {
 
 tag_and_release() {
     local tag=$1
+    # $2: whether the release may be marked "Latest" (true or false).
     local tag_remote release_remote
     tag_exists_on_remote "$tag" && tag_remote=true || tag_remote=false
     release_exists "$tag"       && release_remote=true || release_remote=false
@@ -52,7 +53,9 @@ tag_and_release() {
         git push origin "$tag"
     fi
     if [ "$release_remote" = false ]; then
-        gh release create "$tag" --generate-notes --title "$tag"
+        # Only the root crate's release may become "Latest", where the macOS app
+        # is attached; otherwise whichever crate is tagged last would take it.
+        gh release create "$tag" --generate-notes --title "$tag" --latest="$2"
     fi
 }
 
@@ -62,9 +65,8 @@ members=$(cargo metadata --no-deps --format-version 1 \
 while read -r name version; do
     [ -z "$name" ] && continue
     if [ "$name" = "$ROOT_CRATE" ]; then
-        tag="v$version"
+        tag_and_release "v$version" true
     else
-        tag="$name-v$version"
+        tag_and_release "$name-v$version" false
     fi
-    tag_and_release "$tag"
 done <<< "$members"
