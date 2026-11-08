@@ -2,14 +2,23 @@
 
 use gpui::component::menu::PopupMenu;
 use gpui::{Context, WeakEntity, Window, px};
-use sirene_core::flowchart::edit::{Line, MAX_LENGTH};
-use sirene_core::flowchart::{Arrow, Flowchart, Node, Shape, Stroke};
+use sirene_core::flowchart::edit::{self, Line, MAX_LENGTH};
+use sirene_core::flowchart::{Arrow, Direction, Flowchart, Node, Shape, Stroke};
 
 use crate::viewer::Viewer;
 use crate::{
-    AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, LongerEdge, Rename,
-    ReverseEdge, SelectAll, SetArrows, SetShape, SetStroke, ShorterEdge,
+    AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, Group, KeepTogether,
+    LongerEdge, MoveEarlier, MoveLater, MoveTo, Rename, ReverseEdge, SelectAll, SetArrows,
+    SetDirection, SetShape, SetStroke, ShorterEdge, Ungroup,
 };
+
+/// The directions in Direction, with their names.
+pub const DIRECTIONS: [(&str, Direction); 4] = [
+    ("Top to Bottom", Direction::TopBottom),
+    ("Left to Right", Direction::LeftRight),
+    ("Bottom to Top", Direction::BottomTop),
+    ("Right to Left", Direction::RightLeft),
+];
 
 /// The strokes in Line, with their names.
 pub const STROKES: [(&str, Stroke); 4] = [
@@ -58,19 +67,31 @@ pub(crate) fn build(
     let Some(viewer) = viewer.upgrade() else {
         return menu;
     };
-    let (nodes, edges, chart, focus) = {
+    let (nodes, edges, chart, src, subgraph, focus) = {
         let v = viewer.read(cx);
         (
             v.selected_nodes(),
             v.selected_edges(),
             v.doc.chart.clone(),
+            v.doc.source.clone(),
+            v.menu_subgraph.clone(),
             v.drawing_focus.clone(),
         )
     };
     let mut menu = menu.action_context(focus);
     if nodes.is_empty() && edges.is_empty() {
+        menu = menu.menu("Add Node", Box::new(AddNode)).separator();
+        // On a subgraph: its direction, and Ungroup (WYSIWY-16).
+        let current = match &subgraph {
+            Some(id) => chart.subgraph(id).and_then(|s| s.direction),
+            None => Some(chart.direction),
+        };
+        menu = direction_items(menu, subgraph.clone(), current, window, cx);
+        if let Some(id) = subgraph {
+            let stuck = edit::ungroup(&src, &id).is_none();
+            menu = menu.menu_with_disabled("Ungroup", Box::new(Ungroup { id }), stuck);
+        }
         return menu
-            .menu("Add Node", Box::new(AddNode))
             .separator()
             .menu("Select All", Box::new(SelectAll))
             .menu("Fit Window", Box::new(FitWindow));
@@ -80,11 +101,130 @@ pub(crate) fn build(
     }
     if !nodes.is_empty() {
         menu = node_items(menu, &nodes, &chart, window, cx);
+        menu = layout_items(menu, &nodes, &chart, &src, window, cx);
     }
     if !edges.is_empty() {
         menu = edge_items(menu, &edges, &chart, window, cx);
     }
+    if let [edge] = edges.as_slice()
+        && nodes.is_empty()
+    {
+        menu = menu
+            .separator()
+            .menu_with_disabled(
+                "Move Earlier",
+                Box::new(MoveEarlier),
+                edit::move_edge(&src, *edge, false).is_none(),
+            )
+            .menu_with_disabled(
+                "Move Later",
+                Box::new(MoveLater),
+                edit::move_edge(&src, *edge, true).is_none(),
+            );
+    }
     menu.separator().menu("Delete", Box::new(Delete))
+}
+
+/// The four directions, with `current` checked, for the diagram or `subgraph`.
+fn direction_items(
+    menu: PopupMenu,
+    subgraph: Option<String>,
+    current: Option<Direction>,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    menu.submenu("Direction", window, cx, move |m, _, _| {
+        DIRECTIONS.iter().fold(m, |m, &(name, direction)| {
+            m.menu_with_check(
+                name,
+                current == Some(direction),
+                Box::new(SetDirection {
+                    direction,
+                    subgraph: subgraph.clone(),
+                }),
+            )
+        })
+    })
+}
+
+/// Group, Keep Together, Move To, and Move Earlier or Later for the selected nodes
+/// (WYSIWY-16).
+fn layout_items(
+    menu: PopupMenu,
+    nodes: &[String],
+    chart: &Flowchart,
+    src: &str,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    let ids: Vec<&str> = nodes.iter().map(String::as_str).collect();
+    let mut menu = menu.separator().menu_with_disabled(
+        "Group",
+        Box::new(Group),
+        edit::group(src, &ids, "").is_none(),
+    );
+    if nodes.len() == 2 {
+        menu = menu.menu("Keep Together", Box::new(KeepTogether));
+    }
+    // Where the one selected node is now, checked in Move To.
+    let parent = match nodes {
+        [id] => Some(
+            chart
+                .subgraphs
+                .iter()
+                .find(|s| s.members.iter().any(|m| m == id))
+                .map(|s| s.id.clone()),
+        ),
+        _ => None,
+    };
+    let targets: Vec<(String, String)> = chart
+        .subgraphs
+        .iter()
+        .map(|s| {
+            let title = s.title.lines().into_iter().next().unwrap_or_default();
+            let name = if title.is_empty() || title == s.id {
+                s.id.clone()
+            } else {
+                format!("{title} ({})", s.id)
+            };
+            (s.id.clone(), name)
+        })
+        .collect();
+    if !targets.is_empty() {
+        menu = menu.submenu("Move To", window, cx, move |m, _, _| {
+            let top = parent.as_ref().is_some_and(Option::is_none);
+            let m = m
+                .menu_with_check("Top Level", top, Box::new(MoveTo { subgraph: None }))
+                .separator();
+            targets.iter().fold(
+                m.scrollable(true).max_h(px(LIST_HEIGHT)),
+                |m, (id, name)| {
+                    let here = parent.as_ref().is_some_and(|p| p.as_deref() == Some(id));
+                    m.menu_with_check(
+                        name.clone(),
+                        here,
+                        Box::new(MoveTo {
+                            subgraph: Some(id.clone()),
+                        }),
+                    )
+                },
+            )
+        });
+    }
+    if let [id] = nodes {
+        menu = menu
+            .menu_with_disabled(
+                "Move Earlier",
+                Box::new(MoveEarlier),
+                edit::move_node(src, id, false).is_none(),
+            )
+            .menu_with_disabled(
+                "Move Later",
+                Box::new(MoveLater),
+                edit::move_node(src, id, true).is_none(),
+            );
+    }
+    menu
 }
 
 fn node_items(

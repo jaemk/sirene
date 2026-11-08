@@ -67,6 +67,10 @@ the zoom.
 | OpenRecent, ClearRecent | (menu) | open a recent file, or forget them (GUISHE-10) |
 | AddNodeBefore | (menu) | add a node with an edge to the selected node (WYSIWY-14) |
 | AddShape | (shape bar) | add a node of a shape, linked from the selected node (WYSIWY-15) |
+| Group | secondary-g on the drawing | put the selected nodes in a new subgraph (WYSIWY-16) |
+| KeepTogether | (menu) | add an invisible edge between the two selected nodes (WYSIWY-16) |
+| MoveEarlier, MoveLater | alt-up, alt-down on the drawing | swap the selected item's statement with its neighbor (WYSIWY-16) |
+| SetDirection, Ungroup, MoveTo | (right-click menu) | set a direction, remove a subgraph, move nodes in or out of subgraphs (WYSIWY-16) |
 | ReverseEdge, LongerEdge, ShorterEdge | (menu) | reverse, lengthen, or shorten the selected edges (WYSIWY-14) |
 | SetShape, SetStroke, SetArrows | (right-click menu) | set the selected nodes' shape or edges' line (WYSIWY-14) |
 | ConnectTo, ConnectFrom | (right-click menu) | add edges to or from a node (WYSIWY-14) |

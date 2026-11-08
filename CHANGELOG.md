@@ -31,6 +31,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `flowchart::edit::set_node_shape`, `set_edge_line`, and `reverse_edge`.
 - Editor: a shape bar on the drawing that adds a node of a shape; double-click empty space to
   add a node, or drag from a node to empty space to add a linked one.
+- Editor: layout hints: set the diagram's or a subgraph's direction, group and ungroup nodes,
+  move nodes into or out of subgraphs (also by dragging onto one), keep two nodes together, and
+  move statements earlier or later.
+- `flowchart::edit::set_direction`, `keep_together`, `group`, `ungroup`, `move_to_subgraph`,
+  `move_node`, and `move_edge`.
 
 ### Changed
 

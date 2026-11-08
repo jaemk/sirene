@@ -170,3 +170,41 @@ Dragging from a node and releasing on empty space inside the drawing adds a node
 from the dragged node; releasing outside the drawing, or on an edge, adds nothing. Each is one
 drawing change (WYSIWY-13). Tests: `crates/sirene-gui/tests/shape_bar.rs` and
 `dragging_connects_and_pans` in `crates/sirene-gui/tests/drawing.rs`.
+
+A node added by a double-click or a drag that ends inside a subgraph is added to that subgraph
+(`move_to_subgraph`, WYSIWY-16), except that a drag ending on another subgraph than the dragged
+node's moves the dragged node into it instead.
+
+## WYSIWY-16 Layout hints
+
+Edits that steer the layout without positions, as source edits (WYSIWY-8) and actions (GUISHE-5):
+
+- `set_direction`: replaces the header's direction, or adds one after `flowchart`/`graph`; for a
+  subgraph, replaces its last `direction` statement or adds one after its `subgraph` line,
+  indented like its statements. Written as `TD`, `BT`, `LR`, or `RL`; no edit when it already
+  reads so.
+- `keep_together`: appends `A ~~~ B`, an invisible edge.
+- `group`: appends `subgraph groupN [TITLE]` with a bare mention of each node and `end`, at the
+  end of the subgraph the nodes share (so it nests there) or of the document. `groupN` is the
+  first unused. No edit when the nodes are in different subgraphs.
+- `ungroup`: removes the `subgraph` and `end` lines, takes one indent level off the lines
+  between, and removes the subgraph's own `direction`, its `style` statements, and its id from
+  `class` lists. No edit when an edge starts or ends at the subgraph, or the `subgraph` or `end`
+  line has another statement on it.
+- `move_to_subgraph`: from the top level, adds a bare mention at the end of the target; from a
+  subgraph, moves the node's statements in it, which must each be the node alone, to the end
+  of the target or of the document.
+- `move_node` and `move_edge`: swap the statement with the node's first mention, or the edge,
+  with the statement before or after it in the same subgraph or document, when that is a node
+  or edge statement or a subgraph. `linkStyle` indexes follow their edges.
+
+On the drawing: a right press on a subgraph (not on a node or edge inside it) opens a menu with
+Add Node, Direction (for the subgraph, its current one checked), Ungroup (disabled when
+`ungroup` makes no edit), Select All, and Fit Window; on empty space, Direction is the
+diagram's. The node menu adds Group (secondary-g), Keep Together (two nodes), Move To (Top Level
+and each subgraph, the one node's place checked), and for one node Move Earlier (alt-up) and
+Move Later (alt-down), disabled when they make no edit; the edge menu adds Move Earlier and Move
+Later for one edge, which stays selected. Move To acts on each selected node in turn as one
+change. Tests: `crates/sirene-gui/tests/layout_hints.rs`, and `directions`, `keeping_together`,
+`grouping`, `ungrouping`, `moving_into_subgraphs`, and `moving_statements` in
+`crates/sirene-core/tests/flowchart_edit.rs`.

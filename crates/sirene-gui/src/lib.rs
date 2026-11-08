@@ -23,7 +23,7 @@ use document::Document;
 use gpui::component::input as text;
 use navigation::{PAN_FAR, PAN_STEP};
 use settings::{Appearance, Settings};
-use sirene_core::flowchart::{Arrow, Shape, Stroke};
+use sirene_core::flowchart::{Arrow, Direction, Shape, Stroke};
 use viewer::Viewer;
 
 actions!(
@@ -95,8 +95,38 @@ actions!(
         LongerEdge,
         /// Make the selected edges span one rank fewer.
         ShorterEdge,
+        /// Put the selected nodes in a new subgraph.
+        Group,
+        /// Lay out the two selected nodes as if linked, with an invisible edge.
+        KeepTogether,
+        /// Swap the selected item's statement with the one before it.
+        MoveEarlier,
+        /// Swap the selected item's statement with the one after it.
+        MoveLater,
     ]
 );
+
+/// Set the direction of the diagram, or of subgraph `subgraph` (WYSIWY-16).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetDirection {
+    pub direction: Direction,
+    pub subgraph: Option<String>,
+}
+
+/// Remove subgraph `id`, keeping what is in it (WYSIWY-16).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct Ungroup {
+    pub id: String,
+}
+
+/// Move the selected nodes into subgraph `subgraph`, or out to the top level (WYSIWY-16).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct MoveTo {
+    pub subgraph: Option<String>,
+}
 
 /// Give the selected nodes a shape (WYSIWY-14).
 #[derive(Clone, PartialEq, Debug, gpui::Action)]
@@ -209,6 +239,9 @@ pub fn key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new(secondary!("a"), SelectAll, Some("Drawing")),
         KeyBinding::new("tab", SelectNext, Some("Drawing")),
         KeyBinding::new("shift-tab", SelectPrevious, Some("Drawing")),
+        KeyBinding::new(secondary!("g"), Group, Some("Drawing")),
+        KeyBinding::new("alt-up", MoveEarlier, Some("Drawing")),
+        KeyBinding::new("alt-down", MoveLater, Some("Drawing")),
         KeyBinding::new(secondary!("shift-e"), ExportPng, None),
         KeyBinding::new(secondary!("shift-c"), CopyImage, None),
     ]
@@ -269,6 +302,11 @@ pub fn menus(recent: &[PathBuf]) -> Vec<Menu> {
                 MenuItem::action("Longer Edge", LongerEdge),
                 MenuItem::action("Shorter Edge", ShorterEdge),
                 MenuItem::action("Delete", Delete),
+                MenuItem::separator(),
+                MenuItem::action("Group", Group),
+                MenuItem::action("Keep Together", KeepTogether),
+                MenuItem::action("Move Earlier", MoveEarlier),
+                MenuItem::action("Move Later", MoveLater),
                 MenuItem::separator(),
                 MenuItem::action("Select All", SelectAll),
                 MenuItem::action("Select Next Node", SelectNext),
@@ -701,11 +739,11 @@ mod tests {
                 .flat_map(|m| actions(&m.items))
                 .collect()
         };
-        assert_eq!(all(&[]).len(), 40);
+        assert_eq!(all(&[]).len(), 44);
         let recent = [PathBuf::from("/a.mmd"), PathBuf::from("/b/c.mmd")];
         let names = all(&recent);
-        assert_eq!(names.len(), 42);
+        assert_eq!(names.len(), 46);
         assert!(names.contains(&"/b/c.mmd".to_owned()));
-        assert_eq!(key_bindings().len(), 34);
+        assert_eq!(key_bindings().len(), 37);
     }
 }
