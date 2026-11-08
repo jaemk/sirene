@@ -7,14 +7,14 @@ use gpui::{
     Subscription, Window, point, px,
 };
 use sirene_core::flowchart::edit::{self, Line, TextEdit};
-use sirene_core::flowchart::{self, Flowchart};
+use sirene_core::flowchart::{self, Flowchart, Shape};
 use sirene_core::scene::{Owner, Pt};
 
 use crate::paint::Placement;
 use crate::viewer::{Viewer, place};
 use crate::{
-    AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, Deselect, LongerEdge, Redo, Rename,
-    ReverseEdge, SetArrows, SetShape, SetStroke, ShorterEdge, Undo,
+    AddNode, AddNodeBefore, AddShape, ConnectFrom, ConnectTo, Delete, Deselect, LongerEdge, Redo,
+    Rename, ReverseEdge, SetArrows, SetShape, SetStroke, ShorterEdge, Undo,
 };
 
 /// A selectable diagram item: a node by id, or an edge by index.
@@ -34,6 +34,13 @@ pub(crate) enum Drag {
     },
     /// Moving the drawing with the pointer.
     Pan { last: Point<Pixels> },
+}
+
+/// How a new node is linked to an existing one.
+enum Link {
+    None,
+    From(String),
+    To(String),
 }
 
 /// The text field over an item whose label is being edited.
@@ -206,12 +213,16 @@ impl Viewer {
     ) {
         window.focus(&self.drawing_focus, cx);
         let hit = self.item_at(e.position, window);
-        if e.click_count >= 2
-            && let Some(item) = hit
-        {
+        if e.click_count >= 2 {
             self.drag = None;
-            self.select(vec![item.clone()], cx);
-            self.edit_label(item, window, cx);
+            match hit {
+                Some(item) => {
+                    self.select(vec![item.clone()], cx);
+                    self.edit_label(item, window, cx);
+                }
+                // Double-clicking empty space adds a node there (WYSIWY-15).
+                None => self.add_linked(Shape::Rect, Link::None, window, cx),
+            }
             return;
         }
         match hit {
@@ -279,9 +290,18 @@ impl Viewer {
         };
         let moved = e.position - start;
         let far = f32::from(moved.x).hypot(f32::from(moved.y)) > DRAG;
-        if far && let Some(Item::Node(to)) = self.item_at(e.position, window) {
-            let edit = edit::add_edge(&self.doc.source, &from, &to);
-            self.apply(edit, window, cx);
+        if far {
+            match self.item_at(e.position, window) {
+                Some(Item::Node(to)) => {
+                    let edit = edit::add_edge(&self.doc.source, &from, &to);
+                    self.apply(edit, window, cx);
+                }
+                // Released on empty space in the drawing: a new node, linked (WYSIWY-15).
+                None if self.viewport.get().contains(&e.position) => {
+                    self.add_linked(Shape::Rect, Link::From(from), window, cx);
+                }
+                _ => {}
+            }
         }
         cx.notify();
     }
@@ -346,12 +366,27 @@ impl Viewer {
         }
     }
 
-    pub(crate) fn add_node(&mut self, _: &AddNode, window: &mut Window, cx: &mut Context<Self>) {
+    /// Adds a node labeled [`NEW_NODE`] in `shape`, linked as `link` says, as one change; then
+    /// selects it and opens its label (WYSIWY-11, WYSIWY-15).
+    fn add_linked(
+        &mut self,
+        shape: Shape,
+        link: Link,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let src = self.doc.source.clone();
         let (id, add) = edit::add_node(&src, NEW_NODE);
         let mut out = add.apply(&src);
-        if let [Item::Node(from)] = self.selection.as_slice() {
-            out = edit::add_edge(&out, from, &id).apply(&out);
+        if shape != Shape::Rect
+            && let Some(e) = edit::set_node_shape(&out, &id, shape)
+        {
+            out = e.apply(&out);
+        }
+        match link {
+            Link::None => {}
+            Link::From(from) => out = edit::add_edge(&out, &from, &id).apply(&out),
+            Link::To(to) => out = edit::add_edge(&out, &id, &to).apply(&out),
         }
         if let Some(edit) = TextEdit::between(&src, &out) {
             self.apply(edit, window, cx);
@@ -359,6 +394,24 @@ impl Viewer {
         let item = Item::Node(id);
         self.select(vec![item.clone()], cx);
         self.edit_label(item, window, cx);
+    }
+
+    /// Links a new node from the one selected node, if there is one.
+    fn link_from_selection(&self) -> Link {
+        match self.selection.as_slice() {
+            [Item::Node(from)] => Link::From(from.clone()),
+            _ => Link::None,
+        }
+    }
+
+    pub(crate) fn add_node(&mut self, _: &AddNode, window: &mut Window, cx: &mut Context<Self>) {
+        let link = self.link_from_selection();
+        self.add_linked(Shape::Rect, link, window, cx);
+    }
+
+    pub(crate) fn add_shape(&mut self, a: &AddShape, window: &mut Window, cx: &mut Context<Self>) {
+        let link = self.link_from_selection();
+        self.add_linked(a.shape, link, window, cx);
     }
 
     pub(crate) fn add_node_before(
@@ -370,17 +423,8 @@ impl Viewer {
         let [Item::Node(to)] = self.selection.as_slice() else {
             return;
         };
-        let to = to.clone();
-        let src = self.doc.source.clone();
-        let (id, add) = edit::add_node(&src, NEW_NODE);
-        let mut out = add.apply(&src);
-        out = edit::add_edge(&out, &id, &to).apply(&out);
-        if let Some(edit) = TextEdit::between(&src, &out) {
-            self.apply(edit, window, cx);
-        }
-        let item = Item::Node(id);
-        self.select(vec![item.clone()], cx);
-        self.edit_label(item, window, cx);
+        let link = Link::To(to.clone());
+        self.add_linked(Shape::Rect, link, window, cx);
     }
 
     /// The selected node ids.

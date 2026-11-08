@@ -259,14 +259,26 @@ fn dragging_connects_and_pans(cx: &mut TestAppContext) {
         source(&viewer, cx),
         "flowchart LR\n    A --> B\n    C\n    C --> A\n"
     );
-    // A press without a drag, or a drag ending on nothing, adds nothing.
+    // A press without a drag, or a drag ending outside the drawing, adds nothing.
     let a = center(&viewer, cx, &node("A"));
     drag(cx, a, a);
-    drag(cx, a, point(a.x, a.y - px(200.0)));
+    let area = viewer.read_with(cx, |v, _| v.drawing_area());
+    drag(cx, a, area.origin - point(px(5.0), px(5.0)));
     assert_eq!(
         source(&viewer, cx),
         "flowchart LR\n    A --> B\n    C\n    C --> A\n"
     );
+    // A drag ending on empty space adds a node there, linked, with its label open
+    // (WYSIWY-15).
+    drag(cx, a, point(a.x, a.y - px(200.0)));
+    assert_eq!(
+        source(&viewer, cx),
+        "flowchart LR\n    A --> B\n    C\n    C --> A\n    D[New node]\n    A --> D\n"
+    );
+    assert_eq!(selection(&viewer, cx), [node("D")]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("New node"));
+    viewer.update_in(cx, |v, window, cx| v.cancel_label(window, cx));
+    let a = center(&viewer, cx, &node("A"));
 
     // Dragging from empty space pans.
     let empty = point(a.x, a.y - px(200.0));

@@ -8,6 +8,7 @@ pub mod menu;
 pub mod navigation;
 pub mod paint;
 pub mod settings;
+pub mod shape_bar;
 pub mod viewer;
 
 use std::path::{Path, PathBuf};
@@ -101,6 +102,13 @@ actions!(
 #[derive(Clone, PartialEq, Debug, gpui::Action)]
 #[action(namespace = sirene, no_json)]
 pub struct SetShape {
+    pub shape: Shape,
+}
+
+/// Add a node of a shape, linked from the selected node (WYSIWY-15).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct AddShape {
     pub shape: Shape,
 }
 

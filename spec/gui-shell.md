@@ -66,6 +66,7 @@ the zoom.
 | AppearanceSystem, AppearanceLight, AppearanceDark | (menu) | set the Appearance (GUISHE-6) |
 | OpenRecent, ClearRecent | (menu) | open a recent file, or forget them (GUISHE-10) |
 | AddNodeBefore | (menu) | add a node with an edge to the selected node (WYSIWY-14) |
+| AddShape | (shape bar) | add a node of a shape, linked from the selected node (WYSIWY-15) |
 | ReverseEdge, LongerEdge, ShorterEdge | (menu) | reverse, lengthen, or shorten the selected edges (WYSIWY-14) |
 | SetShape, SetStroke, SetArrows | (right-click menu) | set the selected nodes' shape or edges' line (WYSIWY-14) |
 | ConnectTo, ConnectFrom | (right-click menu) | add edges to or from a node (WYSIWY-14) |
