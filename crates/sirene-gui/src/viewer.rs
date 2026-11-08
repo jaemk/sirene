@@ -1,12 +1,15 @@
 //! A window's document: the source pane beside the drawing (GUISHE-2, WYSIWY-1..6).
 
 use std::cell::Cell;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
 use gpui::base::input::{Diagnostic, DiagnosticSeverity};
-use gpui::component::input::{Editor, EditorState, Escape, Input, InputEvent, Position, RopeExt};
+use gpui::component::input::{
+    self as text, Editor, EditorState, Escape, Input, InputEvent, Position, RopeExt,
+};
+use gpui::component::menu::AppMenuBar;
 use gpui::component::resizable::{ResizableState, h_resizable, resizable_panel};
 use gpui::component::{Theme as KitTheme, ThemeMode};
 use gpui::{
@@ -21,7 +24,8 @@ use crate::drawing::{Drag, Item, LabelEdit};
 use crate::paint::{self, Metrics, Placement};
 use crate::settings::{self, Settings};
 use crate::{
-    ActualSize, CloseWindow, FitWindow, Open, Reload, Save, SaveAs, ToggleSource, ZoomIn, ZoomOut,
+    ActualSize, CloseWindow, FitWindow, Open, Redo, Reload, Save, SaveAs, SelectAll, ToggleSource,
+    Undo, ZoomIn, ZoomOut,
 };
 
 /// How often the file is checked for changes.
@@ -55,6 +59,10 @@ pub struct Viewer {
     /// The outcome of the last export or copy, shown in the status bar until the document
     /// changes (GUISHE-9).
     pub notice: Option<String>,
+    /// The menus drawn in the window, where the platform has no menu bar (GUISHE-12).
+    pub menu_bar: Option<Entity<AppMenuBar>>,
+    /// The recent files the menu bar was last built with.
+    menu_recent: Vec<PathBuf>,
     scene: Option<Rc<Scene>>,
     /// The drawing area from the last paint.
     pub(crate) viewport: Rc<Cell<Bounds<Pixels>>>,
@@ -106,6 +114,14 @@ impl Viewer {
         // The Appearance setting, and the pane, follow the app's settings (GUISHE-10).
         let chosen = cx.observe_global_in::<Settings>(window, |v, window, cx| {
             v.set_dark(effective_dark(window, cx), cx);
+            // Open Recent changed: rebuild the window's menus.
+            let recent = &settings::get(cx).recent;
+            if let Some(bar) = &v.menu_bar
+                && v.menu_recent != *recent
+            {
+                v.menu_recent = recent.clone();
+                bar.update(cx, |bar, cx| bar.reload(cx));
+            }
         });
         let resized = cx.observe_window_bounds(window, |_, window, cx| {
             let size = window.window_bounds().get_bounds().size;
@@ -131,6 +147,8 @@ impl Viewer {
         let remembered = settings::get(cx);
         let (show_source, source_width) = (remembered.show_source, remembered.source_width);
         let panes = cx.new(|_| ResizableState::default());
+        let menu_bar = crate::IN_WINDOW_MENUS.then(|| AppMenuBar::new(cx));
+        let menu_recent = settings::get(cx).recent.clone();
         let mut viewer = Self {
             doc,
             source,
@@ -147,6 +165,8 @@ impl Viewer {
             future: Vec::new(),
             fit_pending: true,
             notice: None,
+            menu_bar,
+            menu_recent,
             scene: None,
             viewport: Rc::default(),
             focus: cx.focus_handle(),
@@ -371,10 +391,7 @@ impl Viewer {
 
     /// Asks for a path and saves there.
     pub fn save_as(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Task<bool> {
-        let dir = self.doc.path.as_deref().and_then(Path::parent).map_or_else(
-            || std::env::current_dir().unwrap_or_default(),
-            Path::to_owned,
-        );
+        let dir = crate::dialog_dir(self.doc.path.as_deref());
         let name = match &self.doc.path {
             Some(_) => self.doc.name(),
             None => "diagram.mmd".to_owned(),
@@ -521,6 +538,26 @@ impl Viewer {
     pub fn status(&self) -> String {
         self.notice.clone().unwrap_or_else(|| self.doc.status())
     }
+
+    /// Whether the drawing has the keyboard; it then shows a focus ring (GUISHE-12).
+    pub fn drawing_focused(&self, window: &Window) -> bool {
+        self.drawing_focus.is_focused(window)
+    }
+
+    // Edit > Undo, Redo, and Select All reach here when the drawing did not take them: the
+    // source pane or the label field has the keyboard, so they act on its text (GUISHE-12).
+
+    fn text_undo(&mut self, _: &Undo, window: &mut Window, cx: &mut Context<Self>) {
+        window.dispatch_action(Box::new(text::Undo), cx);
+    }
+
+    fn text_redo(&mut self, _: &Redo, window: &mut Window, cx: &mut Context<Self>) {
+        window.dispatch_action(Box::new(text::Redo), cx);
+    }
+
+    fn text_select_all(&mut self, _: &SelectAll, window: &mut Window, cx: &mut Context<Self>) {
+        window.dispatch_action(Box::new(text::SelectAll), cx);
+    }
 }
 
 fn theme_mode(dark: bool) -> ThemeMode {
@@ -547,6 +584,7 @@ impl Render for Viewer {
             .filter_map(|i| self.owner(i))
             .collect();
         let band = self.rubber_band(window);
+        let ring = self.drawing_focused(window);
         let field = self.label_field(window, px(160.0));
         let drawing = div()
             .id("drawing")
@@ -591,6 +629,9 @@ impl Render for Viewer {
                         paint::outline(&scene, &selected, &at, accent, window);
                         if let Some((from, to)) = band {
                             paint::line(from, to, accent, window);
+                        }
+                        if ring {
+                            paint::focus_ring(bounds, accent, window);
                         }
                     },
                 )
@@ -651,11 +692,24 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::close))
             .on_action(cx.listener(Self::open))
             .on_action(cx.listener(Self::add_node))
+            .on_action(cx.listener(Self::text_undo))
+            .on_action(cx.listener(Self::text_redo))
+            .on_action(cx.listener(Self::text_select_all))
             .size_full()
             .flex()
             .flex_col()
             .bg(paint::color(theme.background))
             .text_color(paint::color(theme.text))
+            .children(self.menu_bar.clone().map(|bar| {
+                div()
+                    .id("menu-bar")
+                    .h(px(30.0))
+                    .px_1()
+                    .flex_none()
+                    .border_b_1()
+                    .border_color(rule)
+                    .child(bar)
+            }))
             .child(body.child(panes))
             .child(
                 div()

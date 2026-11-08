@@ -92,10 +92,7 @@ impl Viewer {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Task<Option<PathBuf>> {
-        let dir = self.doc.path.as_deref().and_then(Path::parent).map_or_else(
-            || std::env::current_dir().unwrap_or_default(),
-            Path::to_owned,
-        );
+        let dir = crate::dialog_dir(self.doc.path.as_deref());
         let chosen = cx.prompt_for_new_path(&dir, Some(&self.export_name(format)));
         cx.spawn_in(window, async move |this, cx| {
             let Ok(Ok(Some(path))) = chosen.await else {

@@ -1,8 +1,8 @@
 //! Painting scenes with gpui (GUISHE-4).
 
 use gpui::{
-    App, Font, FontStyle, FontWeight, Hsla, PathBuilder, Pixels, Point, Rgba, SharedString,
-    TextAlign, TextRun, Window, point, px,
+    App, BorderStyle, Bounds, Font, FontStyle, FontWeight, Hsla, PathBuilder, Pixels, Point, Rgba,
+    SharedString, TextAlign, TextRun, Window, point, px,
 };
 use sirene_core::scene::{Color, Owner, Primitive, Pt, Scene, Segment, TextMetrics, TextStyle};
 
@@ -122,6 +122,18 @@ pub fn line(from: Point<Pixels>, to: Point<Pixels>, color: Hsla, window: &mut Wi
     if let Ok(path) = b.build() {
         window.paint_path(path, color);
     }
+}
+
+/// A 2px frame just inside `bounds`, shown while the drawing has the keyboard (GUISHE-12).
+pub fn focus_ring(bounds: Bounds<Pixels>, color: Hsla, window: &mut Window) {
+    window.paint_quad(gpui::quad(
+        bounds,
+        0.0,
+        gpui::transparent_black(),
+        2.0,
+        color,
+        BorderStyle::Solid,
+    ));
 }
 
 /// Paints `scene` at `at`, with text in `font`.

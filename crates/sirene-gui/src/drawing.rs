@@ -151,6 +151,11 @@ impl Viewer {
     }
 
     pub(crate) fn undo(&mut self, _: &Undo, window: &mut Window, cx: &mut Context<Self>) {
+        // The label field's own text comes first (GUISHE-12).
+        if self.label.is_some() {
+            cx.propagate();
+            return;
+        }
         let Some((before, after)) = self.history.pop() else {
             return;
         };
@@ -166,6 +171,10 @@ impl Viewer {
     }
 
     pub(crate) fn redo(&mut self, _: &Redo, window: &mut Window, cx: &mut Context<Self>) {
+        if self.label.is_some() {
+            cx.propagate();
+            return;
+        }
         let Some((before, after)) = self.future.pop() else {
             return;
         };

@@ -194,7 +194,9 @@ fn misspelled_command(files: &[PathBuf]) -> Option<(String, &'static str)> {
             let mut prev = row[0];
             row[0] = i + 1;
             for (j, cb) in b.iter().enumerate() {
-                let next = (prev + usize::from(ca != cb)).min(row[j] + 1).min(row[j + 1] + 1);
+                let next = (prev + usize::from(ca != cb))
+                    .min(row[j] + 1)
+                    .min(row[j + 1] + 1);
                 prev = row[j + 1];
                 row[j + 1] = next;
             }
