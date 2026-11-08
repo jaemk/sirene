@@ -276,6 +276,7 @@ fn label_colors_follow_the_fill() {
 }
 
 /// Nodes stacked in a column connect with straight lines, whatever their widths.
+#[cfg(feature = "png")]
 #[test]
 fn chains_draw_straight() {
     let src = "flowchart TD\n\
@@ -303,6 +304,7 @@ fn chains_draw_straight() {
 }
 
 /// Curves and corners finish before the arrowhead, so the head sits on a straight run.
+#[cfg(feature = "png")]
 #[test]
 fn arrowheads_sit_on_straight_runs() {
     let sources = [
@@ -371,14 +373,17 @@ fn arrowheads_sit_on_straight_runs() {
 }
 
 /// `TextMetrics` through a trait object.
+#[cfg(feature = "png")]
 struct Dyn<'a>(&'a dyn TextMetrics);
 
+#[cfg(feature = "png")]
 impl TextMetrics for Dyn<'_> {
     fn width(&self, text: &str, size: f32) -> f32 {
         self.0.width(text, size)
     }
 }
 
+#[cfg(feature = "png")]
 fn runs(s: &Scene, owner: Owner) -> Vec<(String, Pt, TextStyle)> {
     owned(s, owner)
         .into_iter()
@@ -395,6 +400,7 @@ fn runs(s: &Scene, owner: Owner) -> Vec<(String, Pt, TextStyle)> {
 }
 
 /// Markdown emphasis draws as bold and italic runs, left to right on one line.
+#[cfg(feature = "png")]
 #[test]
 fn markdown_runs() {
     let s = flowchart(
@@ -439,6 +445,7 @@ fn markdown_runs() {
 }
 
 /// Long labels wrap at spaces near 200px; diamonds wrap to stay compact.
+#[cfg(feature = "png")]
 #[test]
 fn long_labels_wrap() {
     let long = "a label long enough that it has to wrap onto more lines than one";
