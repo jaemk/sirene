@@ -343,6 +343,10 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
         }
     }
 
+    log::debug!(
+        "drew a {width}x{height} scene of {} elements",
+        p.elements.len()
+    );
     Scene {
         width,
         height,

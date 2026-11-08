@@ -6746,6 +6746,7 @@ version = "0.1.2-dev"
 dependencies = [
  "assert_cmd",
  "clap",
+ "log",
  "predicates",
  "sirene-core",
  "sirene-gui",
@@ -6757,6 +6758,7 @@ name = "sirene-core"
 version = "0.1.2-dev"
 dependencies = [
  "insta",
+ "log",
  "proptest",
  "resvg 0.46.0",
  "rowan",
@@ -6771,6 +6773,7 @@ dependencies = [
  "anyhow",
  "futures",
  "gpui-kit",
+ "log",
  "sirene-core",
  "tempfile",
 ]

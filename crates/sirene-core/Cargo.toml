@@ -18,6 +18,7 @@ workspace = true
 png = ["dep:resvg", "dep:ttf-parser"]
 
 [dependencies]
+log = "0.4.35"
 resvg = { version = "0.46.0", default-features = false, features = ["text"], optional = true }
 rowan = "0.17.0"
 ttf-parser = { version = "0.25.1", optional = true }

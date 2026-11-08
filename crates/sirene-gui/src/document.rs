@@ -86,12 +86,35 @@ impl Document {
     /// Reads and parses `path`. A file that cannot be read gives an empty document that
     /// records the error.
     pub fn open(path: &Path) -> Self {
+        let doc = Self::read(path);
+        match &doc.read_error {
+            Some(e) => log::debug!("{e}"),
+            None => log::debug!(
+                "opened {}: {} bytes, {} problems",
+                path.display(),
+                doc.source.len(),
+                doc.problems.len()
+            ),
+        }
+        doc
+    }
+
+    fn read(path: &Path) -> Self {
+        let (text, error) = Self::read_text(path);
+        Self {
+            read_error: error,
+            ..Self::from_source(Some(path.to_owned()), text)
+        }
+    }
+
+    /// The file's text, or an empty text and the read error.
+    fn read_text(path: &Path) -> (String, Option<String>) {
         match std::fs::read_to_string(path) {
-            Ok(src) => Self::from_source(Some(path.to_owned()), src),
-            Err(e) => Self {
-                read_error: Some(format!("cannot read {}: {e}", path.display())),
-                ..Self::from_source(Some(path.to_owned()), String::new())
-            },
+            Ok(text) => (text, None),
+            Err(e) => (
+                String::new(),
+                Some(format!("cannot read {}: {e}", path.display())),
+            ),
         }
     }
 
@@ -116,17 +139,34 @@ impl Document {
         let Some(path) = &self.path else {
             return Disk::Unchanged;
         };
-        let next = Self::open(path);
-        if next.saved == self.saved && next.read_error == self.read_error {
+        // Compare the text before parsing it: this runs every 500ms.
+        let (text, error) = Self::read_text(path);
+        if text == self.saved && error == self.read_error {
             return Disk::Unchanged;
         }
+        let next = Self {
+            read_error: error,
+            ..Self::from_source(Some(path.clone()), text)
+        };
         if !self.is_edited() {
+            log::debug!(
+                "{} changed on disk; took the new text ({} bytes){}",
+                path.display(),
+                next.source.len(),
+                next.read_error
+                    .as_deref()
+                    .map_or_else(String::new, |e| format!(": {e}"))
+            );
             *self = next;
             return Disk::Reloaded;
         }
         if self.disk_changed {
             return Disk::Unchanged;
         }
+        log::debug!(
+            "{} changed on disk under unsaved edits; keeping the edits",
+            path.display()
+        );
         self.disk_changed = true;
         Disk::Conflict
     }
@@ -136,6 +176,7 @@ impl Document {
         let Some(path) = &self.path else {
             return false;
         };
+        log::debug!("reloading {}", path.display());
         let next = Self::open(path);
         let changed = next.source != self.source;
         *self = next;
@@ -150,6 +191,10 @@ impl Document {
                 .map_err(|e| format!("cannot write {}: {e}", path.display())),
             None => Err("no file to save to".to_owned()),
         };
+        match &result {
+            Ok(()) => log::debug!("saved {} bytes to {}", self.source.len(), self.name()),
+            Err(e) => log::debug!("save failed: {e}"),
+        }
         match &result {
             Ok(()) => {
                 self.saved = self.source.clone();
@@ -265,6 +310,7 @@ fn write_atomic_with(
     use std::io::Write;
 
     let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
+    log::debug!("writing {}", path.display());
     let meta = std::fs::metadata(&path).ok();
     if meta.as_ref().is_some_and(|m| m.permissions().readonly()) {
         return Err(std::io::Error::new(
@@ -295,8 +341,12 @@ fn write_atomic_with(
         Ok(true)
     })();
     let result = match staged {
-        Ok(true) => std::fs::rename(&tmp, &path),
+        Ok(true) => {
+            log::debug!("renaming {} over it", tmp.display());
+            std::fs::rename(&tmp, &path)
+        }
         Ok(false) => {
+            log::debug!("cannot keep the file's owner; writing in place");
             let _ = std::fs::remove_file(&tmp);
             write_in_place(&path, text)
         }
