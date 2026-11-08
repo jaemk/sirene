@@ -64,6 +64,8 @@ pub struct Viewer {
     /// The recent files the menu bar was last built with.
     menu_recent: Vec<PathBuf>,
     scene: Option<Rc<Scene>>,
+    /// The shape bar's icons, in the current theme (WYSIWY-15).
+    icons: Option<Rc<Vec<Scene>>>,
     /// The drawing area from the last paint.
     pub(crate) viewport: Rc<Cell<Bounds<Pixels>>>,
     focus: FocusHandle,
@@ -173,6 +175,7 @@ impl Viewer {
             menu_bar,
             menu_recent,
             scene: None,
+            icons: None,
             viewport: Rc::default(),
             focus: cx.focus_handle(),
             drawing_focus: cx.focus_handle(),
@@ -263,6 +266,7 @@ impl Viewer {
         if dark != self.dark {
             self.dark = dark;
             self.scene = None;
+            self.icons = None;
             KitTheme::change(theme_mode(dark), None, cx);
             cx.notify();
         }
@@ -283,6 +287,20 @@ impl Viewer {
                     font: window.text_style().font(),
                 };
                 Rc::new(scene::flowchart(&doc.chart, &metrics, &theme))
+            })
+            .clone()
+    }
+
+    /// The shape bar's icons, built on first use after the theme changes.
+    fn icons(&mut self, window: &Window) -> Rc<Vec<Scene>> {
+        let theme = self.theme();
+        self.icons
+            .get_or_insert_with(|| {
+                let metrics = Metrics {
+                    window,
+                    font: window.text_style().font(),
+                };
+                Rc::new(crate::shape_bar::icons(&theme, &metrics))
             })
             .clone()
     }
@@ -592,6 +610,13 @@ impl Render for Viewer {
         let band = self.rubber_band(window);
         let ring = self.drawing_focused(window);
         let field = self.label_field(window, px(160.0));
+        let shape_bar = crate::shape_bar::bar(
+            self.icons(window),
+            font.clone(),
+            paint::color(theme.background),
+            rule,
+            cx,
+        );
         let drawing = div()
             .id("drawing")
             .track_focus(&self.drawing_focus)
@@ -644,6 +669,7 @@ impl Render for Viewer {
                 )
                 .size_full(),
             )
+            .child(shape_bar)
             .children(field.map(|(input, at, width)| {
                 div()
                     .absolute()
@@ -703,6 +729,7 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::open))
             .on_action(cx.listener(Self::add_node))
             .on_action(cx.listener(Self::add_node_before))
+            .on_action(cx.listener(Self::add_shape))
             .on_action(cx.listener(Self::set_shape))
             .on_action(cx.listener(Self::set_stroke))
             .on_action(cx.listener(Self::set_arrows))

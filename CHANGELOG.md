@@ -29,6 +29,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Editor: a right-click menu on the drawing to set node shapes, edge lines, arrowheads, and
   lengths, reverse edges, add a node before or after, and connect to or from any node.
 - `flowchart::edit::set_node_shape`, `set_edge_line`, and `reverse_edge`.
+- Editor: a shape bar on the drawing that adds a node of a shape; double-click empty space to
+  add a node, or drag from a node to empty space to add a linked one.
 
 ### Changed
 

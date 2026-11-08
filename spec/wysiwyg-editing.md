@@ -122,7 +122,8 @@ removes the label.
 AddNode (secondary-shift-n) adds a node labelled `New node`; with one node selected, it also adds
 an edge from that node to the new one. The new node is selected and its label opens for editing.
 Dragging from a node and releasing on another node (or the same one) adds an edge between them;
-a line follows the pointer while dragging. Dragging from empty space pans.
+a line follows the pointer while dragging; releasing on empty space in the drawing adds a node
+(WYSIWY-15). Dragging from empty space pans.
 
 ## WYSIWY-12 Deleting
 
@@ -154,3 +155,18 @@ every selected item of their kind, as one drawing change (WYSIWY-13):
 - Delete.
 
 The same edits are actions (GUISHE-5). Tests: `crates/sirene-gui/tests/context_menu.rs`.
+
+## WYSIWY-15 Shape bar and quick adds
+
+A bar at the top left of the drawing has a button for each of rect, rounded, stadium, diamond,
+hexagon, circle, cylinder, and lean right, each showing that shape as the drawing draws it, with
+an "Add SHAPE" tooltip. A button runs AddShape: like AddNode (WYSIWY-11), a node labelled
+`New node`, linked from the one selected node if there is one, then selected with its label
+open, but in that shape (written as `set_node_shape` writes it, WYSIWY-8). Presses on the bar
+do not reach the drawing.
+
+Double-clicking empty space on the drawing (or a subgraph) adds an unlinked node the same way.
+Dragging from a node and releasing on empty space inside the drawing adds a node with an edge
+from the dragged node; releasing outside the drawing, or on an edge, adds nothing. Each is one
+drawing change (WYSIWY-13). Tests: `crates/sirene-gui/tests/shape_bar.rs` and
+`dragging_connects_and_pans` in `crates/sirene-gui/tests/drawing.rs`.
