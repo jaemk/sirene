@@ -9,3 +9,9 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo test --package sirene --no-default-features --locked
 cargo llvm-cov --workspace --locked --fail-under-lines 95
+# The release workflow's audit job is the gate; run the scan here when it is installed.
+if command -v cargo-audit >/dev/null 2>&1; then
+    cargo audit
+else
+    echo "cargo-audit not installed; skipping the advisory scan"
+fi

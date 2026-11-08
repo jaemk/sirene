@@ -1,181 +1,406 @@
-name: Publish to crates.io
+name: release
+
+# Merging a version bump to main is the release. Every push to main runs
+# `decide`, which releases only when Cargo.toml carries a stable version that
+# has no GitHub release yet: a `-dev` version (main between releases) and an
+# already-released version both skip, so ordinary merges cost one short job.
+# The workflow creates the `v<version>` tag itself, through `gh release create`.
+#
+# `workflow_dispatch` re-runs a release that failed partway. Every publishing
+# step below is idempotent: an existing GitHub release gets its assets
+# re-uploaded, a crate version already on crates.io is skipped, and an
+# up-to-date formula and cask are not re-committed.
+#
+# The workflow file name and the `release` environment are what the crates.io
+# trusted publishers for sirene-core, sirene-gui, and sirene name.
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Publish when the root crate's version is not on crates.io yet. This keys off
-  # the index, not the commit message, so no merge strategy can lose the signal.
-  check:
-    runs-on: ubuntu-latest
+  decide:
+    # A fork has no `release` environment and no publish credentials.
+    if: github.repository == 'jaemk/sirene'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
-      should_publish: ${{ steps.decide.outputs.should_publish }}
+      release: ${{ steps.decide.outputs.release }}
       version: ${{ steps.decide.outputs.version }}
     steps:
-    - uses: actions/checkout@v6
-    # The decision below sees only the root crate's version, not a half-bumped
-    # workspace; fail the release on that first.
-    - name: Check the workspace versions agree
-      run: bash bin/check-versions.sh
-    - name: Check whether the root crate version is already published
-      id: decide
-      run: |
-        set -euo pipefail
-        version=$(cargo metadata --no-deps --format-version 1 \
-          | jq -r '.packages[] | select(.name == "sirene") | .version')
-        if [ -z "$version" ]; then
-          echo "Could not determine the root crate version." >&2
-          exit 1
-        fi
-        echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Every publishable crate must carry the root version and pin its
+      # siblings to it, or a release would publish a half-bumped workspace.
+      - name: check the workspace versions agree
+        run: bash bin/check-versions.sh
+      - name: decide whether this commit is a release
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(grep '^version = ' Cargo.toml | head -n1 | cut -d'"' -f2)"
+          if [ -z "$version" ]; then
+            echo "could not read the version from Cargo.toml" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in
+            *-*)
+              echo "$version is a pre-release (main between releases); nothing to release"
+              echo "release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+          # A lookup failure other than "not found" must fail loudly rather
+          # than skip a real release.
+          if gh release view "v$version" --json tagName >/dev/null 2>err.txt; then
+            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "v$version exists; re-running its release steps"
+              echo "release=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "v$version is already released; nothing to release"
+              echo "release=false" >> "$GITHUB_OUTPUT"
+            fi
+          elif grep -q "release not found" err.txt; then
+            echo "v$version has no release yet; releasing"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            cat err.txt >&2
+            exit 1
+          fi
+      # The release notes come from CHANGELOG.md; fail now, not after the
+      # builds, when the section is missing.
+      - name: check the changelog has a section for the version
+        if: steps.decide.outputs.release == 'true'
+        run: bash bin/changelog-section.sh "${{ steps.decide.outputs.version }}" > /dev/null
 
-        # A brand-new crate is a 404, which means "publish". Any other failure
-        # must fail loudly rather than resolve to "nothing to publish".
-        status=$(curl -sS -o versions.json -w '%{http_code}' \
-          -H "User-Agent: jaemk-sirene-release-workflow" \
-          "https://crates.io/api/v1/crates/sirene/versions")
-        if [ "$status" = 404 ]; then
-          echo '{"versions":[]}' > versions.json
-        elif [ "$status" != 200 ]; then
-          echo "crates.io returned HTTP $status." >&2
-          cat versions.json >&2
-          exit 1
-        fi
-
-        if jq -e --arg v "$version" '.versions[] | select(.num == $v)' versions.json >/dev/null; then
-          echo "sirene $version is already on crates.io - nothing to release."
-          echo "should_publish=false" >> "$GITHUB_OUTPUT"
-        else
-          echo "sirene $version is not on crates.io - releasing."
-          echo "should_publish=true" >> "$GITHUB_OUTPUT"
-        fi
-
-  # Everything that can fail runs before `publish`, because a crates.io upload
-  # cannot be undone or overwritten.
-
-  # Package and build-check every crate together, each against the packaged
-  # crates before it, so a crate that would fail its own `cargo publish`
-  # verification fails here instead of after its dependencies are uploaded.
-  verify:
-    needs: check
-    if: github.event_name == 'workflow_dispatch' || needs.check.outputs.should_publish == 'true'
-    runs-on: ubuntu-latest
+  ci:
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-    - uses: actions/checkout@v6
-    - run: >
-        sudo apt-get update && sudo apt-get install -y
-        libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
-        libfontconfig1-dev libfreetype-dev libvulkan-dev
-    - run: rustup show
-    - run: cargo package --workspace --exclude xtask --locked
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: install the gpui build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libwayland-dev libfontconfig1-dev libfreetype-dev libvulkan-dev
+      # Pinned by rust-toolchain.toml; named here too so the action installs
+      # exactly the toolchain cargo will then select. Keep the two in step.
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit
+        with:
+          toolchain: "1.99.1"
+          components: clippy, rustfmt, llvm-tools-preview
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2
+        with:
+          tool: cargo-llvm-cov
+      - run: bash scripts/ci.sh
 
-  # Build the macOS app now and keep it as an artifact; `publish` attaches it to
-  # the release once the release exists.
-  macos:
-    needs: check
-    if: github.event_name == 'workflow_dispatch' || needs.check.outputs.should_publish == 'true'
-    runs-on: macos-latest
+  ci-macos:
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Pinned by rust-toolchain.toml; named here too so the action installs
+      # exactly the toolchain cargo will then select. Keep the two in step.
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit
+        with:
+          toolchain: "1.99.1"
+          components: clippy, rustfmt, llvm-tools-preview
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: taiki-e/install-action@3a3daafd3b7f23b8f65d9f5ba2db203fb59b79e2 # v2
+        with:
+          tool: cargo-llvm-cov
+      - run: bash scripts/ci.sh
+
+  # A release must not ship a tree with a known advisory. This is the one place
+  # the scan gates the artifacts. Ignored advisories, with the reason for each,
+  # are in .cargo/audit.toml.
+  audit:
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: rustsec/audit-check@858dc40f52ca2b8570b7a997c1c4e35c6fc9a432
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ignore: RUSTSEC-2026-0194,RUSTSEC-2026-0195
+
+  build:
+    name: build ${{ matrix.target }}
+    needs: [decide, ci, ci-macos, audit]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    # The release binaries are built with a deliberately pinned toolchain.
+    # RUSTUP_TOOLCHAIN outranks rust-toolchain.toml, so the pin holds even if
+    # the two drift apart.
     env:
-      TAG: v${{ needs.check.outputs.version }}
-      ZIP: Sirene-v${{ needs.check.outputs.version }}.zip
+      RUSTUP_TOOLCHAIN: "1.99.1"
+      VERSION: ${{ needs.decide.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-15
+          # Intel macOS, cross-compiled on the Apple Silicon runner: the Xcode
+          # toolchain builds both architectures, so this leg does not depend
+          # on an Intel runner image.
+          - target: x86_64-apple-darwin
+            os: macos-15
+          # The gnu legs include the GUI and link the system's X11, Wayland,
+          # and Vulkan libraries; the Homebrew formula uses them.
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+          # musl legs: statically linked, glibc-version-independent binaries
+          # for bin/install.sh. gpui cannot link statically, so these are built
+          # without the GUI.
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+            features: --no-default-features
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-24.04
+            features: --no-default-features
     steps:
-    - uses: actions/checkout@v6
-    # rust-toolchain.toml selects the channel; add both architectures.
-    - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-    - run: cargo build --release --locked --package sirene --target aarch64-apple-darwin
-    - run: cargo build --release --locked --package sirene --target x86_64-apple-darwin
-    - run: >
-        lipo -create -output target/sirene
-        target/aarch64-apple-darwin/release/sirene
-        target/x86_64-apple-darwin/release/sirene
-    - run: cargo xtask bundle --binary target/sirene --out target/bundle
-    - run: mkdir target/release-assets
-    - run: ditto -c -k --keepParent target/bundle/Sirene.app "target/release-assets/$ZIP"
-    - run: >
-        cargo xtask cask
-        --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$ZIP"
-        --sha256 "$(shasum -a 256 "target/release-assets/$ZIP" | cut -d ' ' -f 1)"
-        --homepage "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-        > target/release-assets/sirene.rb
-    - run: cat target/release-assets/sirene.rb
-    - uses: actions/upload-artifact@v4
-      with:
-        name: macos-release-assets
-        path: target/release-assets/
-        if-no-files-found: error
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: install the gpui build dependencies
+        if: contains(matrix.target, 'linux-gnu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libwayland-dev libfontconfig1-dev libfreetype-dev libvulkan-dev
+      - name: install musl tools
+        if: contains(matrix.target, 'musl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+      - name: configure musl linker (x86_64)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> "$GITHUB_ENV"
+      - name: configure musl linker (aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-musl'
+        run: |
+          echo "CC_aarch64_unknown_linux_musl=musl-gcc" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit
+        with:
+          toolchain: "1.99.1"
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: ${{ matrix.target }}
+      # Embed a dependency SBOM in the shipped binary (cargo-auditable) so
+      # `cargo audit bin sirene` can scan a downloaded release against the
+      # RustSec advisory database. Pinned for a reproducible release build.
+      - name: install cargo-auditable
+        run: cargo install cargo-auditable --version 0.7.5 --locked
+      - name: build
+        run: >
+          cargo auditable build --release --locked --package sirene
+          --target ${{ matrix.target }} ${{ matrix.features }}
+      # Package and build-check every crate, each against the packaged crates
+      # before it, so a crate that would fail its own verification fails here
+      # instead of after its dependencies are on crates.io. The musl legs skip
+      # it: the GUI crate does not build for musl.
+      - name: verify the crates
+        if: ${{ !contains(matrix.target, 'musl') }}
+        run: cargo package --workspace --exclude xtask --locked --target ${{ matrix.target }}
+      - name: package
+        run: |
+          dist="sirene-${VERSION}-${{ matrix.target }}"
+          mkdir "$dist"
+          cp "target/${{ matrix.target }}/release/sirene" "$dist/"
+          tar -czf "${dist}.tar.gz" -C "$dist" sirene
+      - name: attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: sirene-*.tar.gz
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.target }}
+          path: sirene-*.tar.gz
+
+  # The universal Sirene.app zip and its Homebrew cask (spec/macos-packaging.md).
+  app:
+    needs: [decide, ci, ci-macos, audit]
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      RUSTUP_TOOLCHAIN: "1.99.1"
+      VERSION: ${{ needs.decide.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit
+        with:
+          toolchain: "1.99.1"
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: app
+      - name: install cargo-auditable
+        run: cargo install cargo-auditable --version 0.7.5 --locked
+      - name: build
+        run: |
+          cargo auditable build --release --locked --package sirene --target aarch64-apple-darwin
+          cargo auditable build --release --locked --package sirene --target x86_64-apple-darwin
+          lipo -create -output target/sirene \
+            target/aarch64-apple-darwin/release/sirene \
+            target/x86_64-apple-darwin/release/sirene
+      - name: bundle, zip, and write the cask
+        run: |
+          set -euo pipefail
+          zip="Sirene-v${VERSION}.zip"
+          cargo xtask bundle --binary target/sirene --out target/bundle
+          mkdir app
+          ditto -c -k --keepParent target/bundle/Sirene.app "app/$zip"
+          cargo xtask cask \
+            --url "https://github.com/jaemk/sirene/releases/download/v${VERSION}/$zip" \
+            --sha256 "$(shasum -a 256 "app/$zip" | cut -d ' ' -f 1)" \
+            --homepage "https://github.com/jaemk/sirene" \
+            > app/sirene.rb
+          cat app/sirene.rb
+      - name: attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: app/Sirene-*.zip
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app
+          path: app/
+
+  release:
+    needs: [decide, build, app]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.decide.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: generate SHA256SUMS
+        run: |
+          cd dist
+          sha256sum *.tar.gz *.zip > ../SHA256SUMS
+          cd ..
+      - name: create the tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # `--target` creates the `v<version>` tag on the released commit.
+        run: |
+          tag="v${VERSION}"
+          if gh release view "$tag" --json tagName >/dev/null 2>&1; then
+            echo "$tag exists; re-uploading its assets"
+            gh release upload "$tag" dist/*.tar.gz dist/*.zip dist/sirene.rb SHA256SUMS --clobber
+          else
+            bash bin/changelog-section.sh "$VERSION" > notes.md
+            gh release create "$tag" dist/*.tar.gz dist/*.zip dist/sirene.rb SHA256SUMS \
+              --target "$GITHUB_SHA" --title "$tag" --notes-file notes.md
+          fi
 
   publish:
-    needs: [check, verify, macos]
-    # Ask for release-environment approval only when there is a new version (or
-    # on a manual dispatch, to re-run a release that failed partway), and only
-    # after `verify` and `macos` have passed.
-    if: github.event_name == 'workflow_dispatch' || needs.check.outputs.should_publish == 'true'
-    runs-on: ubuntu-latest
+    needs: [decide, release]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     environment: release
-    permissions:
-      id-token: write     # OIDC token exchange for trusted publishing
-      contents: write     # tags and GitHub releases
+    # Same reason as the build job: keep the deliberate pin from being
+    # overridden by rust-toolchain.toml.
     env:
-      # Set only to publish a crate's first version, which trusted publishing
-      # cannot do. Delete the secret once every crate has a trusted publisher.
-      BOOTSTRAP_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      RUSTUP_TOOLCHAIN: "1.99.1"
+      VERSION: ${{ needs.decide.outputs.version }}
+    permissions:
+      contents: write
+      id-token: write
     steps:
-    - uses: actions/checkout@v6
-      with:
-        fetch-depth: 0    # --generate-notes needs the previous tag
-    # `cargo publish` verifies each crate by building it, and gpui needs these.
-    - run: >
-        sudo apt-get update && sudo apt-get install -y
-        libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
-        libfontconfig1-dev libfreetype-dev libvulkan-dev
-    - run: rustup show
-    - uses: rust-lang/crates-io-auth-action@v1
-      if: env.BOOTSTRAP_TOKEN == ''
-      id: auth
-    - name: Publish to crates.io
-      run: bash bin/publish.sh
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || env.BOOTSTRAP_TOKEN }}
-    - name: Tag and create GitHub releases
-      # Idempotent, so a re-run of a release that published but died before
-      # tagging still gets its tags and releases.
-      if: success()
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: bash bin/tag-release.sh
-    - uses: actions/download-artifact@v4
-      with:
-        name: macos-release-assets
-        path: release-assets
-    - name: Attach the macOS app and cask to the release
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: gh release upload "v${{ needs.check.outputs.version }}" --clobber release-assets/*
-    - name: Commit the cask to the tap
-      # This repo is the Homebrew tap (`brew tap jaemk/sirene
-      # https://github.com/jaemk/sirene`), so the cask must be on main.
-      # Pushes straight to main with GITHUB_TOKEN; if branch protection is ever
-      # enabled on main, add github-actions[bot] as a bypass actor or open a PR
-      # here instead. A GITHUB_TOKEN push starts no workflow run, and an
-      # up-to-date cask is not re-committed, so re-runs are safe.
-      env:
-        VERSION: ${{ needs.check.outputs.version }}
-      run: |
-        set -euo pipefail
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        git checkout main
-        git pull --ff-only origin main
-        cp release-assets/sirene.rb Casks/sirene.rb
-        git add Casks/sirene.rb
-        if git diff --cached --quiet; then
-          echo "Casks/sirene.rb is already at $VERSION"
-        else
-          git commit -m "update \`sirene\` cask to $VERSION"
-          git push origin main
-        fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # Default checkout is the released commit. cargo publish --locked must
+        # run from it, not from a newer main.
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit (moving branch ref; runs alongside id-token: write)
+        with:
+          toolchain: "1.99.1"
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+        id: auth
+      # sirene-core, sirene-gui, then sirene; a version already on crates.io
+      # is a skip. `--no-verify`: the build job already verified (see the
+      # script).
+      - name: publish to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: bash bin/publish.sh
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: commit the formula, the cask, and the next dev version
+        # Pushes straight to main with the job's default GITHUB_TOKEN. If branch
+        # protection is ever enabled on main (required reviews, required status
+        # checks, or a restriction on who can push), this push starts failing;
+        # either add github-actions[bot] as an allowed bypass actor, or switch
+        # this step to open a PR instead of pushing directly.
+        #
+        # The same commit puts main back on the next patch's `-dev` version, so
+        # a build from main never reports the released version. It is skipped
+        # when main has already moved off the released version. A push made
+        # with GITHUB_TOKEN starts no workflow run, so it does not re-enter
+        # this one (and `decide` would skip the `-dev` version if it did).
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout main
+          git pull --ff-only origin main
+          bash bin/update-formula.sh "$VERSION" dist Formula/sirene.rb
+          cp dist/sirene.rb Casks/sirene.rb
+          git add Formula/sirene.rb Casks/sirene.rb
+          message="update \`sirene\` formula and cask to ${VERSION}"
+          if grep -q "^version = \"${VERSION}\"$" Cargo.toml; then
+            next="$(bash bin/bump-dev.sh "$VERSION")"
+            cargo update --workspace
+            git add Cargo.toml Cargo.lock
+            message="${message}, back to ${next}"
+          fi
+          if git diff --cached --quiet; then
+            echo "formula, cask, and version already up to date"
+          else
+            git commit -m "$message"
+            git push origin main
+          fi

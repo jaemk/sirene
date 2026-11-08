@@ -1,19 +1,26 @@
 /*!
-Coverage for the release shell scripts in `bin/` (WORKSP-5).
+Coverage for the release shell scripts in `bin/` (WORKSP-8, WORKSP-9).
 
-Neither script runs in a normal build, and both only run during a release, where
+None of them runs in a normal build, and most only run during a release, where
 a mistake is expensive and hard to reverse: `check-versions.sh` stops a
-half-bumped workspace from publishing, and `publish.sh`'s exit status decides
-whether a release reports green.
+half-bumped workspace from publishing, `publish.sh`'s exit status decides
+whether a release reports green, and the formula, changelog, and version
+scripts write what the release commits and publishes. `install.sh` runs on
+users' machines.
 
 The `check-versions.sh` failure cases hand the script a crafted `cargo metadata`
-document, which is why it accepts one as an argument.
+document, which is why it accepts one as an argument. Commands that would reach
+the network (`cargo publish`, `curl`, `gh`) are stubbed by fake scripts placed
+first on `PATH`.
 */
 
 #![cfg(unix)]
 
+use std::collections::BTreeSet;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
+use std::sync::Mutex;
 
 use tempfile::TempDir;
 
@@ -31,13 +38,49 @@ fn scratch_dir() -> TempDir {
     TempDir::new_in(root).expect("create scratch dir")
 }
 
+/// Serializes writing a stub executable against forking a child. A child
+/// forked while another test thread holds a stub open for writing inherits that
+/// fd until it execs, and exec'ing the stub in that window fails with ETXTBSY,
+/// so the shell would skip the stub and run the real command.
+static EXEC_LOCK: Mutex<()> = Mutex::new(());
+
+fn exec_lock() -> std::sync::MutexGuard<'static, ()> {
+    EXEC_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// `Command::output` with the fork taken under [`EXEC_LOCK`].
+fn output(cmd: &mut Command) -> Output {
+    let child = {
+        let _guard = exec_lock();
+        cmd.stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("spawn")
+    };
+    child.wait_with_output().expect("wait")
+}
+
+fn write_exec(path: &Path, content: &str) {
+    let _guard = exec_lock();
+    std::fs::write(path, content).expect("write stub");
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+        .expect("make stub executable");
+}
+
+/// `PATH` with `bin` in front of the inherited one.
+fn path_with(bin: &Path) -> String {
+    let path = std::env::var("PATH").unwrap_or_default();
+    format!("{}:{path}", bin.display())
+}
+
 fn run(script: &str, args: &[&str]) -> Output {
-    Command::new("bash")
-        .arg(repo_root().join("bin").join(script))
-        .args(args)
-        .current_dir(repo_root())
-        .output()
-        .unwrap_or_else(|e| panic!("failed to run bin/{script}: {e}"))
+    output(
+        Command::new("bash")
+            .arg(repo_root().join("bin").join(script))
+            .args(args)
+            .current_dir(repo_root()),
+    )
 }
 
 fn stderr(out: &Output) -> String {
@@ -46,6 +89,22 @@ fn stderr(out: &Output) -> String {
 
 fn stdout(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+/// The SHA-256 of `path` in hex, from `sha256sum` or, on macOS, `shasum`.
+fn sha256(path: &Path) -> String {
+    let out = output(Command::new("shasum").args(["-a", "256"]).arg(path));
+    let out = if out.status.success() {
+        out
+    } else {
+        output(Command::new("sha256sum").arg(path))
+    };
+    assert!(out.status.success(), "{}", stderr(&out));
+    stdout(&out).split_whitespace().next().unwrap().to_owned()
+}
+
+fn read(path: &Path) -> String {
+    std::fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
 
 /// A `cargo metadata --no-deps` document with the fields the script reads:
@@ -173,30 +232,25 @@ fn a_missing_root_fails_the_check() {
     );
 }
 
-/// Put a fake `cargo` first on `PATH` that prints `output` and exits with
-/// `code`, then run `publish.sh`, which calls a bare `cargo publish` per crate.
-fn publish_with_stub_cargo(output: &str, code: i32) -> Output {
+/// Put a fake `cargo` first on `PATH` that echoes its arguments, prints
+/// `output`, and exits with `code`, then run `publish.sh`, which calls a bare
+/// `cargo publish` per crate.
+fn publish_with_stub_cargo(output_text: &str, code: i32) -> Output {
     let dir = scratch_dir();
     let bin = dir.path().join("stub-bin");
     std::fs::create_dir_all(&bin).expect("create stub bin dir");
-    let stub = bin.join("cargo");
-    std::fs::write(
-        &stub,
-        format!("#!/bin/bash\ncat <<'STUB_EOF'\n{output}\nSTUB_EOF\nexit {code}\n"),
+    write_exec(
+        &bin.join("cargo"),
+        &format!(
+            "#!/bin/bash\necho \"cargo $*\"\ncat <<'STUB_EOF'\n{output_text}\nSTUB_EOF\nexit {code}\n"
+        ),
+    );
+    output(
+        Command::new("bash")
+            .arg(repo_root().join("bin").join("publish.sh"))
+            .current_dir(repo_root())
+            .env("PATH", path_with(&bin)),
     )
-    .expect("write stub cargo");
-
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755))
-        .expect("make stub cargo executable");
-
-    let path = std::env::var("PATH").unwrap_or_default();
-    Command::new("bash")
-        .arg(repo_root().join("bin").join("publish.sh"))
-        .current_dir(repo_root())
-        .env("PATH", format!("{}:{path}", bin.display()))
-        .output()
-        .expect("failed to run bin/publish.sh")
 }
 
 #[test]
@@ -217,6 +271,12 @@ fn publish_reports_success() {
     assert!(core < gui && gui < root, "{log}");
     assert!(
         log.contains("3 published, 0 already current, 0 failed"),
+        "{log}"
+    );
+    // The token is in the environment, so nothing may be built.
+    assert_eq!(
+        log.matches("cargo publish --locked --no-verify\n").count(),
+        3,
         "{log}"
     );
 }
@@ -253,109 +313,448 @@ fn publish_fails_the_release_on_any_other_error() {
     assert!(stderr(&out).contains("Release failed"));
 }
 
-/// Runs `tag-release.sh` with stub `git` and `gh` that log their arguments.
-/// `existing` lists the tags that already have a remote tag and a release.
-fn tag_release_with_stubs(existing: &[&str]) -> (Output, String) {
+const CHANGELOG: &str = "# Changelog\n\n## [Unreleased]\n\n## [1.2.0] - 2026-01-02\n\n\n- one\n\n- two\n\n\n## [1.1.0] - 2026-01-01\n\n- old\n";
+
+fn changelog_section(version: &str) -> Output {
     let dir = scratch_dir();
-    let bin = dir.path().join("stub-bin");
-    std::fs::create_dir_all(&bin).expect("create stub bin dir");
-    let log = dir.path().join("calls.log");
-    let known = existing.join(" ");
-    let stubs = [
-        (
-            "git",
-            format!(
-                r#"#!/bin/bash
-echo "git $*" >> "{log}"
-case "$1" in
-  ls-remote) for t in {known}; do [ "refs/tags/$t" = "$4" ] && printf 'sha\trefs/tags/%s\n' "$t"; done ;;
-  rev-parse) exit 1 ;;
-esac
-exit 0
-"#,
-                log = log.display()
-            ),
-        ),
-        (
-            "gh",
-            format!(
-                r#"#!/bin/bash
-echo "gh $*" >> "{log}"
-if [ "$2" = view ]; then
-  for t in {known}; do [ "$t" = "$3" ] && exit 0; done
-  exit 1
-fi
-exit 0
-"#,
-                log = log.display()
-            ),
-        ),
-    ];
-    use std::os::unix::fs::PermissionsExt;
-    for (name, body) in stubs {
-        let path = bin.join(name);
-        std::fs::write(&path, body).expect("write stub");
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-            .expect("make stub executable");
-    }
-    let path = std::env::var("PATH").unwrap_or_default();
-    let out = Command::new("bash")
-        .arg(repo_root().join("bin").join("tag-release.sh"))
-        .current_dir(repo_root())
-        .env("PATH", format!("{}:{path}", bin.display()))
-        .env_remove("GITHUB_ACTIONS")
-        .output()
-        .expect("failed to run bin/tag-release.sh");
-    let calls = std::fs::read_to_string(&log).unwrap_or_default();
-    (out, calls)
+    let path = dir.path().join("CHANGELOG.md");
+    std::fs::write(&path, CHANGELOG).unwrap();
+    run("changelog-section.sh", &[version, path.to_str().unwrap()])
 }
 
-/// Every crate gets a tag and release; only the root crate's may be "Latest".
 #[test]
-fn tag_release_marks_only_the_root_release_latest() {
-    let version = env!("CARGO_PKG_VERSION");
-    let (out, calls) = tag_release_with_stubs(&[]);
+fn changelog_section_is_trimmed_and_stops_at_the_next_heading() {
+    let out = changelog_section("1.2.0");
     assert!(out.status.success(), "{}", stderr(&out));
-    for (tag, latest) in [
-        (format!("v{version}"), true),
-        (format!("sirene-core-v{version}"), false),
-        (format!("sirene-gui-v{version}"), false),
-    ] {
-        assert!(
-            calls.contains(&format!("git tag -a {tag} -m Release {tag}\n")),
-            "{calls}"
-        );
-        assert!(
-            calls.contains(&format!("git push origin {tag}\n")),
-            "{calls}"
-        );
-        assert!(
-            calls.contains(&format!(
-                "gh release create {tag} --generate-notes --title {tag} --latest={latest}\n"
-            )),
-            "{calls}"
-        );
+    assert_eq!(stdout(&out), "- one\n\n- two\n");
+    let out = changelog_section("1.1.0");
+    assert_eq!(stdout(&out), "- old\n");
+}
+
+/// `1.2` must not match `1.2.0`, and a missing version fails the release.
+#[test]
+fn changelog_section_requires_the_exact_version() {
+    for version in ["1.2", "9.9.9"] {
+        let out = changelog_section(version);
+        assert!(!out.status.success(), "{version}: {}", stdout(&out));
+        assert_eq!(stdout(&out), "", "{version}");
     }
 }
 
-/// Tags that already have a tag and release are left alone.
+/// The workspace version `decide` would release has its notes written.
 #[test]
-fn tag_release_skips_existing_releases() {
+fn the_changelog_has_a_section_for_a_stable_workspace_version() {
     let version = env!("CARGO_PKG_VERSION");
-    let root = format!("v{version}");
-    let (out, calls) = tag_release_with_stubs(&[&root]);
-    assert!(out.status.success(), "{}", stderr(&out));
+    if version.contains('-') {
+        return;
+    }
+    let out = run("changelog-section.sh", &[version]);
     assert!(
-        stdout(&out).contains(&format!("Tag {root} and its GitHub release already exist")),
+        out.status.success(),
+        "CHANGELOG.md needs a `## [{version}]` section before this version can be released"
+    );
+    assert!(!stdout(&out).trim().is_empty());
+}
+
+/// The release matrix's `target:` entries.
+fn release_matrix_targets() -> BTreeSet<String> {
+    read(&repo_root().join(".github/workflows/release.yml"))
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("- target:"))
+        .map(|t| t.trim().to_owned())
+        .collect()
+}
+
+/// The tarball targets that `update-formula.sh` names.
+const FORMULA_TARGETS: [&str; 4] = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
+];
+
+#[test]
+fn update_formula_writes_each_tarball_checksum() {
+    let dir = scratch_dir();
+    let dist = dir.path().join("dist");
+    std::fs::create_dir_all(&dist).unwrap();
+    for target in FORMULA_TARGETS {
+        std::fs::write(dist.join(format!("sirene-1.2.3-{target}.tar.gz")), target).unwrap();
+    }
+    let formula = dir.path().join("Formula/sirene.rb");
+    let out = run(
+        "update-formula.sh",
+        &["1.2.3", dist.to_str().unwrap(), formula.to_str().unwrap()],
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(
+        stdout(&out),
+        format!("wrote {} for v1.2.3\n", formula.display())
+    );
+    let text = read(&formula);
+    assert!(text.contains("class Sirene < Formula\n"), "{text}");
+    assert!(text.contains("  version \"1.2.3\"\n"), "{text}");
+    assert!(text.contains("    bin.install \"sirene\"\n"), "{text}");
+    for target in FORMULA_TARGETS {
+        let sum = sha256(&dist.join(format!("sirene-1.2.3-{target}.tar.gz")));
+        let url = format!(
+            "      url \"https://github.com/jaemk/sirene/releases/download/v1.2.3/sirene-1.2.3-{target}.tar.gz\"\n      sha256 \"{sum}\"\n"
+        );
+        assert!(text.contains(&url), "{target}:\n{text}");
+    }
+}
+
+#[test]
+fn update_formula_fails_on_a_missing_tarball() {
+    let dir = scratch_dir();
+    let formula = dir.path().join("sirene.rb");
+    let out = run(
+        "update-formula.sh",
+        &[
+            "1.2.3",
+            dir.path().to_str().unwrap(),
+            formula.to_str().unwrap(),
+        ],
+    );
+    assert!(!out.status.success());
+    assert!(!formula.exists());
+}
+
+/// Every tarball the formula and the installer name is built by the release.
+#[test]
+fn the_release_matrix_builds_every_named_tarball() {
+    let matrix = release_matrix_targets();
+    let installer: BTreeSet<String> = ["x86_64", "aarch64"]
+        .iter()
+        .flat_map(|arch| {
+            ["unknown-linux-musl", "unknown-linux-gnu", "apple-darwin"]
+                .map(|os| format!("{arch}-{os}"))
+        })
+        .collect();
+    let formula: BTreeSet<String> = FORMULA_TARGETS.map(String::from).into();
+    let missing: Vec<_> = installer
+        .union(&formula)
+        .filter(|t| !matrix.contains(*t))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "not built: {missing:?}; matrix {matrix:?}"
+    );
+    let script = read(&repo_root().join("bin/update-formula.sh"));
+    for target in FORMULA_TARGETS {
+        assert!(script.contains(&format!("sha {target}")), "{target}");
+    }
+}
+
+const MANIFEST: &str = r#"[workspace.package]
+version = "1.2.3"
+edition = "2024"
+
+[workspace.dependencies]
+sirene-core = { path = "crates/sirene-core", version = "1.2.3" }
+sirene-gui = { path = "crates/sirene-gui", version = "1.2.3" }
+other = { version = "1.2.3" }
+"#;
+
+fn bump_dev(version: &str) -> (Output, String) {
+    let dir = scratch_dir();
+    let path = dir.path().join("Cargo.toml");
+    std::fs::write(&path, MANIFEST).unwrap();
+    let out = run("bump-dev.sh", &[version, path.to_str().unwrap()]);
+    (out, read(&path))
+}
+
+#[test]
+fn bump_dev_moves_the_workspace_to_the_next_patch() {
+    let (out, text) = bump_dev("1.2.3");
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(stdout(&out), "1.2.4-dev\n");
+    assert_eq!(
+        text,
+        MANIFEST
+            .replacen("version = \"1.2.3\"\n", "version = \"1.2.4-dev\"\n", 1)
+            .replace("\", version = \"1.2.3\" }", "\", version = \"1.2.4-dev\" }"),
+        "only the workspace version and the member pins change"
+    );
+    assert!(text.contains("other = { version = \"1.2.3\" }"), "{text}");
+}
+
+/// A main that has already moved on is left alone.
+#[test]
+fn bump_dev_leaves_another_version_alone() {
+    for version in ["1.2.2", "1.2"] {
+        let (out, text) = bump_dev(version);
+        assert!(out.status.success(), "{}", stderr(&out));
+        assert_eq!(stdout(&out), "");
+        assert_eq!(text, MANIFEST);
+    }
+}
+
+/// A fixture for `install.sh`: stub `uname`, `curl`, and `gh` in `bin/`, the
+/// release assets the stub `curl` serves in `assets/`, and a log of the URLs it
+/// was asked for.
+struct Install {
+    dir: TempDir,
+}
+
+impl Install {
+    fn new(os: &str, arch: &str) -> Install {
+        let fx = Install { dir: scratch_dir() };
+        for d in ["bin", "assets"] {
+            std::fs::create_dir_all(fx.path(d)).unwrap();
+        }
+        write_exec(
+            &fx.path("bin/uname"),
+            &format!("#!/bin/sh\ncase \"$1\" in\n-s) echo {os} ;;\n-m) echo {arch} ;;\nesac\n"),
+        );
+        // Serves assets/<basename> (or the latest-release JSON), else exits
+        // 22 like `curl -f` on a 404.
+        write_exec(
+            &fx.path("bin/curl"),
+            &format!(
+                r#"#!/bin/sh
+url=""; dest=""; prev=""
+for a in "$@"; do
+  [ "$prev" = "-o" ] && dest="$a"
+  case "$a" in https://*) url="$a" ;; esac
+  prev="$a"
+done
+printf '%s\n' "$url" >> "{dir}/urls.log"
+case "$url" in
+*/releases/latest) echo '{{"tag_name": "v9.9.9"}}' ;;
+*) f="{dir}/assets/${{url##*/}}"; [ -f "$f" ] || exit 22; cp "$f" "$dest" ;;
+esac
+"#,
+                dir = fx.dir.path().display()
+            ),
+        );
+        write_exec(&fx.path("bin/gh"), "#!/bin/sh\nexit 1\n");
+        fx
+    }
+
+    fn path(&self, rel: &str) -> PathBuf {
+        self.dir.path().join(rel)
+    }
+
+    /// Publishes a tarball holding a `sirene` that contains `payload`.
+    fn publish(&self, target: &str, payload: &str) -> String {
+        let name = format!("sirene-9.9.9-{target}.tar.gz");
+        let staging = self.path(&format!("staging-{target}"));
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::write(staging.join("sirene"), payload).unwrap();
+        let out = output(
+            Command::new("tar")
+                .arg("-czf")
+                .arg(self.path("assets").join(&name))
+                .arg("-C")
+                .arg(&staging)
+                .arg("sirene"),
+        );
+        assert!(out.status.success());
+        name
+    }
+
+    /// Writes SHA256SUMS for the named assets, with their real checksums
+    /// unless `digest` is given.
+    fn sums(&self, names: &[&str], digest: Option<&str>) {
+        let mut body = String::new();
+        for name in names {
+            let real = sha256(&self.path("assets").join(name));
+            let sum = digest.unwrap_or(&real);
+            body.push_str(&format!("{sum}  {name}\n"));
+        }
+        std::fs::write(self.path("assets/SHA256SUMS"), body).unwrap();
+    }
+
+    fn run(&self, env: &[(&str, &str)]) -> Output {
+        let mut cmd = Command::new("sh");
+        cmd.arg(repo_root().join("bin/install.sh"))
+            .env("PATH", path_with(&self.path("bin")))
+            .env("SIRENE_INSTALL_DIR", self.path("install"))
+            .env_remove("SIRENE_VERSION")
+            .env_remove("SIRENE_TARGET");
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
+        output(&mut cmd)
+    }
+
+    fn installed(&self) -> Option<String> {
+        std::fs::read_to_string(self.path("install/sirene")).ok()
+    }
+
+    fn assets_requested(&self) -> Vec<String> {
+        std::fs::read_to_string(self.path("urls.log"))
+            .unwrap_or_default()
+            .lines()
+            .filter(|l| l.ends_with(".tar.gz"))
+            .map(|l| l.rsplit('/').next().unwrap().to_owned())
+            .collect()
+    }
+}
+
+#[test]
+fn install_prefers_the_musl_binary_on_linux() {
+    let fx = Install::new("Linux", "x86_64");
+    let musl = fx.publish("x86_64-unknown-linux-musl", "MUSL");
+    fx.publish("x86_64-unknown-linux-gnu", "GNU");
+    fx.sums(&[&musl], None);
+    let out = fx.run(&[]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(fx.installed().as_deref(), Some("MUSL"));
+    assert_eq!(fx.assets_requested(), [musl]);
+    let mode = std::fs::metadata(fx.path("install/sirene"))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o755);
+    assert!(
+        stdout(&out).contains("installed sirene 9.9.9 to "),
         "{}",
         stdout(&out)
     );
-    assert!(
-        !calls.contains(&format!("git push origin {root}\n")),
-        "{calls}"
+    assert!(stderr(&out).contains("could not be verified (continuing)"));
+}
+
+#[test]
+fn install_falls_back_to_gnu_once_when_musl_is_missing() {
+    let fx = Install::new("Linux", "aarch64");
+    let gnu = fx.publish("aarch64-unknown-linux-gnu", "GNU");
+    fx.sums(&[&gnu], None);
+    let out = fx.run(&[]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(fx.installed().as_deref(), Some("GNU"));
+    assert_eq!(
+        fx.assets_requested(),
+        [
+            "sirene-9.9.9-aarch64-unknown-linux-musl.tar.gz",
+            gnu.as_str()
+        ]
     );
+    assert!(stdout(&out).contains("musl asset unavailable for 9.9.9, retrying with gnu"));
+
+    let fx = Install::new("Linux", "x86_64");
+    let out = fx.run(&[]);
+    assert!(!out.status.success());
+    assert_eq!(fx.assets_requested().len(), 2);
     assert!(
-        calls.contains(&format!("git push origin sirene-core-v{version}\n")),
-        "{calls}"
+        stderr(&out).contains("download failed: "),
+        "{}",
+        stderr(&out)
     );
+}
+
+#[test]
+fn install_does_not_fall_back_on_macos() {
+    let fx = Install::new("Darwin", "arm64");
+    let out = fx.run(&[]);
+    assert!(!out.status.success());
+    assert_eq!(
+        fx.assets_requested(),
+        ["sirene-9.9.9-aarch64-apple-darwin.tar.gz"]
+    );
+
+    let fx = Install::new("Darwin", "x86_64");
+    let mac = fx.publish("x86_64-apple-darwin", "MAC");
+    fx.sums(&[&mac], None);
+    let out = fx.run(&[]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(fx.installed().as_deref(), Some("MAC"));
+}
+
+/// SIRENE_TARGET picks the gnu (GUI) build, and SIRENE_VERSION skips the
+/// latest-release lookup.
+#[test]
+fn install_honors_the_target_and_version_overrides() {
+    let fx = Install::new("Linux", "x86_64");
+    let gnu = fx.publish("x86_64-unknown-linux-gnu", "GNU");
+    fx.sums(&[&gnu], None);
+    let out = fx.run(&[
+        ("SIRENE_TARGET", "x86_64-unknown-linux-gnu"),
+        ("SIRENE_VERSION", "9.9.9"),
+    ]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(fx.installed().as_deref(), Some("GNU"));
+    assert_eq!(fx.assets_requested(), [gnu]);
+    assert!(!read(&fx.path("urls.log")).contains("releases/latest"));
+}
+
+#[test]
+fn install_refuses_a_bad_or_missing_checksum() {
+    let fx = Install::new("Linux", "x86_64");
+    let musl = fx.publish("x86_64-unknown-linux-musl", "MUSL");
+    fx.sums(&[&musl], Some(&"0".repeat(64)));
+    let out = fx.run(&[]);
+    assert!(!out.status.success());
+    assert!(
+        stderr(&out).contains(&format!("checksum mismatch for {musl}")),
+        "{}",
+        stderr(&out)
+    );
+    assert_eq!(fx.installed(), None);
+
+    std::fs::write(fx.path("assets/SHA256SUMS"), "").unwrap();
+    let out = fx.run(&[]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains(&format!("SHA256SUMS has no entry for {musl}")));
+    assert_eq!(fx.installed(), None);
+}
+
+#[test]
+fn install_refuses_an_unsupported_platform_before_any_request() {
+    for (os, arch, message) in [
+        ("Plan9", "x86_64", "unsupported OS: Plan9"),
+        ("Linux", "riscv64", "unsupported architecture: riscv64"),
+    ] {
+        let fx = Install::new(os, arch);
+        let out = fx.run(&[]);
+        assert!(!out.status.success());
+        assert!(stderr(&out).contains(message), "{}", stderr(&out));
+        assert!(!fx.path("urls.log").exists());
+    }
+}
+
+/// The committed formula, once a release has written one, is what
+/// `update-formula.sh` produces for its version and checksums.
+#[test]
+fn the_committed_formula_matches_the_script() {
+    let committed = repo_root().join("Formula/sirene.rb");
+    let Ok(text) = std::fs::read_to_string(&committed) else {
+        return;
+    };
+    let version = text
+        .lines()
+        .find_map(|l| l.strip_prefix("  version \"")?.strip_suffix('"'))
+        .expect("a version line");
+    let sums: Vec<&str> = text
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("sha256 \"")?.strip_suffix('"'))
+        .collect();
+    assert_eq!(sums.len(), FORMULA_TARGETS.len(), "{text}");
+    // Regenerate with placeholder checksums, then put the committed ones back
+    // in order; the rest must be byte-identical.
+    let dir = scratch_dir();
+    for target in FORMULA_TARGETS {
+        std::fs::write(
+            dir.path().join(format!("sirene-{version}-{target}.tar.gz")),
+            "",
+        )
+        .unwrap();
+    }
+    let out_file = dir.path().join("sirene.rb");
+    let out = run(
+        "update-formula.sh",
+        &[
+            version,
+            dir.path().to_str().unwrap(),
+            out_file.to_str().unwrap(),
+        ],
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    let empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    let mut regenerated = read(&out_file);
+    for sum in sums {
+        regenerated = regenerated.replacen(empty, sum, 1);
+    }
+    assert_eq!(text, regenerated);
 }

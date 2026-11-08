@@ -47,21 +47,49 @@ development packages installed first.
 
 ## WORKSP-8 Releases
 
-Merging a version bump to `main` is the release. `.github/workflows/release.yml` runs on every
-push to `main` (and by hand):
+Merging a version bump to `main` is the release. Between releases `main` carries the next
+patch's `-dev` version. To release, set the version (`[workspace.package]` and the
+`[workspace.dependencies]` pins) to a stable `X.Y.Z` and add a `## [X.Y.Z]` section to
+`CHANGELOG.md`. `.github/workflows/release.yml` runs on every push to `main` (and by hand, to
+re-run a release that failed partway; every step is idempotent):
 
-1. `check`: `bin/check-versions.sh` requires every dependency between publishable members to pin
-   exactly that member's version, and no stable crate to depend on a pre-release; then the job
-   publishes only when the `sirene` version is not on crates.io.
-2. Before anything is uploaded, since a crates.io publish cannot be undone or overwritten:
-   `verify` runs `cargo package --workspace`, which build-checks each crate against the packaged
-   crates before it, and `macos` builds the app and cask (MACOSP-6) as a workflow artifact.
-3. `publish`, only after both pass and in the `release` environment (approval required):
-   `bin/publish.sh` publishes `sirene-core`, `sirene-gui`, then `sirene`, treating an
-   already-published version as a skip and any other failure as fatal; `bin/tag-release.sh`
-   tags and creates a GitHub release for each crate's current version that lacks one (`vX.Y.Z`
-   for `sirene`, `NAME-vX.Y.Z` for the others); then the macOS artifact is attached to `vX.Y.Z`.
+1. `decide`: `bin/check-versions.sh` requires every dependency between publishable members to pin
+   exactly that member's version, and no stable crate to depend on a pre-release. A `-dev`
+   version, or one whose `vX.Y.Z` GitHub release exists, ends the run there. A release also
+   needs its changelog section (`bin/changelog-section.sh`).
+2. `ci` (Linux) and `ci-macos` run `scripts/ci.sh`; `audit` runs the RustSec scan, with the
+   advisories `.cargo/audit.toml` ignores and why.
+3. `build`, after all three: one `sirene-X.Y.Z-TARGET.tar.gz` (holding `sirene`) per target,
+   built with `cargo auditable` and the pinned toolchain, each with a build provenance
+   attestation (WORKSP-9). The macOS and gnu legs also run `cargo package --workspace`, which
+   build-checks each crate against the packaged crates before it. `app` builds the universal
+   `Sirene.app` zip and cask (MACOSP-6).
+4. `release`: creates the `vX.Y.Z` tag on the released commit and its GitHub release, with the
+   changelog section as notes and the tarballs, the zip, the cask, and `SHA256SUMS` (of the
+   tarballs and zip) as assets.
+5. `publish`, in the `release` environment (approval required): `bin/publish.sh` publishes
+   `sirene-core`, `sirene-gui`, then `sirene` with `--no-verify` (step 3 verified them, and a
+   build here would run every build script with the token in its environment), treating an
+   already-published version as a skip and any other failure as fatal. Then one commit to
+   `main` writes `Formula/sirene.rb` (`bin/update-formula.sh`), `Casks/sirene.rb`, and, if
+   `main` is still on `X.Y.Z`, the next `-dev` version (`bin/bump-dev.sh`).
 
-crates.io authentication is trusted publishing (`rust-lang/crates-io-auth-action`). A crate's
-first version cannot be published that way, so while the `CARGO_REGISTRY_TOKEN` secret is set
-the job uses it instead. Tests: `xtask/tests/release_scripts.rs`.
+crates.io authentication is trusted publishing (`rust-lang/crates-io-auth-action`) only.
+Tests: `xtask/tests/release_scripts.rs`.
+
+## WORKSP-9 Binaries
+
+Each release carries `sirene` for `aarch64-apple-darwin`, `x86_64-apple-darwin`,
+`aarch64-unknown-linux-gnu`, and `x86_64-unknown-linux-gnu`, which include the GUI, and for
+`aarch64-unknown-linux-musl` and `x86_64-unknown-linux-musl`, which are statically linked and
+built without it (`--no-default-features`, CLI-7).
+
+The repository is a Homebrew tap. `Formula/sirene.rb` installs the macOS and gnu binaries;
+`Casks/sirene.rb` installs `Sirene.app` (MACOSP-5).
+
+`bin/install.sh` installs the binary for the host into `SIRENE_INSTALL_DIR` (default
+`~/.local/bin`): the latest release unless `SIRENE_VERSION` is set, and the musl build on Linux
+unless `SIRENE_TARGET` names another. If a release has no musl build, Linux falls back once to
+the gnu build. It refuses an unsupported OS or architecture before any request, and a tarball
+whose checksum is not in `SHA256SUMS` or does not match. When `gh` is present it checks the
+build provenance attestation, reporting but not failing on a mismatch.

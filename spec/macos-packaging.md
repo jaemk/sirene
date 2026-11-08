@@ -53,7 +53,8 @@ character, is an error.
 
 The repository is its own Homebrew tap: `Casks/sirene.rb` is the cask for the latest release,
 byte-for-byte what `cargo xtask cask` prints for that release's zip URL, checksum, and version.
-After each release the `publish` job (MACOSP-6) commits the new cask to `main`:
+After each release the `publish` job (MACOSP-6) commits the new cask to `main`. The tap also
+has a `sirene` formula for the plain binary (WORKSP-9):
 
 ```
 brew tap jaemk/sirene https://github.com/jaemk/sirene
@@ -63,14 +64,13 @@ brew install --cask sirene
 
 ## MACOSP-6 Release build
 
-The `macos` job of `.github/workflows/release.yml` runs on a macOS runner before the crates.io
-publish (WORKSP-8), which waits for it: it builds `sirene` for `aarch64-apple-darwin` and
-`x86_64-apple-darwin`, joins them with `lipo`, bundles them (MACOSP-1), zips the bundle with
-`ditto`, and prints the cask (MACOSP-5) for the zip's `vX.Y.Z` release URL. The zip and cask are
-kept as a workflow artifact, and the `publish` job attaches them to the `vX.Y.Z` GitHub release
-after creating it, then commits the cask to `Casks/sirene.rb` on `main` (MACOSP-5) unless it
-is already current. The bundle is not signed or notarized, so Gatekeeper asks before the first
-launch.
+The `app` job of `.github/workflows/release.yml` (WORKSP-8) runs on a macOS runner: it builds
+`sirene` for `aarch64-apple-darwin` and `x86_64-apple-darwin`, joins them with `lipo`, bundles
+them (MACOSP-1), zips the bundle with `ditto` as `Sirene-vX.Y.Z.zip` with a build provenance
+attestation, and prints the cask (MACOSP-5) for the zip's `vX.Y.Z` release URL. The `release`
+job attaches the zip and cask to the GitHub release, and the `publish` job commits the cask to
+`Casks/sirene.rb` on `main` unless it is already current. The bundle is not signed or
+notarized, so Gatekeeper asks before the first launch.
 
 ## MACOSP-7 Unverified on macOS
 

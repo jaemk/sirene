@@ -25,7 +25,11 @@ publish_crate() {
     local dir=$1
     local out status
     echo "Publishing crate in directory: $dir..."
-    out=$( (cd "$dir" && cargo publish --locked) 2>&1 )
+    # --no-verify: a verification build here would compile every build script
+    # and proc macro in the tree while CARGO_REGISTRY_TOKEN is in the
+    # environment, so any one of them could read it. The release workflow's
+    # build job already ran `cargo package --workspace`, which verifies.
+    out=$( (cd "$dir" && cargo publish --locked --no-verify) 2>&1 )
     status=$?
 
     if [ $status -eq 0 ]; then

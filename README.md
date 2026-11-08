@@ -6,19 +6,32 @@ See `spec/README.md` for the feature status table.
 
 ## Install
 
-Homebrew (macOS):
+Install script (Linux and macOS):
+
+```
+curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/jaemk/sirene/main/bin/install.sh | sh
+```
+
+It installs to `~/.local/bin` (`SIRENE_INSTALL_DIR`) and checks the download against the
+release's `SHA256SUMS`. On Linux it installs the static musl build, which has no GUI; for the
+GUI build, which needs the system's X11/Wayland and Vulkan libraries, set
+`SIRENE_TARGET=x86_64-unknown-linux-gnu` (or `aarch64-...`).
+
+Homebrew (macOS and Linux):
 
 ```
 brew tap jaemk/sirene https://github.com/jaemk/sirene
 brew trust jaemk/sirene
-brew install --cask sirene
+brew install sirene          # the binary
+brew install --cask sirene   # macOS: Sirene.app, with `sirene` linked onto the PATH
 ```
 
-The repo is not named `homebrew-sirene`, so the tap needs its clone URL. The cask installs
-`Sirene.app` and links `sirene` onto the PATH. The app is not signed, so macOS asks before the
-first launch.
+The repo is not named `homebrew-sirene`, so the tap needs its clone URL. Install one of the
+formula or the cask, not both: each puts `sirene` on the PATH. The app is not signed, so macOS
+asks before the first launch.
 
 With the Rust toolchain: `cargo install sirene` (add `--no-default-features` for the CLI only).
+Release binaries are also on the [releases page](https://github.com/jaemk/sirene/releases).
 
 ## Usage
 
@@ -68,9 +81,10 @@ cargo xtask cask --url URL --sha256 HEX --homepage URL
 
 ## Releasing
 
-Bump `version` in the root `Cargo.toml` (and the matching `[workspace.dependencies]` pins) and
-merge to `main`. `.github/workflows/release.yml` sees the new version is not on crates.io,
-verifies all three crates and builds a universal `Sirene.app` zip and Homebrew cask, then, after
-approval in the `release` environment, publishes `sirene-core`, `sirene-gui`, and `sirene`,
-tags `vX.Y.Z`, creates the GitHub release, attaches the zip and cask, and commits the cask to
-`Casks/sirene.rb` on `main`. See `spec/workspace.md` (WORKSP-8) and `spec/macos-packaging.md`.
+`main` carries the next `-dev` version between releases. To release, set `version` in the root
+`Cargo.toml` (and the matching `[workspace.dependencies]` pins) to `X.Y.Z`, add a `## [X.Y.Z]`
+section to `CHANGELOG.md`, and merge to `main`. `.github/workflows/release.yml` runs CI and the
+RustSec audit, builds the binaries and `Sirene.app`, creates the `vX.Y.Z` release with them,
+then, after approval in the `release` environment, publishes `sirene-core`, `sirene-gui`, and
+`sirene` and commits the formula, the cask, and the next `-dev` version to `main`. See
+`spec/workspace.md` (WORKSP-8, WORKSP-9) and `spec/macos-packaging.md`.
