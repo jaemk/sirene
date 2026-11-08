@@ -258,8 +258,28 @@ impl Viewer {
         }
     }
 
-    /// Re-reads the file, dropping unsaved edits.
+    /// Re-reads the file, asking first when that would drop unsaved edits.
     fn reload(&mut self, _: &Reload, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.doc.is_edited() {
+            self.reload_now(window, cx);
+            return;
+        }
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            &format!("Discard your changes to {}?", self.doc.name()),
+            Some("Reload replaces them with the file's text."),
+            &["Reload", "Cancel"],
+            cx,
+        );
+        cx.spawn_in(window, async move |this, cx| {
+            if let Ok(0) = answer.await {
+                let _ = this.update_in(cx, |v, window, cx| v.reload_now(window, cx));
+            }
+        })
+        .detach();
+    }
+
+    fn reload_now(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.doc.reload();
         self.load_source(window, cx);
     }
@@ -274,15 +294,35 @@ impl Viewer {
         cx.notify();
     }
 
-    /// Saves to the file, asking for one first when there is none (WYSIWY-4). Resolves to
-    /// whether the document was written.
+    /// Saves to the file, asking for one first when there is none, and asking before replacing
+    /// changes made on disk (WYSIWY-4). Resolves to whether the document was written.
     pub fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Task<bool> {
         if self.doc.path.is_none() {
             return self.save_as(window, cx);
         }
+        if !self.doc.disk_changed {
+            return Task::ready(self.write_file(window, cx));
+        }
+        let answer = window.prompt(
+            PromptLevel::Warning,
+            &format!("{} changed on disk. Overwrite it?", self.doc.name()),
+            Some("Saving replaces the changes made outside sirene."),
+            &["Overwrite", "Cancel"],
+            cx,
+        );
+        cx.spawn_in(window, async move |this, cx| match answer.await {
+            Ok(0) => this
+                .update_in(cx, |v, window, cx| v.write_file(window, cx))
+                .unwrap_or(false),
+            _ => false,
+        })
+    }
+
+    /// Writes the document to its file. Returns whether it was written.
+    fn write_file(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let saved = self.doc.save().is_ok();
         self.refresh(window, cx);
-        Task::ready(saved)
+        saved
     }
 
     /// Asks for a path and saves there.

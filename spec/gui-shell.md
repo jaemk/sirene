@@ -40,7 +40,7 @@ the zoom.
 | ZoomOut | secondary-- | zoom by 1/1.25 |
 | ActualSize | secondary-0 | 100%, no pan |
 | FitWindow | secondary-9 | zoom so the drawing fits, no pan |
-| Reload | secondary-r | re-read the file |
+| Reload | secondary-r | re-read the file, asking first when there are unsaved edits (WYSIWY-5) |
 | New | secondary-n | open a new document (WYSIWY-7) |
 | Open | secondary-o | choose files; an unedited Untitled window shows the first, others open new windows |
 | Save | secondary-s | save (WYSIWY-4) |

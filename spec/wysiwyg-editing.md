@@ -39,7 +39,9 @@ write leaves the document edited and shows the error in the status bar.
 The file poll of GUISHE-3 keeps running. When the file changes and the document is not edited, the
 new text replaces the editor's text, keeping the cursor line where it still exists. When the
 document is edited, the editor keeps its text and the status bar says the file changed on disk;
-Reload replaces the edits with the file's text.
+Reload replaces the edits with the file's text. Reload on an edited document first asks
+("Discard your changes to NAME?", Reload or Cancel), and Save after the file changed on disk
+first asks ("NAME changed on disk. Overwrite it?", Overwrite or Cancel); Cancel changes nothing.
 
 ## WYSIWY-6 Closing with unsaved edits
 
