@@ -41,7 +41,9 @@ Node, edge, and subgraph styles apply `fill`, `stroke`, `stroke-width`, `stroke-
 `color` (text). Precedence, lowest first: for nodes, `classDef default`; for edges,
 `linkStyle default`; then the item's classes in order; then its own `style` or `linkStyle`
 declarations. Colors may be `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()`, a common
-CSS name, `none`, or `transparent`. Unknown properties and unparsable values are ignored.
+CSS name, `none`, or `transparent`. Unknown properties and unparsable values are ignored. A
+`stroke-dasharray` whose dash and gap together are under 1 unit draws a solid line, so a source
+cannot make an edge into millions of dashes.
 
 ## DISPLA-7 Shapes
 

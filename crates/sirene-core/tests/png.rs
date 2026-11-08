@@ -69,6 +69,20 @@ fn text_is_drawn() {
     assert!(dark_pixels(&label) > 100, "{}", dark_pixels(&label));
 }
 
+/// Characters XML cannot hold (C0 controls other than tab, newline, and
+/// carriage return) in a label still draw.
+#[test]
+fn control_characters_in_labels() {
+    for src in [
+        "flowchart\nA[\"a\u{1}b\"]\n",
+        "flowchart\nA[a\u{1b}b]\n",
+        "flowchart\nA -->|x\u{7}y| B\n",
+    ] {
+        let s = scene_of(src, &Theme::LIGHT);
+        png::write(&s, 1.0).unwrap_or_else(|e| panic!("{src:?}: {e}"));
+    }
+}
+
 #[test]
 fn deterministic() {
     let s = scene_of(
