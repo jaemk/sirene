@@ -28,6 +28,53 @@ struct Parser<'a> {
     diagnostics: Vec<Diagnostic>,
 }
 
+/// Mermaid's other diagram types, by the keyword that starts them.
+const OTHER_DIAGRAMS: &[&str] = &[
+    "architecture",
+    "architecture-beta",
+    "block",
+    "block-beta",
+    "C4Component",
+    "C4Container",
+    "C4Context",
+    "C4Deployment",
+    "C4Dynamic",
+    "classDiagram",
+    "classDiagram-v2",
+    "erDiagram",
+    "gantt",
+    "gitGraph",
+    "info",
+    "journey",
+    "kanban",
+    "mindmap",
+    "packet",
+    "packet-beta",
+    "pie",
+    "quadrantChart",
+    "radar-beta",
+    "requirementDiagram",
+    "sankey",
+    "sankey-beta",
+    "sequenceDiagram",
+    "stateDiagram",
+    "stateDiagram-v2",
+    "timeline",
+    "treemap-beta",
+    "xychart",
+    "xychart-beta",
+    "zenuml",
+];
+
+/// The other diagram type `r` starts with, if any (FLOWCH-16).
+fn other_diagram(r: &str) -> Option<&str> {
+    let end = r
+        .find(|c: char| c.is_whitespace() || c == ';' || c == ':')
+        .unwrap_or(r.len());
+    let word = &r[..end];
+    OTHER_DIAGRAMS.contains(&word).then_some(word)
+}
+
 fn offset(n: usize) -> TextSize {
     TextSize::try_from(n).expect("source larger than 4 GiB")
 }
@@ -133,6 +180,19 @@ impl<'a> Parser<'a> {
             .any(|kw| scan::keyword(r, kw))
         {
             self.header();
+        } else if let Some(kind) = other_diagram(r) {
+            // FLOWCH-16: the whole document is another diagram type; draw nothing of it.
+            let start = self.pos;
+            self.start(ERROR);
+            self.token(ERROR_TOKEN, r.len());
+            self.finish();
+            self.error(
+                start,
+                start + kind.len(),
+                format!("`{kind}` diagrams are not supported; sirene draws flowcharts"),
+            );
+            self.finish();
+            return;
         } else {
             let end = self.pos + scan::stmt_len(r);
             self.error(self.pos, end, "expected `flowchart` or `graph` header");
