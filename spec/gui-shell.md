@@ -54,6 +54,10 @@ the zoom.
 | Deselect | escape on the drawing | clear the selection (WYSIWY-9) |
 | Undo | secondary-z on the drawing | undo a drawing change (WYSIWY-13) |
 | Redo | secondary-shift-z on the drawing | redo a drawing change (WYSIWY-13) |
+| ZoomToSelection | secondary-8 | fit the selection (GUISHE-8) |
+| Pan | arrow keys on the drawing, shift for further | move the drawing (GUISHE-8) |
+| SelectAll | secondary-a on the drawing | select every node and edge (GUISHE-8) |
+| SelectNext, SelectPrevious | tab, shift-tab on the drawing | select the next or previous node (GUISHE-8) |
 
 The same actions are in the app menus (sirene, File, Edit, View). The window is built on GPUI Kit
 (`gpui-kit`: gpui-pre, gpui-base, gpui-component), whose light or dark theme follows GUISHE-6.
@@ -69,3 +73,16 @@ The status bar shows the first of: a save error (WYSIWY-4), a change on disk und
 (WYSIWY-5), the read error, the first error (else first warning) as `LINE:COL: SEVERITY: MESSAGE`
 with `(+N more)` when there are others, or the window title (WYSIWY-3); and the zoom as a
 percentage.
+
+## GUISHE-8 Navigation
+
+The first time a document is drawn in a window (on opening, or shown in a blank window), a
+drawing larger than the drawing area is zoomed to fit it; smaller drawings stay at 100%.
+ZoomToSelection zooms (up to 200%, and no lower than 10%) so the selection's bounds fit the
+drawing area with a 40px margin, centered; it does nothing with no selection. The arrow keys pan
+by 40px, with shift by 200px, showing more of the drawing on the side the arrow points to.
+SelectAll selects every node, then every edge. SelectNext and SelectPrevious select the node
+after or before the last selected node in source order, wrapping around (the first or last node
+when no node is selected), and pan to center it when any of it is outside the drawing area.
+While a label is being edited these keys go to its field. Tests:
+`crates/sirene-gui/tests/navigation.rs`.

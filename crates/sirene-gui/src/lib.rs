@@ -3,6 +3,7 @@
 
 pub mod document;
 pub mod drawing;
+pub mod navigation;
 pub mod paint;
 pub mod viewer;
 
@@ -15,6 +16,7 @@ use gpui::{
 };
 
 use document::Document;
+use navigation::{PAN_FAR, PAN_STEP};
 use viewer::Viewer;
 
 actions!(
@@ -56,8 +58,31 @@ actions!(
         Undo,
         /// Redo the last change undone on the drawing.
         Redo,
+        /// Zoom and pan so the selection fills the drawing area.
+        ZoomToSelection,
+        /// Select every node and edge.
+        SelectAll,
+        /// Select the next node in source order.
+        SelectNext,
+        /// Select the previous node in source order.
+        SelectPrevious,
     ]
 );
+
+/// Move the drawing by `x` and `y` screen pixels (the arrow keys show more of the side they
+/// point to, so the drawing moves the other way).
+#[derive(Clone, Copy, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct Pan {
+    pub x: f32,
+    pub y: f32,
+}
+
+impl Pan {
+    pub const fn new(x: f32, y: f32) -> Pan {
+        Pan { x, y }
+    }
+}
 
 /// A keystroke with the secondary modifier: Cmd on macOS, Ctrl elsewhere.
 macro_rules! secondary {
@@ -93,6 +118,18 @@ pub fn key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new("escape", Deselect, Some("Drawing")),
         KeyBinding::new(secondary!("z"), Undo, Some("Drawing")),
         KeyBinding::new(secondary!("shift-z"), Redo, Some("Drawing")),
+        KeyBinding::new(secondary!("8"), ZoomToSelection, None),
+        KeyBinding::new("left", Pan::new(PAN_STEP, 0.0), Some("Drawing")),
+        KeyBinding::new("shift-left", Pan::new(PAN_FAR, 0.0), Some("Drawing")),
+        KeyBinding::new("right", Pan::new(-PAN_STEP, 0.0), Some("Drawing")),
+        KeyBinding::new("shift-right", Pan::new(-PAN_FAR, 0.0), Some("Drawing")),
+        KeyBinding::new("up", Pan::new(0.0, PAN_STEP), Some("Drawing")),
+        KeyBinding::new("shift-up", Pan::new(0.0, PAN_FAR), Some("Drawing")),
+        KeyBinding::new("down", Pan::new(0.0, -PAN_STEP), Some("Drawing")),
+        KeyBinding::new("shift-down", Pan::new(0.0, -PAN_FAR), Some("Drawing")),
+        KeyBinding::new(secondary!("a"), SelectAll, Some("Drawing")),
+        KeyBinding::new("tab", SelectNext, Some("Drawing")),
+        KeyBinding::new("shift-tab", SelectPrevious, Some("Drawing")),
     ]
 }
 
@@ -129,6 +166,10 @@ pub fn menus() -> Vec<Menu> {
                 MenuItem::action("Add Node", AddNode),
                 MenuItem::action("Rename", Rename),
                 MenuItem::action("Delete", Delete),
+                MenuItem::separator(),
+                MenuItem::action("Select All", SelectAll),
+                MenuItem::action("Select Next Node", SelectNext),
+                MenuItem::action("Select Previous Node", SelectPrevious),
                 MenuItem::action("Deselect", Deselect),
             ],
         ),
@@ -141,6 +182,12 @@ pub fn menus() -> Vec<Menu> {
                 MenuItem::action("Zoom Out", ZoomOut),
                 MenuItem::action("Actual Size", ActualSize),
                 MenuItem::action("Fit Window", FitWindow),
+                MenuItem::action("Zoom to Selection", ZoomToSelection),
+                MenuItem::separator(),
+                MenuItem::action("Pan Left", Pan::new(PAN_STEP, 0.0)),
+                MenuItem::action("Pan Right", Pan::new(-PAN_STEP, 0.0)),
+                MenuItem::action("Pan Up", Pan::new(0.0, PAN_STEP)),
+                MenuItem::action("Pan Down", Pan::new(0.0, -PAN_STEP)),
             ],
         ),
     ]
@@ -398,7 +445,7 @@ mod tests {
             .flat_map(|m| &m.items)
             .filter(|i| !matches!(i, MenuItem::Separator))
             .count();
-        assert_eq!(items, 18);
-        assert_eq!(key_bindings().len(), 20);
+        assert_eq!(items, 26);
+        assert_eq!(key_bindings().len(), 32);
     }
 }

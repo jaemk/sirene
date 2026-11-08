@@ -46,6 +46,8 @@ pub struct Viewer {
     /// Drawing changes as (before, after) texts, for Undo and Redo (WYSIWY-13).
     pub(crate) history: Vec<(String, String)>,
     pub(crate) future: Vec<(String, String)>,
+    /// Fit the drawing once the drawing area is known (GUISHE-8).
+    pub(crate) fit_pending: bool,
     scene: Option<Rc<Scene>>,
     /// The drawing area from the last paint.
     pub(crate) viewport: Rc<Cell<Bounds<Pixels>>>,
@@ -115,6 +117,7 @@ impl Viewer {
             drag: None,
             history: Vec::new(),
             future: Vec::new(),
+            fit_pending: true,
             scene: None,
             viewport: Rc::default(),
             focus: cx.focus_handle(),
@@ -197,6 +200,7 @@ impl Viewer {
         self.label = None;
         self.history.clear();
         self.future.clear();
+        self.fit_pending = true;
         self.load_source(window, cx);
     }
 
@@ -469,6 +473,11 @@ impl Viewer {
         }
     }
 
+    /// The drawing area, in window coordinates, from the last paint.
+    pub fn drawing_area(&self) -> Bounds<Pixels> {
+        self.viewport.get()
+    }
+
     pub fn status(&self) -> String {
         self.doc.status()
     }
@@ -486,8 +495,9 @@ impl Render for Viewer {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = self.theme();
         let scene = self.scene(window);
-        let (zoom, pan) = (self.zoom, self.pan);
+        let (zoom, pan, fit) = (self.zoom, self.pan, self.fit_pending);
         let viewport = self.viewport.clone();
+        let this = cx.entity().downgrade();
         let font = window.text_style().font();
         let rule = paint::color(theme.cluster_stroke);
         let accent = paint::color(theme.accent);
@@ -507,6 +517,10 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::deselect))
             .on_action(cx.listener(Self::undo))
             .on_action(cx.listener(Self::redo))
+            .on_action(cx.listener(Self::pan_action))
+            .on_action(cx.listener(Self::select_all))
+            .on_action(cx.listener(Self::select_next))
+            .on_action(cx.listener(Self::select_previous))
             .relative()
             .flex_1()
             .h_full()
@@ -518,8 +532,20 @@ impl Render for Viewer {
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::mouse_up))
             .child(
                 canvas(
-                    move |bounds, _, _| viewport.set(bounds),
-                    move |bounds, (), window, cx| {
+                    {
+                        let scene = scene.clone();
+                        move |bounds, _, cx| {
+                            viewport.set(bounds);
+                            // The first paint after a document is shown fits it (GUISHE-8).
+                            fit.then(|| {
+                                this.update(cx, |v, cx| v.fit_on_open(&scene, bounds.size, cx))
+                                    .ok()
+                            })
+                            .flatten()
+                            .unwrap_or((zoom, pan))
+                        }
+                    },
+                    move |bounds, (zoom, pan), window, cx| {
                         let at = place(&scene, zoom, pan, bounds);
                         paint::paint(&scene, &at, &font, window, cx);
                         paint::outline(&scene, &selected, &at, accent, window);
@@ -560,6 +586,7 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::zoom_out))
             .on_action(cx.listener(Self::actual_size))
             .on_action(cx.listener(Self::fit_window))
+            .on_action(cx.listener(Self::zoom_to_selection))
             .on_action(cx.listener(Self::reload))
             .on_action(cx.listener(Self::toggle_source))
             .on_action(cx.listener(Self::save_action))
