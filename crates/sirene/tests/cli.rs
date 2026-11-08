@@ -529,7 +529,21 @@ fn watch_renders_changes() {
         .spawn()
         .unwrap();
     let mut child = Running(child);
+    // Collect stderr as it comes, so the test can wait for a status line itself.
+    let log = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+    let mut stderr = child.0.stderr.take().unwrap();
+    let sink = log.clone();
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 4096];
+        while let Ok(n @ 1..) = std::io::Read::read(&mut stderr, &mut buf) {
+            sink.lock()
+                .unwrap()
+                .push_str(&String::from_utf8_lossy(&buf[..n]));
+        }
+    });
+    let err = || log.lock().unwrap().clone();
     let svg = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap_or_default();
+    let wrote_a = format!("wrote {}\n", dir.join("a.svg").display());
 
     eventually("a.svg", || svg("a.svg").contains(">A</text>"));
     std::fs::write(dir.join("a.mmd"), "flowchart\nA --> Changed\n").unwrap();
@@ -548,18 +562,15 @@ fn watch_renders_changes() {
     eventually("a.svg to change again", || {
         svg("a.svg").contains(">Broken</text>")
     });
+    // The status line follows the write.
+    eventually("the third `wrote a.svg`", || err().matches(&wrote_a).count() >= 3);
     assert!(child.0.try_wait().unwrap().is_none(), "watch exited");
 
-    let _ = child.0.kill();
-    let mut err = String::new();
-    std::io::Read::read_to_string(child.0.stderr.as_mut().unwrap(), &mut err).unwrap();
+    let err = err();
     assert!(
         err.starts_with(&format!("watching {} (Ctrl-C to stop)\n", dir.display())),
         "{err}"
     );
-    let a = dir.join("a.svg");
-    let wrote_a = format!("wrote {}\n", a.display());
-    assert!(err.matches(&wrote_a).count() >= 3, "{err}");
     assert!(
         err.contains(&format!("wrote {}\n", dir.join("new/b.svg").display())),
         "{err}"
