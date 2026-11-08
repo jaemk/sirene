@@ -1,0 +1,39 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    env:
+      ZIP: Sirene-${{ github.ref_name }}.zip
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml selects the channel; add the second target.
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - run: cargo build --release --locked --package sirene --target aarch64-apple-darwin
+      - run: cargo build --release --locked --package sirene --target x86_64-apple-darwin
+      - run: >
+          lipo -create -output target/sirene
+          target/aarch64-apple-darwin/release/sirene
+          target/x86_64-apple-darwin/release/sirene
+      - run: cargo xtask bundle --binary target/sirene --out target/bundle
+      - run: ditto -c -k --keepParent target/bundle/Sirene.app "target/$ZIP"
+      - run: >
+          cargo xtask cask
+          --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$ZIP"
+          --sha256 "$(shasum -a 256 "target/$ZIP" | cut -d ' ' -f 1)"
+          --homepage "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          > target/sirene.rb
+      - run: cat target/sirene.rb
+      - run: gh release create "$GITHUB_REF_NAME" --generate-notes "target/$ZIP" target/sirene.rb
+        env:
+          GH_TOKEN: ${{ github.token }}

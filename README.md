@@ -34,3 +34,16 @@ bash scripts/ci.sh
 ```
 
 Runs fmt, clippy, tests, and the coverage gate (needs `cargo install cargo-llvm-cov`).
+
+## Packaging
+
+```
+cargo build --release --package sirene
+cargo xtask bundle --binary target/release/sirene    # target/bundle/Sirene.app
+cargo xtask icon                                     # target/bundle/sirene.{icns,png}
+cargo xtask cask --url URL --sha256 HEX --homepage URL
+```
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which attaches a universal
+`Sirene.app` zip and a Homebrew cask to the GitHub release. The app is not signed. See
+`spec/macos-packaging.md`.
