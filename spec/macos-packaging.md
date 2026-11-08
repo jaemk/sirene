@@ -7,7 +7,8 @@ the `xtask` crate (`cargo xtask ...`); tests: `xtask/tests/xtask.rs` and the uni
 ## MACOSP-1 Bundle
 
 `cargo xtask bundle --binary PATH [--out DIR]` writes `DIR/Sirene.app` (default `DIR` is
-`target/bundle`), replacing any existing bundle:
+`target/bundle`), replacing any existing bundle once `PATH` has been read (so `PATH` may be
+inside it, and a missing `PATH` leaves it in place):
 
 | Path | Contents |
 |------|----------|
@@ -24,7 +25,7 @@ The bundle runs the same `sirene` binary as the CLI; with no arguments it opens 
 An XML property list with `CFBundleIdentifier` `io.github.jaemk.sirene`, `CFBundleName` and
 `CFBundleDisplayName` `Sirene`, `CFBundleExecutable` `sirene`, `CFBundleIconFile` `sirene`,
 `CFBundlePackageType` `APPL`, `CFBundleShortVersionString` and `CFBundleVersion` set to the
-workspace version, `LSMinimumSystemVersion` `10.15.7`, `NSHighResolutionCapable` true,
+workspace version without a pre-release suffix (`0.1.2-dev` -> `0.1.2`), `LSMinimumSystemVersion` `10.15.7`, `NSHighResolutionCapable` true,
 `LSApplicationCategoryType` `public.app-category.developer-tools`, and the document types of
 MACOSP-3.
 

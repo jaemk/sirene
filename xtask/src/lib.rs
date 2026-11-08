@@ -135,8 +135,8 @@ pub fn info_plist() -> Value {
         ("CFBundleIconFile", "sirene"),
         ("CFBundlePackageType", "APPL"),
         ("CFBundleInfoDictionaryVersion", "6.0"),
-        ("CFBundleShortVersionString", VERSION),
-        ("CFBundleVersion", VERSION),
+        ("CFBundleShortVersionString", bundle_version()),
+        ("CFBundleVersion", bundle_version()),
         ("LSMinimumSystemVersion", "10.15.7"),
         (
             "LSApplicationCategoryType",
@@ -155,6 +155,16 @@ pub fn info_plist() -> Value {
         Value::Array(vec![uti.into()]),
     );
     d.into()
+}
+
+/// The workspace version without its pre-release suffix (`0.1.2-dev` ->
+/// `0.1.2`): bundle versions are period-separated integers.
+pub fn bundle_version() -> &'static str {
+    version_core(VERSION)
+}
+
+fn version_core(version: &str) -> &str {
+    version.split_once('-').map_or(version, |(core, _)| core)
 }
 
 /// Renders the icon (MACOSP-4) as a square PNG of `size` pixels.
@@ -195,6 +205,8 @@ pub fn write_icon(dir: &Path) -> Result<(), String> {
 
 /// Writes `dir/Sirene.app` around `binary` (MACOSP-1) and returns its path.
 pub fn bundle(binary: &Path, dir: &Path) -> Result<PathBuf, String> {
+    // Read the binary before removing the old bundle, which may hold it.
+    let exe_bytes = fs::read(binary).map_err(|e| context(binary, e))?;
     let app = dir.join(format!("{APP}.app"));
     if app.exists() {
         fs::remove_dir_all(&app).map_err(|e| context(&app, e))?;
@@ -206,7 +218,7 @@ pub fn bundle(binary: &Path, dir: &Path) -> Result<PathBuf, String> {
         fs::create_dir_all(d).map_err(|e| context(d, e))?;
     }
     let exe = macos.join("sirene");
-    fs::copy(binary, &exe).map_err(|e| context(binary, e))?;
+    write(&exe, &exe_bytes)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -290,6 +302,13 @@ mod tests {
             let e = cask("1", "u", &ok, bad).unwrap_err();
             assert!(e.starts_with("homepage "), "{e}");
         }
+    }
+
+    #[test]
+    fn bundle_versions_drop_the_prerelease() {
+        assert_eq!(version_core("0.1.2-dev"), "0.1.2");
+        assert_eq!(version_core("1.0.0-rc.1"), "1.0.0");
+        assert_eq!(version_core("0.1.1"), "0.1.1");
     }
 
     #[test]

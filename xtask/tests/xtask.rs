@@ -63,6 +63,15 @@ fn bundle_layout() {
     run(&["bundle", "--binary", path(&binary), "--out", path(&out)]).unwrap();
     assert!(!contents.join("stale").exists());
     assert_eq!(fs::read(&exe).unwrap(), b"new");
+
+    // The binary may come from the bundle being replaced.
+    run(&["bundle", "--binary", path(&exe), "--out", path(&out)]).unwrap();
+    assert_eq!(fs::read(&exe).unwrap(), b"new");
+
+    // A missing binary leaves the existing bundle alone.
+    let missing = tmp.path().join("missing");
+    run(&["bundle", "--binary", path(&missing), "--out", path(&out)]).unwrap_err();
+    assert_eq!(fs::read(&exe).unwrap(), b"new");
 }
 
 #[test]
@@ -99,8 +108,9 @@ fn info_plist() {
     assert_eq!(s("CFBundleExecutable"), "sirene");
     assert_eq!(s("CFBundleIconFile"), "sirene");
     assert_eq!(s("CFBundlePackageType"), "APPL");
-    assert_eq!(s("CFBundleShortVersionString"), env!("CARGO_PKG_VERSION"));
-    assert_eq!(s("CFBundleVersion"), env!("CARGO_PKG_VERSION"));
+    let version = env!("CARGO_PKG_VERSION").split('-').next().unwrap();
+    assert_eq!(s("CFBundleShortVersionString"), version);
+    assert_eq!(s("CFBundleVersion"), version);
     assert_eq!(s("LSMinimumSystemVersion"), "10.15.7");
     assert_eq!(
         s("LSApplicationCategoryType"),
