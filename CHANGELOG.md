@@ -42,6 +42,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Readable label colors on styled fills; straighter edges between near-aligned nodes.
 - `svg` and `png` refuse to overwrite their input.
+- New windows fit the screen when the remembered size came from a larger one, and a remembered
+  source pane leaves the drawing at least 240px.
+- Settings are saved through a temporary file, so a crash cannot leave them half written.
 - `svg DIR` and `png DIR` skip a diagram whose output another already writes (`a.mmd` beside
   `a.mermaid`) instead of overwriting it, and report an unreadable DIR or an `-o` that is a file
   once instead of per diagram.

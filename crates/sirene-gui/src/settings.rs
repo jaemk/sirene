@@ -9,6 +9,24 @@ use gpui::{App, Global};
 pub const RECENT: usize = 10;
 /// The source pane's width when none is remembered.
 pub const SOURCE_WIDTH: f32 = 480.0;
+/// The source pane's least width.
+pub const SOURCE_MIN: f32 = 160.0;
+/// The width a new window leaves the drawing beside a remembered source pane.
+pub const DRAWING_MIN: f32 = 240.0;
+
+/// The remembered window size `want`, shrunk to fit a screen of `screen` (when known).
+pub fn fit_window(want: (f32, f32), screen: Option<(f32, f32)>) -> (f32, f32) {
+    match screen {
+        Some((sw, sh)) => (want.0.min(sw), want.1.min(sh)),
+        None => want,
+    }
+}
+
+/// The remembered source pane `width`, narrowed so a window `window_width` wide keeps
+/// `DRAWING_MIN` for the drawing, but no narrower than `SOURCE_MIN`.
+pub fn source_width_in(width: f32, window_width: f32) -> f32 {
+    width.min(window_width - DRAWING_MIN).max(SOURCE_MIN)
+}
 
 /// Which theme windows draw with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -188,10 +206,15 @@ impl Settings {
         let Some(file) = &self.file else {
             return;
         };
+        // Written beside, then renamed over, so a crash never leaves the file half written.
+        let mut temp = file.clone().into_os_string();
+        temp.push(".tmp");
+        let temp = PathBuf::from(temp);
         let written = file
             .parent()
             .map_or(Ok(()), std::fs::create_dir_all)
-            .and_then(|()| std::fs::write(file, self.to_text()));
+            .and_then(|()| std::fs::write(&temp, self.to_text()))
+            .and_then(|()| std::fs::rename(&temp, file));
         match written {
             Ok(()) => log::debug!("wrote settings to {}", file.display()),
             Err(e) => log::debug!("cannot write settings to {}: {e}", file.display()),
@@ -307,6 +330,22 @@ mod tests {
     }
 
     #[test]
+    fn fits_the_screen() {
+        assert_eq!(fit_window((900.0, 600.0), None), (900.0, 600.0));
+        assert_eq!(
+            fit_window((900.0, 600.0), Some((1920.0, 1080.0))),
+            (900.0, 600.0)
+        );
+        assert_eq!(
+            fit_window((3000.0, 600.0), Some((1440.0, 875.0))),
+            (1440.0, 600.0)
+        );
+        assert_eq!(source_width_in(300.0, 900.0), 300.0);
+        assert_eq!(source_width_in(800.0, 900.0), 660.0);
+        assert_eq!(source_width_in(800.0, 300.0), SOURCE_MIN);
+    }
+
+    #[test]
     fn recent_files() {
         let dir = tempfile::tempdir().unwrap();
         let a = dir.path().join("a.mmd");
@@ -338,6 +377,12 @@ mod tests {
         };
         blocked.save();
         Settings::default().save();
+        // Nothing is left beside the file.
+        let names: Vec<_> = std::fs::read_dir(file.parent().unwrap())
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(names, ["settings"]);
         assert!(Appearance::System.is_dark(true) && !Appearance::Light.is_dark(true));
         assert!(Appearance::Dark.is_dark(false));
     }

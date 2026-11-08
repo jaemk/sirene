@@ -145,7 +145,12 @@ impl Viewer {
         let dark = effective_dark(window, cx);
         KitTheme::change(theme_mode(dark), Some(window), cx);
         let remembered = settings::get(cx);
-        let (show_source, source_width) = (remembered.show_source, remembered.source_width);
+        let show_source = remembered.show_source;
+        // A pane remembered from a wider window still leaves room for the drawing.
+        let source_width = settings::source_width_in(
+            remembered.source_width,
+            f32::from(window.viewport_size().width),
+        );
         let panes = cx.new(|_| ResizableState::default());
         let menu_bar = crate::IN_WINDOW_MENUS.then(|| AppMenuBar::new(cx));
         let menu_recent = settings::get(cx).recent.clone();
@@ -659,7 +664,7 @@ impl Render for Viewer {
             .child(
                 resizable_panel()
                     .size(px(self.source_width))
-                    .size_range(px(160.0)..px(4000.0))
+                    .size_range(px(settings::SOURCE_MIN)..px(4000.0))
                     // Window resizes go to the drawing.
                     .fixed()
                     .visible(self.show_source)

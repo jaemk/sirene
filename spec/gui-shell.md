@@ -116,6 +116,8 @@ Windows, `$XDG_CONFIG_HOME/sirene` or `~/.config/sirene` elsewhere), as `key = v
 `appearance` (`system`, `light`, `dark`), `window` (`WxH`), `source` (`shown`, `hidden`),
 `source_width`, and up to 10 `recent` paths, most recent first. A missing or unreadable file gives
 the defaults; unknown keys and bad values are skipped; a file that cannot be written is skipped.
+A save writes `settings.tmp` beside it and renames it over the file, so a crash never leaves it
+half written.
 The Appearance, Clear Recent, and showing or hiding the source pane are saved at once; the window
 size and pane width when a window closes and on Quit. Without `run` (as in tests), settings are
 kept in memory only.
@@ -127,12 +129,15 @@ the unit tests in `settings.rs`.
 
 ## GUISHE-11 Window layout
 
-New windows open at the last window size (1200x760 at first) and with the source pane shown or
+New windows open at the last window size (1200x760 at first), shrunk to fit the usable area of
+the active window's display (else the primary display's), and with the source pane shown or
 hidden as it last was. The first window is centered; later ones open 28px right of and below the
 active window, or centered when that would leave its display. Tests: `new_windows_cascade` in
 `crates/sirene-gui/tests/shell.rs`. The divider between the source pane and the drawing can be dragged; the
 pane is 480px wide at first, at least 160px, keeps its width when the window is resized, and new
-windows use the width it was last dragged to. Tests: `windows_remember_their_layout` in
+windows use the width it was last dragged to, narrowed (to no less than 160px) when that would
+leave the drawing under 240px; the remembered width is kept for wider windows. Tests:
+`windows_remember_their_layout` and `remembered_sizes_fit_the_screen` in
 `crates/sirene-gui/tests/settings.rs`.
 
 ## GUISHE-12 Menus, text editing, and focus
