@@ -4,7 +4,7 @@ A local WYSIWYG editor and viewer for Mermaid flowcharts, with SVG, PNG, and ter
 output. Only flowcharts (`flowchart` and `graph`) are drawn; other Mermaid diagram types are
 reported as unsupported.
 
-See `spec/README.md` for the feature status table.
+Docs: <https://jaemk.github.io/sirene/>. See `spec/README.md` for the feature status table.
 
 ## Install
 

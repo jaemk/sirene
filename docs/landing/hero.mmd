@@ -1,0 +1,5 @@
+flowchart LR
+    src[diagram.mmd] --> parse{Parse}
+    parse -->|ok| draw([Drawing])
+    parse -.->|errors| diag[/Diagnostics/]
+    draw --> svg[(SVG)] & png[(PNG)] & ascii[[ASCII]]

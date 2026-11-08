@@ -1,0 +1,98 @@
+/* sirene docs: the mdBook navy theme retinted to match the landing page. Loaded via
+   `additional-css`. */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  --cyan: #22d3ee;
+  --sky: #7dd3fc;
+  --sidebar-width: 280px;
+  --content-max-width: 780px;
+}
+
+.navy {
+  --bg: #06101f;
+  --fg: #dbeafe;
+
+  --sidebar-bg: #050d1a;
+  --sidebar-fg: #9fb4d3;
+  --sidebar-non-existant: #3d5273;
+  --sidebar-active: #7dd3fc;
+  --sidebar-spacer: #12233d;
+
+  --scrollbar: #24406a;
+
+  --icons: #7088ab;
+  --icons-hover: #dbeafe;
+
+  --links: #7dd3fc;
+
+  --inline-code-color: #a5f3fc;
+
+  --theme-popup-bg: #0a1a30;
+  --theme-popup-border: #1d3557;
+  --theme-hover: #10233d;
+
+  --quote-bg: #0b1b31;
+  --quote-border: #1d3557;
+
+  --table-border-color: #1d3557;
+  --table-header-bg: #10233d;
+  --table-alternate-bg: #091729;
+
+  --searchbar-border-color: #1d3557;
+  --searchbar-bg: #0a1a30;
+  --searchbar-fg: #dbeafe;
+  --searchbar-shadow-color: #0b2a52;
+  --searchresults-header-fg: #8ba3c4;
+  --searchresults-border-color: #1d3557;
+  --searchresults-li-bg: #0b1b31;
+  --search-mark-bg: #0e7490;
+}
+
+html.navy,
+.navy body {
+  background:
+    radial-gradient(1100px 600px at 85% -10%, rgba(34, 211, 238, 0.1), transparent 60%),
+    var(--bg);
+}
+
+.navy .content { font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.navy .content h1,
+.navy .content h2,
+.navy .content h3 { font-weight: 700; letter-spacing: -0.4px; }
+.navy .content h1 {
+  background: linear-gradient(180deg, #ffffff 10%, var(--sky) 60%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.navy .content h2 { border-bottom: 1px solid var(--quote-border); padding-bottom: 0.3em; }
+
+.navy code { font-variant-ligatures: none; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+.navy .content pre { border: 1px solid var(--quote-border); border-radius: 10px; }
+
+/* Rendered diagrams sit on their own dark background. */
+.content img { max-width: 100%; border: 1px solid var(--quote-border); border-radius: 10px; }
+
+.navy .chapter li.chapter-item a { border-radius: 7px; padding-left: 8px; }
+.navy .chapter li.chapter-item a:hover { background: var(--theme-hover); }
+.navy .chapter li.chapter-item a.active {
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.14), transparent);
+  border-left: 3px solid var(--cyan);
+}
+
+.navy blockquote { border-left: 3px solid var(--cyan); border-radius: 0 10px 10px 0; }
+
+/* The "sirene home" link custom.js adds to the sidebar. */
+.sirene-home {
+  display: block;
+  margin: 0 14px 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--quote-border);
+  border-radius: 9px;
+  font-weight: 600;
+  color: var(--sky) !important;
+  background: linear-gradient(120deg, rgba(34, 211, 238, 0.12), rgba(30, 58, 138, 0.25));
+}
+.sirene-home:hover { border-color: var(--cyan); }

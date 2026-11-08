@@ -8,6 +8,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- A documentation site at <https://jaemk.github.io/sirene/>: a landing page and an mdBook
+  guide, with the examples rendered by sirene at build time.
 - `sirene png --quality draft|normal|fine` (default `fine`, 4x); the default scale shrinks
   to fit the largest image.
 - `sirene svg DIR` and `sirene png DIR` render every `.mmd` and `.mermaid` file under a
