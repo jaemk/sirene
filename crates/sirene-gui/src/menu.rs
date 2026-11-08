@@ -1,0 +1,202 @@
+//! The drawing's right-click menu (WYSIWY-14).
+
+use gpui::component::menu::PopupMenu;
+use gpui::{Context, WeakEntity, Window, px};
+use sirene_core::flowchart::edit::{Line, MAX_LENGTH};
+use sirene_core::flowchart::{Arrow, Flowchart, Node, Shape, Stroke};
+
+use crate::viewer::Viewer;
+use crate::{
+    AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, LongerEdge, Rename,
+    ReverseEdge, SelectAll, SetArrows, SetShape, SetStroke, ShorterEdge,
+};
+
+/// The strokes in Line, with their names.
+pub const STROKES: [(&str, Stroke); 4] = [
+    ("Solid", Stroke::Normal),
+    ("Thick", Stroke::Thick),
+    ("Dotted", Stroke::Dotted),
+    ("Invisible", Stroke::Invisible),
+];
+
+/// The arrowheads in Arrows: name, start, end.
+pub const ARROWS: [(&str, Option<Arrow>, Option<Arrow>); 6] = [
+    ("Arrow at End", None, Some(Arrow::Point)),
+    ("Arrow at Start", Some(Arrow::Point), None),
+    (
+        "Arrows at Both Ends",
+        Some(Arrow::Point),
+        Some(Arrow::Point),
+    ),
+    ("No Arrows", None, None),
+    ("Circle at End", None, Some(Arrow::Circle)),
+    ("Cross at End", None, Some(Arrow::Cross)),
+];
+
+/// The tallest a list of nodes or shapes gets before it scrolls.
+const LIST_HEIGHT: f32 = 420.0;
+
+/// How a node is named in Connect To and Connect From: its label's first line, and its id
+/// when that differs.
+fn node_name(n: &Node) -> String {
+    let label = n.label.lines().into_iter().next().unwrap_or_default();
+    if label.is_empty() || label == n.id {
+        n.id.clone()
+    } else {
+        format!("{label} ({})", n.id)
+    }
+}
+
+/// The menu for what `viewer` has selected: the selection's own items, or the drawing's when
+/// nothing is selected. Its actions go to the drawing.
+pub(crate) fn build(
+    viewer: &WeakEntity<Viewer>,
+    menu: PopupMenu,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    let Some(viewer) = viewer.upgrade() else {
+        return menu;
+    };
+    let (nodes, edges, chart, focus) = {
+        let v = viewer.read(cx);
+        (
+            v.selected_nodes(),
+            v.selected_edges(),
+            v.doc.chart.clone(),
+            v.drawing_focus.clone(),
+        )
+    };
+    let mut menu = menu.action_context(focus);
+    if nodes.is_empty() && edges.is_empty() {
+        return menu
+            .menu("Add Node", Box::new(AddNode))
+            .separator()
+            .menu("Select All", Box::new(SelectAll))
+            .menu("Fit Window", Box::new(FitWindow));
+    }
+    if nodes.len() + edges.len() == 1 {
+        menu = menu.menu("Rename", Box::new(Rename));
+    }
+    if !nodes.is_empty() {
+        menu = node_items(menu, &nodes, &chart, window, cx);
+    }
+    if !edges.is_empty() {
+        menu = edge_items(menu, &edges, &chart, window, cx);
+    }
+    menu.separator().menu("Delete", Box::new(Delete))
+}
+
+fn node_items(
+    menu: PopupMenu,
+    nodes: &[String],
+    chart: &Flowchart,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    let current = match nodes {
+        [id] => chart.node(id).map(|n| n.shape),
+        _ => None,
+    };
+    let mut menu = menu.submenu("Shape", window, cx, move |m, window, cx| {
+        shape_items(m, current, window, cx)
+    });
+    if nodes.len() == 1 {
+        menu = menu
+            .menu("Add Node After", Box::new(AddNode))
+            .menu("Add Node Before", Box::new(AddNodeBefore));
+    }
+    let others: Vec<(String, String)> = chart
+        .nodes
+        .iter()
+        .filter(|n| !nodes.contains(&n.id))
+        .map(|n| (n.id.clone(), node_name(n)))
+        .collect();
+    if others.is_empty() {
+        return menu;
+    }
+    let to = others.clone();
+    menu.submenu("Connect To", window, cx, move |m, _, _| {
+        to.iter().fold(
+            m.scrollable(true).max_h(px(LIST_HEIGHT)),
+            |m, (id, name)| m.menu(name.clone(), Box::new(ConnectTo { id: id.clone() })),
+        )
+    })
+    .submenu("Connect From", window, cx, move |m, _, _| {
+        others.iter().fold(
+            m.scrollable(true).max_h(px(LIST_HEIGHT)),
+            |m, (id, name)| m.menu(name.clone(), Box::new(ConnectFrom { id: id.clone() })),
+        )
+    })
+}
+
+/// The classic shapes, then the rest under More.
+fn shape_items(
+    menu: PopupMenu,
+    current: Option<Shape>,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    let item = move |m: PopupMenu, shape: Shape| {
+        m.menu_with_check(
+            shape.title(),
+            current == Some(shape),
+            Box::new(SetShape { shape }),
+        )
+    };
+    let menu = Shape::ALL
+        .iter()
+        .filter(|s| s.delimiters().is_some())
+        .fold(menu, |m, &s| item(m, s));
+    menu.separator()
+        .submenu("More", window, cx, move |m, _, _| {
+            Shape::ALL
+                .iter()
+                .filter(|s| s.delimiters().is_none())
+                .fold(m.scrollable(true).max_h(px(LIST_HEIGHT)), |m, &s| {
+                    item(m, s)
+                })
+        })
+}
+
+fn edge_items(
+    menu: PopupMenu,
+    edges: &[usize],
+    chart: &Flowchart,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    let line = match edges {
+        [i] => chart.edges.get(*i).map(Line::of),
+        _ => None,
+    };
+    menu.submenu("Line", window, cx, move |m, _, _| {
+        STROKES.iter().fold(m, |m, &(name, stroke)| {
+            m.menu_with_check(
+                name,
+                line.is_some_and(|l| l.stroke == stroke),
+                Box::new(SetStroke { stroke }),
+            )
+        })
+    })
+    .submenu("Arrows", window, cx, move |m, _, _| {
+        ARROWS.iter().fold(m, |m, &(name, start, end)| {
+            m.menu_with_check(
+                name,
+                line.is_some_and(|l| l.start == start && l.end == end),
+                Box::new(SetArrows { start, end }),
+            )
+        })
+    })
+    .menu("Reverse", Box::new(ReverseEdge))
+    .menu_with_disabled(
+        "Longer",
+        Box::new(LongerEdge),
+        line.is_some_and(|l| l.length >= MAX_LENGTH),
+    )
+    .menu_with_disabled(
+        "Shorter",
+        Box::new(ShorterEdge),
+        line.is_some_and(|l| l.length <= 1),
+    )
+}

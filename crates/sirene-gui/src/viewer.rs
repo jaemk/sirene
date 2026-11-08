@@ -9,7 +9,7 @@ use gpui::base::input::{Diagnostic, DiagnosticSeverity};
 use gpui::component::input::{
     self as text, Editor, EditorState, Escape, Input, InputEvent, Position, RopeExt,
 };
-use gpui::component::menu::AppMenuBar;
+use gpui::component::menu::{AppMenuBar, ContextMenuExt};
 use gpui::component::resizable::{ResizableState, h_resizable, resizable_panel};
 use gpui::component::{Theme as KitTheme, ThemeMode};
 use gpui::{
@@ -580,6 +580,7 @@ impl Render for Viewer {
         let (zoom, pan, fit) = (self.zoom, self.pan, self.fit_pending);
         let viewport = self.viewport.clone();
         let this = cx.entity().downgrade();
+        let menu_viewer = this.clone();
         let font = window.text_style().font();
         let rule = paint::color(theme.cluster_stroke);
         let accent = paint::color(theme.accent);
@@ -610,6 +611,7 @@ impl Render for Viewer {
             .overflow_hidden()
             .on_scroll(cx.listener(Self::scroll))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
+            .on_mouse_down(MouseButton::Right, cx.listener(Self::right_down))
             .on_mouse_move(cx.listener(Self::mouse_move))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::mouse_up))
@@ -650,7 +652,10 @@ impl Render for Viewer {
                     .w(width)
                     .on_action(cx.listener(|v, _: &Escape, window, cx| v.cancel_label(window, cx)))
                     .child(Input::new(&input))
-            }));
+            }))
+            .context_menu(move |menu, window, cx| {
+                crate::menu::build(&menu_viewer, menu, window, cx)
+            });
         // The source pane is as wide as last dragged, in any window (GUISHE-11).
         let panes = h_resizable("panes")
             .with_state(&self.panes)
@@ -697,6 +702,15 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::close))
             .on_action(cx.listener(Self::open))
             .on_action(cx.listener(Self::add_node))
+            .on_action(cx.listener(Self::add_node_before))
+            .on_action(cx.listener(Self::set_shape))
+            .on_action(cx.listener(Self::set_stroke))
+            .on_action(cx.listener(Self::set_arrows))
+            .on_action(cx.listener(Self::longer_edge))
+            .on_action(cx.listener(Self::shorter_edge))
+            .on_action(cx.listener(Self::reverse_edge))
+            .on_action(cx.listener(Self::connect_to))
+            .on_action(cx.listener(Self::connect_from))
             .on_action(cx.listener(Self::text_undo))
             .on_action(cx.listener(Self::text_redo))
             .on_action(cx.listener(Self::text_select_all))

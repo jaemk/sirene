@@ -71,6 +71,8 @@ elsewhere). The full key table is in `spec/gui-shell.md` (GUISHE-5).
 - Click to select (shift-click for more), double-click or enter to edit a label, drag from one
   node to another to connect them, secondary-shift-n to add a node, backspace to delete. Each
   change is written to the source as an ordinary text edit, and secondary-z undoes it.
+- Right-click a node or edge for its menu: change a node's shape, an edge's line, arrowheads, or
+  length, reverse an edge, add a node before or after, or connect to or from any other node.
 - Scroll or drag empty space to pan, secondary-scroll to zoom; the arrow keys pan (shift for
   further), tab steps through nodes, secondary-8 zooms to the selection, secondary-9 fits the
   window, secondary-0 is 100%.

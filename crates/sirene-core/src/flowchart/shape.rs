@@ -91,6 +91,44 @@ impl Shape {
         NAMES.iter().find(|(n, _)| *n == name).map(|&(_, s)| s)
     }
 
+    /// The classic delimiters that draw the shape, e.g. `("([", "])")` for `Stadium`; `None`
+    /// for shapes written only with `@{ shape }`.
+    pub fn delimiters(self) -> Option<(&'static str, &'static str)> {
+        Some(match self {
+            Shape::Rect => ("[", "]"),
+            Shape::Rounded => ("(", ")"),
+            Shape::Stadium => ("([", "])"),
+            Shape::FramedRect => ("[[", "]]"),
+            Shape::Cylinder => ("[(", ")]"),
+            Shape::Circle => ("((", "))"),
+            Shape::DoubleCircle => ("(((", ")))"),
+            Shape::Ellipse => ("(-", "-)"),
+            Shape::Odd => (">", "]"),
+            Shape::Diamond => ("{", "}"),
+            Shape::Hexagon => ("{{", "}}"),
+            Shape::LeanRight => ("[/", "/]"),
+            Shape::LeanLeft => ("[\\", "\\]"),
+            Shape::TrapezoidBottom => ("[/", "\\]"),
+            Shape::TrapezoidTop => ("[\\", "/]"),
+            _ => return None,
+        })
+    }
+
+    /// A name for people: the variant's words, e.g. `Framed rect` for `FramedRect`.
+    pub fn title(self) -> String {
+        let name = format!("{self:?}");
+        let mut out = String::new();
+        for (i, c) in name.chars().enumerate() {
+            if i > 0 && c.is_uppercase() {
+                out.push(' ');
+                out.extend(c.to_lowercase());
+            } else {
+                out.push(c);
+            }
+        }
+        out
+    }
+
     /// The shape drawn by classic delimiters, given the opening and closing delimiter text.
     pub(crate) fn from_delimiters(open: &str, close: &str) -> Shape {
         match (open, close) {
@@ -172,6 +210,19 @@ mod tests {
         ];
         for (open, close, shape) in cases {
             assert_eq!(Shape::from_delimiters(open, close), shape, "{open} {close}");
+            assert_eq!(shape.delimiters(), Some((open, close)), "{shape:?}");
         }
+        let classic = Shape::ALL
+            .iter()
+            .filter(|s| s.delimiters().is_some())
+            .count();
+        assert_eq!(classic, cases.len());
+    }
+
+    #[test]
+    fn titles() {
+        assert_eq!(Shape::Rect.title(), "Rect");
+        assert_eq!(Shape::FramedRect.title(), "Framed rect");
+        assert_eq!(Shape::TrapezoidBottom.title(), "Trapezoid bottom");
     }
 }

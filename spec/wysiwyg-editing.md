@@ -82,6 +82,19 @@ it touches, including comments and formatting, is kept byte for byte. Tests:
   including edges removed with a node. A statement that ends up empty
   is removed with its line when it was alone on it, otherwise with the `;` between it and its
   neighbor.
+- `set_node_shape`: a shape with classic delimiters (`[...]`, `(...)`, `{...}`, and the other 12)
+  replaces the delimiters of the node's last mention that has them, or adds them with the label
+  after its first mention, and drops `shape` from the node's `@{ ... }` (the whole `@{ ... }` when
+  nothing else is in it). Any other shape sets `shape: NAME` in the `@{ ... }` of the node's last
+  mention with delimiters or metadata (or its first mention), adding `@{ shape: NAME }` when there
+  is none. A label written as unquoted text is rewritten as for `set_node_label`; quoted labels
+  are kept.
+- `set_edge_line`: rewrites the edge's stroke in canonical form with the given stroke, arrowheads,
+  and length (clamped to 1..=10), keeping its label as `|...|`.
+- `reverse_edge`: an edge alone in its statement swaps its two ends in place. An edge in a chain is
+  deleted (as `delete` does) and appended reversed, with its stroke and label, as its own
+  statement. Edges that share a stroke (`A & B --> C`), and edges with an id in a chain, are not
+  reversed.
 - Labels are written bare when they are one line of letters, digits, spaces, and `_.,!?'`;
   otherwise quoted, with `"`, `#`, `<`, and (outside markdown) `` ` `` as entity codes and line
   breaks as `<br>`. Markdown labels stay markdown strings. Parsing the written label gives back
@@ -122,3 +135,22 @@ Changes made on the drawing are applied to the source pane's text as one edit ea
 the document edited and the pane's own undo reverts them. Undo (secondary-z) and Redo
 (secondary-shift-z) with the drawing focused step through the drawing's changes while the text
 still matches; typing in the pane clears that history.
+
+## WYSIWY-14 Right-click menu
+
+A right press on the drawing selects the item under it (keeping the selection when the item is
+already in it; clearing it over empty space) and opens a menu for the selection. Its items act on
+every selected item of their kind, as one drawing change (WYSIWY-13):
+
+- Nothing selected: Add Node, Select All, Fit Window.
+- One item: Rename.
+- Nodes: Shape (the 15 classic shapes, then More with the rest; the current shape of one selected
+  node is checked), Add Node After and Add Node Before (one node: a new node with an edge from
+  or to it, selected with its label open), Connect To and Connect From (an edge from or to each
+  other node, named by its label's first line and id).
+- Edges: Line (Solid, Thick, Dotted, Invisible), Arrows (at end, at start, at both ends, none,
+  circle at end, cross at end), Reverse, Longer and Shorter (one rank more or fewer, 1 to 10;
+  disabled at the limit for one edge).
+- Delete.
+
+The same edits are actions (GUISHE-5). Tests: `crates/sirene-gui/tests/context_menu.rs`.

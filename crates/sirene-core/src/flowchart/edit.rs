@@ -5,7 +5,8 @@ use std::ops::Range;
 
 use rowan::TextRange;
 
-use super::model::{Arrow, Edge, Flowchart, Stroke};
+use super::model::{Arrow, Edge, Flowchart, Node, Shape, Stroke};
+use super::text;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -160,6 +161,161 @@ pub fn set_edge_label(src: &str, edge: usize, label: &str) -> Option<TextEdit> {
         }
     };
     doc.finish(vec![edit])
+}
+
+/// Sets the shape of node `id`. A shape with classic delimiters replaces the delimiters of the
+/// node's last mention that has them (or adds them, with the label, after its first mention) and
+/// drops `shape` from its metadata; any other shape is written as `@{ shape: NAME }` on the last
+/// mention with a shape or metadata (or the first). `None` when there is no such node or the
+/// shape is unchanged.
+pub fn set_node_shape(src: &str, id: &str, shape: Shape) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let node = doc.chart.node(id)?;
+    if node.shape == shape {
+        return None;
+    }
+    let mentions = doc.mentions(node);
+    let mut edits = Vec::new();
+    match shape.delimiters() {
+        Some((open, close)) => {
+            for meta in mentions.iter().filter_map(|m| child(m, METADATA)) {
+                edits.extend(doc.remove_meta_key(&meta, "shape"));
+            }
+            match mentions.iter().rev().find_map(|m| child(m, SHAPE)) {
+                Some(s) => {
+                    let label = child(&s, LABEL).map_or(String::new(), |l| label_text(&l));
+                    edits.push((span(s.text_range()), format!("{open}{label}{close}")));
+                }
+                None => {
+                    let end = usize::from(token(mentions.first()?, IDENT)?.text_range().end());
+                    let label = label_source(&node.label.text, false);
+                    edits.push((end..end, format!("{open}{label}{close}")));
+                }
+            }
+        }
+        None => {
+            let last = mentions
+                .iter()
+                .rev()
+                .find(|m| child(m, SHAPE).is_some() || child(m, METADATA).is_some())
+                .or(mentions.first())?;
+            match child(last, METADATA) {
+                Some(meta) => edits.push(doc.set_meta_key(&meta, "shape", shape.name())),
+                None => {
+                    let end = usize::from(last.text_range().end());
+                    edits.push((end..end, format!("@{{ shape: {} }}", shape.name())));
+                }
+            }
+        }
+    }
+    doc.finish(edits)
+}
+
+/// An edge's line: its stroke, arrowheads, and length (FLOWMO-8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Line {
+    pub stroke: Stroke,
+    pub start: Option<Arrow>,
+    pub end: Option<Arrow>,
+    /// Ranks spanned, 1 to 10.
+    pub length: u8,
+}
+
+impl Line {
+    pub fn of(e: &Edge) -> Line {
+        Line {
+            stroke: e.stroke,
+            start: e.start,
+            end: e.end,
+            length: e.length,
+        }
+    }
+}
+
+/// The longest edge length mermaid reads.
+pub const MAX_LENGTH: u8 = 10;
+
+/// Sets the line of edge `edge` (an index into `Flowchart::edges`), rewriting its stroke in
+/// canonical form and keeping its label. The length is clamped to 1..=`MAX_LENGTH`. `None` when
+/// there is no such edge or the line is unchanged.
+pub fn set_edge_line(src: &str, edge: usize, line: Line) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let e = doc.chart.edges.get(edge)?;
+    let line = Line {
+        length: line.length.clamp(1, MAX_LENGTH),
+        ..line
+    };
+    if Line::of(e) == line {
+        return None;
+    }
+    let syntax = doc.edge_syntax(e)?;
+    let first = syntax
+        .children_with_tokens()
+        .find(|el| matches!(el.kind(), STROKE | STROKE_OPEN))?;
+    let start = usize::from(first.text_range().start());
+    let mut text = stroke_text(&Edge {
+        stroke: line.stroke,
+        start: line.start,
+        end: line.end,
+        length: line.length,
+        ..e.clone()
+    });
+    if let Some(label) = edge_label_text(&syntax) {
+        text = format!("{text}|{label}|");
+    }
+    doc.finish(vec![(start..usize::from(syntax.text_range().end()), text)])
+}
+
+/// Reverses edge `edge`: `A --> B` becomes `B --> A`. An edge alone in its statement swaps its
+/// ends in place; one in a chain is taken out (as `delete` does) and written reversed as its own
+/// statement at the end. `None` when there is no such edge, it shares its stroke with others
+/// (`A & B --> C`), or it has an id and is in a chain.
+pub fn reverse_edge(src: &str, edge: usize) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let chart = &doc.chart;
+    let e = chart.edges.get(edge)?;
+    if chart.edges.iter().filter(|x| x.range == e.range).count() > 1 {
+        return None;
+    }
+    let syntax = doc.edge_syntax(e)?;
+    let stmt = syntax.parent()?;
+    let parts: Vec<SyntaxNode> = stmt.children().collect();
+    if let [a, mid, b] = parts.as_slice()
+        && a.kind() == NODE_GROUP
+        && *mid == syntax
+        && b.kind() == NODE_GROUP
+    {
+        let between = &src[usize::from(a.text_range().end())..usize::from(b.text_range().start())];
+        let range = usize::from(a.text_range().start())..usize::from(b.text_range().end());
+        return doc.finish(vec![(range, format!("{}{between}{}", b.text(), a.text()))]);
+    }
+    if e.id.is_some() {
+        return None;
+    }
+    let mut stroke = stroke_text(e);
+    if let Some(label) = edge_label_text(&syntax) {
+        stroke = format!("{stroke}|{label}|");
+    }
+    let line = format!("{} {stroke} {}", e.to, e.from);
+    let without = delete(src, &[], &[edge])?.apply(src);
+    let out = Doc::new(&without).append(&line).apply(&without);
+    TextEdit::between(src, &out)
+}
+
+/// Source text for a label node: kept as written when quoted, otherwise rewritten by
+/// `label_source`, which quotes it when its text could end the delimiters around it.
+fn label_text(label: &SyntaxNode) -> String {
+    if tokens(label).any(|t| matches!(t.kind(), STRING | MD_STRING)) {
+        return label.text().to_string().trim().to_owned();
+    }
+    label_source(&text::label(&label.text().to_string(), false).text, false)
+}
+
+/// An edge's label as source text for `|...|`, when it has one.
+fn edge_label_text(edge: &SyntaxNode) -> Option<String> {
+    let label = child(edge, EDGE_LABEL).and_then(|l| child(&l, LABEL))?;
+    let text = label_text(&label);
+    (!text.is_empty()).then_some(text)
 }
 
 /// Adds a node labelled `label` (just its id when `label` is empty). Returns its id and the
@@ -482,6 +638,74 @@ impl<'a> Doc<'a> {
             end += rest.len() - rest.trim_start_matches([' ', '\t']).len();
         }
         (range.start..end, String::new())
+    }
+
+    /// The `NODE` syntax of each mention of `node`, in source order.
+    fn mentions(&self, node: &Node) -> Vec<SyntaxNode> {
+        self.root
+            .descendants()
+            .filter(|n| n.kind() == NODE && node.mentions.contains(&n.text_range()))
+            .collect()
+    }
+
+    /// The `EDGE` syntax of `e`.
+    fn edge_syntax(&self, e: &Edge) -> Option<SyntaxNode> {
+        self.root
+            .descendants()
+            .find(|n| n.kind() == EDGE && n.text_range() == e.range)
+    }
+
+    /// The edit setting `key` to `value` in a `METADATA` node: the existing entry's value, or a
+    /// new entry first.
+    fn set_meta_key(&self, meta: &SyntaxNode, key: &str, value: &str) -> (Range<usize>, String) {
+        let Some(body) = token(meta, META_BODY) else {
+            // `@{}`: the body goes between the braces.
+            let at = usize::from(
+                token(meta, META_OPEN)
+                    .map_or(meta.text_range(), |t| t.text_range())
+                    .end(),
+            );
+            return (at..at, format!(" {key}: {value} "));
+        };
+        let base = usize::from(body.text_range().start());
+        let entries = text::metadata_entries(body.text());
+        match entries.iter().rev().find(|e| e.key == key) {
+            Some(e) => (base + e.value.start..base + e.value.end, value.to_owned()),
+            None => {
+                let lead = body.text().len() - body.text().trim_start().len();
+                let at = base + lead;
+                if body.text().trim().is_empty() {
+                    (base..base + body.text().len(), format!(" {key}: {value} "))
+                } else {
+                    (at..at, format!("{key}: {value}, "))
+                }
+            }
+        }
+    }
+
+    /// The edit removing every `key` entry from a `METADATA` node, or the whole `@{ ... }` when
+    /// nothing else is left in it. `None` when it has no such entry.
+    fn remove_meta_key(&self, meta: &SyntaxNode, key: &str) -> Option<(Range<usize>, String)> {
+        let body = token(meta, META_BODY)?;
+        let text = body.text();
+        let entries = text::metadata_entries(text);
+        if !entries.iter().any(|e| e.key == key) {
+            return None;
+        }
+        let kept: Vec<&str> = entries
+            .iter()
+            .filter(|e| e.key != key)
+            .map(|e| &text[e.entry.clone()])
+            .collect();
+        if kept.is_empty() {
+            return Some((span(meta.text_range()), String::new()));
+        }
+        let lead = &text[..text.len() - text.trim_start().len()];
+        let trail = &text[text.trim_end().len()..];
+        Some((
+            span(body.text_range()),
+            format!("{lead}{}{trail}", kept.join(", ")),
+        ))
     }
 
     /// The edit appending `line` as a statement at the end of the document.

@@ -26,6 +26,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Editor: Edit > Cut, Copy, and Paste; Undo, Redo, and Select All act on the source text when
   it has the keyboard.
 - Editor: a focus ring shows when the drawing has the keyboard.
+- Editor: a right-click menu on the drawing to set node shapes, edge lines, arrowheads, and
+  lengths, reverse edges, add a node before or after, and connect to or from any node.
+- `flowchart::edit::set_node_shape`, `set_edge_line`, and `reverse_edge`.
 
 ### Changed
 

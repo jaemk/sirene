@@ -190,6 +190,39 @@ pub(crate) fn metadata(body: &str) -> (Vec<(String, String)>, Vec<String>) {
     (entries, invalid)
 }
 
+/// One entry of a metadata body, with byte ranges into the body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MetaEntry {
+    pub key: String,
+    /// The entry without surrounding whitespace.
+    pub entry: std::ops::Range<usize>,
+    /// The value without surrounding whitespace.
+    pub value: std::ops::Range<usize>,
+}
+
+/// The `key: value` entries of a metadata body in source order, each with where it is.
+pub(crate) fn metadata_entries(body: &str) -> Vec<MetaEntry> {
+    let base = body.as_ptr() as usize;
+    split_unquoted(body, |c| c == ',' || c == '\n', true)
+        .into_iter()
+        .filter_map(|part| {
+            let start = part.as_ptr() as usize - base;
+            let lead = part.len() - part.trim_start().len();
+            let trimmed = part.trim();
+            let (key, value) = trimmed.split_once(':')?;
+            let entry = start + lead..start + lead + trimmed.len();
+            let value_start = entry.start + key.len() + 1;
+            let value_lead = value.len() - value.trim_start().len();
+            let value = value_start + value_lead..value_start + value_lead + value.trim().len();
+            Some(MetaEntry {
+                key: key.trim().to_owned(),
+                entry,
+                value,
+            })
+        })
+        .collect()
+}
+
 /// A YAML scalar: double-quoted (with `\` escapes), single-quoted (with `''`), or plain.
 fn yaml_scalar(v: &str) -> String {
     if v.len() >= 2 && v.starts_with('"') && v.ends_with('"') {
@@ -251,6 +284,33 @@ mod tests {
             property: p.into(),
             value: v.into(),
         }
+    }
+
+    #[test]
+    fn metadata_entry_ranges() {
+        let body = r#" shape: doc ,label: "a, b"
+  bad
+  x:1"#;
+        let entries = metadata_entries(body);
+        let parts: Vec<(&str, &str, &str)> = entries
+            .iter()
+            .map(|e| {
+                (
+                    e.key.as_str(),
+                    &body[e.entry.clone()],
+                    &body[e.value.clone()],
+                )
+            })
+            .collect();
+        assert_eq!(
+            parts,
+            [
+                ("shape", "shape: doc", "doc"),
+                ("label", r#"label: "a, b""#, r#""a, b""#),
+                ("x", "x:1", "1"),
+            ]
+        );
+        assert!(metadata_entries("").is_empty());
     }
 
     #[test]

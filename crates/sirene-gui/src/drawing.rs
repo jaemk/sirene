@@ -6,12 +6,16 @@ use gpui::{
     AppContext, Context, Entity, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point,
     Subscription, Window, point, px,
 };
-use sirene_core::flowchart::edit::{self, TextEdit};
+use sirene_core::flowchart::edit::{self, Line, TextEdit};
+use sirene_core::flowchart::{self, Flowchart};
 use sirene_core::scene::{Owner, Pt};
 
 use crate::paint::Placement;
 use crate::viewer::{Viewer, place};
-use crate::{AddNode, Delete, Deselect, Redo, Rename, Undo};
+use crate::{
+    AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, Deselect, LongerEdge, Redo, Rename,
+    ReverseEdge, SetArrows, SetShape, SetStroke, ShorterEdge, Undo,
+};
 
 /// A selectable diagram item: a node by id, or an edge by index.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +41,11 @@ pub struct LabelEdit {
     pub item: Item,
     pub input: Entity<InputState>,
     _subscription: Subscription,
+}
+
+/// The flowchart `src` describes.
+fn chart(src: &str) -> Flowchart {
+    flowchart::parse(src).lower().flowchart
 }
 
 /// How far, in screen pixels, a click may miss a stroke.
@@ -350,6 +359,199 @@ impl Viewer {
         let item = Item::Node(id);
         self.select(vec![item.clone()], cx);
         self.edit_label(item, window, cx);
+    }
+
+    pub(crate) fn add_node_before(
+        &mut self,
+        _: &AddNodeBefore,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let [Item::Node(to)] = self.selection.as_slice() else {
+            return;
+        };
+        let to = to.clone();
+        let src = self.doc.source.clone();
+        let (id, add) = edit::add_node(&src, NEW_NODE);
+        let mut out = add.apply(&src);
+        out = edit::add_edge(&out, &id, &to).apply(&out);
+        if let Some(edit) = TextEdit::between(&src, &out) {
+            self.apply(edit, window, cx);
+        }
+        let item = Item::Node(id);
+        self.select(vec![item.clone()], cx);
+        self.edit_label(item, window, cx);
+    }
+
+    /// The selected node ids.
+    pub fn selected_nodes(&self) -> Vec<String> {
+        self.selection
+            .iter()
+            .filter_map(|i| match i {
+                Item::Node(id) => Some(id.clone()),
+                Item::Edge(_) => None,
+            })
+            .collect()
+    }
+
+    /// The selected edge indexes.
+    pub fn selected_edges(&self) -> Vec<usize> {
+        self.selection
+            .iter()
+            .filter_map(|i| match i {
+                Item::Edge(e) => Some(*e),
+                Item::Node(_) => None,
+            })
+            .collect()
+    }
+
+    /// Applies the edits `f` makes, one after another, as one drawing change.
+    fn change(&mut self, window: &mut Window, cx: &mut Context<Self>, f: impl FnOnce(&mut String)) {
+        let src = self.doc.source.clone();
+        let mut out = src.clone();
+        f(&mut out);
+        if let Some(edit) = TextEdit::between(&src, &out) {
+            self.apply(edit, window, cx);
+        }
+    }
+
+    /// Sets the line of each selected edge to what `f` makes of it.
+    fn change_lines(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        f: impl Fn(Line) -> Line,
+    ) {
+        let edges = self.selected_edges();
+        self.change(window, cx, |out| {
+            for i in edges {
+                let Some(e) = chart(out).edges.get(i).map(Line::of) else {
+                    continue;
+                };
+                if let Some(edit) = edit::set_edge_line(out, i, f(e)) {
+                    *out = edit.apply(out);
+                }
+            }
+        });
+    }
+
+    pub(crate) fn set_shape(&mut self, a: &SetShape, window: &mut Window, cx: &mut Context<Self>) {
+        let nodes = self.selected_nodes();
+        self.change(window, cx, |out| {
+            for id in nodes {
+                if let Some(edit) = edit::set_node_shape(out, &id, a.shape) {
+                    *out = edit.apply(out);
+                }
+            }
+        });
+    }
+
+    pub(crate) fn set_stroke(
+        &mut self,
+        a: &SetStroke,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let stroke = a.stroke;
+        self.change_lines(window, cx, |l| Line { stroke, ..l });
+    }
+
+    pub(crate) fn set_arrows(
+        &mut self,
+        a: &SetArrows,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let (start, end) = (a.start, a.end);
+        self.change_lines(window, cx, |l| Line { start, end, ..l });
+    }
+
+    pub(crate) fn longer_edge(
+        &mut self,
+        _: &LongerEdge,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.change_lines(window, cx, |l| Line {
+            length: l.length.saturating_add(1),
+            ..l
+        });
+    }
+
+    pub(crate) fn shorter_edge(
+        &mut self,
+        _: &ShorterEdge,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.change_lines(window, cx, |l| Line {
+            length: l.length.saturating_sub(1),
+            ..l
+        });
+    }
+
+    pub(crate) fn reverse_edge(
+        &mut self,
+        _: &ReverseEdge,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // An edge in a chain moves to the end, so later indexes go first.
+        let mut edges = self.selected_edges();
+        edges.sort_unstable_by(|a, b| b.cmp(a));
+        self.change(window, cx, |out| {
+            for i in edges {
+                if let Some(edit) = edit::reverse_edge(out, i) {
+                    *out = edit.apply(out);
+                }
+            }
+        });
+        self.prune();
+    }
+
+    pub(crate) fn connect_to(
+        &mut self,
+        a: &ConnectTo,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let nodes = self.selected_nodes();
+        self.change(window, cx, |out| {
+            for from in nodes {
+                *out = edit::add_edge(out, &from, &a.id).apply(out);
+            }
+        });
+    }
+
+    pub(crate) fn connect_from(
+        &mut self,
+        a: &ConnectFrom,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let nodes = self.selected_nodes();
+        self.change(window, cx, |out| {
+            for to in nodes {
+                *out = edit::add_edge(out, &a.id, &to).apply(out);
+            }
+        });
+    }
+
+    /// A right press selects what is under it (unless it is already selected) before the
+    /// drawing's menu opens (WYSIWY-14).
+    pub(crate) fn right_down(
+        &mut self,
+        e: &MouseDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        window.focus(&self.drawing_focus, cx);
+        self.drag = None;
+        match self.item_at(e.position, window) {
+            Some(item) if !self.selection.contains(&item) => self.select(vec![item], cx),
+            Some(_) => {}
+            None => self.select(Vec::new(), cx),
+        }
     }
 
     /// Opens the label field over `item` (WYSIWY-10).
