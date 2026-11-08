@@ -6742,7 +6742,7 @@ checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "sirene"
-version = "0.1.1"
+version = "0.1.2-dev"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -6754,7 +6754,7 @@ dependencies = [
 
 [[package]]
 name = "sirene-core"
-version = "0.1.1"
+version = "0.1.2-dev"
 dependencies = [
  "insta",
  "proptest",
@@ -6766,7 +6766,7 @@ dependencies = [
 
 [[package]]
 name = "sirene-gui"
-version = "0.1.1"
+version = "0.1.2-dev"
 dependencies = [
  "anyhow",
  "futures",
@@ -9000,7 +9000,7 @@ checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
 
 [[package]]
 name = "xtask"
-version = "0.1.1"
+version = "0.1.2-dev"
 dependencies = [
  "assert_cmd",
  "clap",
