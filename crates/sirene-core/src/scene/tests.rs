@@ -242,6 +242,154 @@ fn styles_apply() {
     assert_eq!(*fill, parse_color("#abcdef"));
 }
 
+/// Without `color`, labels stay readable on a styled fill, in either theme.
+#[test]
+fn label_colors_follow_the_fill() {
+    let src = "flowchart LR\n\
+               A[light]:::light --> B[dark]:::dark --> C[plain] --> D[set]:::set --> E[clear]\n\
+               classDef light fill:#e8f1fb\n\
+               classDef dark fill:#1f3a5f\n\
+               classDef set fill:#e8f1fb,color:#ff0000\n\
+               style E fill:transparent\n\
+               subgraph S [Group]\nF\nend\n\
+               style S fill:#fdf2e3\n";
+    let color_of = |theme: &Theme, wanted: &str| {
+        let s = flowchart(&chart(src), &Approx, theme);
+        s.elements
+            .iter()
+            .find_map(|e| match &e.primitive {
+                Primitive::Text { text, color, .. } if text == wanted => Some(*color),
+                _ => None,
+            })
+            .unwrap()
+    };
+    let (light, dark) = (&Theme::LIGHT, &Theme::DARK);
+    assert_eq!(color_of(dark, "light"), light.text);
+    assert_eq!(color_of(dark, "Group"), light.text);
+    assert_eq!(color_of(light, "dark"), dark.text);
+    // The theme's text stays where it reads.
+    assert_eq!(color_of(light, "light"), light.text);
+    assert_eq!(color_of(dark, "dark"), dark.text);
+    assert_eq!(color_of(dark, "plain"), dark.text);
+    assert_eq!(color_of(dark, "clear"), dark.text);
+    assert_eq!(color_of(dark, "set"), parse_color("#ff0000").unwrap());
+}
+
+/// Nodes stacked in a column connect with straight lines, whatever their widths.
+#[test]
+fn chains_draw_straight() {
+    let src = "flowchart TD\n\
+               rect[Rectangle] --> round(Rounded) --> stadium([Stadium]) --> sub[[Subroutine]]\n\
+               cyl[(Cylinder)] --> circle((Circle)) --> dbl(((Double circle))) --> odd>Asymmetric]\n\
+               diamond{Diamond} --> hex{{Hexagon}} --> leanR[/Lean right/] --> leanL[\\Lean left\\]\n\
+               trap[/Trapezoid\\] --> inv[\\Inverted trapezoid/] --> ellipse(-Ellipse-) --> bare\n";
+    for metrics in [&Approx as &dyn TextMetrics, &png::FontMetrics] {
+        let s = flowchart(&chart(src), &Dyn(metrics), &Theme::LIGHT);
+        for e in 0..12 {
+            let line = owned(&s, Owner::Edge(e))
+                .into_iter()
+                .find_map(|p| match p {
+                    Primitive::Path {
+                        segments,
+                        fill: None,
+                        ..
+                    } => Some(segments),
+                    _ => None,
+                })
+                .unwrap();
+            assert_eq!(line.len(), 2, "edge {e}: {line:?}");
+        }
+    }
+}
+
+/// Curves and corners finish before the arrowhead, so the head sits on a straight run.
+#[test]
+fn arrowheads_sit_on_straight_runs() {
+    let sources = [
+        "flowchart LR\n\
+         cart[Cart] --> placed[Placed]\n\
+         placed ==>|paid| paid[Paid]\n\
+         placed -. timeout .-> cancelled[Cancelled]\n\
+         paid --> packed[Packed] --> shipped[Shipped]\n\
+         shipped ==> delivered([Delivered])\n\
+         shipped --x lost[Lost in transit]\n\
+         delivered <-->|exchange| paid\n\
+         delivered --o review[Review]\n",
+        "flowchart TB\nA -- text --> B -- text2 --> C\na --> b & c--> d\nA & B--> C & D\nX[x] & Y(y) --> Z{z}\n",
+        "flowchart TD\nA[Start] --> B{Is it?}\nB -->|Yes| C[OK]\nC --> D[Rethink]\nD --> B\nB ---->|No| E[End]\n",
+    ];
+    for src in sources {
+        for metrics in [&Approx as &dyn TextMetrics, &png::FontMetrics] {
+            let c = chart(src);
+            let s = flowchart(&c, &Dyn(metrics), &Theme::LIGHT);
+            for (i, e) in c.edges.iter().enumerate() {
+                if e.end != Some(flowchart::Arrow::Point) {
+                    continue;
+                }
+                let prims = owned(&s, Owner::Edge(i));
+                let head = prims.iter().find_map(|p| match p {
+                    Primitive::Path {
+                        segments,
+                        fill: Some(_),
+                        ..
+                    } => Some(segments),
+                    _ => None,
+                });
+                let line = prims.iter().find_map(|p| match p {
+                    Primitive::Path {
+                        segments,
+                        fill: None,
+                        ..
+                    } => Some(segments),
+                    _ => None,
+                });
+                let (Some(head), Some(line)) = (head, line) else {
+                    continue;
+                };
+                // The tip is the head's first point; its base is the line's end.
+                let Segment::Move(tip) = head[0] else {
+                    panic!("head starts with a move")
+                };
+                let curve_end = line.iter().rev().find_map(|s| match *s {
+                    Segment::Cubic { to, .. } | Segment::Arc { to, .. } => Some(to),
+                    _ => None,
+                });
+                let Some(curve_end) = curve_end else { continue };
+                let reach = (tip.x - curve_end.x).hypot(tip.y - curve_end.y);
+                let len = if e.stroke == flowchart::Stroke::Thick {
+                    13.5
+                } else {
+                    9.0
+                };
+                assert!(
+                    reach >= len + 3.0,
+                    "{src}\nedge {i}: curve ends {reach} from the tip: {line:?}"
+                );
+            }
+        }
+    }
+}
+
+/// `TextMetrics` through a trait object.
+struct Dyn<'a>(&'a dyn TextMetrics);
+
+impl TextMetrics for Dyn<'_> {
+    fn width(&self, text: &str, size: f32) -> f32 {
+        self.0.width(text, size)
+    }
+}
+
+#[test]
+fn colors_over() {
+    let white = Color::rgb(0xffffff);
+    assert_eq!(Color::rgb(0x102030).over(white), Color::rgb(0x102030));
+    assert_eq!(Color::rgb(0).with_alpha(0).over(white), white);
+    assert_eq!(
+        Color::rgb(0).with_alpha(128).over(white),
+        Color::rgb(0x7f7f7f)
+    );
+}
+
 #[test]
 fn nested_clusters_paint_outer_first() {
     let s = draw("flowchart TD\nsubgraph inner\nA\nend\nsubgraph outer\ninner\nend\nA --> outer\n");

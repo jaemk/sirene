@@ -10,10 +10,15 @@ flowchart LR
     lint -. warnings .-> fail
 
     subgraph release [Release, on main]
-        direction TB
         decide{New version?} -->|yes| build[Build binaries]
         build --> publish[(crates.io)]
         decide -->|no| skip(Nothing to do)
     end
 
     pr ==> decide
+
+    %% A subgraph's direction applies when no edge crosses its border.
+    subgraph checks [Checks run on each push]
+        direction TB
+        fmt[cargo fmt] --> clippy[cargo clippy] --> tests[cargo test]
+    end

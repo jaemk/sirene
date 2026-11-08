@@ -16,13 +16,13 @@ expression: "flowchart LR\n    c1-->a2\n    subgraph one\n        a1-->a2\n    e
 <text x="109" y="260" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">Only a string</text>
 <path d="M68 354 L151 354 L151 414 L68 414 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
 <path d="M367 67 L358 71.5 L358 62.5 Z" fill="#333333"/>
-<path d="M130 96 L200 96 C214 96 214 76 226 76 L226 76 C238 76 238 58 252 58 L339 58 C353 58 353 67 359 67 L359 67" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M130 96 L200 96 C214 96 214 76 226 76 L226 76 C238 76 238 58 252 58 L326 58 C340 58 340 67 354 67 L359 67" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M367 77 L358 81.5 L358 72.5 Z" fill="#333333"/>
-<path d="M318 97 L318 97 C329 97 329 86 341 86 L341 86 C353 86 353 77 359 77 L359 77" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M318 97 L318 97 C329 97 329 77 343 77 L359 77" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M573 139 L582 134.5 L582 143.5 Z" fill="#333333"/>
 <path d="M622 139 L581 139" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M482 119 L473 123.5 L473 114.5 Z" fill="#333333"/>
-<path d="M433 85 L433 85 C444 85 444 103 456 103 L456 103 C468 103 468 119 474 119 L474 119" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M433 85 L436 85 A8 8 0 0 1 444 93 L444 111 A8 8 0 0 0 452 119 L474 119" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M130 106 L139 101.5 L139 110.5 Z" fill="#333333"/>
 <path d="M482 133 L482 133 C468 133 468 148 454 148 L252 148 C238 148 238 146 226 146 L222 146 A8 8 0 0 1 214 138 L214 114 A8 8 0 0 0 206 106 L138 106" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M89 83 L130 83 L130 119 L89 119 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>

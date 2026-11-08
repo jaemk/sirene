@@ -7,11 +7,11 @@ expression: "flowchart TD\n    A[Start] --> B{Is it?}\n    B -->|Yes| C[OK]\n   
 <path d="M87 93.29 L82.5 84.29 L91.5 84.29 Z" fill="#333333"/>
 <path d="M87 52 L87 85.29" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M37 233 L32.5 224 L41.5 224 Z" fill="#333333"/>
-<path d="M51 144.55 L51 162 C51 176 40 176 40 190 L40 208 C40 222 37 222 37 225 L37 225" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M51 144.55 L51 162 C51 176 40 176 40 190 L40 192 C40 206 37 206 37 220 L37 225" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M50 337 L45.5 328 L54.5 328 Z" fill="#333333"/>
-<path d="M37 269 L37 269 C37 280 44 280 44 294 L44 312 C44 326 50 326 50 329 L50 329" fill="none" stroke="#333333" stroke-width="1.5"/>
-<path d="M87 164.71 L91.5 173.71 L82.5 173.71 Z" fill="#333333"/>
-<path d="M82 337 L82 337 C82 326 88 326 88 312 L88 190 C88 176 87 176 87 172.71 L87 172.71" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M37 269 L37 269 C37 280 44 280 44 294 L44 296 C44 310 50 310 50 324 L50 329" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M88 164.14 L92.5 173.14 L83.5 173.14 Z" fill="#333333"/>
+<path d="M82 337 L82 337 C82 326 88 326 88 312 L88 172.14" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M139 414 L134.5 405 L143.5 405 Z" fill="#333333"/>
 <path d="M122 144.55 L122 162 C122 176 139 176 139 190 L139 406" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M54 16 L120 16 L120 52 L54 52 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
