@@ -5,9 +5,10 @@ sirene [FILE...]              open each FILE in the editor, or a new document
 sirene ascii [FILE|-]         print a flowchart as text
 sirene svg [FILE|DIR|-]       print or write SVG
 sirene png [FILE|DIR|-]       write PNG
+sirene check [FILE|DIR|-]...  print diagnostics only
 ```
 
-`svg`, `png`, and `ascii` never open a window, and work in a build without the GUI. With no FILE,
+`svg`, `png`, `ascii`, and `check` never open a window, and work in a build without the GUI. With no FILE,
 or `-`, they read stdin.
 
 ## Opening files
@@ -73,10 +74,52 @@ sirene svg docs/ -o site/diagrams/   # docs/x/b.mmd -> site/diagrams/x/b.svg
 One file's errors fail the run without stopping the others. When two diagrams would write the
 same output (`a.mmd` beside `a.mermaid`), the first in path order wins and the other is reported.
 
+## Markdown files
+
+`sirene svg FILE.md` and `sirene png FILE.md` (also `.markdown`) render each `mermaid` code block
+to `STEM-N.svg` or `STEM-N.png` beside the file, N counting blocks from 1; `-o OUTDIR` writes
+them there instead. Blocks of other diagram types are skipped with a warning.
+
+The Markdown file is not changed unless `--link` is given. `--link` adds an image link on the
+line after each rendered block, and only when that line is not already the link, so running it
+again changes nothing. The blocks themselves are never changed or removed.
+
+```
+$ sirene svg guide.md --link
+wrote guide-1.svg
+guide.md:9:1: warning: skipping a `pie` diagram; sirene draws flowcharts
+guide.md:15:8: error: expected a node after the edge
+wrote guide-3.svg
+linked the images in guide.md
+```
+
+````
+```mermaid
+flowchart LR
+  A[Write] --> B[Render]
+```
+![diagram 1](guide-1.svg)
+````
+
+Diagnostic positions are lines and columns in the Markdown file.
+
+## `sirene check`
+
+Prints diagnostics without rendering, for diagram files, directories (every `.mmd` and
+`.mermaid` file under them), Markdown files (each mermaid block), or stdin. It checks every
+FILE and exits 1 if any has an error, so it fits a pre-commit hook or a CI step:
+
+```
+$ sirene check guide.md docs/
+guide.md:9:1: warning: skipping a `pie` diagram; sirene draws flowcharts
+guide.md:15:8: error: expected a node after the edge
+```
+
 ## Watching
 
 `-w, --watch` renders, then renders again each input that changes (and in a directory, each
-diagram that appears) until interrupted:
+diagram that appears) until interrupted. A watched Markdown file is rendered again when it
+changes:
 
 ```
 $ sirene png --watch docs/

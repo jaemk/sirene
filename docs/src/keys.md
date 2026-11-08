@@ -18,6 +18,7 @@ Select All act on that text instead.
 | secondary-w | Close the window |
 | secondary-q | Quit |
 | secondary-e | Show or hide the source pane |
+| secondary-i | Show or hide the styles panel |
 
 ## Editing
 
@@ -31,6 +32,8 @@ Select All act on that text instead.
 | secondary-shift-z | Redo |
 | secondary-a | Select every node and edge (drawing), or all text |
 | tab, shift-tab (drawing) | Select the next or previous node |
+| secondary-g (drawing) | Group the selected nodes in a subgraph |
+| alt-up, alt-down (drawing) | Move the selected statement earlier or later |
 
 ## View
 
@@ -50,6 +53,9 @@ Select All act on that text instead.
 |---|---|
 | click | Select a node or edge, or clear the selection on empty space |
 | shift-click | Add to or remove from the selection |
-| double-click | Edit a label |
+| double-click | Edit a label; on empty space, add a node |
+| right-click | The menu for the item under the pointer or the selection |
 | drag from a node to a node | Connect them |
+| drag from a node to empty space | Add a node linked from it |
+| drag a node onto a subgraph | Move it into the subgraph |
 | drag empty space, or scroll | Pan |
