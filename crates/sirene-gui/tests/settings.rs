@@ -196,6 +196,27 @@ fn windows_remember_their_layout(cx: &mut TestAppContext) {
     assert!((saved.source_width - 400.0).abs() < 4.0);
 }
 
+/// A size or pane remembered from a larger screen is fitted to this one; the setting is kept.
+#[gpui::test]
+fn remembered_sizes_fit_the_screen(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    use_settings(cx, dir.path());
+    cx.update(|cx| {
+        settings::update(cx, |s| {
+            s.window = Some((3000.0, 2000.0));
+            s.source_width = 2900.0;
+        })
+    });
+    // The test display is 1920x1080.
+    let (viewer, vcx) = open(cx, Document::untitled());
+    let viewport = vcx.update(|window, _| window.viewport_size());
+    assert_eq!(viewport, size(px(1920.0), px(1080.0)));
+    let area = viewer.read_with(vcx, |v, _| v.drawing_area());
+    let left = px(1920.0 - settings::DRAWING_MIN);
+    assert!((area.origin.x - left).abs() < px(2.0), "{area:?}");
+    assert_eq!(current(cx).source_width, 2900.0);
+}
+
 /// Without settings loaded (as in `init` alone), nothing is written anywhere.
 #[gpui::test]
 fn settings_stay_in_memory_without_a_file(cx: &mut TestAppContext) {

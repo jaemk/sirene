@@ -307,7 +307,8 @@ pub fn open_window(
     doc: Document,
     cx: &mut App,
 ) -> anyhow::Result<(AnyWindowHandle, Entity<Viewer>)> {
-    let (w, h) = settings::get(cx).window.unwrap_or((1200.0, 760.0));
+    let want = settings::get(cx).window.unwrap_or((1200.0, 760.0));
+    let (w, h) = settings::fit_window(want, screen(cx));
     let size = size(px(w), px(h));
     let bounds = cascade(size, cx).unwrap_or_else(|| Bounds::centered(None, size, cx));
     let options = WindowOptions {
@@ -322,6 +323,20 @@ pub fn open_window(
     gpui::open_window(options, cx, |window, cx| {
         cx.new(|cx| Viewer::new(doc, window, cx))
     })
+}
+
+/// The usable size of the display a new window opens on: the active window's, else the
+/// primary display's.
+fn screen(cx: &mut App) -> Option<(f32, f32)> {
+    let active = cx.active_window().and_then(|w| {
+        w.update(cx, |_, window, cx| {
+            window.display(cx).map(|d| d.visible_bounds().size)
+        })
+        .ok()
+        .flatten()
+    });
+    let size = active.or_else(|| cx.primary_display().map(|d| d.visible_bounds().size))?;
+    Some((f32::from(size.width), f32::from(size.height)))
 }
 
 /// How far each new window is moved from the last one (GUISHE-11).
