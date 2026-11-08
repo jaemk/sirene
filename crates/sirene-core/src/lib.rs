@@ -1,4 +1,4 @@
-//! Mermaid parsing, diagram model, and layout for sirene.
+#![doc = include_str!("../README.md")]
 
 pub mod ascii;
 pub mod diagnostic;
