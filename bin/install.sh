@@ -6,6 +6,8 @@
 # Honors:
 #   SIRENE_VERSION       version to install (e.g. 0.2.0); default: latest release
 #   SIRENE_INSTALL_DIR   install directory; default: ~/.local/bin
+#   SIRENE_TARGET        release target triple (e.g. x86_64-unknown-linux-gnu for
+#                        the Linux GUI build); default: this platform's, musl on Linux
 set -eu
 
 REPO="jaemk/sirene"
@@ -69,8 +71,9 @@ if [ -z "$version" ]; then
 		| sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' \
 		| head -n 1)"
 	[ -n "$tag" ] || err "could not determine the latest release; set SIRENE_VERSION"
-	version="${tag#v}"
+	version="$tag"
 fi
+version="${version#v}"
 
 asset="sirene-${version}-${target}.tar.gz"
 url="https://github.com/${REPO}/releases/download/v${version}/${asset}"
@@ -80,10 +83,10 @@ trap 'rm -rf "$tmp"' EXIT
 
 # This script is served from `main` but installs the latest RELEASE, whose
 # asset set may predate what main builds. If the musl leg is missing, fall back
-# to the gnu leg once, on Linux only.
+# to the gnu leg once, on Linux only, unless SIRENE_TARGET asked for a target.
 echo "sirene-install: downloading ${asset}"
 if ! fetch_to "$url" "$tmp/$asset"; then
-	if [ "$os" = "Linux" ] && [ "$target" = "${arch_part}-unknown-linux-musl" ]; then
+	if [ "$os" = "Linux" ] && [ -z "${SIRENE_TARGET:-}" ]; then
 		echo "sirene-install: musl asset unavailable for ${version}, retrying with gnu"
 		target="${arch_part}-unknown-linux-gnu"
 		asset="sirene-${version}-${target}.tar.gz"

@@ -30,8 +30,10 @@ env:
 
 jobs:
   decide:
-    # A fork has no `release` environment and no publish credentials.
-    if: github.repository == 'jaemk/sirene'
+    # A fork has no `release` environment and no publish credentials. Only main
+    # releases: a dispatch from another branch would publish that branch and
+    # then commit its formula and cask to main.
+    if: github.repository == 'jaemk/sirene' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:

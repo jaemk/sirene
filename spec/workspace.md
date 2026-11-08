@@ -50,8 +50,8 @@ development packages installed first.
 Merging a version bump to `main` is the release. Between releases `main` carries the next
 patch's `-dev` version. To release, set the version (`[workspace.package]` and the
 `[workspace.dependencies]` pins) to a stable `X.Y.Z` and add a `## [X.Y.Z]` section to
-`CHANGELOG.md`. `.github/workflows/release.yml` runs on every push to `main` (and by hand, to
-re-run a release that failed partway; every step is idempotent):
+`CHANGELOG.md`. `.github/workflows/release.yml` runs on every push to `main` (and by hand from
+`main`, to re-run a release that failed partway; every step is idempotent; any other ref skips):
 
 1. `decide`: `bin/check-versions.sh` requires every dependency between publishable members to pin
    exactly that member's version, and no stable crate to depend on a pre-release. A `-dev`
@@ -88,8 +88,8 @@ The repository is a Homebrew tap. `Formula/sirene.rb` installs the macOS and gnu
 `Casks/sirene.rb` installs `Sirene.app` (MACOSP-5).
 
 `bin/install.sh` installs the binary for the host into `SIRENE_INSTALL_DIR` (default
-`~/.local/bin`): the latest release unless `SIRENE_VERSION` is set, and the musl build on Linux
-unless `SIRENE_TARGET` names another. If a release has no musl build, Linux falls back once to
-the gnu build. It refuses an unsupported OS or architecture before any request, and a tarball
+`~/.local/bin`): the latest release unless `SIRENE_VERSION` is set (a leading `v` is dropped),
+and the musl build on Linux unless `SIRENE_TARGET` names another. If a release has no musl
+build and `SIRENE_TARGET` is unset, Linux falls back once to the gnu build. It refuses an unsupported OS or architecture before any request, and a tarball
 whose checksum is not in `SHA256SUMS` or does not match. When `gh` is present it checks the
 build provenance attestation, reporting but not failing on a mismatch.
