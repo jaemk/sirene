@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sirene - Mermaid flowchart editor</title>
+  <meta name="description" content="A local WYSIWYG editor and viewer for Mermaid flowcharts, with SVG, PNG, and terminal ASCII output." />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#top">
+      <img class="brand-mark" src="favicon.svg" alt="" width="26" height="26" />
+      <span class="brand-name">sirene</span>
+    </a>
+    <nav class="nav-links">
+      <a href="guide/">Docs</a>
+      <a href="guide/quickstart.html">Quickstart</a>
+      <a href="https://github.com/jaemk/sirene">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <h1 class="title">sirene</h1>
+      <p class="tagline">
+        A local editor and viewer for Mermaid flowcharts. Edit the source or the drawing, and
+        render SVG, PNG, or text from the command line. One binary, no browser.
+      </p>
+
+      <div class="window" aria-label="The sirene editor: source beside the drawing">
+        <div class="window-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="window-title">diagram.mmd</span>
+          <div class="views" role="tablist" aria-label="Output">
+            <button class="view is-active" type="button" role="tab" aria-selected="true" data-view="drawing">drawing</button>
+            <button class="view" type="button" role="tab" aria-selected="false" data-view="ascii">sirene ascii</button>
+          </div>
+        </div>
+        <div class="window-body">
+          <pre class="source" id="source"><code></code></pre>
+          <div class="output">
+            <div class="pane is-active" data-pane="drawing">
+              <img id="drawing" src="hero.svg" alt="The flowchart drawn by sirene" />
+            </div>
+            <pre class="pane ascii" data-pane="ascii" id="ascii" hidden></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="install" id="install">
+      <h2>Install</h2>
+      <div class="tabs" role="tablist" aria-label="Install method">
+        <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="curl">curl</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="brew">brew</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="cargo">cargo</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="github">GitHub</button>
+      </div>
+
+      <div class="panel is-active" role="tabpanel" data-panel="curl">
+        <div class="cmd">
+          <code><span class="prompt">$</span> curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/jaemk/sirene/main/bin/install.sh | sh</code>
+          <button class="copy" type="button" aria-label="Copy install script command" data-copy="curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/jaemk/sirene/main/bin/install.sh | sh">Copy</button>
+        </div>
+        <p class="note">Linux gets the static command-line build; see <a href="guide/install.html">Install</a> for the editor build.</p>
+      </div>
+
+      <div class="panel" role="tabpanel" data-panel="brew" hidden>
+        <div class="cmd">
+          <code><span class="prompt">$</span> brew tap jaemk/sirene https://github.com/jaemk/sirene
+<span class="prompt">$</span> brew trust jaemk/sirene
+<span class="prompt">$</span> brew install sirene</code>
+          <button class="copy" type="button" aria-label="Copy Homebrew install commands" data-copy="brew tap jaemk/sirene https://github.com/jaemk/sirene
+brew trust jaemk/sirene
+brew install sirene">Copy</button>
+        </div>
+        <p class="note">On macOS, <code>brew install --cask sirene</code> installs Sirene.app instead.</p>
+      </div>
+
+      <div class="panel" role="tabpanel" data-panel="cargo" hidden>
+        <div class="cmd">
+          <code><span class="prompt">$</span> cargo install sirene</code>
+          <button class="copy" type="button" aria-label="Copy cargo install command" data-copy="cargo install sirene">Copy</button>
+        </div>
+        <p class="note">Add <code>--no-default-features</code> for the command line only.</p>
+      </div>
+
+      <div class="panel" role="tabpanel" data-panel="github" hidden>
+        <div class="cmd">
+          <code><span class="prompt">&#8599;</span> github.com/jaemk/sirene/releases</code>
+          <a class="copy" href="https://github.com/jaemk/sirene/releases" target="_blank" rel="noopener">Open</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="features">
+      <article class="card">
+        <h3>Edit either side</h3>
+        <p>Type in the source and the drawing follows. Rename, add, connect, and delete on the
+           drawing, and each change lands in the source as an ordinary text edit, with comments
+           and formatting kept.</p>
+        <a href="guide/editor.html">The editor</a>
+      </article>
+      <article class="card">
+        <h3>Render anywhere</h3>
+        <p><code>sirene svg</code>, <code>png</code>, and <code>ascii</code> render a file,
+           stdin, or a whole directory, and <code>--watch</code> keeps the images current. PNGs
+           use embedded fonts, so they are the same on every machine.</p>
+        <a href="guide/cli.html">Command line</a>
+      </article>
+      <article class="card">
+        <h3>Errors that point</h3>
+        <p>Diagnostics name the line and column, and a diagram with a mistake is still drawn.
+           Over 50 Mermaid shapes, subgraphs, classes, and styles are supported.</p>
+        <a href="guide/syntax.html">Supported syntax</a>
+      </article>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>sirene &middot; Mermaid flowcharts, drawn locally</span>
+    <a href="https://github.com/jaemk/sirene/tree/main/spec">Spec</a>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

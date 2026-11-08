@@ -2,3 +2,8 @@
 /local
 !/local/.gitkeep
 /scripts/probe.sh
+# Built and rendered by .github/workflows/pages.yml.
+/docs/book
+/docs/src/examples
+/docs/landing/hero.svg
+/docs/landing/hero.txt

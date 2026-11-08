@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="fin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#bae6fd"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#sea)"/>
+  <path fill="url(#fin)" d="M 420 924 C 470 820 500 720 490 640 C 480 580 400 540 300 470 C 240 428 200 380 180 320 C 260 330 380 360 450 410 C 480 432 500 450 512 470 C 524 450 544 432 574 410 C 644 360 764 330 844 320 C 824 380 784 428 724 470 C 624 540 544 580 534 640 C 524 720 570 820 610 924 Z"/>
+</svg>

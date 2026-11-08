@@ -1,0 +1,20 @@
+[book]
+title = "sirene"
+description = "A local WYSIWYG editor and viewer for Mermaid flowcharts, with SVG, PNG, and terminal ASCII output."
+authors = ["James Kominick"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/jaemk/sirene"
+edit-url-template = "https://github.com/jaemk/sirene/edit/main/docs/{path}"
+# Docs are served under /guide/ on the Pages site; the landing page owns the root.
+site-url = "/sirene/guide/"
+additional-css = ["assets/custom.css"]
+additional-js = ["assets/custom.js"]
+
+[output.html.fold]
+enable = true
+level = 1
