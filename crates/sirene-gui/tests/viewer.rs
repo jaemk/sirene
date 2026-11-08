@@ -161,4 +161,19 @@ fn open_windows_for_paths(cx: &mut TestAppContext) {
     });
     cx.run_until_parked();
     assert_eq!(cx.windows().len(), 2);
+
+    // A file already open, however it is spelled, brings its window forward.
+    let same = dir.path().join(".").join("a.mmd");
+    cx.update(|cx| sirene_gui::open_paths(&[a.clone(), same, a.clone()], cx));
+    cx.run_until_parked();
+    assert_eq!(cx.windows().len(), 2);
+
+    // Including when a blank window is asked to show it.
+    let (viewer, vcx) = open(cx, Document::untitled());
+    viewer.update_in(vcx, |v, window, cx| {
+        v.show_paths(std::slice::from_ref(&a), window, cx)
+    });
+    vcx.run_until_parked();
+    assert_eq!(cx.windows().len(), 3);
+    viewer.read_with(vcx, |v, _| assert!(v.is_blank()));
 }
