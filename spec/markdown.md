@@ -19,3 +19,11 @@ closed. `Block::position` maps a line and column in the code back to the Markdow
 
 `Parse::other_diagram` gives the keyword of the other Mermaid diagram type a source is (FLOWCH-16),
 e.g. `pie`, so callers can skip such blocks.
+
+## MARKDO-3 Replacing a block's code
+
+`Block::body` is the byte range between a block's fences. `Block::replace_code` returns the
+Markdown with that range replaced by new code: each non-blank line indented by the block's
+indentation, every line ended like the Markdown's (`\r\n` when it has any), and everything else,
+fences included, unchanged. Replacing a block's code with itself returns the Markdown unchanged.
+The editor writes edits to a Markdown file's block with it (WYSIWY-20).

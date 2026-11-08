@@ -48,6 +48,7 @@ $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
 
 ```
 sirene diagram.mmd           # edit the source beside a live drawing; follows changes on disk
+sirene notes.md              # edit a Markdown file's mermaid blocks, one at a time
 sirene svg diagram.mmd       # print SVG (--theme light|dark, -o FILE)
 sirene png diagram.mmd       # write diagram.png (--quality draft|normal|fine, --scale N, --theme, -o FILE)
 sirene png --watch docs/     # write a .png beside each .mmd under docs/, again on each change
@@ -55,8 +56,8 @@ sirene svg README.md         # write README-1.svg, ... for each ```mermaid block
 sirene check docs/ a.md      # report errors only; exit 1 if any
 ```
 
-Markdown files are never changed except by `--link`, which adds an image link after each
-block; the mermaid blocks are kept as written.
+`svg`, `png`, and `check` never change a Markdown file except with `--link`, which adds an image
+link after each block; the mermaid blocks are kept as written.
 
 `-v`/`--verbose`, before or after the command, prints each step (reading, parsing, layout,
 rendering, writing, and in the GUI opening, reloading, and saving files) with timings to stderr.
@@ -91,6 +92,9 @@ elsewhere). The full key table is in `spec/gui-shell.md` (GUISHE-5).
 - Scroll or drag empty space to pan, secondary-scroll to zoom; the arrow keys pan (shift for
   further), tab steps through nodes, secondary-8 zooms to the selection, secondary-9 fits the
   window, secondary-0 is 100%.
+- A Markdown file opens one mermaid block at a time; edits go back into that block and leave the
+  rest of the file alone. The status bar's buttons, or secondary-shift-] and secondary-shift-[,
+  step through the blocks.
 - File > Export writes PNG or SVG, and secondary-shift-c copies the drawing as an image.
 - View > Appearance overrides the system's light or dark mode. It, File > Open Recent, and the
   window and source pane sizes are kept in `~/.config/sirene/settings`

@@ -19,6 +19,8 @@ Select All act on that text instead.
 | secondary-q | Quit |
 | secondary-e | Show or hide the source pane |
 | secondary-i | Show or hide the styles panel |
+| secondary-shift-] | Next mermaid block of a Markdown file |
+| secondary-shift-[ | Previous mermaid block of a Markdown file |
 
 ## Editing
 

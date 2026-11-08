@@ -50,6 +50,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `sirene svg FILE.md` and `sirene png FILE.md` write one image per mermaid block; `--link`
   adds an image link after each block, keeping the blocks.
 - `sirene_core::markdown::mermaid_blocks` and `flowchart::Parse::other_diagram`.
+- Editor: `sirene FILE.md` edits a Markdown file's mermaid blocks one at a time, writing each
+  edit back into its block; `markdown::Block::replace_code`.
 
 ### Changed
 

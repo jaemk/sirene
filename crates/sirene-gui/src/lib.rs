@@ -107,6 +107,10 @@ actions!(
         MoveLater,
         /// Show or hide the styles panel.
         ToggleStyles,
+        /// Show a Markdown file's next mermaid block.
+        NextDiagram,
+        /// Show a Markdown file's previous mermaid block.
+        PreviousDiagram,
     ]
 );
 
@@ -223,6 +227,8 @@ pub fn key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new(secondary!("shift-s"), SaveAs, None),
         KeyBinding::new(secondary!("e"), ToggleSource, None),
         KeyBinding::new(secondary!("i"), ToggleStyles, None),
+        KeyBinding::new(secondary!("shift-]"), NextDiagram, None),
+        KeyBinding::new(secondary!("shift-["), PreviousDiagram, None),
         KeyBinding::new(secondary!("w"), CloseWindow, None),
         KeyBinding::new(secondary!("q"), Quit, None),
         KeyBinding::new(secondary!("shift-n"), AddNode, None),
@@ -324,6 +330,8 @@ pub fn menus(recent: &[PathBuf]) -> Vec<Menu> {
             vec![
                 MenuItem::action("Show or Hide Source", ToggleSource),
                 MenuItem::action("Show or Hide Styles", ToggleStyles),
+                MenuItem::action("Next Diagram", NextDiagram),
+                MenuItem::action("Previous Diagram", PreviousDiagram),
                 MenuItem::submenu(menu(
                     "Appearance",
                     vec![
@@ -745,11 +753,11 @@ mod tests {
                 .flat_map(|m| actions(&m.items))
                 .collect()
         };
-        assert_eq!(all(&[]).len(), 45);
+        assert_eq!(all(&[]).len(), 47);
         let recent = [PathBuf::from("/a.mmd"), PathBuf::from("/b/c.mmd")];
         let names = all(&recent);
-        assert_eq!(names.len(), 47);
+        assert_eq!(names.len(), 49);
         assert!(names.contains(&"/b/c.mmd".to_owned()));
-        assert_eq!(key_bindings().len(), 38);
+        assert_eq!(key_bindings().len(), 40);
     }
 }

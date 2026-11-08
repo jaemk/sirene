@@ -14,12 +14,44 @@ pub struct Block {
     pub end: usize,
     /// Whether a closing fence ends the block; otherwise it runs to the end of the text.
     pub closed: bool,
+    /// The bytes between the fences: from the start of the first code line to the start of the
+    /// closing fence's line (or the end of the text).
+    pub body: std::ops::Range<usize>,
 }
 
 impl Block {
     /// Where a position in [`Block::code`] (line and column from 1) is in the Markdown.
     pub fn position(&self, line: usize, col: usize) -> (usize, usize) {
         (self.line + line - 1, col + self.indent)
+    }
+
+    /// `src`, the Markdown this block was found in, with the block's code replaced by `code`:
+    /// each line indented like the fence and ended like the Markdown's lines (`\r\n` or `\n`).
+    /// The fences and everything outside the block are kept.
+    pub fn replace_code(&self, src: &str, code: &str) -> String {
+        let newline = if src.contains("\r\n") { "\r\n" } else { "\n" };
+        let pad = " ".repeat(self.indent);
+        let mut body = String::with_capacity(code.len() + 8);
+        for line in code.lines() {
+            if !line.is_empty() {
+                body.push_str(&pad);
+            }
+            body.push_str(line);
+            body.push_str(newline);
+        }
+        // An unclosed block at the end of a text without a final newline keeps it that way.
+        if !self.closed && !src.ends_with('\n') && !code.ends_with('\n') {
+            body.truncate(body.len() - newline.len());
+        }
+        let mut out = String::with_capacity(src.len() + body.len());
+        out.push_str(&src[..self.body.start]);
+        // The opening fence ends the text: the code starts a line of its own.
+        if self.body.start == src.len() && !src.ends_with('\n') && !body.is_empty() {
+            out.push_str(newline);
+        }
+        out.push_str(&body);
+        out.push_str(&src[self.body.end..]);
+        out
     }
 }
 
@@ -84,12 +116,15 @@ pub fn mermaid_blocks(src: &str) -> Vec<Block> {
         }
         let end = lines.get(j + 1).map_or(src.len(), |(at, _)| *at);
         if mermaid {
+            let start = lines.get(i + 1).map_or(src.len(), |(at, _)| *at);
+            let stop = lines.get(j).map_or(src.len(), |(at, _)| *at);
             blocks.push(Block {
                 code,
                 line: i + 2,
                 indent,
                 end,
                 closed: j < lines.len(),
+                body: start..stop.max(start),
             });
         }
         i = j + 1;
@@ -124,6 +159,50 @@ mod tests {
         assert_eq!(blocks[2].code, "flowchart TD\n");
         assert_eq!(blocks[2].end, src.len());
         assert!(blocks[0].closed && blocks[1].closed && !blocks[2].closed);
+    }
+
+    #[test]
+    fn replacing_code() {
+        let src = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\ntext\n";
+        let block = &mermaid_blocks(src)[0];
+        assert_eq!(&src[block.body.clone()], "flowchart LR\n  A --> B\n");
+        let out = block.replace_code(src, "flowchart TD\n  X --> Y\n  Y --> Z\n");
+        assert_eq!(
+            out,
+            "# Doc\n\n```mermaid\nflowchart TD\n  X --> Y\n  Y --> Z\n```\n\ntext\n"
+        );
+        // Round trip, and the block is found again with the new code.
+        assert_eq!(block.replace_code(src, &block.code), src);
+        assert_eq!(
+            mermaid_blocks(&out)[0].code,
+            "flowchart TD\n  X --> Y\n  Y --> Z\n"
+        );
+
+        // An indented fence indents the code (not blank lines); CRLF stays CRLF.
+        let src = "- item\n\n  ```mermaid\r\n  graph TD\r\n    A\r\n  ```\r\n";
+        let block = &mermaid_blocks(src)[0];
+        assert_eq!(block.code, "graph TD\n  A\n");
+        assert_eq!(
+            block.replace_code(src, "graph TD\n\n  B\n"),
+            "- item\n\n  ```mermaid\r\n  graph TD\r\n\r\n    B\r\n  ```\r\n"
+        );
+        // An empty block, an unclosed one, and one whose fence ends the text.
+        let src = "```mermaid\n```\n";
+        let block = &mermaid_blocks(src)[0];
+        assert_eq!(block.body, 11..11);
+        assert_eq!(
+            block.replace_code(src, "graph TD"),
+            "```mermaid\ngraph TD\n```\n"
+        );
+        let src = "```mermaid\ngraph TD";
+        let block = &mermaid_blocks(src)[0];
+        assert_eq!(block.replace_code(src, "graph LR"), "```mermaid\ngraph LR");
+        let src = "```mermaid";
+        let block = &mermaid_blocks(src)[0];
+        assert_eq!(
+            block.replace_code(src, "graph LR\n"),
+            "```mermaid\ngraph LR\n"
+        );
     }
 
     #[test]

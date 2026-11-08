@@ -25,9 +25,11 @@ use crate::paint::{self, Metrics, Placement};
 use crate::settings::{self, Settings};
 use crate::styles::StylePanel;
 use crate::{
-    ActualSize, CloseWindow, FitWindow, Open, Redo, Reload, Save, SaveAs, SelectAll, ToggleSource,
-    ToggleStyles, Undo, ZoomIn, ZoomOut,
+    ActualSize, CloseWindow, FitWindow, NextDiagram, Open, PreviousDiagram, Redo, Reload, Save,
+    SaveAs, SelectAll, ToggleSource, ToggleStyles, Undo, ZoomIn, ZoomOut,
 };
+use gpui::base::Disableable;
+use gpui::component::button::{Button, ButtonVariants};
 
 /// How often the file is checked for changes.
 pub const POLL: Duration = Duration::from_millis(500);
@@ -265,6 +267,11 @@ impl Viewer {
     /// Shows `doc` in place of the current document.
     pub fn set_document(&mut self, doc: Document, window: &mut Window, cx: &mut Context<Self>) {
         self.doc = doc;
+        self.show_fresh(window, cx);
+    }
+
+    /// Starts over on the diagram the document shows: no selection or drawing history, fitted.
+    fn show_fresh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.zoom = 1.0;
         self.pan = Point::default();
         self.selection.clear();
@@ -273,6 +280,66 @@ impl Viewer {
         self.future.clear();
         self.fit_pending = true;
         self.load_source(window, cx);
+    }
+
+    /// Shows mermaid block `i` of a Markdown file (WYSIWY-20).
+    pub fn show_block(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if self.doc.show_block(i) {
+            log::debug!("showing diagram {} of {}", i + 1, self.doc.name());
+            self.show_fresh(window, cx);
+        }
+    }
+
+    /// Shows the next (or with `back`, the previous) block of a Markdown file, wrapping around.
+    fn step_block(&mut self, back: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((n, count, _)) = self.doc.block_info() else {
+            return;
+        };
+        let i = if back {
+            (n + count - 2) % count
+        } else {
+            n % count
+        };
+        self.show_block(i, window, cx);
+    }
+
+    /// For a Markdown file with a block: previous and next buttons (disabled for one block)
+    /// around `Diagram N of M (line L)`.
+    fn block_switcher(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        let (n, count, line) = self.doc.block_info()?;
+        let step = |id: &'static str, label: &'static str, back: bool| {
+            div().debug_selector(move || id.to_owned()).child(
+                Button::new(id)
+                    .ghost()
+                    .compact()
+                    .label(label)
+                    .disabled(count < 2)
+                    .on_click(cx.listener(move |v, _, window, cx| v.step_block(back, window, cx))),
+            )
+        };
+        Some(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap_1()
+                .child(step("previous-diagram", "<", true))
+                .child(format!("Diagram {n} of {count} (line {line})"))
+                .child(step("next-diagram", ">", false)),
+        )
+    }
+
+    fn next_diagram(&mut self, _: &NextDiagram, window: &mut Window, cx: &mut Context<Self>) {
+        self.step_block(false, window, cx);
+    }
+
+    fn previous_diagram(
+        &mut self,
+        _: &PreviousDiagram,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.step_block(true, window, cx);
     }
 
     pub fn set_dark(&mut self, dark: bool, cx: &mut Context<Self>) {
@@ -770,6 +837,8 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::reload))
             .on_action(cx.listener(Self::toggle_source))
             .on_action(cx.listener(Self::toggle_styles))
+            .on_action(cx.listener(Self::next_diagram))
+            .on_action(cx.listener(Self::previous_diagram))
             .on_action(cx.listener(Self::save_action))
             .on_action(cx.listener(Self::save_as_action))
             .on_action(cx.listener(Self::close))
@@ -821,8 +890,17 @@ impl Render for Viewer {
                     .text_sm()
                     .border_t_1()
                     .border_color(rule)
+                    .items_center()
                     .child(self.status())
-                    .child(format!("{:.0}%", self.zoom * 100.0)),
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap_2()
+                            .children(self.block_switcher(cx))
+                            .child(format!("{:.0}%", self.zoom * 100.0)),
+                    ),
             )
     }
 }
