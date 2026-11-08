@@ -61,14 +61,18 @@ the zoom.
 | ExportPng | secondary-shift-e | export as PNG (GUISHE-9) |
 | ExportSvg | (menu) | export as SVG (GUISHE-9) |
 | CopyImage | secondary-shift-c | copy the drawing as an image (GUISHE-9) |
+| AppearanceSystem, AppearanceLight, AppearanceDark | (menu) | set the Appearance (GUISHE-6) |
+| OpenRecent, ClearRecent | (menu) | open a recent file, or forget them (GUISHE-10) |
 
 The same actions are in the app menus (sirene, File, Edit, View). The window is built on GPUI Kit
 (`gpui-kit`: gpui-pre, gpui-base, gpui-component), whose light or dark theme follows GUISHE-6.
 
 ## GUISHE-6 Appearance
 
-The window draws with `Theme::DARK` when the system appearance is dark and `Theme::LIGHT`
-otherwise, and redraws when the appearance changes.
+With the Appearance setting at Follow System (the default), the window draws with `Theme::DARK`
+when the system appearance is dark and `Theme::LIGHT` otherwise, and redraws when the appearance
+changes. View > Appearance > Light or Dark draws every window, open or new, with that theme
+whatever the system's appearance (GUISHE-10).
 
 ## GUISHE-7 Status bar
 
@@ -99,3 +103,28 @@ there in the window's theme: PNG as `sirene png` writes it at fine quality (DISP
 status bar shows `exported PATH`, `copied the drawing as an image`, or the error (`cannot write
 PATH: REASON`) until the document next changes; a cancelled dialog changes nothing. Tests:
 `crates/sirene-gui/tests/export.rs`.
+
+## GUISHE-10 Settings and recent files
+
+`sirene_gui::run` keeps settings in `settings` under `SIRENE_CONFIG_DIR`, else the platform's
+configuration directory (`~/Library/Application Support/sirene` on macOS, `%APPDATA%\sirene` on
+Windows, `$XDG_CONFIG_HOME/sirene` or `~/.config/sirene` elsewhere), as `key = value` lines:
+`appearance` (`system`, `light`, `dark`), `window` (`WxH`), `source` (`shown`, `hidden`),
+`source_width`, and up to 10 `recent` paths, most recent first. A missing or unreadable file gives
+the defaults; unknown keys and bad values are skipped; a file that cannot be written is skipped.
+The Appearance, Clear Recent, and showing or hiding the source pane are saved at once; the window
+size and pane width when a window closes and on Quit. Without `run` (as in tests), settings are
+kept in memory only.
+
+Opening a file (from the command line, Open, Open Recent, or the platform), showing one in a blank
+window, and Save As put its resolved path first in File > Open Recent, once. Open Recent opens the
+file as Open does; Clear Recent empties the list. Tests: `crates/sirene-gui/tests/settings.rs` and
+the unit tests in `settings.rs`.
+
+## GUISHE-11 Window layout
+
+New windows open at the last window size (1200x760 at first) and with the source pane shown or
+hidden as it last was. The divider between the source pane and the drawing can be dragged; the
+pane is 480px wide at first, at least 160px, keeps its width when the window is resized, and new
+windows use the width it was last dragged to. Tests: `windows_remember_their_layout` in
+`crates/sirene-gui/tests/settings.rs`.

@@ -7,11 +7,11 @@ use std::time::Duration;
 
 use gpui::base::input::{Diagnostic, DiagnosticSeverity};
 use gpui::component::input::{Editor, EditorState, Escape, Input, InputEvent, Position, RopeExt};
+use gpui::component::resizable::{ResizableState, h_resizable, resizable_panel};
 use gpui::component::{Theme as KitTheme, ThemeMode};
 use gpui::{
-    Bounds, Context, Entity, FocusHandle, MouseButton, Pixels, Point, PromptLevel, Render,
+    App, Bounds, Context, Entity, FocusHandle, MouseButton, Pixels, Point, PromptLevel, Render,
     ScrollEvent, Subscription, Task, Window, WindowAppearance, canvas, div, prelude::*, px,
-    relative,
 };
 use sirene_core::Severity;
 use sirene_core::scene::{self, Owner, Scene, Theme};
@@ -19,6 +19,7 @@ use sirene_core::scene::{self, Owner, Scene, Theme};
 use crate::document::{Disk, Document};
 use crate::drawing::{Drag, Item, LabelEdit};
 use crate::paint::{self, Metrics, Placement};
+use crate::settings::{self, Settings};
 use crate::{
     ActualSize, CloseWindow, FitWindow, Open, Reload, Save, SaveAs, ToggleSource, ZoomIn, ZoomOut,
 };
@@ -34,6 +35,9 @@ pub struct Viewer {
     /// The source pane's editor.
     pub source: Entity<EditorState>,
     pub show_source: bool,
+    /// The source pane's width, in pixels, as last dragged (GUISHE-11).
+    pub source_width: f32,
+    panes: Entity<ResizableState>,
     pub zoom: f32,
     /// Offset of the drawing from its resting place.
     pub pan: Point<Pixels>,
@@ -80,6 +84,13 @@ fn is_dark(a: WindowAppearance) -> bool {
     matches!(a, WindowAppearance::Dark | WindowAppearance::VibrantDark)
 }
 
+/// Whether `window` draws dark: the Appearance setting, or the system's appearance.
+fn effective_dark(window: &Window, cx: &App) -> bool {
+    settings::get(cx)
+        .appearance
+        .is_dark(is_dark(window.appearance()))
+}
+
 impl Viewer {
     pub fn new(doc: Document, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let text = doc.source.clone();
@@ -90,7 +101,16 @@ impl Viewer {
             }
         });
         let appearance = cx.observe_window_appearance(window, |v, window, cx| {
-            v.set_dark(is_dark(window.appearance()), cx);
+            v.set_dark(effective_dark(window, cx), cx);
+        });
+        // The Appearance setting, and the pane, follow the app's settings (GUISHE-10).
+        let chosen = cx.observe_global_in::<Settings>(window, |v, window, cx| {
+            v.set_dark(effective_dark(window, cx), cx);
+        });
+        let resized = cx.observe_window_bounds(window, |_, window, cx| {
+            let size = window.window_bounds().get_bounds().size;
+            let size = (f32::from(size.width), f32::from(size.height));
+            settings::remember(cx, |s| s.window = Some(size));
         });
         let watch = cx.spawn_in(window, async move |this, cx| {
             while this
@@ -106,12 +126,17 @@ impl Viewer {
                 .unwrap_or(true)
         });
         source.update(cx, |s, cx| s.focus(window, cx));
-        let dark = is_dark(window.appearance());
+        let dark = effective_dark(window, cx);
         KitTheme::change(theme_mode(dark), Some(window), cx);
+        let remembered = settings::get(cx);
+        let (show_source, source_width) = (remembered.show_source, remembered.source_width);
+        let panes = cx.new(|_| ResizableState::default());
         let mut viewer = Self {
             doc,
             source,
-            show_source: true,
+            show_source,
+            source_width,
+            panes,
             zoom: 1.0,
             pan: Point::default(),
             dark,
@@ -127,7 +152,7 @@ impl Viewer {
             focus: cx.focus_handle(),
             drawing_focus: cx.focus_handle(),
             _watch: watch,
-            _subscriptions: vec![edits, appearance],
+            _subscriptions: vec![edits, appearance, chosen, resized],
         };
         viewer.refresh(window, cx);
         viewer
@@ -298,6 +323,8 @@ impl Viewer {
 
     fn toggle_source(&mut self, _: &ToggleSource, window: &mut Window, cx: &mut Context<Self>) {
         self.show_source = !self.show_source;
+        let shown = self.show_source;
+        settings::update(cx, |s| s.show_source = shown);
         if self.show_source {
             self.source.update(cx, |s, cx| s.focus(window, cx));
         } else {
@@ -360,7 +387,10 @@ impl Viewer {
             };
             log::debug!("save as {}", path.display());
             this.update_in(cx, |v, window, cx| {
-                let saved = v.doc.save_as(path).is_ok();
+                let saved = v.doc.save_as(path.clone()).is_ok();
+                if saved {
+                    crate::note_recent(&path, cx);
+                }
                 v.refresh(window, cx);
                 saved
             })
@@ -414,7 +444,10 @@ impl Viewer {
         cx.spawn_in(window, async move |_, cx| {
             if confirmed.await {
                 log::debug!("closing the window");
-                let _ = cx.update(|window, _| window.remove_window());
+                let _ = cx.update(|window, cx| {
+                    settings::get(cx).save();
+                    window.remove_window()
+                });
             }
         })
         .detach();
@@ -427,6 +460,7 @@ impl Viewer {
     /// The platform asks before closing the window, e.g. from its title bar.
     pub fn should_close(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if !self.doc.is_edited() {
+            settings::get(cx).save();
             return true;
         }
         self.close_when_confirmed(window, cx);
@@ -459,6 +493,7 @@ impl Viewer {
     pub fn show_paths(&mut self, paths: &[PathBuf], window: &mut Window, cx: &mut Context<Self>) {
         let rest = match paths.split_first() {
             Some((first, rest)) if self.is_blank() && !crate::focus_existing(first, cx) => {
+                crate::note_recent(first, cx);
                 self.set_document(Document::open(first), window, cx);
                 rest
             }
@@ -570,20 +605,34 @@ impl Render for Viewer {
                     .on_action(cx.listener(|v, _: &Escape, window, cx| v.cancel_label(window, cx)))
                     .child(Input::new(&input))
             }));
-        let body = div().flex().flex_row().flex_1().min_h_0().w_full();
-        let body = if self.show_source {
-            body.child(
-                div()
-                    .id("source")
-                    .w(relative(0.4))
-                    .h_full()
-                    .border_r_1()
-                    .border_color(rule)
-                    .child(Editor::new(&self.source).bordered(false).size_full()),
+        // The source pane is as wide as last dragged, in any window (GUISHE-11).
+        let panes = h_resizable("panes")
+            .with_state(&self.panes)
+            .on_resize(|state, _, cx| {
+                if let Some(width) = state.read(cx).sizes().first().copied() {
+                    let width = f32::from(width);
+                    log::debug!("source pane resized to {width:.0}px");
+                    settings::remember(cx, |s| s.source_width = width);
+                }
+            })
+            .child(
+                resizable_panel()
+                    .size(px(self.source_width))
+                    .size_range(px(160.0)..px(4000.0))
+                    // Window resizes go to the drawing.
+                    .fixed()
+                    .visible(self.show_source)
+                    .child(
+                        div()
+                            .id("source")
+                            .size_full()
+                            .border_r_1()
+                            .border_color(rule)
+                            .child(Editor::new(&self.source).bordered(false).size_full()),
+                    ),
             )
-        } else {
-            body
-        };
+            .child(resizable_panel().child(drawing));
+        let body = div().flex().flex_row().flex_1().min_h_0().w_full();
         div()
             .track_focus(&self.focus)
             .key_context("Viewer")
@@ -607,7 +656,7 @@ impl Render for Viewer {
             .flex_col()
             .bg(paint::color(theme.background))
             .text_color(paint::color(theme.text))
-            .child(body.child(drawing))
+            .child(body.child(panes))
             .child(
                 div()
                     .flex()
