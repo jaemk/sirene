@@ -86,7 +86,8 @@ elsewhere). The full key table is in `spec/gui-shell.md` (GUISHE-5).
   invisible `~~~` edge), and Move Earlier or Later (alt-up, alt-down) to reorder statements.
 - View > Show or Hide Styles (secondary-i) opens a panel of the document's classes: check one
   to give it to the selected nodes, or edit a class's fill, stroke, text color, width, and
-  dashes. It writes `classDef` and `class` statements.
+  dashes. It writes `classDef` and `class` statements. With edges selected, it sets their color,
+  label color, width, and dashes with `linkStyle`.
 - Scroll or drag empty space to pan, secondary-scroll to zoom; the arrow keys pan (shift for
   further), tab steps through nodes, secondary-8 zooms to the selection, secondary-9 fits the
   window, secondary-0 is 100%.

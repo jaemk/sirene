@@ -148,3 +148,67 @@ fn classes_apply_to_the_selected_nodes(cx: &mut TestAppContext) {
     click(cx, edit_hot);
     assert_eq!(editing(&viewer, cx).as_deref(), Some("hot"));
 }
+
+fn edge_color(viewer: &Entity<Viewer>, cx: &mut VisualTestContext, row: usize) -> Option<String> {
+    cx.update(|_, cx| {
+        let p = viewer.read(cx).styles.read(cx).edge_pickers()[row].clone();
+        p.read(cx).value().map(hex)
+    })
+}
+
+#[gpui::test]
+fn edges_get_link_styles(cx: &mut TestAppContext) {
+    let (viewer, cx) = open_src(
+        cx,
+        "flowchart TD\n    A --> B --> C\n    linkStyle 0 stroke:#00f\n",
+    );
+    cx.dispatch_action(ToggleStyles);
+    cx.run_until_parked();
+    // No edge selected: no edge controls.
+    assert!(cx.debug_bounds("edge-width-2").is_none());
+
+    // The pickers follow the selected edge's colors.
+    viewer.update(cx, |v, cx| v.select(vec![Item::Edge(0)], cx));
+    cx.run_until_parked();
+    assert_eq!(edge_color(&viewer, cx, 0).as_deref(), Some("#0000ff"));
+    viewer.update(cx, |v, cx| v.select(vec![Item::Edge(1)], cx));
+    cx.run_until_parked();
+    assert_eq!(edge_color(&viewer, cx, 0), None);
+
+    // Width, dashes, and colors apply to every selected edge as one change.
+    viewer.update(cx, |v, cx| v.select(vec![Item::Edge(0), Item::Edge(1)], cx));
+    cx.run_until_parked();
+    let three = control(cx, "edge-width-3");
+    click(cx, three);
+    assert_eq!(
+        source(&viewer, cx),
+        "flowchart TD\n    A --> B --> C\n    linkStyle 0 stroke:#00f,stroke-width:3px\n    linkStyle 1 stroke-width:3px\n"
+    );
+    let dashed = control(cx, "edge-dashed");
+    click(cx, dashed);
+    assert!(source(&viewer, cx).ends_with(&format!(
+        "    linkStyle 1 stroke-width:3px,stroke-dasharray:{DASH}\n"
+    )));
+    let solid = control(cx, "edge-solid");
+    click(cx, solid);
+    cx.update(|window, cx| {
+        let p = viewer.read(cx).styles.read(cx).edge_pickers()[1].clone();
+        p.update(cx, |p, cx| {
+            p.select_color(hsla(0.0, 1.0, 0.5, 1.0), window, cx)
+        });
+    });
+    cx.run_until_parked();
+    assert_eq!(
+        source(&viewer, cx),
+        "flowchart TD\n    A --> B --> C\n    linkStyle 0 stroke:#00f,stroke-width:3px,color:#ff0000\n    linkStyle 1 stroke-width:3px,color:#ff0000\n"
+    );
+    assert_eq!(edge_color(&viewer, cx, 1).as_deref(), Some("#ff0000"));
+    let area = viewer.read_with(cx, |v, _| v.drawing_area());
+    click(
+        cx,
+        area.origin + gpui::point(px(5.0), area.size.height - px(5.0)),
+    );
+    cx.simulate_keystrokes(&format!("{SECONDARY}-z"));
+    cx.run_until_parked();
+    assert!(source(&viewer, cx).ends_with("    linkStyle 1 stroke-width:3px\n"));
+}

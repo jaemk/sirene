@@ -231,3 +231,20 @@ as `#rrggbb`, or `#rrggbbaa` when translucent; clearing one removes the property
 4 (`stroke-width:Npx`), and Line Solid or Dashed (`stroke-dasharray:5 5`). Each change is one
 drawing change (WYSIWY-13). Tests: `crates/sirene-gui/tests/styles.rs`, and `class_styles` and
 `applying_classes` in `crates/sirene-core/tests/flowchart_edit.rs`.
+
+## WYSIWY-18 Edge styles
+
+Edges are styled with `linkStyle`, which replaces an edge's earlier `linkStyle` declarations:
+
+- `set_link_style`: sets or removes one property of edge N, starting from the declarations in
+  effect for it. It rewrites the last `linkStyle` naming only N (removing one left empty, or
+  only its declarations when it has `interpolate`), or appends `linkStyle N ...`. Every other
+  `linkStyle` that styles N drops N from its list (a statement naming only N loses its
+  declarations, keeping `interpolate`); a curve from a shared statement moves into the new one.
+  `linkStyle default` is not changed.
+
+With edges selected, the styles panel (WYSIWY-17) has an Edge section, filled from the first
+selected edge: Color (`stroke`) and Text (`color`) pickers, Width 1 to 4, and Line Solid or
+Dashed. Each applies to every selected edge as one drawing change. Tests: `edges_get_link_styles`
+in `crates/sirene-gui/tests/styles.rs`, and `link_styles` in
+`crates/sirene-core/tests/flowchart_edit.rs`.

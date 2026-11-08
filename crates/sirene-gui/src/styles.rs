@@ -23,6 +23,11 @@ pub const WIDTHS: [u8; 4] = [1, 2, 3, 4];
 pub const DASH: &str = "5 5";
 /// The declarations of a class made by New Class.
 pub const NEW_CLASS: [(&str, &str); 2] = [("fill", "#e8f1fb"), ("stroke", "#3b6ea5")];
+/// The color rows for the selected edges: label and the `linkStyle` property they set.
+pub const EDGE_COLORS: [(&str, &str); 2] = [("Color", "stroke"), ("Text", "color")];
+
+/// What the edge pickers were last filled from: the selected edges and their colors.
+type EdgeSync = (Vec<usize>, Vec<Option<String>>);
 
 pub struct StylePanel {
     viewer: WeakEntity<Viewer>,
@@ -30,6 +35,9 @@ pub struct StylePanel {
     pub editing: Option<String>,
     /// One picker per [`COLORS`] row.
     pickers: Vec<Entity<ColorPickerState>>,
+    /// One picker per [`EDGE_COLORS`] row, for the selected edges.
+    edge_pickers: Vec<Entity<ColorPickerState>>,
+    edge_sync: EdgeSync,
     /// Set while the pickers are being filled from the source, so they write nothing back.
     syncing: bool,
     _subscriptions: Vec<Subscription>,
@@ -58,6 +66,17 @@ fn class_value(chart: &Flowchart, name: &str, property: &str) -> Option<String> 
         .map(|s| s.value.clone())
 }
 
+/// The value edge `i` gives `property` in its `linkStyle`.
+fn edge_value(chart: &Flowchart, i: usize, property: &str) -> Option<String> {
+    chart
+        .edges
+        .get(i)?
+        .styles
+        .iter()
+        .rfind(|s| s.property == property)
+        .map(|s| s.value.clone())
+}
+
 impl StylePanel {
     pub fn new(viewer: WeakEntity<Viewer>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut pickers = Vec::new();
@@ -74,10 +93,28 @@ impl StylePanel {
             ));
             pickers.push(picker);
         }
+        let mut edge_pickers = Vec::new();
+        for (_, property) in EDGE_COLORS {
+            let picker = cx.new(|cx| ColorPickerState::new(window, cx));
+            subscriptions.push(cx.subscribe_in(
+                &picker,
+                window,
+                move |this, _, e: &ColorPickerEvent, window, cx| {
+                    let ColorPickerEvent::Change(color) = e;
+                    if !this.syncing {
+                        let value = color.map(hex);
+                        this.set_edges(property, value.as_deref(), window, cx);
+                    }
+                },
+            ));
+            edge_pickers.push(picker);
+        }
         Self {
             viewer,
             editing: None,
             pickers,
+            edge_pickers,
+            edge_sync: (Vec::new(), Vec::new()),
             syncing: false,
             _subscriptions: subscriptions,
         }
@@ -86,6 +123,70 @@ impl StylePanel {
     /// The color picker of each [`COLORS`] row.
     pub fn pickers(&self) -> &[Entity<ColorPickerState>] {
         &self.pickers
+    }
+
+    /// The color picker of each [`EDGE_COLORS`] row.
+    pub fn edge_pickers(&self) -> &[Entity<ColorPickerState>] {
+        &self.edge_pickers
+    }
+
+    /// Sets `property` of every selected edge's `linkStyle`, as one drawing change.
+    pub fn set_edges(
+        &mut self,
+        property: &str,
+        value: Option<&str>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.viewer
+            .update(cx, |v, cx| {
+                let src = v.doc.source.clone();
+                let mut out = src.clone();
+                for edge in v.selected_edges() {
+                    if let Some(e) = edit::set_link_style(&out, edge, property, value) {
+                        out = e.apply(&out);
+                    }
+                }
+                if let Some(edit) = TextEdit::between(&src, &out) {
+                    v.apply(edit, window, cx);
+                }
+            })
+            .ok();
+        cx.notify();
+    }
+
+    /// What the edge pickers show for `edges` of `chart`: the first edge's colors.
+    fn edge_state(chart: &Flowchart, edges: &[usize]) -> EdgeSync {
+        let colors = EDGE_COLORS
+            .iter()
+            .map(|(_, p)| edges.first().and_then(|&i| edge_value(chart, i, p)))
+            .collect();
+        (edges.to_vec(), colors)
+    }
+
+    /// Fills the edge pickers from the selected edges when they or their colors changed.
+    fn sync_edges(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(viewer) = self.viewer.upgrade() else {
+            return;
+        };
+        let state = {
+            let v = viewer.read(cx);
+            Self::edge_state(&v.doc.chart, &v.selected_edges())
+        };
+        if state == self.edge_sync {
+            return;
+        }
+        self.syncing = true;
+        for (picker, value) in self.edge_pickers.clone().iter().zip(&state.1) {
+            let color = value.as_deref().and_then(parse_color).map(paint::color);
+            picker.update(cx, |p, cx| match color {
+                Some(c) => p.set_value(c, window, cx),
+                None => p.clear_value(window, cx),
+            });
+        }
+        self.syncing = false;
+        self.edge_sync = state;
+        cx.notify();
     }
 
     fn picked(
@@ -214,14 +315,23 @@ impl StylePanel {
 }
 
 impl Render for StylePanel {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let Some(viewer) = self.viewer.upgrade() else {
             return div();
         };
-        let (chart, nodes, dark) = {
+        let (chart, nodes, edges, dark) = {
             let v = viewer.read(cx);
-            (v.doc.chart.clone(), v.selected_nodes(), v.dark)
+            (
+                v.doc.chart.clone(),
+                v.selected_nodes(),
+                v.selected_edges(),
+                v.dark,
+            )
         };
+        // The pickers can't be set while rendering; refill them right after.
+        if Self::edge_state(&chart, &edges) != self.edge_sync {
+            cx.defer_in(window, |this, window, cx| this.sync_edges(window, cx));
+        }
         let rule = paint::color(if dark {
             sirene_core::scene::Theme::DARK.cluster_stroke
         } else {
@@ -357,6 +467,78 @@ impl Render for StylePanel {
                         .font_weight(gpui::FontWeight::SEMIBOLD)
                         .child(format!("Class {name}")),
                 )
+                .children(colors)
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .child("Width")
+                        .child(div().flex().flex_row().gap_1().children(widths)),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .child("Line")
+                        .child(div().flex().flex_row().gap_1().children(dashes)),
+                );
+        }
+        if let Some(&first) = edges.first() {
+            let width = edge_value(&chart, first, "stroke-width");
+            let dashed = edge_value(&chart, first, "stroke-dasharray").is_some();
+            let colors = EDGE_COLORS
+                .iter()
+                .zip(&self.edge_pickers)
+                .map(|(&(label, _), picker)| {
+                    div()
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .child(label)
+                        .child(ColorPicker::new(picker))
+                });
+            let widths = WIDTHS.iter().map(|&w| {
+                let value = format!("{w}px");
+                let on = width.as_deref() == Some(value.as_str());
+                div()
+                    .debug_selector(move || format!("edge-width-{w}"))
+                    .child(
+                        Button::new(("edge-width", usize::from(w)))
+                            .compact()
+                            .outline()
+                            .label(w.to_string())
+                            .toggled(on)
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.set_edges("stroke-width", Some(&value), window, cx);
+                            })),
+                    )
+            });
+            let dashes = [("Solid", None), ("Dashed", Some(DASH))].map(|(label, value)| {
+                let id = format!("edge-{}", label.to_lowercase());
+                div().debug_selector(move || id).child(
+                    Button::new(("edge-dash", usize::from(value.is_some())))
+                        .compact()
+                        .outline()
+                        .label(label)
+                        .toggled(dashed == value.is_some())
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.set_edges("stroke-dasharray", value, window, cx);
+                        })),
+                )
+            });
+            let title = if edges.len() == 1 {
+                "Edge".to_owned()
+            } else {
+                format!("{} Edges", edges.len())
+            };
+            panel = panel
+                .child(div().h(px(1.0)).bg(rule))
+                .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(title))
                 .children(colors)
                 .child(
                     div()
