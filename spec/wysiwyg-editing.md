@@ -68,14 +68,16 @@ it touches, including comments and formatting, is kept byte for byte. Tests:
   canonical form (keeping its stroke kind, arrowheads, and length) with a `|...|` label, or
   without one when the label is empty. Edges written in one statement with `&` share a label.
 - `add_node` and `add_edge`: append a statement at the end of the document, indented like the
-  last top-level statement. New node ids are the first unused of `A` to `Z`, then `n1`, `n2`, ...
+  last top-level statement. New node ids are the first of `A` to `Z`, then `n1`, `n2`, ..., that
+  the source does not use or name (a `class` statement can name a node not written yet).
 - `delete`: removes nodes, edges, and every edge touching a removed node. A chain that loses a
   middle edge or node is split into one statement per remaining piece, on its own line. A piece
   left as a single bare node is dropped when the node was already mentioned before it in the same
   subgraph (or at the top level), so node order, subgraph membership, and what later `class` and
   `style` statements apply to stay the same. `class` lists drop
   removed ids, `style` and `click` statements for removed nodes go, `linkStyle` indexes are
-  renumbered, and `id@{ ... }` statements of removed edges go. A statement that ends up empty
+  renumbered, and the `id@{ ... }`, `class`, and `style` statements of removed edges go,
+  including edges removed with a node. A statement that ends up empty
   is removed with its line when it was alone on it, otherwise with the `;` between it and its
   neighbor.
 - Labels are written bare when they are one line of letters, digits, spaces, and `_.,!?'`;
