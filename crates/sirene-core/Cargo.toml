@@ -27,6 +27,10 @@ unicode-width = "0.2.3"
 name = "png"
 required-features = ["png"]
 
+[[test]]
+name = "examples"
+required-features = ["png"]
+
 [dev-dependencies]
 insta = "1.49.0"
 proptest = "1.11.0"

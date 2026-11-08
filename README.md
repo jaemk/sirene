@@ -59,6 +59,10 @@ On the drawing: click to select (shift-click for more), double-click or enter to
 drag from one node to another to connect them, secondary-shift-n to add a node, backspace to
 delete. Each change is written to the source as an ordinary text edit.
 
+`examples/` has diagrams to try (`sirene examples/architecture.mmd`, or
+`cargo run -p sirene -- examples/shapes.mmd` from a checkout); a test keeps them free of
+diagnostics.
+
 On Linux, building needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan development
 packages (see `.github/workflows/ci.yml`).
 

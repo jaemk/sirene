@@ -1,0 +1,11 @@
+flowchart LR
+    %% classDef, class, :::, style, and linkStyle.
+    a[Default] --> b[Hot]:::hot --> c[Cold] --> d[Dashed] --> e["`**Markdown** label`"]
+    c --> f[Line 1<br>Line 2]
+
+    classDef hot fill:#fde2e1,stroke:#c0392b,stroke-width:2px,color:#7b241c
+    classDef cold fill:#e3f2fd,stroke:#1f618d
+    class c cold
+    style d fill:#fff,stroke:#555,stroke-dasharray: 5 3
+    linkStyle 0 stroke:#c0392b,stroke-width:3px
+    linkStyle 2 stroke:#1f618d,stroke-dasharray: 4 2

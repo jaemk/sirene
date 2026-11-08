@@ -1,0 +1,14 @@
+flowchart TD
+    %% A sign-in flow with two-factor authentication.
+    start([Open the app]) --> session{Signed in?}
+    session -->|yes| home[Home screen]
+    session -->|no| form[/Email and password/]
+    form --> check{Valid?}
+    check -->|no| error[Show the error] --> form
+    check -->|yes| twofa{Two-factor on?}
+    twofa -->|no| home
+    twofa -->|yes| code[/Enter the code/]
+    code --> verify{Code matches?}
+    verify -->|yes| home
+    verify -->|no, 3 tries| locked[Lock the account]
+    verify -->|no| code

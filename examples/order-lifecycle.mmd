@@ -1,0 +1,11 @@
+flowchart LR
+    %% Edge kinds: solid, thick, dotted, invisible, and arrowheads.
+    cart[Cart] --> placed[Placed]
+    placed ==>|paid| paid[Paid]
+    placed -. timeout .-> cancelled[Cancelled]
+    paid --> packed[Packed] --> shipped[Shipped]
+    shipped ==> delivered([Delivered])
+    shipped --x lost[Lost in transit]
+    delivered <-->|exchange| paid
+    delivered --o review[Review]
+    lost ~~~ cancelled

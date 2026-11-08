@@ -1,0 +1,25 @@
+flowchart LR
+    user((User)) --> cdn[CDN]
+    cdn --> lb{{Load balancer}}
+
+    subgraph app [Application]
+        lb --> api1[API server 1] & api2[API server 2]
+        api1 & api2 --> queue>Job queue]
+        queue --> worker[[Worker]]
+    end
+
+    subgraph data [Data]
+        db[(Postgres)]
+        cache[(Redis)]
+        blob[(Object store)]
+    end
+
+    api1 & api2 --> db
+    api1 & api2 -.-> cache
+    worker --> db
+    worker --> blob
+
+    classDef store fill:#e8f1fb,stroke:#3b6ea5
+    classDef edge fill:#fdf2e3,stroke:#c77d1a
+    class db,cache,blob store
+    class cdn,lb edge

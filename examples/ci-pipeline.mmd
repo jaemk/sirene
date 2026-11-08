@@ -1,0 +1,19 @@
+---
+title: CI pipeline
+---
+flowchart LR
+    push([Push to a branch]) --> lint[fmt and clippy]
+    lint --> test[Tests]
+    test --> cov{Coverage at least 98%?}
+    cov -->|yes| pr[Ready to merge]
+    cov -->|no| fail[[Fail the run]]
+    lint -. warnings .-> fail
+
+    subgraph release [Release, on main]
+        direction TB
+        decide{New version?} -->|yes| build[Build binaries]
+        build --> publish[(crates.io)]
+        decide -->|no| skip(Nothing to do)
+    end
+
+    pr ==> decide
