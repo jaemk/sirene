@@ -67,7 +67,7 @@ const OTHER_DIAGRAMS: &[&str] = &[
 ];
 
 /// The other diagram type `r` starts with, if any (FLOWCH-16).
-fn other_diagram(r: &str) -> Option<&str> {
+pub(super) fn other_diagram(r: &str) -> Option<&str> {
     let end = r
         .find(|c: char| c.is_whitespace() || c == ';' || c == ':')
         .unwrap_or(r.len());

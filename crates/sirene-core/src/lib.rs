@@ -4,6 +4,7 @@ pub mod ascii;
 pub mod diagnostic;
 pub mod flowchart;
 pub mod layout;
+pub mod markdown;
 pub mod scene;
 pub mod syntax;
 

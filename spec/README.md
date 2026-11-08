@@ -20,6 +20,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | WYSIWYG Editing | done | [wysiwyg-editing.md](wysiwyg-editing.md) |
 | macOS Packaging | research | [macos-packaging.md](macos-packaging.md) |
 | Flowchart Model | done | [flowchart-model.md](flowchart-model.md) |
+| Markdown | done | [markdown.md](markdown.md) |
 
 ## Conventions
 
