@@ -13,8 +13,9 @@ use sirene_core::scene::{Owner, Pt};
 use crate::paint::Placement;
 use crate::viewer::{Viewer, place};
 use crate::{
-    AddNode, AddNodeBefore, AddShape, ConnectFrom, ConnectTo, Delete, Deselect, LongerEdge, Redo,
-    Rename, ReverseEdge, SetArrows, SetShape, SetStroke, ShorterEdge, Undo,
+    AddNode, AddNodeBefore, AddShape, ConnectFrom, ConnectTo, Delete, Deselect, Group,
+    KeepTogether, LongerEdge, MoveEarlier, MoveLater, MoveTo, Redo, Rename, ReverseEdge, SetArrows,
+    SetDirection, SetShape, SetStroke, ShorterEdge, Undo, Ungroup,
 };
 
 /// A selectable diagram item: a node by id, or an edge by index.
@@ -61,6 +62,8 @@ const SLOP: f32 = 4.0;
 const DRAG: f32 = 4.0;
 /// Label of nodes made by AddNode.
 pub const NEW_NODE: &str = "New node";
+/// Title of subgraphs made by Group.
+pub const GROUP: &str = "Group";
 
 impl Viewer {
     /// Where the drawing lands in the drawing area from the last paint.
@@ -220,8 +223,12 @@ impl Viewer {
                     self.select(vec![item.clone()], cx);
                     self.edit_label(item, window, cx);
                 }
-                // Double-clicking empty space adds a node there (WYSIWY-15).
-                None => self.add_linked(Shape::Rect, Link::None, window, cx),
+                // Double-clicking empty space adds a node there, in the subgraph under the
+                // pointer if any (WYSIWY-15).
+                None => {
+                    let scope = self.subgraph_at(e.position, window);
+                    self.add_linked(Shape::Rect, Link::None, scope, window, cx);
+                }
             }
             return;
         }
@@ -296,9 +303,18 @@ impl Viewer {
                     let edit = edit::add_edge(&self.doc.source, &from, &to);
                     self.apply(edit, window, cx);
                 }
-                // Released on empty space in the drawing: a new node, linked (WYSIWY-15).
+                // Released on another subgraph: the node moves into it (WYSIWY-16). Elsewhere
+                // in the drawing: a new node, linked, where it was released (WYSIWY-15).
                 None if self.viewport.get().contains(&e.position) => {
-                    self.add_linked(Shape::Rect, Link::From(from), window, cx);
+                    let scope = self.subgraph_at(e.position, window);
+                    if scope.is_some() && scope != self.parent_of(&from) {
+                        let src = &self.doc.source;
+                        if let Some(edit) = edit::move_to_subgraph(src, &from, scope.as_deref()) {
+                            self.apply(edit, window, cx);
+                        }
+                    } else {
+                        self.add_linked(Shape::Rect, Link::From(from), scope, window, cx);
+                    }
                 }
                 _ => {}
             }
@@ -366,12 +382,14 @@ impl Viewer {
         }
     }
 
-    /// Adds a node labeled [`NEW_NODE`] in `shape`, linked as `link` says, as one change; then
-    /// selects it and opens its label (WYSIWY-11, WYSIWY-15).
+    /// Adds a node labeled [`NEW_NODE`] in `shape`, linked as `link` says, in subgraph `scope`
+    /// (or at the top level), as one change; then selects it and opens its label (WYSIWY-11,
+    /// WYSIWY-15).
     fn add_linked(
         &mut self,
         shape: Shape,
         link: Link,
+        scope: Option<String>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -387,6 +405,11 @@ impl Viewer {
             Link::None => {}
             Link::From(from) => out = edit::add_edge(&out, &from, &id).apply(&out),
             Link::To(to) => out = edit::add_edge(&out, &id, &to).apply(&out),
+        }
+        if scope.is_some()
+            && let Some(e) = edit::move_to_subgraph(&out, &id, scope.as_deref())
+        {
+            out = e.apply(&out);
         }
         if let Some(edit) = TextEdit::between(&src, &out) {
             self.apply(edit, window, cx);
@@ -406,12 +429,140 @@ impl Viewer {
 
     pub(crate) fn add_node(&mut self, _: &AddNode, window: &mut Window, cx: &mut Context<Self>) {
         let link = self.link_from_selection();
-        self.add_linked(Shape::Rect, link, window, cx);
+        self.add_linked(Shape::Rect, link, None, window, cx);
     }
 
     pub(crate) fn add_shape(&mut self, a: &AddShape, window: &mut Window, cx: &mut Context<Self>) {
         let link = self.link_from_selection();
-        self.add_linked(a.shape, link, window, cx);
+        self.add_linked(a.shape, link, None, window, cx);
+    }
+
+    /// The subgraph drawn at window position `p`, when no node or edge is.
+    pub fn subgraph_at(&mut self, p: Point<Pixels>, window: &Window) -> Option<String> {
+        let at = self.placement(window);
+        let q = Pt::new(
+            f32::from(p.x - at.origin.x) / at.zoom,
+            f32::from(p.y - at.origin.y) / at.zoom,
+        );
+        match self.scene(window).hit(q, SLOP / at.zoom)? {
+            Owner::Cluster(i) => self.doc.chart.subgraphs.get(i).map(|s| s.id.clone()),
+            _ => None,
+        }
+    }
+
+    /// The window bounds of subgraph `id` (top left, bottom right).
+    pub fn subgraph_bounds(
+        &mut self,
+        id: &str,
+        window: &Window,
+    ) -> Option<(Point<Pixels>, Point<Pixels>)> {
+        let i = self.doc.chart.subgraphs.iter().position(|s| s.id == id)?;
+        let (lo, hi) = self.scene(window).bounds(Owner::Cluster(i))?;
+        let at = self.placement(window);
+        Some((at.map(lo), at.map(hi)))
+    }
+
+    /// The subgraph node `id` is a member of.
+    pub fn parent_of(&self, id: &str) -> Option<String> {
+        self.doc
+            .chart
+            .subgraphs
+            .iter()
+            .find(|s| s.members.iter().any(|m| m == id))
+            .map(|s| s.id.clone())
+    }
+
+    pub(crate) fn set_direction(
+        &mut self,
+        a: &SetDirection,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let edit = edit::set_direction(&self.doc.source, a.subgraph.as_deref(), a.direction);
+        if let Some(edit) = edit {
+            self.apply(edit, window, cx);
+        }
+    }
+
+    pub(crate) fn group(&mut self, _: &Group, window: &mut Window, cx: &mut Context<Self>) {
+        let nodes = self.selected_nodes();
+        let ids: Vec<&str> = nodes.iter().map(String::as_str).collect();
+        if let Some((_, edit)) = edit::group(&self.doc.source, &ids, GROUP) {
+            self.apply(edit, window, cx);
+        }
+    }
+
+    pub(crate) fn ungroup(&mut self, a: &Ungroup, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(edit) = edit::ungroup(&self.doc.source, &a.id) {
+            self.apply(edit, window, cx);
+        }
+    }
+
+    pub(crate) fn keep_together(
+        &mut self,
+        _: &KeepTogether,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let [a, b] = self.selected_nodes().as_slice() {
+            let edit = edit::keep_together(&self.doc.source, a, b);
+            self.apply(edit, window, cx);
+        }
+    }
+
+    pub(crate) fn move_to(&mut self, a: &MoveTo, window: &mut Window, cx: &mut Context<Self>) {
+        let nodes = self.selected_nodes();
+        let target = a.subgraph.clone();
+        self.change(window, cx, |src| {
+            for id in &nodes {
+                if let Some(e) = edit::move_to_subgraph(src, id, target.as_deref()) {
+                    *src = e.apply(src);
+                }
+            }
+        });
+    }
+
+    pub(crate) fn move_earlier(
+        &mut self,
+        _: &MoveEarlier,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.move_item(false, window, cx);
+    }
+
+    pub(crate) fn move_later(
+        &mut self,
+        _: &MoveLater,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.move_item(true, window, cx);
+    }
+
+    /// Moves the one selected item's statement (WYSIWY-16); a moved edge stays selected.
+    fn move_item(&mut self, later: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let src = &self.doc.source;
+        let (edit, edge) = match self.selection.as_slice() {
+            [Item::Node(id)] => (edit::move_node(src, id, later), None),
+            [Item::Edge(i)] => (
+                edit::move_edge(src, *i, later),
+                self.doc.chart.edges.get(*i).cloned(),
+            ),
+            _ => return,
+        };
+        let Some(edit) = edit else {
+            return;
+        };
+        self.apply(edit, window, cx);
+        if let Some(old) = edge {
+            let same = |e: &flowchart::Edge| {
+                e.from == old.from && e.to == old.to && e.label == old.label && e.id == old.id
+            };
+            if let Some(i) = self.doc.chart.edges.iter().position(same) {
+                self.select(vec![Item::Edge(i)], cx);
+            }
+        }
     }
 
     pub(crate) fn add_node_before(
@@ -424,7 +575,7 @@ impl Viewer {
             return;
         };
         let link = Link::To(to.clone());
-        self.add_linked(Shape::Rect, link, window, cx);
+        self.add_linked(Shape::Rect, link, None, window, cx);
     }
 
     /// The selected node ids.
@@ -591,10 +742,15 @@ impl Viewer {
     ) {
         window.focus(&self.drawing_focus, cx);
         self.drag = None;
+        self.menu_subgraph = None;
         match self.item_at(e.position, window) {
             Some(item) if !self.selection.contains(&item) => self.select(vec![item], cx),
             Some(_) => {}
-            None => self.select(Vec::new(), cx),
+            None => {
+                self.select(Vec::new(), cx);
+                // A press on a subgraph opens its menu (WYSIWY-16).
+                self.menu_subgraph = self.subgraph_at(e.position, window);
+            }
         }
     }
 

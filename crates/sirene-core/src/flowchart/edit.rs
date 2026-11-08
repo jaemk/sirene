@@ -5,7 +5,7 @@ use std::ops::Range;
 
 use rowan::TextRange;
 
-use super::model::{Arrow, Edge, Flowchart, Node, Shape, Stroke};
+use super::model::{Arrow, Direction, Edge, Flowchart, Node, Shape, Stroke, Subgraph};
 use super::text;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
@@ -334,6 +334,244 @@ pub fn add_node(src: &str, label: &str) -> (String, TextEdit) {
 /// Adds an edge from `from` to `to`.
 pub fn add_edge(src: &str, from: &str, to: &str) -> TextEdit {
     Doc::new(src).append(&format!("{from} --> {to}"))
+}
+
+/// Adds an invisible edge (`~~~`) from `a` to `b`, which lays them out like linked nodes without
+/// drawing a line.
+pub fn keep_together(src: &str, a: &str, b: &str) -> TextEdit {
+    Doc::new(src).append(&format!("{a} ~~~ {b}"))
+}
+
+/// The keyword sirene writes for `d`.
+pub fn direction_text(d: Direction) -> &'static str {
+    match d {
+        Direction::TopBottom => "TD",
+        Direction::BottomTop => "BT",
+        Direction::LeftRight => "LR",
+        Direction::RightLeft => "RL",
+    }
+}
+
+/// Sets the direction of the diagram (`subgraph` `None`: the header's) or of a subgraph (its
+/// last `direction` statement, or a new one after its header). `None` when it already reads
+/// `dir` or there is no such subgraph.
+pub fn set_direction(src: &str, subgraph: Option<&str>, dir: Direction) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let text = direction_text(dir);
+    let same = |t: &SyntaxToken| Direction::from_text(t.text()) == Some(dir);
+    let edit = match subgraph {
+        None => {
+            let header = child(&doc.root, HEADER)?;
+            match token(&header, DIR) {
+                Some(t) if same(&t) => return None,
+                Some(t) => (span(t.text_range()), text.to_owned()),
+                None => {
+                    let at = usize::from(token(&header, GRAPH_KW)?.text_range().end());
+                    (at..at, format!(" {text}"))
+                }
+            }
+        }
+        Some(id) => {
+            let block = doc.subgraph_syntax(doc.chart.subgraph(id)?)?;
+            let last = block
+                .children()
+                .filter(|n| n.kind() == DIRECTION_STMT)
+                .last();
+            match last.as_ref().map(|s| (s, token(s, DIR))) {
+                Some((_, Some(t))) if same(&t) => return None,
+                Some((_, Some(t))) => (span(t.text_range()), text.to_owned()),
+                Some((s, None)) => (span(s.text_range()), format!("direction {text}")),
+                None => {
+                    let header = child(&block, SUBGRAPH_HEADER)?;
+                    let end = usize::from(header.text_range().end());
+                    let at = src[end..].find('\n').map_or(src.len(), |i| end + i);
+                    let indent = doc.body_indent(&block);
+                    (at..at, format!("{}{indent}direction {text}", doc.newline))
+                }
+            }
+        }
+    };
+    doc.finish(vec![edit])
+}
+
+/// Puts `nodes` in a new subgraph titled `title`, written at the end of the subgraph they share
+/// (or of the document) with a bare mention of each. Returns the subgraph's id and the edit;
+/// `None` when `nodes` is empty, names a missing node, or spans more than one subgraph.
+pub fn group(src: &str, nodes: &[&str], title: &str) -> Option<(String, TextEdit)> {
+    let doc = Doc::new(src);
+    let (first, rest) = nodes.split_first()?;
+    let parent = doc.parent(first);
+    if nodes.iter().any(|id| doc.chart.node(id).is_none())
+        || rest.iter().any(|id| doc.parent(id) != parent)
+    {
+        return None;
+    }
+    let id = doc.fresh_group_id();
+    let scope = match parent {
+        Some(p) => Some(doc.subgraph_syntax(doc.chart.subgraph(p)?)?),
+        None => None,
+    };
+    let mut lines = vec![format!("subgraph {id} [{}]", label_source(title, false))];
+    lines.extend(nodes.iter().map(|n| format!("    {n}")));
+    lines.push("end".to_owned());
+    let edit = doc.insert_lines(scope.as_ref(), &lines);
+    Some((id, doc.finish(vec![edit])?))
+}
+
+/// Removes subgraph `id`, keeping its statements one level less indented, and its `direction`,
+/// `style`, and `class` statements. `None` when there is no such subgraph, an edge starts or
+/// ends at it, or its `subgraph` line or `end` shares a line with another statement.
+pub fn ungroup(src: &str, id: &str) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let sg = doc.chart.subgraph(id)?;
+    if doc.chart.edges.iter().any(|e| e.from == id || e.to == id) {
+        return None;
+    }
+    let block = doc.subgraph_syntax(sg)?;
+    let start = usize::from(block.text_range().start());
+    let first_line = line_start(src, start);
+    if !src[first_line..start].trim().is_empty() {
+        return None;
+    }
+    let header_end = usize::from(child(&block, SUBGRAPH_HEADER)?.text_range().end());
+    let body_start = header_end + src[header_end..].find('\n')? + 1;
+    if !src[header_end..body_start].trim().is_empty() {
+        return None;
+    }
+    let end_kw = token(&block, END_KW)?;
+    let end_start = usize::from(end_kw.text_range().start());
+    let end_line = line_start(src, end_start);
+    let end_after = usize::from(end_kw.text_range().end());
+    let end_line_end = src[end_after..]
+        .find('\n')
+        .map_or(src.len(), |i| end_after + i + 1);
+    if !src[end_line..end_start].trim().is_empty()
+        || !src[end_after..end_line_end].trim().is_empty()
+    {
+        return None;
+    }
+
+    let mut edits = vec![
+        (first_line..body_start, String::new()),
+        (end_line..end_line_end, String::new()),
+    ];
+    // One level of indent comes off each body line.
+    let outer = indent(src, start);
+    let inner = doc.body_indent(&block);
+    if let Some(unit) = inner.strip_prefix(outer).filter(|u| !u.is_empty()) {
+        let prefix = format!("{outer}{unit}");
+        let mut at = body_start;
+        while at < end_line {
+            if src[at..].starts_with(&prefix) {
+                let from = at + outer.len();
+                edits.push((from..from + unit.len(), String::new()));
+            }
+            at += src[at..].find('\n').map_or(src.len() - at, |i| i + 1);
+        }
+    }
+    for stmt in block.children().filter(|n| n.kind() == DIRECTION_STMT) {
+        edits.push(doc.remove(&stmt));
+    }
+    for stmt in doc.root.descendants() {
+        match stmt.kind() {
+            STYLE_STMT if token(&stmt, IDENT).is_some_and(|t| t.text() == id) => {
+                edits.push(doc.remove(&stmt));
+            }
+            CLASS_STMT => {
+                let Some(list) = child(&stmt, ID_LIST) else {
+                    continue;
+                };
+                let ids: Vec<String> = tokens(&list)
+                    .filter(|t| t.kind() == IDENT)
+                    .map(|t| t.text().to_owned())
+                    .collect();
+                let kept: Vec<&str> = ids
+                    .iter()
+                    .map(String::as_str)
+                    .filter(|i| *i != id)
+                    .collect();
+                if kept.is_empty() {
+                    edits.push(doc.remove(&stmt));
+                } else if kept.len() < ids.len() {
+                    edits.push((span(list.text_range()), kept.join(",")));
+                }
+            }
+            _ => {}
+        }
+    }
+    doc.finish(edits)
+}
+
+/// Moves node `id` into subgraph `target`, or out to the top level when `target` is `None`.
+/// From the top level, a bare mention is added to the target; from a subgraph, the statements
+/// in it that mention the node move, and each must be the node alone (`A` or `A[label]`).
+/// `None` when nothing would change or the node's statements cannot move.
+pub fn move_to_subgraph(src: &str, id: &str, target: Option<&str>) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    doc.chart.node(id)?;
+    let current = doc.parent(id);
+    if current == target {
+        return None;
+    }
+    let scope = match target {
+        Some(t) => Some(doc.subgraph_syntax(doc.chart.subgraph(t)?)?),
+        None => None,
+    };
+    let mut edits = Vec::new();
+    let mut lines = Vec::new();
+    match current {
+        None => lines.push(id.to_owned()),
+        Some(c) => {
+            let block = doc.subgraph_syntax(doc.chart.subgraph(c)?)?;
+            for stmt in block.children().filter(|n| n.kind() == VERTEX_STMT) {
+                let nodes: Vec<SyntaxNode> =
+                    stmt.descendants().filter(|n| n.kind() == NODE).collect();
+                if !nodes
+                    .iter()
+                    .any(|n| token(n, IDENT).is_some_and(|t| t.text() == id))
+                {
+                    continue;
+                }
+                if nodes.len() != 1 || child(&stmt, EDGE).is_some() {
+                    return None;
+                }
+                lines.push(stmt.text().to_string());
+                edits.push(doc.remove(&stmt));
+            }
+            if lines.is_empty() {
+                return None;
+            }
+        }
+    }
+    edits.push(doc.insert_lines(scope.as_ref(), &lines));
+    doc.finish(edits)
+}
+
+/// Swaps the statement with node `id`'s first mention and the statement before it (or, with
+/// `later`, after it). See [`move_edge`].
+pub fn move_node(src: &str, id: &str, later: bool) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let first = *doc.chart.node(id)?.mentions.first()?;
+    let stmt = doc
+        .root
+        .descendants()
+        .find(|n| n.kind() == NODE && n.text_range() == first)?
+        .ancestors()
+        .find(|n| n.kind() == VERTEX_STMT)?;
+    doc.swap(&stmt, later)
+}
+
+/// Swaps the statement with edge `edge` and the statement before it (or, with `later`, after
+/// it). Only a neighboring node or edge statement or subgraph swaps; `linkStyle` indexes follow
+/// their edges. `None` at either end of its subgraph or document, or next to another kind of
+/// statement.
+pub fn move_edge(src: &str, edge: usize, later: bool) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let stmt = doc
+        .edge_syntax(doc.chart.edges.get(edge)?)?
+        .ancestors()
+        .find(|n| n.kind() == VERTEX_STMT)?;
+    doc.swap(&stmt, later)
 }
 
 /// Deletes the nodes `nodes`, the edges `edges` (indexes into `Flowchart::edges`), and every
@@ -711,12 +949,7 @@ impl<'a> Doc<'a> {
     /// The edit appending `line` as a statement at the end of the document.
     fn append(&self, line: &str) -> TextEdit {
         let src = self.src;
-        let last = self
-            .root
-            .children()
-            .filter(|n| !matches!(n.kind(), HEADER | ERROR))
-            .last();
-        let indent = last.map_or("    ", |n| indent(src, usize::from(n.text_range().start())));
+        let indent = self.top_indent();
         let sep = if src.is_empty() || src.ends_with('\n') {
             ""
         } else {
@@ -728,27 +961,184 @@ impl<'a> Doc<'a> {
         }
     }
 
-    /// The first id of `A` to `Z`, then `n1`, `n2`, ..., not used by a node, subgraph, or edge,
-    /// nor named in the source (as by a `class` statement for a node not written yet).
-    fn fresh_id(&self) -> String {
-        let chart = &self.chart;
-        let named: HashSet<String> = self
+    /// The `SUBGRAPH` block of `sg`.
+    fn subgraph_syntax(&self, sg: &Subgraph) -> Option<SyntaxNode> {
+        self.root
+            .descendants()
+            .find(|n| n.kind() == SUBGRAPH && n.text_range() == sg.range)
+    }
+
+    /// The id of the subgraph node `id` is a member of.
+    fn parent(&self, id: &str) -> Option<&str> {
+        self.chart
+            .subgraphs
+            .iter()
+            .find(|s| s.members.iter().any(|m| m == id))
+            .map(|s| s.id.as_str())
+    }
+
+    /// The indent of the statements in `block`: its first statement's, else its own plus four
+    /// spaces.
+    fn body_indent(&self, block: &SyntaxNode) -> String {
+        match block.children().find(|n| n.kind() != SUBGRAPH_HEADER) {
+            Some(first) => indent(self.src, usize::from(first.text_range().start())).to_owned(),
+            None => format!(
+                "{}    ",
+                indent(self.src, usize::from(block.text_range().start()))
+            ),
+        }
+    }
+
+    /// The indent of top-level statements, as [`Doc::append`] uses.
+    fn top_indent(&self) -> &str {
+        self.root
+            .children()
+            .filter(|n| !matches!(n.kind(), HEADER | ERROR))
+            .last()
+            .map_or("    ", |n| {
+                indent(self.src, usize::from(n.text_range().start()))
+            })
+    }
+
+    /// The edit adding `lines` as statements at the end of `scope` (a `SUBGRAPH`, before its
+    /// `end`) or of the document, each indented like the statements there.
+    fn insert_lines(&self, scope: Option<&SyntaxNode>, lines: &[String]) -> (Range<usize>, String) {
+        let src = self.src;
+        let nl = self.newline;
+        let Some(block) = scope else {
+            let indent = self.top_indent();
+            let sep = if src.is_empty() || src.ends_with('\n') {
+                ""
+            } else {
+                nl
+            };
+            let body: String = lines.iter().map(|l| format!("{indent}{l}{nl}")).collect();
+            return (src.len()..src.len(), format!("{sep}{body}"));
+        };
+        let inner = self.body_indent(block);
+        let body: String = lines.iter().map(|l| format!("{inner}{l}{nl}")).collect();
+        let Some(end) = token(block, END_KW) else {
+            // An unclosed subgraph runs to the end of the document.
+            let at = usize::from(block.text_range().end());
+            let sep = if src[..at].ends_with('\n') { "" } else { nl };
+            return (at..at, format!("{sep}{body}"));
+        };
+        let at = usize::from(end.text_range().start());
+        let start = line_start(src, at);
+        if src[start..at].trim().is_empty() {
+            (start..start, body)
+        } else {
+            let outer = indent(src, usize::from(block.text_range().start()));
+            (at..at, format!("{nl}{body}{outer}"))
+        }
+    }
+
+    /// Swaps vertex statement `stmt` with the statement before it, or after it with `later`,
+    /// when that is a vertex statement or subgraph; `linkStyle` indexes follow their edges.
+    fn swap(&self, stmt: &SyntaxNode, later: bool) -> Option<TextEdit> {
+        let siblings: Vec<SyntaxNode> = stmt
+            .parent()?
+            .children()
+            .filter(|n| !matches!(n.kind(), HEADER | SUBGRAPH_HEADER | ERROR))
+            .collect();
+        let at = siblings.iter().position(|n| n == stmt)?;
+        let other = if later {
+            siblings.get(at + 1)?
+        } else {
+            siblings.get(at.checked_sub(1)?)?
+        };
+        if !matches!(other.kind(), VERTEX_STMT | SUBGRAPH) {
+            return None;
+        }
+        let (first, second) = if later { (stmt, other) } else { (other, stmt) };
+        let mut edits = vec![
+            (span(first.text_range()), second.text().to_string()),
+            (span(second.text_range()), first.text().to_string()),
+        ];
+        // Edges keep source order: the second statement's edges now come first.
+        let inside = |r: TextRange, e: &Edge| r.contains_range(e.range);
+        let edges = &self.chart.edges;
+        let old_first: Vec<usize> = (0..edges.len())
+            .filter(|&i| inside(first.text_range(), &edges[i]))
+            .collect();
+        let old_second: Vec<usize> = (0..edges.len())
+            .filter(|&i| inside(second.text_range(), &edges[i]))
+            .collect();
+        let mut order: Vec<usize> = (0..edges.len())
+            .filter(|i| !old_first.contains(i) && !old_second.contains(i))
+            .collect();
+        if let Some(&base) = old_first.first().or(old_second.first()) {
+            let at = order.iter().position(|&i| i > base).unwrap_or(order.len());
+            order.splice(
+                at..at,
+                old_second
+                    .iter()
+                    .chain(&old_first)
+                    .copied()
+                    .collect::<Vec<_>>(),
+            );
+        }
+        let new_index = |old: usize| order.iter().position(|&i| i == old);
+        for stmt in self
             .root
+            .descendants()
+            .filter(|n| n.kind() == LINKSTYLE_STMT)
+        {
+            let Some(list) = child(&stmt, ID_LIST) else {
+                continue;
+            };
+            let old: Vec<String> = tokens(&list)
+                .filter(|t| t.kind() == NUMBER)
+                .map(|t| t.text().to_owned())
+                .collect();
+            let new: Vec<String> = old
+                .iter()
+                .map(|n| match n.parse::<usize>().ok().and_then(new_index) {
+                    Some(i) => i.to_string(),
+                    None => n.clone(),
+                })
+                .collect();
+            if new != old {
+                edits.push((span(list.text_range()), new.join(",")));
+            }
+        }
+        self.finish(edits)
+    }
+
+    /// The first `groupN` id not used by a node, subgraph, or edge, nor named in the source.
+    fn fresh_group_id(&self) -> String {
+        let named = self.named();
+        (1..)
+            .map(|n| format!("group{n}"))
+            .find(|id| !named.contains(id) && !self.used(id))
+            .expect("ids are unbounded")
+    }
+
+    /// Every identifier in the source.
+    fn named(&self) -> HashSet<String> {
+        self.root
             .descendants_with_tokens()
             .filter_map(|e| e.into_token())
             .filter(|t| t.kind() == IDENT)
             .map(|t| t.text().to_owned())
-            .collect();
-        let used = |id: &str| {
-            named.contains(id)
-                || chart.node(id).is_some()
-                || chart.subgraph(id).is_some()
-                || chart.edge(id).is_some()
-        };
+            .collect()
+    }
+
+    /// Whether `id` is a node, subgraph, or edge.
+    fn used(&self, id: &str) -> bool {
+        self.chart.node(id).is_some()
+            || self.chart.subgraph(id).is_some()
+            || self.chart.edge(id).is_some()
+    }
+
+    /// The first id of `A` to `Z`, then `n1`, `n2`, ..., not used by a node, subgraph, or edge,
+    /// nor named in the source (as by a `class` statement for a node not written yet).
+    fn fresh_id(&self) -> String {
+        let named = self.named();
         ('A'..='Z')
             .map(String::from)
             .chain((1..).map(|n| format!("n{n}")))
-            .find(|id| !used(id))
+            .find(|id| !named.contains(id) && !self.used(id))
             .expect("ids are unbounded")
     }
 }
@@ -777,6 +1167,11 @@ fn indent(src: &str, at: usize) -> &str {
     let start = src[..at].rfind('\n').map_or(0, |i| i + 1);
     let line = &src[start..];
     &line[..line.len() - line.trim_start_matches([' ', '\t']).len()]
+}
+
+/// The start of the line containing byte `at`.
+fn line_start(src: &str, at: usize) -> usize {
+    src[..at].rfind('\n').map_or(0, |i| i + 1)
 }
 
 fn span(r: TextRange) -> Range<usize> {

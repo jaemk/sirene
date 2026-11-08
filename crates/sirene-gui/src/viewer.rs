@@ -51,6 +51,8 @@ pub struct Viewer {
     /// The open label field (WYSIWY-10).
     pub label: Option<LabelEdit>,
     pub(crate) drag: Option<Drag>,
+    /// The subgraph the right-click menu was opened on (WYSIWY-16).
+    pub menu_subgraph: Option<String>,
     /// Drawing changes as (before, after) texts, for Undo and Redo (WYSIWY-13).
     pub(crate) history: Vec<(String, String)>,
     pub(crate) future: Vec<(String, String)>,
@@ -168,6 +170,7 @@ impl Viewer {
             selection: Vec::new(),
             label: None,
             drag: None,
+            menu_subgraph: None,
             history: Vec::new(),
             future: Vec::new(),
             fit_pending: true,
@@ -730,6 +733,13 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::add_node))
             .on_action(cx.listener(Self::add_node_before))
             .on_action(cx.listener(Self::add_shape))
+            .on_action(cx.listener(Self::set_direction))
+            .on_action(cx.listener(Self::group))
+            .on_action(cx.listener(Self::ungroup))
+            .on_action(cx.listener(Self::keep_together))
+            .on_action(cx.listener(Self::move_to))
+            .on_action(cx.listener(Self::move_earlier))
+            .on_action(cx.listener(Self::move_later))
             .on_action(cx.listener(Self::set_shape))
             .on_action(cx.listener(Self::set_stroke))
             .on_action(cx.listener(Self::set_arrows))

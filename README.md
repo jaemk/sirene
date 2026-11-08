@@ -76,6 +76,9 @@ elsewhere). The full key table is in `spec/gui-shell.md` (GUISHE-5).
 - The shape bar at the top left of the drawing adds a node of its shape, linked from the selected
   node. Double-click empty space to add a node; drag from a node to empty space to add a linked
   one.
+- Layout hints, from the right-click menu: the direction of the diagram or a subgraph, Group
+  (secondary-g) and Ungroup, Move To a subgraph (or drag a node onto one), Keep Together (an
+  invisible `~~~` edge), and Move Earlier or Later (alt-up, alt-down) to reorder statements.
 - Scroll or drag empty space to pan, secondary-scroll to zoom; the arrow keys pan (shift for
   further), tab steps through nodes, secondary-8 zooms to the selection, secondary-9 fits the
   window, secondary-0 is 100%.

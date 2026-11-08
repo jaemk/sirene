@@ -3,10 +3,11 @@
 use proptest::prelude::*;
 use sirene_core::Severity;
 use sirene_core::flowchart::edit::{
-    Line, MAX_LENGTH, TextEdit, add_edge, add_node, delete, label_source, reverse_edge,
-    set_edge_label, set_edge_line, set_node_label, set_node_shape,
+    Line, MAX_LENGTH, TextEdit, add_edge, add_node, delete, group, keep_together, label_source,
+    move_edge, move_node, move_to_subgraph, reverse_edge, set_direction, set_edge_label,
+    set_edge_line, set_node_label, set_node_shape, ungroup,
 };
-use sirene_core::flowchart::{self, Arrow, Flowchart, Shape, Stroke};
+use sirene_core::flowchart::{self, Arrow, Direction, Flowchart, Shape, Stroke};
 
 fn chart(src: &str) -> Flowchart {
     flowchart::parse(src).lower().flowchart
@@ -303,6 +304,183 @@ fn edge_lines() {
         None
     );
     assert_eq!(set_edge_line(src, 9, Line::of(&e)), None);
+}
+
+#[test]
+fn directions() {
+    // The header's direction is replaced, or added.
+    let src = "flowchart TD\n    A --> B\n";
+    assert_eq!(
+        applied(src, set_direction(src, None, Direction::LeftRight)),
+        "flowchart LR\n    A --> B\n"
+    );
+    assert_eq!(set_direction(src, None, Direction::TopBottom), None);
+    assert_eq!(
+        set_direction("graph TB\n", None, Direction::TopBottom),
+        None
+    );
+    assert_eq!(
+        applied(
+            "graph\nA\n",
+            set_direction("graph\nA\n", None, Direction::RightLeft)
+        ),
+        "graph RL\nA\n"
+    );
+
+    // A subgraph's last `direction` is replaced; without one, one is added after the header.
+    let src = "flowchart TD\n    subgraph s [S]\n        A --> B\n    end\n";
+    let out = applied(src, set_direction(src, Some("s"), Direction::LeftRight));
+    assert_eq!(
+        out,
+        "flowchart TD\n    subgraph s [S]\n        direction LR\n        A --> B\n    end\n"
+    );
+    assert_eq!(
+        chart(&out).subgraphs[0].direction,
+        Some(Direction::LeftRight)
+    );
+    assert_eq!(
+        applied(&out, set_direction(&out, Some("s"), Direction::BottomTop)),
+        "flowchart TD\n    subgraph s [S]\n        direction BT\n        A --> B\n    end\n"
+    );
+    assert_eq!(set_direction(&out, Some("s"), Direction::LeftRight), None);
+    assert_eq!(
+        set_direction(&out, Some("nope"), Direction::LeftRight),
+        None
+    );
+    // An empty subgraph indents one level in.
+    let src = "flowchart TD\n  subgraph s\n  end\n";
+    assert_eq!(
+        applied(src, set_direction(src, Some("s"), Direction::RightLeft)),
+        "flowchart TD\n  subgraph s\n      direction RL\n  end\n"
+    );
+}
+
+#[test]
+fn keeping_together() {
+    let src = "flowchart LR\n    A\n    B\n";
+    let out = keep_together(src, "A", "B").apply(src);
+    assert_eq!(out, "flowchart LR\n    A\n    B\n    A ~~~ B\n");
+    assert_eq!(chart(&out).edges[0].stroke, Stroke::Invisible);
+}
+
+#[test]
+fn grouping() {
+    let src = "flowchart TD\n    A --> B\n    B --> C\n";
+    let (id, edit) = group(src, &["A", "B"], "Front end").unwrap();
+    assert_eq!(id, "group1");
+    let out = edit.apply(src);
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B\n    B --> C\n    subgraph group1 [Front end]\n        A\n        B\n    end\n"
+    );
+    let c = chart(&out);
+    assert_eq!(c.subgraphs[0].members, ["A", "B"]);
+    assert_eq!(c.subgraphs[0].title.text, "Front end");
+    assert_eq!(errors(&out), 0);
+
+    // Nodes in one subgraph are grouped inside it; the next id skips used ones.
+    let (id, edit) = group(&out, &["A"], "x[y]").unwrap();
+    assert_eq!(id, "group2");
+    let nested = edit.apply(&out);
+    assert_eq!(
+        nested,
+        "flowchart TD\n    A --> B\n    B --> C\n    subgraph group1 [Front end]\n        A\n        B\n        subgraph group2 [\"x[y]\"]\n            A\n        end\n    end\n"
+    );
+    let c = chart(&nested);
+    let g1 = c.subgraph("group1").unwrap();
+    assert_eq!(g1.members, ["B", "group2"]);
+    assert_eq!(c.subgraph("group2").unwrap().members, ["A"]);
+
+    // Nodes in different subgraphs, missing nodes, and nothing are not grouped.
+    assert_eq!(group(&out, &["A", "C"], "x"), None);
+    assert_eq!(group(src, &["A", "Z"], "x"), None);
+    assert_eq!(group(src, &[], "x"), None);
+}
+
+#[test]
+fn ungrouping() {
+    let src = "flowchart TD\n    subgraph s [S]\n        direction LR\n        A --> B\n        subgraph t\n            C\n        end\n    end\n    style s fill:#eee\n    class s,A warm\n    class s cool\n";
+    let out = applied(src, ungroup(src, "s"));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B\n    subgraph t\n        C\n    end\n    class A warm\n"
+    );
+    assert_eq!(chart(&out).subgraph("s"), None);
+    assert_eq!(chart(&out).subgraph("t").unwrap().members, ["C"]);
+
+    // Edges at the subgraph, a missing subgraph, and a one-line block are left alone.
+    assert_eq!(
+        ungroup(
+            "flowchart TD\n    subgraph s\n        A\n    end\n    s --> B\n",
+            "s"
+        ),
+        None
+    );
+    assert_eq!(ungroup(src, "nope"), None);
+    assert_eq!(ungroup("flowchart TD\n    subgraph s; A; end\n", "s"), None);
+}
+
+#[test]
+fn moving_into_subgraphs() {
+    let src = "flowchart TD\n    A --> B\n    subgraph s [S]\n        C\n    end\n";
+    // From the top level: a bare mention goes in.
+    let out = applied(src, move_to_subgraph(src, "A", Some("s")));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B\n    subgraph s [S]\n        C\n        A\n    end\n"
+    );
+    assert_eq!(chart(&out).subgraph("s").unwrap().members, ["C", "A"]);
+    // Out again: its lone statements move to the end of the document.
+    let back = applied(&out, move_to_subgraph(&out, "A", None));
+    assert_eq!(
+        back,
+        "flowchart TD\n    A --> B\n    subgraph s [S]\n        C\n    end\n    A\n"
+    );
+    assert_eq!(chart(&back).subgraph("s").unwrap().members, ["C"]);
+
+    // Nothing to do, a missing node or subgraph, and a node in a chain inside a subgraph.
+    assert_eq!(move_to_subgraph(src, "A", None), None);
+    assert_eq!(move_to_subgraph(src, "Z", Some("s")), None);
+    assert_eq!(move_to_subgraph(src, "A", Some("nope")), None);
+    let chain = "flowchart TD\n    subgraph s\n        A --> B\n    end\n    subgraph t\n    end\n";
+    assert_eq!(move_to_subgraph(chain, "A", Some("t")), None);
+    // A target whose `end` follows a statement on its line.
+    let tight = "flowchart TD\n    X\n    subgraph t\n        Y; end\n";
+    assert_eq!(
+        applied(tight, move_to_subgraph(tight, "X", Some("t"))),
+        "flowchart TD\n    X\n    subgraph t\n        Y; \n        X\n    end\n"
+    );
+}
+
+#[test]
+fn moving_statements() {
+    let src = "flowchart TD\n    A --> B\n    C --> D\n    E\n    linkStyle 0 stroke:red\n    linkStyle 1 stroke:blue\n";
+    // C --> D moves before A --> B; the link styles follow their edges.
+    let out = applied(src, move_edge(src, 1, false));
+    assert_eq!(
+        out,
+        "flowchart TD\n    C --> D\n    A --> B\n    E\n    linkStyle 1 stroke:red\n    linkStyle 0 stroke:blue\n"
+    );
+    assert_eq!(chart(&out).nodes[0].id, "C");
+    // And back, by node.
+    assert_eq!(applied(&out, move_node(&out, "A", false)), src);
+    assert_eq!(applied(src, move_node(src, "A", true)), out);
+    // E swaps with the edge before it, which keeps its index; nothing moves past the ends or a
+    // `linkStyle`.
+    assert_eq!(
+        applied(src, move_node(src, "E", false)),
+        "flowchart TD\n    A --> B\n    E\n    C --> D\n    linkStyle 0 stroke:red\n    linkStyle 1 stroke:blue\n"
+    );
+    assert_eq!(move_node(src, "A", false), None);
+    assert_eq!(move_node(src, "E", true), None);
+    assert_eq!(move_node(src, "Z", true), None);
+    assert_eq!(move_edge(src, 9, true), None);
+    // A subgraph swaps as a whole.
+    let src = "flowchart TD\n    A\n    subgraph s\n        B\n    end\n";
+    assert_eq!(
+        applied(src, move_node(src, "A", true)),
+        "flowchart TD\n    subgraph s\n        B\n    end\n    A\n"
+    );
 }
 
 #[test]
