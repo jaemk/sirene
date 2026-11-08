@@ -1,6 +1,7 @@
 [package]
 name = "sirene-gui"
 description = "gpui viewer and editor for sirene"
+readme = "README.md"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

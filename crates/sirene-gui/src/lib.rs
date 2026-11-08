@@ -1,5 +1,5 @@
-//! The sirene editor: one window per diagram file, with its source beside the drawing
-//! (GUISHE-*, WYSIWY-*).
+#![doc = include_str!("../README.md")]
+// The window's behavior: GUISHE-* in spec/gui-shell.md, WYSIWY-* in spec/wysiwyg-editing.md.
 
 pub mod document;
 pub mod drawing;

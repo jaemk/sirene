@@ -1,6 +1,8 @@
 # sirene
 
-A local WYSIWYG Mermaid diagram editor and viewer, with terminal ASCII output.
+A local WYSIWYG editor and viewer for Mermaid flowcharts, with SVG, PNG, and terminal ASCII
+output. Only flowcharts (`flowchart` and `graph`) are drawn; other Mermaid diagram types are
+reported as unsupported.
 
 See `spec/README.md` for the feature status table.
 
@@ -58,13 +60,24 @@ binary that does not link the GUI. PNG text uses the
 embedded Noto Sans faces (`crates/sirene-core/fonts`, SIL OFL 1.1), so images are the same on every
 machine.
 
-On the drawing: click to select (shift-click for more), double-click or enter to edit a label,
-drag from one node to another to connect them, secondary-shift-n to add a node, backspace to
-delete. Each change is written to the source as an ordinary text edit. Arrow keys pan, tab
-steps through nodes, secondary-8 zooms to the selection, File > Export writes PNG or SVG, and
-secondary-shift-c copies the drawing as an image. View > Appearance overrides the system's light
-or dark mode; it, File > Open Recent, and the window and source pane sizes are kept in
-`~/.config/sirene/settings` (`~/Library/Application Support/sirene/settings` on macOS).
+### The editor
+
+Each window shows the source beside a live drawing. Below, secondary is Cmd on macOS and Ctrl
+elsewhere; every action is also in the menus (the menu bar on macOS, the top of each window
+elsewhere). The full key table is in `spec/gui-shell.md` (GUISHE-5).
+
+- Click the drawing to give it the keyboard (it shows an accent frame); secondary-e shows or
+  hides the source pane, and the divider between them drags.
+- Click to select (shift-click for more), double-click or enter to edit a label, drag from one
+  node to another to connect them, secondary-shift-n to add a node, backspace to delete. Each
+  change is written to the source as an ordinary text edit, and secondary-z undoes it.
+- Scroll or drag empty space to pan, secondary-scroll to zoom; the arrow keys pan (shift for
+  further), tab steps through nodes, secondary-8 zooms to the selection, secondary-9 fits the
+  window, secondary-0 is 100%.
+- File > Export writes PNG or SVG, and secondary-shift-c copies the drawing as an image.
+- View > Appearance overrides the system's light or dark mode. It, File > Open Recent, and the
+  window and source pane sizes are kept in `~/.config/sirene/settings`
+  (`~/Library/Application Support/sirene/settings` on macOS).
 
 `examples/` has diagrams to try (`sirene examples/architecture.mmd`, or
 `cargo run -p sirene -- examples/shapes.mmd` from a checkout); a test keeps them free of

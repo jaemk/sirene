@@ -6,6 +6,47 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `sirene png --quality draft|normal|fine` (default `fine`, 4x); the default scale shrinks
+  to fit the largest image.
+- `sirene svg DIR` and `sirene png DIR` render every `.mmd` and `.mermaid` file under a
+  directory, beside each or under `-o OUTDIR`.
+- `-w`/`--watch` on `ascii`, `svg`, and `png` renders again when an input changes.
+- `-v`/`--verbose` logs each step, with timings, to stderr.
+- Markdown bold and italic in labels; long labels wrap.
+- `examples/` with diagrams to try.
+- Editor: fit large drawings on open, zoom to selection, arrow-key panning, select all, and
+  tab/shift-tab through nodes.
+- Editor: File > Export as PNG or SVG, and Edit > Copy Image.
+- Editor: View > Appearance (Follow System, Light, Dark), File > Open Recent, and a resizable
+  source pane, kept in a settings file with the window size.
+- Editor: the menus are drawn in each window on Linux and Windows, where there is no system
+  menu bar.
+- Editor: Edit > Cut, Copy, and Paste; Undo, Redo, and Select All act on the source text when
+  it has the keyboard.
+- Editor: a focus ring shows when the drawing has the keyboard.
+
+### Changed
+
+- `sirene png` writes at 4x by default (was 2x); `--quality normal` gives the old size.
+- The source pane starts 480px wide and keeps its width when the window resizes.
+- New windows open offset from the last one instead of on top of it.
+- Other Mermaid diagram types (`sequenceDiagram`, `classDiagram`, ...) are one
+  "not supported" error and draw nothing, instead of drawing their text as flowchart nodes.
+- A mistyped subcommand (`sirene asci FILE`) is an error with a suggestion instead of opening
+  windows.
+- Save As and Export start in the home directory when the app runs from `/`.
+
+### Fixed
+
+- Readable label colors on styled fills; straighter edges between near-aligned nodes.
+- `svg` and `png` refuse to overwrite their input.
+- Saving keeps file permissions, owner, group, and symlinks; a read-only file is not saved.
+- Reload asks before dropping unsaved edits; Save asks before replacing changes made on disk.
+- Opening a file that is already open brings its window forward.
+- Deleting a node drops the `id@{ ... }` and `class` statements of its edges.
+
 ## [0.1.1] - 2026-11-07
 
 ### Added

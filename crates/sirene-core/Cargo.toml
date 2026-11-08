@@ -1,6 +1,7 @@
 [package]
 name = "sirene-core"
-description = "Mermaid parsing, diagram model, and layout for sirene"
+description = "Mermaid flowchart parsing, layout, and ASCII/SVG/PNG rendering for sirene"
+readme = "README.md"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
