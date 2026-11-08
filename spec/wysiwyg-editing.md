@@ -27,8 +27,10 @@ the status bar.
 
 Save (secondary-s) writes the text to the document's file, replacing it through a temporary file
 in the same directory, and the document is no longer edited. The text is synced to disk before
-the rename, the file keeps its permissions, a symlinked file stays a symlink (its target is
-written), and anything already at the temporary name is replaced, not written through. Save As (secondary-shift-s), and
+the rename, the file keeps its permissions, owner, and group, a symlinked file stays a symlink
+(its target is written), and anything already at the temporary name is replaced, not written
+through. When the owner cannot be kept (another user's file), the file is overwritten in place
+instead. A read-only file is not saved: `cannot write PATH: the file is read-only`. Save As (secondary-shift-s), and
 Save on an Untitled document, ask for a path first; the window then shows that file. A failed
 write leaves the document edited and shows the error in the status bar.
 
