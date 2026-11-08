@@ -142,4 +142,52 @@ fn right_click_selects_and_opens_the_menu(cx: &mut TestAppContext) {
     first_item(cx, area.origin + point(px(5.0), px(5.0)));
     let text = source(&viewer, cx);
     assert!(text.ends_with("    D[New node]\n"), "{text}");
+
+    // On an edge: its first item is Rename too.
+    let edge = center(&viewer, cx, &Item::Edge(1));
+    first_item(cx, edge);
+    assert_eq!(
+        viewer.read_with(cx, |v, _| v.selection.clone()),
+        [Item::Edge(1)]
+    );
+    assert!(viewer.read_with(cx, |v, _| v.label.is_some()));
+}
+
+/// Right-clicks at `at` and types `keys` into the menu.
+fn pick(cx: &mut VisualTestContext, at: Point<Pixels>, keys: &str) {
+    cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::none());
+    cx.simulate_mouse_up(at, MouseButton::Right, Modifiers::none());
+    cx.run_until_parked();
+    cx.simulate_keystrokes(keys);
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn submenus_for_a_mixed_selection(cx: &mut TestAppContext) {
+    let (viewer, cx) = open_src(cx, SRC);
+    select(&viewer, cx, vec![node("A"), Item::Edge(0)]);
+    let a = center(&viewer, cx, &node("A"));
+    // Up from Delete, past a disabled Shorter: Longer, Reverse, Arrows, Line > Solid, Thick.
+    pick(cx, a, "up up up up up enter down enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "flowchart TD\n    A[Alpha] ==> B[Beta]\n    B --> C\n"
+    );
+    // Shape > Rect, Rounded.
+    pick(cx, a, "down enter down enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "flowchart TD\n    A(Alpha) ==> B[Beta]\n    B --> C\n"
+    );
+}
+
+#[gpui::test]
+fn a_lone_node_has_nothing_to_connect(cx: &mut TestAppContext) {
+    let (viewer, cx) = open_src(cx, "flowchart TD\n    A\n");
+    let a = center(&viewer, cx, &node("A"));
+    // Rename, Shape, Add Node After: no Connect To in between.
+    pick(cx, a, "down down down enter");
+    cx.run_until_parked();
+    let text = source(&viewer, cx);
+    assert!(text.ends_with("    B[New node]\n    A --> B\n"), "{text}");
 }
