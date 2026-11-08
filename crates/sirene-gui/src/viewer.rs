@@ -385,10 +385,11 @@ impl Viewer {
         self.doc.path.is_none() && !self.doc.is_edited()
     }
 
-    /// Shows the first path here when this window is blank, and opens the rest in new windows.
+    /// Shows the first path here when this window is blank and no other window shows it, and
+    /// opens the rest as `open_paths` does.
     pub fn show_paths(&mut self, paths: &[PathBuf], window: &mut Window, cx: &mut Context<Self>) {
         let rest = match paths.split_first() {
-            Some((first, rest)) if self.is_blank() => {
+            Some((first, rest)) if self.is_blank() && !crate::focus_existing(first, cx) => {
                 self.set_document(Document::open(first), window, cx);
                 rest
             }

@@ -265,10 +265,12 @@ fn new_and_open(cx: &mut TestAppContext) {
     assert_eq!(source(&viewer, vcx), "flowchart\nA\n");
     assert_eq!(cx.windows().len(), 3);
 
-    // A window showing a file leaves Open to the app, which opens new windows.
+    // A window showing a file leaves Open to the app, which opens new windows for files not
+    // already open and brings forward the windows of those that are.
+    let c = write(dir.path(), "c.mmd", "flowchart\nC\n");
     vcx.dispatch_action(Open);
     vcx.run_until_parked();
-    cx.simulate_path_prompt_response(move |_| Some(vec![b]));
+    cx.simulate_path_prompt_response(move |_| Some(vec![b, c]));
     cx.run_until_parked();
     assert_eq!(cx.windows().len(), 4);
     assert_eq!(title(vcx), "a.mmd");

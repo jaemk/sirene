@@ -7,7 +7,9 @@ The app window (`crates/sirene-gui`): one window per diagram file. Tests:
 
 `sirene_gui::run(paths)` starts the app and opens one window per path, or one new document
 (WYSIWY-7) when there are none. Files the platform asks the app to open (`file://` URLs, e.g. from Finder) open
-in new windows. The app quits when its last window closes.
+in new windows; a URL naming a host other than `localhost` is ignored. A file that a window
+already shows (compared after resolving links and `..`) brings that window forward instead of
+opening another, however it is opened. The app quits when its last window closes.
 
 ## GUISHE-2 Viewer
 

@@ -6,7 +6,7 @@ pub mod drawing;
 pub mod paint;
 pub mod viewer;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use futures::StreamExt;
 use gpui::{
@@ -216,11 +216,36 @@ pub(crate) fn open_options() -> PathPromptOptions {
     }
 }
 
-/// Opens each path in a new window.
+/// Opens each path in a new window, or brings forward the window already showing it.
 pub fn open_paths(paths: &[PathBuf], cx: &mut App) {
     for p in paths {
-        open_or_report(Document::open(p), cx);
+        if !focus_existing(p, cx) {
+            open_or_report(Document::open(p), cx);
+        }
     }
+}
+
+/// Brings forward the window showing `path` (compared after resolving links and `..`), if any.
+pub fn focus_existing(path: &Path, cx: &mut App) -> bool {
+    let Ok(want) = std::fs::canonicalize(path) else {
+        return false;
+    };
+    for handle in cx.windows() {
+        let found = handle.update(cx, |_, window, cx| {
+            let shows = viewer_in(window, cx).is_some_and(|v| {
+                let shown = v.read(cx).doc.path.as_deref();
+                shown.and_then(|p| std::fs::canonicalize(p).ok()).as_ref() == Some(&want)
+            });
+            if shows {
+                window.activate_window();
+            }
+            shows
+        });
+        if found.unwrap_or(false) {
+            return true;
+        }
+    }
+    false
 }
 
 /// The editor in `window`, if it shows one.
@@ -251,11 +276,14 @@ pub fn confirm_quit(cx: &mut App) -> Task<bool> {
     })
 }
 
-/// The local path of a `file://` URL, percent-decoded.
+/// The local path of a `file://` URL, percent-decoded. A URL naming another host has none.
 pub fn url_path(url: &str) -> Option<PathBuf> {
     let rest = url.strip_prefix("file://")?;
-    // Skip an authority such as `localhost`.
-    let rest = &rest[rest.find('/')?..];
+    let slash = rest.find('/')?;
+    if !matches!(&rest[..slash], "" | "localhost") {
+        return None;
+    }
+    let rest = &rest[slash..];
     let bytes = rest.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -278,7 +306,19 @@ pub fn url_path(url: &str) -> Option<PathBuf> {
             }
         }
     }
-    String::from_utf8(out).ok().map(PathBuf::from)
+    bytes_path(out)
+}
+
+/// A path from raw bytes: any bytes on Unix, UTF-8 elsewhere.
+#[cfg(unix)]
+fn bytes_path(bytes: Vec<u8>) -> Option<PathBuf> {
+    use std::os::unix::ffi::OsStringExt;
+    Some(PathBuf::from(std::ffi::OsString::from_vec(bytes)))
+}
+
+#[cfg(not(unix))]
+fn bytes_path(bytes: Vec<u8>) -> Option<PathBuf> {
+    String::from_utf8(bytes).ok().map(PathBuf::from)
 }
 
 /// Runs the app, opening a window per path, or a new document when there are none
@@ -325,8 +365,14 @@ mod tests {
         );
         assert_eq!(url_path("file:///a%2"), Some(PathBuf::from("/a%2")));
         assert_eq!(url_path("file:///a%zz"), Some(PathBuf::from("/a%zz")));
-        assert_eq!(url_path("file:///%ff"), None);
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            let p = url_path("file:///a%ff").unwrap();
+            assert_eq!(p.as_os_str().as_bytes(), b"/a\xff");
+        }
         assert_eq!(url_path("file://host"), None);
+        assert_eq!(url_path("file://otherhost/etc/a.mmd"), None);
         assert_eq!(url_path("https://example.com/a.mmd"), None);
     }
 
