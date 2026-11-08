@@ -5,6 +5,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["mermaid", "diagram", "gpui", "editor"]
+categories = ["gui", "visualization"]
 
 [dependencies]
 anyhow = "1"

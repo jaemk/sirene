@@ -29,5 +29,21 @@ When FILE cannot be read, sirene prints `error: cannot read FILE: REASON` to std
 
 `sirene svg [FILE]` reads a flowchart as `sirene ascii` does and prints it to stdout as a
 standalone SVG document (`display-list.md`), with text measured by the monospace estimate.
-`--theme light|dark` picks the colors; the default is `light`. Diagnostics and exit status
-follow CLI-3 and CLI-4.
+`--theme light|dark` picks the colors; the default is `light`. `-o, --output PATH` writes the
+SVG to PATH instead of stdout. Diagnostics and exit status follow CLI-3 and CLI-4.
+
+## CLI-6 `sirene png`
+
+`sirene png [FILE]` reads a flowchart as `sirene ascii` does and writes it as a PNG
+(DISPLA-11), with text measured by the embedded font, without opening a window. `--theme` is as
+for `sirene svg`; `--scale N` sets pixels per diagram unit (default 2). The PNG goes to
+`-o, --output PATH`; without it, to FILE with its extension replaced by `.png`, or to stdout
+when reading stdin. Writing a PNG to a terminal is refused. Diagnostics and exit status follow
+CLI-3 and CLI-4; a write or render failure prints `error: ...` and exits 1.
+
+## CLI-7 Headless builds
+
+The `gui` feature of the `sirene` crate is on by default. Built without it
+(`--no-default-features`), the binary does not link the GUI or its system libraries, the
+subcommands work as above, and running with no subcommand prints
+`error: built without the GUI; see sirene --help` and exits 1.

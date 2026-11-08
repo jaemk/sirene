@@ -7,4 +7,5 @@ cd "$(dirname "$0")/.."
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
+cargo test --package sirene --no-default-features --locked
 cargo llvm-cov --workspace --locked --fail-under-lines 95

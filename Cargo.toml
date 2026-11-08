@@ -7,6 +7,10 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.92"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/jaemk/sirene"
+homepage = "https://github.com/jaemk/sirene"
+keywords = ["mermaid", "diagram", "flowchart", "ascii", "editor"]
+categories = ["command-line-utilities", "visualization", "gui"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -15,5 +19,5 @@ unsafe_code = "forbid"
 all = { level = "warn", priority = -1 }
 
 [workspace.dependencies]
-sirene-core = { path = "crates/sirene-core" }
-sirene-gui = { path = "crates/sirene-gui" }
+sirene-core = { path = "crates/sirene-core", version = "0.1.0" }
+sirene-gui = { path = "crates/sirene-gui", version = "0.1.0" }

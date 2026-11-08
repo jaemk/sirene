@@ -175,6 +175,128 @@ fn svg_output() {
         .stderr(predicate::str::contains(": error: "));
 }
 
+/// The width and height in a PNG's header.
+fn png_size(bytes: &[u8]) -> (u32, u32) {
+    assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"), "not a PNG");
+    assert_eq!(&bytes[12..16], b"IHDR");
+    let n = |i: usize| u32::from_be_bytes(bytes[i..i + 4].try_into().unwrap());
+    (n(16), n(20))
+}
+
+#[test]
+fn svg_to_a_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out.svg");
+    sirene()
+        .args([
+            "svg",
+            &fixture("accessibility"),
+            "-o",
+            out.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout("");
+    let svg = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        svg.starts_with("<svg ") && svg.ends_with("</svg>\n"),
+        "{svg}"
+    );
+}
+
+#[test]
+fn png_next_to_the_input() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("diagram.mmd");
+    std::fs::write(&src, "flowchart LR\nA[Hello] --> B[World]\n").unwrap();
+    sirene()
+        .args(["png", src.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout("")
+        .stderr("");
+    let (w2, h2) = png_size(&std::fs::read(tmp.path().join("diagram.png")).unwrap());
+
+    let out = tmp.path().join("small.png");
+    sirene()
+        .args([
+            "png",
+            src.to_str().unwrap(),
+            "--scale",
+            "1",
+            "--theme",
+            "dark",
+        ])
+        .args(["--output", out.to_str().unwrap()])
+        .assert()
+        .success();
+    let (w1, h1) = png_size(&std::fs::read(&out).unwrap());
+    assert!(w1 > 50 && h1 > 20, "{w1}x{h1}");
+    assert!(
+        w2.abs_diff(2 * w1) <= 1 && h2.abs_diff(2 * h1) <= 1,
+        "{w2}x{h2} vs {w1}x{h1}"
+    );
+}
+
+#[test]
+fn png_from_stdin() {
+    let out = sirene()
+        .arg("png")
+        .write_stdin("flowchart TD\nA --> B\n")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    png_size(&out);
+    let out = sirene()
+        .args(["png", "-"])
+        .write_stdin("flowchart TD\nA --> B\nlinkStyle 5 color:red\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(": error: "))
+        .get_output()
+        .stdout
+        .clone();
+    png_size(&out);
+}
+
+#[test]
+fn png_failures() {
+    sirene()
+        .args(["png", "--scale", "0", "-"])
+        .write_stdin("flowchart\nA\n")
+        .assert()
+        .failure()
+        .stdout("")
+        .stderr("error: scale must be a positive number, not 0\n");
+    sirene()
+        .args(["png", "-o", "does/not/exist.png", "-"])
+        .write_stdin("flowchart\nA\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::starts_with(
+            "error: cannot write does/not/exist.png: ",
+        ));
+    sirene()
+        .args(["png", "does/not/exist.mmd"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::starts_with(
+            "error: cannot read does/not/exist.mmd: ",
+        ));
+}
+
+#[cfg(not(feature = "gui"))]
+#[test]
+fn no_gui() {
+    sirene()
+        .arg("diagram.mmd")
+        .assert()
+        .failure()
+        .stderr("error: built without the GUI; see sirene --help\n");
+}
+
 #[test]
 fn rejects_unknown_flag() {
     sirene()

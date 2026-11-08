@@ -73,3 +73,13 @@ that contains it (even-odd), or a stroked path within `slop` plus half the strok
 the diagram's own elements (its title) are never hit, so a label hits the shape or label
 background under it. `Scene::bounds(owner)` is the bounding box of an owner's paths. Tests: unit
 tests in `crates/sirene-core/src/scene/hit.rs`.
+
+## DISPLA-11 PNG
+
+With the `png` feature, `scene::png::write(scene, scale)` draws a scene's SVG (DISPLA-9) into an
+RGBA PNG of `ceil(width * scale)` by `ceil(height * scale)` pixels, with all text
+in the embedded Noto Sans Regular (`crates/sirene-core/fonts`, SIL OFL 1.1). No system fonts are
+read, so the output is the same on every machine; characters Noto Sans lacks are not drawn.
+`png::FontMetrics` measures text with the same font (DISPLA-4), using `Approx` for characters it
+lacks. A scale that is not finite and positive, an image over 16384 pixels on a side, or a scene
+with no area is an error. Tests: `crates/sirene-core/tests/png.rs`.

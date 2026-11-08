@@ -5,13 +5,27 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords = ["mermaid", "diagram", "flowchart", "parser", "layout"]
+categories = ["parser-implementations", "visualization"]
 
 [lints]
 workspace = true
 
+[features]
+## PNG output (`scene::png`), with an embedded font.
+png = ["dep:resvg", "dep:ttf-parser"]
+
 [dependencies]
+resvg = { version = "0.46.0", default-features = false, features = ["text"], optional = true }
 rowan = "0.17.0"
+ttf-parser = { version = "0.25.1", optional = true }
 unicode-width = "0.2.3"
+
+[[test]]
+name = "png"
+required-features = ["png"]
 
 [dev-dependencies]
 insta = "1.49.0"

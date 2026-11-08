@@ -5,15 +5,25 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
 
 [[bin]]
 name = "sirene"
 path = "src/main.rs"
 
+[features]
+default = ["gui"]
+## The viewer window; without it the binary is CLI only.
+gui = ["dep:sirene-gui"]
+
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
-sirene-core.workspace = true
-sirene-gui.workspace = true
+sirene-core = { workspace = true, features = ["png"] }
+sirene-gui = { workspace = true, optional = true }
 
 [lints]
 workspace = true
@@ -21,3 +31,4 @@ workspace = true
 [dev-dependencies]
 assert_cmd = "2.2.2"
 predicates = "3.1.4"
+tempfile = "3.27.0"

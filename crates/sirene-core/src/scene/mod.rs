@@ -2,6 +2,8 @@
 
 mod hit;
 mod paint;
+#[cfg(feature = "png")]
+pub mod png;
 mod shapes;
 mod style;
 pub mod svg;

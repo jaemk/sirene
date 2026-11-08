@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use sirene_core::Severity;
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::flowchart::{self, Lowered};
+use sirene_core::scene::png::{self, FontMetrics};
 use sirene_core::scene::{self, Approx, Theme};
 
 /// Mermaid diagram editor and viewer.
@@ -42,6 +43,23 @@ enum Command {
         /// Colors to draw with.
         #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
         theme: ThemeArg,
+        /// Write the SVG here instead of stdout.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+    /// Write a diagram as a PNG image.
+    Png {
+        /// Mermaid file to read; stdin when omitted or `-`.
+        file: Option<PathBuf>,
+        /// Colors to draw with.
+        #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
+        theme: ThemeArg,
+        /// Pixels per diagram unit.
+        #[arg(long, default_value_t = 2.0)]
+        scale: f32,
+        /// Where to write the PNG; defaults to FILE with a .png extension, or stdout for stdin.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
     },
 }
 
@@ -59,30 +77,69 @@ enum ThemeArg {
     Dark,
 }
 
+impl ThemeArg {
+    fn theme(self) -> Theme {
+        match self {
+            ThemeArg::Light => Theme::LIGHT,
+            ThemeArg::Dark => Theme::DARK,
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
-        None => {
-            sirene_gui::run(cli.files);
-            ExitCode::SUCCESS
-        }
+        None => gui(cli.files),
         Some(Command::Ascii { file, charset }) => {
             let charset = match charset {
                 CharsetArg::Unicode => Charset::Unicode,
                 CharsetArg::Ascii => Charset::Ascii,
             };
-            print_with(file, |l| ascii::render(&l.flowchart, &Options { charset }))
+            render_with(file, None, |l| {
+                Ok(ascii::render(&l.flowchart, &Options { charset }).into_bytes())
+            })
         }
-        Some(Command::Svg { file, theme }) => {
-            let theme = match theme {
-                ThemeArg::Light => Theme::LIGHT,
-                ThemeArg::Dark => Theme::DARK,
-            };
-            print_with(file, |l| {
-                scene::svg::write(&scene::flowchart(&l.flowchart, &Approx, &theme))
+        Some(Command::Svg {
+            file,
+            theme,
+            output,
+        }) => render_with(file, output, |l| {
+            let scene = scene::flowchart(&l.flowchart, &Approx, &theme.theme());
+            Ok(scene::svg::write(&scene).into_bytes())
+        }),
+        Some(Command::Png {
+            file,
+            theme,
+            scale,
+            output,
+        }) => {
+            let output = output.or_else(|| {
+                file.as_ref()
+                    .filter(|f| f.as_os_str() != "-")
+                    .map(|f| f.with_extension("png"))
+            });
+            if output.is_none() && std::io::stdout().is_terminal() {
+                eprintln!("error: refusing to write a PNG to a terminal; use --output");
+                return ExitCode::FAILURE;
+            }
+            render_with(file, output, |l| {
+                let scene = scene::flowchart(&l.flowchart, &FontMetrics, &theme.theme());
+                png::write(&scene, scale)
             })
         }
     }
+}
+
+#[cfg(feature = "gui")]
+fn gui(files: Vec<PathBuf>) -> ExitCode {
+    sirene_gui::run(files);
+    ExitCode::SUCCESS
+}
+
+#[cfg(not(feature = "gui"))]
+fn gui(_: Vec<PathBuf>) -> ExitCode {
+    eprintln!("error: built without the GUI; see sirene --help");
+    ExitCode::FAILURE
 }
 
 /// Reads the source named on the command line: a file, or stdin for `None` or `-`.
@@ -104,8 +161,13 @@ fn read(file: Option<PathBuf>) -> Result<(String, String), String> {
     }
 }
 
-/// Reports diagnostics on stderr and prints `render`'s output, failing if there were errors.
-fn print_with(file: Option<PathBuf>, render: impl FnOnce(&Lowered) -> String) -> ExitCode {
+/// Reports diagnostics on stderr and writes `render`'s output to `output` (stdout when `None`),
+/// failing if there were errors.
+fn render_with(
+    file: Option<PathBuf>,
+    output: Option<PathBuf>,
+    render: impl FnOnce(&Lowered) -> Result<Vec<u8>, String>,
+) -> ExitCode {
     let (name, src) = match read(file) {
         Ok(read) => read,
         Err(message) => {
@@ -126,7 +188,18 @@ fn print_with(file: Option<PathBuf>, render: impl FnOnce(&Lowered) -> String) ->
         };
         eprintln!("{name}:{line}:{col}: {severity}: {}", d.message);
     }
-    print!("{}", render(&lowered));
+    let written = render(&lowered).and_then(|bytes| match &output {
+        Some(path) => {
+            std::fs::write(path, bytes).map_err(|e| format!("cannot write {}: {e}", path.display()))
+        }
+        None => std::io::stdout()
+            .write_all(&bytes)
+            .map_err(|e| format!("cannot write <stdout>: {e}")),
+    });
+    if let Err(message) = written {
+        eprintln!("error: {message}");
+        return ExitCode::FAILURE;
+    }
     if failed {
         ExitCode::FAILURE
     } else {
