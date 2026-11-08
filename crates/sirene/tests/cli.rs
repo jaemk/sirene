@@ -616,6 +616,34 @@ fn no_gui() {
         .stderr("error: built without the GUI; see sirene --help\n");
 }
 
+/// A mistyped command is an error instead of a window for a file that does not exist (CLI-1).
+#[test]
+fn suggests_a_misspelled_command() {
+    sirene()
+        .args(["asci", "diagram.mmd"])
+        .assert()
+        .code(2)
+        .stdout("")
+        .stderr(
+            "error: no file or command named 'asci'; did you mean 'sirene ascii'? \
+             (to open a new file with that name, use './asci')\n",
+        );
+}
+
+/// Another Mermaid diagram type gets one clear error and no drawing (FLOWCH-16).
+#[test]
+fn other_diagram_types() {
+    sirene()
+        .arg("ascii")
+        .write_stdin("sequenceDiagram\n  A->>B: hi\n")
+        .assert()
+        .failure()
+        .stderr(
+            "<stdin>:1:1: error: `sequenceDiagram` diagrams are not supported; \
+             sirene draws flowcharts\n",
+        );
+}
+
 #[test]
 fn rejects_unknown_flag() {
     sirene()
