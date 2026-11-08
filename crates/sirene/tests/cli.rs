@@ -276,7 +276,7 @@ fn png_next_to_the_input() {
         .success()
         .stdout("")
         .stderr("");
-    let (w2, h2) = png_size(&std::fs::read(tmp.path().join("diagram.png")).unwrap());
+    let (w4, h4) = png_size(&std::fs::read(tmp.path().join("diagram.png")).unwrap());
 
     let out = tmp.path().join("small.png");
     sirene()
@@ -293,10 +293,43 @@ fn png_next_to_the_input() {
         .success();
     let (w1, h1) = png_size(&std::fs::read(&out).unwrap());
     assert!(w1 > 50 && h1 > 20, "{w1}x{h1}");
+    // The default is fine quality, at 4 pixels per unit.
     assert!(
-        w2.abs_diff(2 * w1) <= 1 && h2.abs_diff(2 * h1) <= 1,
-        "{w2}x{h2} vs {w1}x{h1}"
+        w4.abs_diff(4 * w1) <= 3 && h4.abs_diff(4 * h1) <= 3,
+        "{w4}x{h4} vs {w1}x{h1}"
     );
+}
+
+/// `--quality` sets the scale unless `--scale` is given.
+#[test]
+fn png_quality() {
+    let size = |args: &[&str]| {
+        let out = sirene()
+            .arg("png")
+            .args(args)
+            .write_stdin("flowchart LR\nA[Hello] --> B[World]\n")
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        png_size(&out)
+    };
+    let (w1, _) = size(&["--quality", "draft"]);
+    for (args, n) in [
+        (&["--quality", "normal"][..], 2),
+        (&["--quality", "fine"], 4),
+        (&[], 4),
+        (&["--quality", "draft", "--scale", "3"], 3),
+    ] {
+        let (w, _) = size(args);
+        assert!(w.abs_diff(n * w1) <= n, "{args:?}: {w} vs {w1}");
+    }
+    sirene()
+        .args(["png", "--quality", "best", "-"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("best"));
 }
 
 #[test]

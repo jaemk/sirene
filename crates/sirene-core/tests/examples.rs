@@ -31,7 +31,8 @@ fn examples_render_cleanly() {
         for theme in [Theme::LIGHT, Theme::DARK] {
             let s = scene::flowchart(&chart, &FontMetrics, &theme);
             assert!(svg::write(&s).starts_with("<svg"), "{}", path.display());
-            png::write(&s, 2.0).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            png::write(&s, png::Options::new(png::Quality::Normal))
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         }
         assert!(!ascii::render(&chart, &Options::default()).trim().is_empty());
     }

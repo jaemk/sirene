@@ -37,7 +37,9 @@ SVG to PATH instead of stdout; a PATH that is FILE itself is refused before anyt
 
 `sirene png [FILE]` reads a flowchart as `sirene ascii` does and writes it as a PNG
 (DISPLA-11), with text measured by the embedded font, without opening a window. `--theme` is as
-for `sirene svg`; `--scale N` sets pixels per diagram unit (default 2). The PNG goes to
+for `sirene svg`; `--quality draft|normal|fine` (default `fine`) picks the detail (DISPLA-12),
+drawn at that quality's scale, shrunk to fit when the image would be too large; `--scale N` sets
+pixels per diagram unit instead, and a scale too large is an error. The PNG goes to
 `-o, --output PATH`; without it, to FILE with its extension replaced by `.png`, or to stdout
 when reading stdin. Writing a PNG to a terminal, or over FILE (as for `sirene svg`), is
 refused. Diagnostics and exit status follow
