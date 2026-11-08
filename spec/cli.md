@@ -78,10 +78,15 @@ in `crates/sirene/tests/cli.rs` and `arguments` in `crates/sirene/src/main.rs`.
 into subdirectories but skipping hidden entries and symlinked directories, in path order. Each is
 written as `.svg` or `.png` beside it, or with `-o OUTDIR` to the same relative path under OUTDIR
 (directories are created as needed). Diagnostics follow CLI-3 for each file; one file's errors
-fail the run without stopping the others. A DIR with no diagrams is an error
-(`error: no .mmd or .mermaid files in DIR`), as is a directory given to `sirene ascii`
-(`error: DIR is a directory; ascii reads one file`). Tests: `directories` in
-`crates/sirene/tests/cli.rs`.
+fail the run without stopping the others. When two diagrams would write the same output
+(`a.mmd` beside `a.mermaid`), the first in path order is rendered and each later one is
+skipped with `error: skipping LATER; FIRST also writes OUTPUT`, which fails the run (in a watch,
+the line is printed again only when the set of skipped files changes). These are errors that
+render nothing: a DIR with no diagrams (`error: no .mmd or .mermaid files in DIR`), a DIR that
+cannot be listed (`error: cannot read DIR: REASON`), an OUTDIR that exists and is not a directory
+(`error: OUTDIR is not a directory; a DIR renders into one`), and a directory given to
+`sirene ascii` (`error: DIR is a directory; ascii reads one file`). Tests: `directories`,
+`directory_output_collisions`, and `unreadable_directory` in `crates/sirene/tests/cli.rs`.
 
 ## CLI-10 Watching
 

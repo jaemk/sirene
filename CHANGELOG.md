@@ -42,6 +42,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Readable label colors on styled fills; straighter edges between near-aligned nodes.
 - `svg` and `png` refuse to overwrite their input.
+- `svg DIR` and `png DIR` skip a diagram whose output another already writes (`a.mmd` beside
+  `a.mermaid`) instead of overwriting it, and report an unreadable DIR or an `-o` that is a file
+  once instead of per diagram.
 - Saving keeps file permissions, owner, group, and symlinks; a read-only file is not saved.
 - Reload asks before dropping unsaved edits; Save asks before replacing changes made on disk.
 - Opening a file that is already open brings its window forward.
