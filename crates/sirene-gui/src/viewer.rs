@@ -23,9 +23,10 @@ use crate::document::{Disk, Document};
 use crate::drawing::{Drag, Item, LabelEdit};
 use crate::paint::{self, Metrics, Placement};
 use crate::settings::{self, Settings};
+use crate::styles::StylePanel;
 use crate::{
     ActualSize, CloseWindow, FitWindow, Open, Redo, Reload, Save, SaveAs, SelectAll, ToggleSource,
-    Undo, ZoomIn, ZoomOut,
+    ToggleStyles, Undo, ZoomIn, ZoomOut,
 };
 
 /// How often the file is checked for changes.
@@ -33,6 +34,8 @@ pub const POLL: Duration = Duration::from_millis(500);
 pub const MIN_ZOOM: f32 = 0.1;
 pub const MAX_ZOOM: f32 = 8.0;
 const ZOOM_STEP: f32 = 1.25;
+/// The width of the styles panel (WYSIWY-17).
+const STYLES_WIDTH: f32 = 240.0;
 
 pub struct Viewer {
     pub doc: Document,
@@ -53,6 +56,9 @@ pub struct Viewer {
     pub(crate) drag: Option<Drag>,
     /// The subgraph the right-click menu was opened on (WYSIWY-16).
     pub menu_subgraph: Option<String>,
+    /// The styles panel beside the drawing, and whether it is shown (WYSIWY-17).
+    pub styles: Entity<StylePanel>,
+    pub show_styles: bool,
     /// Drawing changes as (before, after) texts, for Undo and Redo (WYSIWY-13).
     pub(crate) history: Vec<(String, String)>,
     pub(crate) future: Vec<(String, String)>,
@@ -158,6 +164,8 @@ impl Viewer {
         let panes = cx.new(|_| ResizableState::default());
         let menu_bar = crate::IN_WINDOW_MENUS.then(|| AppMenuBar::new(cx));
         let menu_recent = settings::get(cx).recent.clone();
+        let me = cx.entity().downgrade();
+        let styles = cx.new(|cx| StylePanel::new(me, window, cx));
         let mut viewer = Self {
             doc,
             source,
@@ -171,6 +179,8 @@ impl Viewer {
             label: None,
             drag: None,
             menu_subgraph: None,
+            styles,
+            show_styles: false,
             history: Vec::new(),
             future: Vec::new(),
             fit_pending: true,
@@ -375,6 +385,23 @@ impl Viewer {
             self.source.update(cx, |s, cx| s.focus(window, cx));
         } else {
             window.focus(&self.drawing_focus, cx);
+        }
+        cx.notify();
+    }
+
+    fn toggle_styles(&mut self, _: &ToggleStyles, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_styles = !self.show_styles;
+        // Opening the panel edits the first class of the selection, if any (WYSIWY-17).
+        if self.show_styles {
+            let first = self
+                .selected_nodes()
+                .iter()
+                .find_map(|id| self.doc.chart.node(id)?.classes.first().cloned());
+            if first.is_some() {
+                let chart = &self.doc.chart;
+                self.styles
+                    .update(cx, |p, cx| p.edit_in(first, chart, window, cx));
+            }
         }
         cx.notify();
     }
@@ -711,7 +738,23 @@ impl Render for Viewer {
                             .child(Editor::new(&self.source).bordered(false).size_full()),
                     ),
             )
-            .child(resizable_panel().child(drawing));
+            .child(
+                resizable_panel().child(div().flex().flex_row().size_full().child(drawing).when(
+                    self.show_styles,
+                    |d| {
+                        d.child(
+                            div()
+                                .id("styles-pane")
+                                .w(px(STYLES_WIDTH))
+                                .h_full()
+                                .flex_none()
+                                .border_l_1()
+                                .border_color(rule)
+                                .child(self.styles.clone()),
+                        )
+                    },
+                )),
+            );
         let body = div().flex().flex_row().flex_1().min_h_0().w_full();
         div()
             .track_focus(&self.focus)
@@ -726,6 +769,7 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::copy_image))
             .on_action(cx.listener(Self::reload))
             .on_action(cx.listener(Self::toggle_source))
+            .on_action(cx.listener(Self::toggle_styles))
             .on_action(cx.listener(Self::save_action))
             .on_action(cx.listener(Self::save_as_action))
             .on_action(cx.listener(Self::close))

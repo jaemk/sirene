@@ -36,6 +36,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   move statements earlier or later.
 - `flowchart::edit::set_direction`, `keep_together`, `group`, `ungroup`, `move_to_subgraph`,
   `move_node`, and `move_edge`.
+- Editor: a styles panel (View > Show or Hide Styles) that applies classes to the selected
+  nodes and edits a class's colors, width, and dashes.
+- `flowchart::edit::set_class_style`, `apply_class`, `remove_class`, and `fresh_class_name`.
 
 ### Changed
 
