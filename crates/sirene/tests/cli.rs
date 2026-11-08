@@ -479,6 +479,65 @@ fn directories() {
             "error: {} is a directory; ascii reads one file\n",
             dir.display()
         ));
+
+    // -o must name a directory.
+    let file = tmp.path().join("file.txt");
+    std::fs::write(&file, "").unwrap();
+    sirene()
+        .arg("svg")
+        .arg(&dir)
+        .arg("-o")
+        .arg(&file)
+        .assert()
+        .failure()
+        .stderr(format!(
+            "error: {} is not a directory; a DIR renders into one\n",
+            file.display()
+        ));
+}
+
+#[test]
+fn directory_output_collisions() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    std::fs::write(dir.join("a.mermaid"), "flowchart\nA\n").unwrap();
+    std::fs::write(dir.join("a.mmd"), "flowchart\nA --> B\n").unwrap();
+    std::fs::write(dir.join("b.mmd"), "flowchart\nB\n").unwrap();
+    sirene()
+        .arg("svg")
+        .arg(dir)
+        .assert()
+        .failure()
+        .stderr(format!(
+            "error: skipping {}; {} also writes {}\n",
+            dir.join("a.mmd").display(),
+            dir.join("a.mermaid").display(),
+            dir.join("a.svg").display()
+        ));
+    // a.svg comes from a.mermaid (one node), not a.mmd.
+    let svg = std::fs::read_to_string(dir.join("a.svg")).unwrap();
+    assert!(!svg.contains(">B<"), "{svg}");
+    assert!(dir.join("b.svg").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn unreadable_directory() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path().join("locked");
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o000)).unwrap();
+    // Root reads it anyway; there is nothing to check then.
+    let readable = std::fs::read_dir(&dir).is_ok();
+    let assert = sirene().arg("svg").arg(&dir).assert().failure();
+    std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+    if !readable {
+        assert.stderr(predicate::str::starts_with(format!(
+            "error: cannot read {}: ",
+            dir.display()
+        )));
+    }
 }
 
 #[test]

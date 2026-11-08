@@ -339,17 +339,28 @@ fn convert(
     let file = file.filter(|f| f.as_os_str() != "-");
     let dir = file.clone().filter(|f| f.is_dir());
     let jobs = || match (&dir, ext) {
-        (Some(d), Some(ext)) => scan(d, output.as_deref().unwrap_or(d), ext)
-            .into_iter()
-            .map(|(i, o)| (Some(i), Some(o)))
-            .collect(),
-        _ => vec![(file.clone(), output.clone())],
+        (Some(d), Some(ext)) => distinct(scan(d, output.as_deref().unwrap_or(d), ext)),
+        _ => (vec![(file.clone(), output.clone())], Vec::new()),
     };
     if let Some(d) = &dir {
         if ext.is_none() {
             eprintln!(
                 "error: {} is a directory; ascii reads one file",
                 d.display()
+            );
+            return ExitCode::FAILURE;
+        }
+        if let Err(e) = std::fs::read_dir(d) {
+            eprintln!("error: cannot read {}: {e}", d.display());
+            return ExitCode::FAILURE;
+        }
+        if let Some(out) = &output
+            && out.exists()
+            && !out.is_dir()
+        {
+            eprintln!(
+                "error: {} is not a directory; a DIR renders into one",
+                out.display()
             );
             return ExitCode::FAILURE;
         }
@@ -365,15 +376,18 @@ fn convert(
     let make_dirs = dir.is_some();
 
     if !watch {
-        let jobs = jobs();
+        let (jobs, skipped) = jobs();
         if let Some(d) = &dir
             && jobs.is_empty()
         {
             eprintln!("error: no .mmd or .mermaid files in {}", d.display());
             return ExitCode::FAILURE;
         }
+        for line in &skipped {
+            eprintln!("{line}");
+        }
         log::debug!("rendering {} file(s)", jobs.len());
-        let mut ok = true;
+        let mut ok = skipped.is_empty();
         for (input, output) in &jobs {
             let done = render_one(input.as_deref(), output.as_deref(), make_dirs, &render);
             ok &= done.written && done.clean;
@@ -391,8 +405,16 @@ fn convert(
     };
     eprintln!("watching {} (Ctrl-C to stop)", watched.display());
     let mut seen = Seen::new();
+    let mut reported = Vec::new();
     loop {
-        for line in watch_pass(&mut seen, &jobs(), make_dirs, &render) {
+        let (jobs, skipped) = jobs();
+        if skipped != reported {
+            for line in &skipped {
+                eprintln!("{line}");
+            }
+            reported = skipped;
+        }
+        for line in watch_pass(&mut seen, &jobs, make_dirs, &render) {
             eprintln!("{line}");
         }
         std::thread::sleep(POLL);
@@ -408,7 +430,7 @@ type Seen = HashMap<PathBuf, Option<Stamp>>;
 /// Renders each of `jobs` whose input changed since `seen`, and returns the status lines.
 fn watch_pass(
     seen: &mut Seen,
-    jobs: &[(Option<PathBuf>, Option<PathBuf>)],
+    jobs: &[Job],
     make_dirs: bool,
     render: &impl Fn(&Lowered) -> Result<Vec<u8>, String>,
 ) -> Vec<String> {
@@ -471,6 +493,31 @@ fn scan(dir: &Path, out: &Path, ext: &str) -> Vec<(PathBuf, PathBuf)> {
     }
     found.sort();
     found
+}
+
+/// An input (stdin when `None`) and its output (stdout when `None`).
+type Job = (Option<PathBuf>, Option<PathBuf>);
+
+/// `found` as jobs, without each input whose output an earlier input already writes (`a.mmd`
+/// beside `a.mermaid`), plus an error line for each input left out.
+fn distinct(found: Vec<(PathBuf, PathBuf)>) -> (Vec<Job>, Vec<String>) {
+    let mut writers: HashMap<PathBuf, PathBuf> = HashMap::new();
+    let mut jobs = Vec::new();
+    let mut skipped = Vec::new();
+    for (input, output) in found {
+        if let Some(first) = writers.get(&output) {
+            skipped.push(format!(
+                "error: skipping {}; {} also writes {}",
+                input.display(),
+                first.display(),
+                output.display()
+            ));
+            continue;
+        }
+        writers.insert(output.clone(), input.clone());
+        jobs.push((Some(input), Some(output)));
+    }
+    (jobs, skipped)
 }
 
 /// How a render went.
@@ -647,6 +694,28 @@ mod tests {
         assert_eq!(
             watch_pass(&mut seen, &jobs, false, &render),
             [format!("printed {}", file.display())]
+        );
+    }
+
+    /// The first input to claim an output keeps it; later ones are left out with a reason.
+    #[test]
+    fn distinct_outputs() {
+        let p = PathBuf::from;
+        let (jobs, skipped) = distinct(vec![
+            (p("a.mermaid"), p("a.svg")),
+            (p("a.mmd"), p("a.svg")),
+            (p("b.mmd"), p("b.svg")),
+        ]);
+        assert_eq!(
+            jobs,
+            [
+                (Some(p("a.mermaid")), Some(p("a.svg"))),
+                (Some(p("b.mmd")), Some(p("b.svg"))),
+            ]
+        );
+        assert_eq!(
+            skipped,
+            ["error: skipping a.mmd; a.mermaid also writes a.svg"]
         );
     }
 
