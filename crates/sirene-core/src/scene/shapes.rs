@@ -410,7 +410,9 @@ fn arc_points(from: Pt, radii: Pt, large: bool, sweep: bool, to: Pt) -> Vec<Pt> 
     } else if !sweep && delta > 0.0 {
         delta -= 2.0 * PI;
     }
-    let steps = ((delta.abs() / (PI / 16.0)).ceil() as usize).max(1);
+    // The tolerance keeps a sweep within rounding of a whole number of steps (a half circle
+    // is 16) at that number, as `atan2` rounds differently across platforms.
+    let steps = ((delta.abs() / (PI / 16.0) - 1e-3).ceil() as usize).max(1);
     (1..=steps)
         .map(|i| {
             if i == steps {

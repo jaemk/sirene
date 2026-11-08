@@ -307,6 +307,9 @@ fn flatten_arcs() {
             .any(|q| (q.x - 5.0).abs() < 0.01 && (q.y + 5.0).abs() < 0.01)
     );
     assert_eq!(*pts.last().unwrap(), p(10.0, 0.0));
+    // A half circle is 16 steps (after the start point) even when the sweep rounds a little
+    // over pi.
+    assert_eq!(pts.len(), 1 + 16);
     // Counterclockwise goes the other way.
     let pts = shapes::flatten(&[
         Segment::Move(p(0.0, 0.0)),
