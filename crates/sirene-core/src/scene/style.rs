@@ -66,17 +66,23 @@ fn apply(out: &mut Resolved, property: &str, value: &str) {
                 .filter(|s| !s.is_empty())
                 .map_while(parse_length)
                 .collect();
-            // All-zero lengths draw a solid line, as in CSS.
+            // All-zero lengths draw a solid line, as in CSS, and so does a period
+            // too fine to see, which would otherwise cost the renderers one
+            // segment per dash.
+            let dashed = |d: f32, g: f32| Some((d + g >= MIN_DASH_PERIOD).then_some((d, g)));
             out.dash = match lengths[..] {
                 _ if value == "none" => Some(None),
-                [d] => Some((d > 0.0).then_some((d, d))),
-                [d, g, ..] => Some((d + g > 0.0).then_some((d, g))),
+                [d] => dashed(d, d),
+                [d, g, ..] => dashed(d, g),
                 [] => out.dash,
             };
         }
         _ => {}
     }
 }
+
+/// The shortest dash plus gap drawn as dashes; shorter patterns are solid.
+const MIN_DASH_PERIOD: f32 = 1.0;
 
 /// A non-negative length in pixels, with an optional `px` unit.
 fn parse_length(value: &str) -> Option<f32> {
@@ -286,5 +292,10 @@ mod tests {
         assert_eq!(dash("0"), Some(None));
         assert_eq!(dash("0 0"), Some(None));
         assert_eq!(dash("x"), None);
+        // Too fine to see: solid.
+        assert_eq!(dash("0.0001"), Some(None));
+        assert_eq!(dash("0.4 0.5"), Some(None));
+        assert_eq!(dash("0.5 0.5"), Some(Some((0.5, 0.5))));
+        assert_eq!(dash("0.5"), Some(Some((0.5, 0.5))));
     }
 }
