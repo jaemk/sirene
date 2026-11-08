@@ -43,7 +43,9 @@ Node, edge, and subgraph styles apply `fill`, `stroke`, `stroke-width`, `stroke-
 declarations. Colors may be `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()`, a common
 CSS name, `none`, or `transparent`. Unknown properties and unparsable values are ignored. A
 `stroke-dasharray` whose dash and gap together are under 1 unit draws a solid line, so a source
-cannot make an edge into millions of dashes.
+cannot make an edge into millions of dashes. A node or subgraph with a `fill` and no `color`
+keeps the theme's text color where it reads on the fill (contrast at least 3:1) and otherwise
+takes the light or dark theme's text color, whichever contrasts more.
 
 ## DISPLA-7 Shapes
 
@@ -56,7 +58,9 @@ are clipped to the outline of the shape they touch, so arrow tips meet the visib
 
 Clusters paint first, outer before inner, with their titles; then edges; then nodes; then edge
 labels on an opaque background. Edges are orthogonal paths with rounded corners; a short jog
-between two parallel runs is drawn as one S-curve. Arrowheads are filled triangles, filled
+between two parallel runs is drawn as one S-curve, and a jog under 2px at either end of an edge
+is dropped so near-aligned nodes connect straight. A jog near an arrowhead moves back (or merges
+with the jog before it) so the head sits on a straight run. Arrowheads are filled triangles, filled
 circles, or crosses, scaled with the stroke width. Normal edges are 1.5px, thick 3.5px, dotted
 2px dashed; invisible edges and their labels are not drawn. A diagram title is centered above
 the drawing.

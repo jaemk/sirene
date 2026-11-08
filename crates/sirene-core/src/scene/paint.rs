@@ -42,6 +42,8 @@ const CORNER: f32 = 8.0;
 const JOG: f32 = 24.0;
 /// How far an S-curve reaches into the runs on either side of its jog.
 const SWING: f32 = 14.0;
+/// The straight run kept between a curve and an arrowhead.
+const LEAD: f32 = 4.0;
 
 /// Sizes in pixels. Layout rects span `x..=x+w-1`, so each size is one more than the drawn
 /// extent.
@@ -158,7 +160,7 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
                 Owner::Cluster(i),
                 &[subgraph_title(s)],
                 at(t).center(),
-                r.color.unwrap_or(theme.text),
+                text_color(&r, theme),
             );
         }
     }
@@ -253,6 +255,46 @@ fn rect(b: BoxF) -> Vec<Segment> {
     ])
 }
 
+/// The text color for a style: its `color`, or else one that reads on its `fill`. The theme's
+/// text color is kept unless it is hard to read there, as dark-theme text on a light fill is.
+fn text_color(r: &Resolved, theme: &Theme) -> Color {
+    if let Some(c) = r.color {
+        return c;
+    }
+    let Some(fill) = r.fill else {
+        return theme.text;
+    };
+    let fill = fill.over(theme.background);
+    if contrast(theme.text, fill) >= 3.0 {
+        return theme.text;
+    }
+    let (dark, light) = (Theme::LIGHT.text, Theme::DARK.text);
+    if contrast(dark, fill) >= contrast(light, fill) {
+        dark
+    } else {
+        light
+    }
+}
+
+/// The WCAG contrast ratio of two opaque colors, from 1 to 21.
+fn contrast(a: Color, b: Color) -> f32 {
+    let (la, lb) = (luminance(a), luminance(b));
+    (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+}
+
+/// WCAG relative luminance.
+fn luminance(c: Color) -> f32 {
+    let channel = |v: u8| {
+        let v = f32::from(v) / 255.0;
+        if v <= 0.040_45 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b)
+}
+
 fn stroke(r: &Resolved, color: Color, width: f32, dash: Option<(f32, f32)>) -> Stroke {
     Stroke {
         width: r.stroke_width.unwrap_or(width),
@@ -337,12 +379,7 @@ impl Painter<'_> {
         }
         if shapes::has_label(node.shape) {
             let center = shapes::text_box(node.shape, b).center();
-            self.lines(
-                owner,
-                &node.label.lines(),
-                center,
-                s.color.unwrap_or(theme.text),
-            );
+            self.lines(owner, &node.label.lines(), center, text_color(s, theme));
         }
     }
 
@@ -356,6 +393,7 @@ impl Painter<'_> {
         to: &[Pt],
     ) {
         points.dedup();
+        straighten(&mut points);
         if points.len() < 2 {
             return;
         }
@@ -368,6 +406,13 @@ impl Painter<'_> {
         let n = points.len();
         points[0] = clip(points[1], points[0], from);
         points[n - 1] = clip(points[n - 2], points[n - 1], to);
+        let scale = arrow_scale(line.width);
+        for (at_end, arrow) in [(false, e.start), (true, e.end)] {
+            if let Some(a) = arrow {
+                make_room(&mut points, at_end, cap_len(a, scale) + LEAD + SWING);
+            }
+        }
+        let n = points.len();
         let owner = Owner::Edge(i);
         let solid = Stroke { dash: None, ..line };
         for (at_end, arrow) in [(false, e.start), (true, e.end)] {
@@ -388,6 +433,100 @@ impl Painter<'_> {
     }
 }
 
+/// Removes a jog shorter than `NUDGE` between parallel runs at either end of a route, by moving
+/// the end run onto the line of the run before it, so near-aligned nodes connect straight.
+fn straighten(points: &mut Vec<Pt>) {
+    let jog = |p: &[Pt], a: usize, b: usize, c: usize, d: usize| {
+        let shift = Pt::new(p[b].x - p[c].x, p[b].y - p[c].y);
+        let parallel = unit(p[a], p[b]) == unit(p[c], p[d]);
+        (parallel && shift.x.hypot(shift.y) < NUDGE).then_some(shift)
+    };
+    let n = points.len();
+    if n >= 4
+        && let Some(s) = jog(points, n - 4, n - 3, n - 2, n - 1)
+    {
+        for p in &mut points[n - 2..] {
+            *p = Pt::new(p.x + s.x, p.y + s.y);
+        }
+        points.dedup();
+    }
+    let n = points.len();
+    if n >= 4
+        && let Some(s) = jog(points, 3, 2, 1, 0)
+    {
+        for p in &mut points[..2] {
+            *p = Pt::new(p.x + s.x, p.y + s.y);
+        }
+        points.dedup();
+    }
+    // Drop the corners that straightening left in the middle of a straight run.
+    let mut k = 1;
+    while k + 1 < points.len() {
+        if unit(points[k - 1], points[k]) == unit(points[k], points[k + 1]) {
+            points.remove(k);
+        } else {
+            k += 1;
+        }
+    }
+}
+
+/// Moves the last jog of a route (the first when `at_end` is false) back from that end until
+/// the run after it is at least `need` long, so its curve does not bend under the arrowhead.
+fn make_room(points: &mut Vec<Pt>, at_end: bool, need: f32) {
+    if !at_end {
+        points.reverse();
+    }
+    loop {
+        let n = points.len();
+        if n < 4 {
+            break;
+        }
+        let (a, b, c, d) = (points[n - 4], points[n - 3], points[n - 2], points[n - 1]);
+        let din = unit(a, b);
+        let run = dist(c, d);
+        if din != unit(c, d) || run >= need {
+            break;
+        }
+        let shift = (need - run).min((dist(a, b) - SWING).max(0.0));
+        points[n - 3] = step(b, din, -shift);
+        points[n - 2] = step(c, din, -shift);
+        if shift >= need - run || n < 6 {
+            break;
+        }
+        // The run before the jog is too short to move it back: fold it and the jog before it
+        // into one jog, from where that one starts.
+        let (j, k) = (points[n - 6], points[n - 5]);
+        if unit(j, k) != din {
+            break;
+        }
+        // Both jogs together, starting where the first one does.
+        let (b, c) = (points[n - 3], points[n - 2]);
+        let corner = Pt::new(a.x + c.x - b.x, a.y + c.y - b.y);
+        points.splice(n - 5..n - 1, [k, corner]);
+        points.dedup();
+    }
+    if !at_end {
+        points.reverse();
+    }
+}
+
+/// How much an edge's arrowheads grow with its width.
+fn arrow_scale(width: f32) -> f32 {
+    1.0 + (width - 1.5).max(0.0) / 4.0
+}
+
+/// How far back from the tip an arrowhead reaches.
+fn cap_len(arrow: Arrow, scale: f32) -> f32 {
+    match arrow {
+        Arrow::Point => ARROW * scale,
+        Arrow::Circle => 8.0 * scale,
+        Arrow::Cross => 7.0 * scale + 1.0,
+    }
+}
+
+/// The longest jog `straighten` removes.
+const NUDGE: f32 = 2.0;
+
 /// Moves the end `end` of the segment from `prev` along its direction onto `boundary`.
 fn clip(prev: Pt, end: Pt, boundary: &[Pt]) -> Pt {
     let dir = unit(prev, end);
@@ -405,7 +544,7 @@ fn unit(a: Pt, b: Pt) -> Pt {
 fn cap(arrow: Arrow, prev: Pt, tip: Pt, width: f32) -> (Vec<(Vec<Segment>, bool)>, Pt) {
     let d = unit(prev, tip);
     let n = Pt::new(-d.y, d.x);
-    let scale = 1.0 + (width - 1.5).max(0.0) / 4.0;
+    let scale = arrow_scale(width);
     let along =
         |k: f32, side: f32| Pt::new(tip.x - d.x * k + n.x * side, tip.y - d.y * k + n.y * side);
     match arrow {

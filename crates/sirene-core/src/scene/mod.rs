@@ -70,6 +70,20 @@ impl Color {
     pub const fn with_alpha(self, a: u8) -> Self {
         Self { a, ..self }
     }
+
+    /// This color drawn over the opaque color `below`.
+    pub fn over(self, below: Color) -> Color {
+        let a = u16::from(self.a);
+        let mix = |top: u8, bottom: u8| {
+            ((u16::from(top) * a + u16::from(bottom) * (255 - a) + 127) / 255) as u8
+        };
+        Color {
+            r: mix(self.r, below.r),
+            g: mix(self.g, below.g),
+            b: mix(self.b, below.b),
+            a: 255,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
