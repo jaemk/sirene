@@ -51,10 +51,10 @@ bundle at `URL`: the workspace version, the checksum, `app "Sirene.app"`, and `b
 
 ## MACOSP-6 Release build
 
-`.github/workflows/release.yml` runs on `v*` tags on a macOS runner: it builds `sirene` for
-`aarch64-apple-darwin` and `x86_64-apple-darwin`, joins them with `lipo`, bundles them
-(MACOSP-1), zips the bundle with `ditto`, prints the cask (MACOSP-5) for the zip, and attaches
-the zip and cask to the GitHub release. The bundle is not signed or notarized, so Gatekeeper asks
+The `macos` job of `.github/workflows/release.yml` runs on a macOS runner after a crates.io
+release (WORKSP-8): it builds `sirene` for `aarch64-apple-darwin` and `x86_64-apple-darwin`,
+joins them with `lipo`, bundles them (MACOSP-1), zips the bundle with `ditto`, prints the cask
+(MACOSP-5) for the zip, and attaches the zip and cask to the `vX.Y.Z` GitHub release. The bundle is not signed or notarized, so Gatekeeper asks
 before the first launch.
 
 ## MACOSP-7 Unverified on macOS

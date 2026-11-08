@@ -44,3 +44,22 @@ that drops below the threshold fails.
 CI (GitHub Actions) runs on pushes to `main` and on pull requests, on both `ubuntu-latest` and
 `macos-latest`. On Linux, gpui needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan
 development packages installed first.
+
+## WORKSP-8 Releases
+
+Merging a version bump to `main` is the release. `.github/workflows/release.yml` runs on every
+push to `main` (and by hand):
+
+1. `check`: `bin/check-versions.sh` requires every dependency between publishable members to pin
+   exactly that member's version, and no stable crate to depend on a pre-release; then the job
+   publishes only when the `sirene` version is not on crates.io.
+2. `publish`, in the `release` environment (approval required): `bin/publish.sh` publishes
+   `sirene-core`, `sirene-gui`, then `sirene`, treating an already-published version as a skip
+   and any other failure as fatal; then `bin/tag-release.sh` tags and creates a GitHub release
+   for each crate's current version that lacks one (`vX.Y.Z` for `sirene`, `NAME-vX.Y.Z` for the
+   others).
+3. `macos`: builds the app for `vX.Y.Z` (MACOSP-6) and attaches it to that release.
+
+crates.io authentication is trusted publishing (`rust-lang/crates-io-auth-action`). A crate's
+first version cannot be published that way, so while the `CARGO_REGISTRY_TOKEN` secret is set
+the job uses it instead. Tests: `xtask/tests/release_scripts.rs`.

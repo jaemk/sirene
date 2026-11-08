@@ -1,39 +1,126 @@
-name: release
-
+name: Publish to crates.io
 on:
   push:
-    tags: ["v*"]
+    branches:
+      - main
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
-permissions:
-  contents: write
-
 jobs:
-  macos:
-    runs-on: macos-latest
-    env:
-      ZIP: Sirene-${{ github.ref_name }}.zip
+  # Publish when the root crate's version is not on crates.io yet. This keys off
+  # the index, not the commit message, so no merge strategy can lose the signal.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.decide.outputs.should_publish }}
+      version: ${{ steps.decide.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      # rust-toolchain.toml selects the channel; add the second target.
-      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-      - run: cargo build --release --locked --package sirene --target aarch64-apple-darwin
-      - run: cargo build --release --locked --package sirene --target x86_64-apple-darwin
-      - run: >
-          lipo -create -output target/sirene
-          target/aarch64-apple-darwin/release/sirene
-          target/x86_64-apple-darwin/release/sirene
-      - run: cargo xtask bundle --binary target/sirene --out target/bundle
-      - run: ditto -c -k --keepParent target/bundle/Sirene.app "target/$ZIP"
-      - run: >
-          cargo xtask cask
-          --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/$ZIP"
-          --sha256 "$(shasum -a 256 "target/$ZIP" | cut -d ' ' -f 1)"
-          --homepage "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-          > target/sirene.rb
-      - run: cat target/sirene.rb
-      - run: gh release create "$GITHUB_REF_NAME" --generate-notes "target/$ZIP" target/sirene.rb
-        env:
-          GH_TOKEN: ${{ github.token }}
+    - uses: actions/checkout@v6
+    # The decision below sees only the root crate's version, not a half-bumped
+    # workspace; fail the release on that first.
+    - name: Check the workspace versions agree
+      run: bash bin/check-versions.sh
+    - name: Check whether the root crate version is already published
+      id: decide
+      run: |
+        set -euo pipefail
+        version=$(cargo metadata --no-deps --format-version 1 \
+          | jq -r '.packages[] | select(.name == "sirene") | .version')
+        if [ -z "$version" ]; then
+          echo "Could not determine the root crate version." >&2
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+        # A brand-new crate is a 404, which means "publish". Any other failure
+        # must fail loudly rather than resolve to "nothing to publish".
+        status=$(curl -sS -o versions.json -w '%{http_code}' \
+          -H "User-Agent: jaemk-sirene-release-workflow" \
+          "https://crates.io/api/v1/crates/sirene/versions")
+        if [ "$status" = 404 ]; then
+          echo '{"versions":[]}' > versions.json
+        elif [ "$status" != 200 ]; then
+          echo "crates.io returned HTTP $status." >&2
+          cat versions.json >&2
+          exit 1
+        fi
+
+        if jq -e --arg v "$version" '.versions[] | select(.num == $v)' versions.json >/dev/null; then
+          echo "sirene $version is already on crates.io - nothing to release."
+          echo "should_publish=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "sirene $version is not on crates.io - releasing."
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+        fi
+
+  publish:
+    needs: check
+    # Ask for release-environment approval only when there is a new version (or
+    # on a manual dispatch, to re-run a release that failed partway).
+    if: github.event_name == 'workflow_dispatch' || needs.check.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write     # OIDC token exchange for trusted publishing
+      contents: write     # tags and GitHub releases
+    env:
+      # Set only to publish a crate's first version, which trusted publishing
+      # cannot do. Delete the secret once every crate has a trusted publisher.
+      BOOTSTRAP_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0    # --generate-notes needs the previous tag
+    # `cargo publish` verifies each crate by building it, and gpui needs these.
+    - run: >
+        sudo apt-get update && sudo apt-get install -y
+        libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev
+        libfontconfig1-dev libfreetype-dev libvulkan-dev
+    - run: rustup show
+    - uses: rust-lang/crates-io-auth-action@v1
+      if: env.BOOTSTRAP_TOKEN == ''
+      id: auth
+    - name: Publish to crates.io
+      run: bash bin/publish.sh
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || env.BOOTSTRAP_TOKEN }}
+    - name: Tag and create GitHub releases
+      # Idempotent, so a re-run of a release that published but died before
+      # tagging still gets its tags and releases.
+      if: success()
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: bash bin/tag-release.sh
+
+  macos:
+    needs: [check, publish]
+    runs-on: macos-latest
+    permissions:
+      contents: write     # release assets
+    env:
+      TAG: v${{ needs.check.outputs.version }}
+      ZIP: Sirene-v${{ needs.check.outputs.version }}.zip
+    steps:
+    - uses: actions/checkout@v6
+    # rust-toolchain.toml selects the channel; add both architectures.
+    - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+    - run: cargo build --release --locked --package sirene --target aarch64-apple-darwin
+    - run: cargo build --release --locked --package sirene --target x86_64-apple-darwin
+    - run: >
+        lipo -create -output target/sirene
+        target/aarch64-apple-darwin/release/sirene
+        target/x86_64-apple-darwin/release/sirene
+    - run: cargo xtask bundle --binary target/sirene --out target/bundle
+    - run: ditto -c -k --keepParent target/bundle/Sirene.app "target/$ZIP"
+    - run: >
+        cargo xtask cask
+        --url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$ZIP"
+        --sha256 "$(shasum -a 256 "target/$ZIP" | cut -d ' ' -f 1)"
+        --homepage "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+        > target/sirene.rb
+    - run: cat target/sirene.rb
+    - run: gh release upload "$TAG" --clobber "target/$ZIP" target/sirene.rb
+      env:
+        GH_TOKEN: ${{ github.token }}
