@@ -86,7 +86,7 @@ tests in `crates/sirene-core/src/scene/hit.rs`.
 
 ## DISPLA-11 PNG
 
-With the `png` feature, `scene::png::write(scene, scale)` draws a scene's SVG (DISPLA-9) into an
+With the `png` feature, `scene::png::write(scene, options)` draws a scene's SVG (DISPLA-9) into an
 RGBA PNG of `ceil(width * scale)` by `ceil(height * scale)` pixels, with all text
 in the embedded Noto Sans Regular, Bold, Italic, and Bold Italic (`crates/sirene-core/fonts`,
 SIL OFL 1.1). No system fonts are read, so the output is the same on every machine; characters
@@ -94,3 +94,12 @@ Noto Sans lacks are not drawn. `png::FontMetrics` measures text with the face of
 style (DISPLA-4), using `Approx` for characters it
 lacks. A scale that is not finite and positive, an image over 16384 pixels on a side, or a scene
 with no area is an error. Tests: `crates/sirene-core/tests/png.rs`.
+
+## DISPLA-12 PNG quality
+
+`png::Options` holds the scale and a `png::Quality`: `Draft` draws at 1 pixel per unit without
+anti-aliasing, `Normal` at 2 anti-aliased, and `Fine` (the default) at 4 anti-aliased with text
+drawn from its exact outlines. `Options::new(quality)` uses the quality's own scale.
+`png::fit(scene, scale)` returns `scale`, or the largest smaller scale at which the scene fits in
+16384 pixels a side. Tests: `qualities` and `fit_to_the_largest_image` in
+`crates/sirene-core/tests/png.rs`.

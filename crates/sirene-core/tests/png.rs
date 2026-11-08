@@ -2,12 +2,68 @@
 
 use resvg::tiny_skia::Pixmap;
 use sirene_core::flowchart;
-use sirene_core::scene::png::{self, FontMetrics};
+use sirene_core::scene::png::{self, FontMetrics, Options, Quality};
 use sirene_core::scene::{self, Approx, Color, Scene, TextMetrics, Theme};
 
 fn scene_of(src: &str, theme: &Theme) -> Scene {
     let chart = flowchart::parse(src).lower().flowchart;
     scene::flowchart(&chart, &FontMetrics, theme)
+}
+
+/// Draws at `scale` with normal quality.
+fn write(s: &Scene, scale: f32) -> Result<Vec<u8>, String> {
+    png::write(
+        s,
+        Options {
+            scale,
+            quality: Quality::Normal,
+        },
+    )
+}
+
+/// The number of distinct pixel colors.
+fn colors(p: &Pixmap) -> usize {
+    let mut seen: Vec<_> = p
+        .pixels()
+        .iter()
+        .map(|c| (c.red(), c.green(), c.blue(), c.alpha()))
+        .collect();
+    seen.sort_unstable();
+    seen.dedup();
+    seen.len()
+}
+
+#[test]
+fn qualities() {
+    assert_eq!(Options::default(), Options::new(Quality::Fine));
+    let scales = [Quality::Draft, Quality::Normal, Quality::Fine].map(Quality::scale);
+    assert_eq!(scales, [1.0, 2.0, 4.0]);
+
+    let s = scene_of("flowchart LR\nA[Hello] --> B((World))\n", &Theme::LIGHT);
+    let draw = |quality, scale| {
+        Pixmap::decode_png(&png::write(&s, Options { scale, quality }).unwrap()).unwrap()
+    };
+    for q in [Quality::Draft, Quality::Normal, Quality::Fine] {
+        let p = Pixmap::decode_png(&png::write(&s, Options::new(q)).unwrap()).unwrap();
+        assert_eq!(p.width(), (s.width * q.scale()).ceil() as u32, "{q:?}");
+    }
+    // Without anti-aliasing every pixel is one of the scene's own colors; with it, edges blend.
+    let draft = colors(&draw(Quality::Draft, 2.0));
+    let normal = colors(&draw(Quality::Normal, 2.0));
+    assert!(draft < 16, "{draft}");
+    assert!(normal > 4 * draft, "{normal} vs {draft}");
+    assert!(colors(&draw(Quality::Fine, 2.0)) > 4 * draft);
+}
+
+#[test]
+fn fit_to_the_largest_image() {
+    let s = scene_of("flowchart LR\nA --> B\n", &Theme::LIGHT);
+    assert_eq!(png::fit(&s, 4.0), 4.0);
+    let side = s.width.max(s.height);
+    let big = 2.0 * png::MAX_SIDE as f32 / side;
+    let fitted = png::fit(&s, big);
+    assert!(fitted < big && fitted > 0.99 * big / 2.0, "{fitted}");
+    assert_eq!((side * fitted).ceil(), png::MAX_SIDE as f32);
 }
 
 fn dark_pixels(p: &Pixmap) -> usize {
@@ -38,7 +94,7 @@ fn font_metrics() {
 fn image_size_and_background() {
     let s = scene_of("flowchart LR\nA --> B\n", &Theme::LIGHT);
     for scale in [1.0, 2.0, 0.5] {
-        let bytes = png::write(&s, scale).unwrap();
+        let bytes = write(&s, scale).unwrap();
         assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"));
         let p = Pixmap::decode_png(&bytes).unwrap();
         assert_eq!(p.width(), (s.width * scale).ceil() as u32);
@@ -50,9 +106,8 @@ fn image_size_and_background() {
             (bg.r, bg.g, bg.b, 255)
         );
     }
-    let dark =
-        Pixmap::decode_png(&png::write(&scene_of("flowchart\nA\n", &Theme::DARK), 1.0).unwrap())
-            .unwrap();
+    let dark = Pixmap::decode_png(&write(&scene_of("flowchart\nA\n", &Theme::DARK), 1.0).unwrap())
+        .unwrap();
     let c = dark.pixel(0, 0).unwrap();
     let bg = Theme::DARK.background;
     assert_eq!((c.red(), c.green(), c.blue()), (bg.r, bg.g, bg.b));
@@ -63,8 +118,8 @@ fn text_is_drawn() {
     // One node and no edges: the only dark pixels are its label.
     let blank = scene_of("flowchart\nA[\" \"]\n", &Theme::LIGHT);
     let label = scene_of("flowchart\nA[Hello world]\n", &Theme::LIGHT);
-    let blank = Pixmap::decode_png(&png::write(&blank, 2.0).unwrap()).unwrap();
-    let label = Pixmap::decode_png(&png::write(&label, 2.0).unwrap()).unwrap();
+    let blank = Pixmap::decode_png(&write(&blank, 2.0).unwrap()).unwrap();
+    let label = Pixmap::decode_png(&write(&label, 2.0).unwrap()).unwrap();
     assert_eq!(dark_pixels(&blank), 0);
     assert!(dark_pixels(&label) > 100, "{}", dark_pixels(&label));
 }
@@ -79,7 +134,7 @@ fn control_characters_in_labels() {
         "flowchart\nA -->|x\u{7}y| B\n",
     ] {
         let s = scene_of(src, &Theme::LIGHT);
-        png::write(&s, 1.0).unwrap_or_else(|e| panic!("{src:?}: {e}"));
+        write(&s, 1.0).unwrap_or_else(|e| panic!("{src:?}: {e}"));
     }
 }
 
@@ -89,7 +144,7 @@ fn deterministic() {
         "flowchart TD\nA[One] --> B{Two}\nB -->|x| C((Three))\n",
         &Theme::LIGHT,
     );
-    assert_eq!(png::write(&s, 2.0).unwrap(), png::write(&s, 2.0).unwrap());
+    assert_eq!(write(&s, 2.0).unwrap(), write(&s, 2.0).unwrap());
 }
 
 #[test]
@@ -105,7 +160,7 @@ fn empty_scene_is_an_error() {
         },
         elements: Vec::new(),
     };
-    let e = png::write(&s, 1.0).unwrap_err();
+    let e = write(&s, 1.0).unwrap_err();
     assert!(e.starts_with("cannot draw the diagram: "), "{e}");
 }
 
@@ -113,9 +168,9 @@ fn empty_scene_is_an_error() {
 fn errors() {
     let s = scene_of("flowchart\nA\n", &Theme::LIGHT);
     for bad in [0.0, -1.0, f32::NAN, f32::INFINITY] {
-        let e = png::write(&s, bad).unwrap_err();
+        let e = write(&s, bad).unwrap_err();
         assert!(e.starts_with("scale must be a positive number"), "{e}");
     }
-    let e = png::write(&s, 1000.0).unwrap_err();
+    let e = write(&s, 1000.0).unwrap_err();
     assert!(e.contains("too large (at most 16384 pixels a side)"), "{e}");
 }

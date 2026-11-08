@@ -78,8 +78,84 @@ impl TextMetrics for FontMetrics {
     }
 }
 
-/// Draws `scene` as a PNG with `scale` pixels per scene unit.
-pub fn write(scene: &Scene, scale: f32) -> Result<Vec<u8>, String> {
+/// How finely an image is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Quality {
+    /// 1 pixel per unit, without anti-aliasing.
+    Draft,
+    /// 2 pixels per unit, anti-aliased.
+    Normal,
+    /// 4 pixels per unit, anti-aliased, with text drawn from its exact outlines.
+    #[default]
+    Fine,
+}
+
+impl Quality {
+    /// The pixels per scene unit this quality draws at when no scale is given.
+    pub fn scale(self) -> f32 {
+        match self {
+            Quality::Draft => 1.0,
+            Quality::Normal => 2.0,
+            Quality::Fine => 4.0,
+        }
+    }
+
+    fn rendering(self) -> (usvg::ShapeRendering, usvg::TextRendering) {
+        match self {
+            Quality::Draft => (
+                usvg::ShapeRendering::CrispEdges,
+                usvg::TextRendering::OptimizeSpeed,
+            ),
+            Quality::Normal => (
+                usvg::ShapeRendering::GeometricPrecision,
+                usvg::TextRendering::OptimizeLegibility,
+            ),
+            Quality::Fine => (
+                usvg::ShapeRendering::GeometricPrecision,
+                usvg::TextRendering::GeometricPrecision,
+            ),
+        }
+    }
+}
+
+/// How `write` draws: pixels per scene unit, and anti-aliasing from the quality.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Options {
+    pub scale: f32,
+    pub quality: Quality,
+}
+
+impl Options {
+    /// `quality` at its own scale (`Quality::scale`).
+    pub fn new(quality: Quality) -> Options {
+        Options {
+            scale: quality.scale(),
+            quality,
+        }
+    }
+}
+
+impl Default for Options {
+    fn default() -> Options {
+        Options::new(Quality::default())
+    }
+}
+
+/// `scale`, or the largest scale under it at which `scene` fits in `MAX_SIDE` pixels a side.
+pub fn fit(scene: &Scene, scale: f32) -> f32 {
+    let side = scene.width.max(scene.height);
+    if (side * scale).ceil() <= MAX_SIDE as f32 {
+        return scale;
+    }
+    // Shrink a hair below the exact ratio so rounding up stays inside.
+    let fitted = MAX_SIDE as f32 / side * (1.0 - 1e-5);
+    log::debug!("scale {scale} would exceed {MAX_SIDE} pixels a side; using {fitted}");
+    fitted
+}
+
+/// Draws `scene` as a PNG with `options.scale` pixels per scene unit.
+pub fn write(scene: &Scene, options: Options) -> Result<Vec<u8>, String> {
+    let Options { scale, quality } = options;
     if !(scale.is_finite() && scale > 0.0) {
         return Err(format!("scale must be a positive number, not {scale}"));
     }
@@ -90,9 +166,12 @@ pub fn write(scene: &Scene, scale: f32) -> Result<Vec<u8>, String> {
             "a {w}x{h} image is too large (at most {MAX_SIDE} pixels a side)"
         ));
     }
+    let (shape_rendering, text_rendering) = quality.rendering();
     let options = usvg::Options {
         font_family: FAMILY.to_owned(),
         fontdb: fonts(),
+        shape_rendering,
+        text_rendering,
         ..usvg::Options::default()
     };
     let tree = usvg::Tree::from_str(&super::svg::write(scene), &options)
@@ -106,7 +185,7 @@ pub fn write(scene: &Scene, scale: f32) -> Result<Vec<u8>, String> {
     );
     let bytes = pixmap.encode_png().map_err(|e| e.to_string())?;
     log::debug!(
-        "encoded a {w}x{h} PNG at scale {scale}, {} bytes",
+        "encoded a {w}x{h} PNG at scale {scale}, {quality:?} quality, {} bytes",
         bytes.len()
     );
     Ok(bytes)

@@ -91,9 +91,12 @@ enum Command {
         /// Colors to draw with.
         #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
         theme: ThemeArg,
-        /// Pixels per diagram unit.
-        #[arg(long, default_value_t = 2.0)]
-        scale: f32,
+        /// Detail: draft (1x, no anti-aliasing), normal (2x), or fine (4x, exact text outlines).
+        #[arg(long, value_enum, default_value_t = QualityArg::Fine)]
+        quality: QualityArg,
+        /// Pixels per diagram unit, instead of the quality's own.
+        #[arg(long)]
+        scale: Option<f32>,
         /// Where to write the PNG; defaults to FILE with a .png extension, or stdout for stdin.
         #[arg(short, long)]
         output: Option<PathBuf>,
@@ -106,6 +109,23 @@ enum CharsetArg {
     Unicode,
     /// Printable ASCII only.
     Ascii,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum QualityArg {
+    Draft,
+    Normal,
+    Fine,
+}
+
+impl QualityArg {
+    fn quality(self) -> png::Quality {
+        match self {
+            QualityArg::Draft => png::Quality::Draft,
+            QualityArg::Normal => png::Quality::Normal,
+            QualityArg::Fine => png::Quality::Fine,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -168,9 +188,11 @@ fn run(cli: Cli) -> ExitCode {
         Some(Command::Png {
             file,
             theme,
+            quality,
             scale,
             output,
         }) => {
+            let quality = quality.quality();
             let output = output.or_else(|| {
                 let default = file
                     .as_ref()
@@ -187,7 +209,9 @@ fn run(cli: Cli) -> ExitCode {
             }
             render_with(file, output, |l| {
                 let scene = scene::flowchart(&l.flowchart, &FontMetrics, &theme.theme());
-                png::write(&scene, scale)
+                // A given scale is kept (and may be too large); the quality's own shrinks to fit.
+                let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
+                png::write(&scene, png::Options { scale, quality })
             })
         }
     }
