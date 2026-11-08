@@ -156,3 +156,26 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: gh release upload "v${{ needs.check.outputs.version }}" --clobber release-assets/*
+    - name: Commit the cask to the tap
+      # This repo is the Homebrew tap (`brew tap jaemk/sirene
+      # https://github.com/jaemk/sirene`), so the cask must be on main.
+      # Pushes straight to main with GITHUB_TOKEN; if branch protection is ever
+      # enabled on main, add github-actions[bot] as a bypass actor or open a PR
+      # here instead. A GITHUB_TOKEN push starts no workflow run, and an
+      # up-to-date cask is not re-committed, so re-runs are safe.
+      env:
+        VERSION: ${{ needs.check.outputs.version }}
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout main
+        git pull --ff-only origin main
+        cp release-assets/sirene.rb Casks/sirene.rb
+        git add Casks/sirene.rb
+        if git diff --cached --quiet; then
+          echo "Casks/sirene.rb is already at $VERSION"
+        else
+          git commit -m "update \`sirene\` cask to $VERSION"
+          git push origin main
+        fi

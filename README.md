@@ -4,6 +4,22 @@ A local WYSIWYG Mermaid diagram editor and viewer, with terminal ASCII output.
 
 See `spec/README.md` for the feature status table.
 
+## Install
+
+Homebrew (macOS):
+
+```
+brew tap jaemk/sirene https://github.com/jaemk/sirene
+brew trust jaemk/sirene
+brew install --cask sirene
+```
+
+The repo is not named `homebrew-sirene`, so the tap needs its clone URL. The cask installs
+`Sirene.app` and links `sirene` onto the PATH. The app is not signed, so macOS asks before the
+first launch.
+
+With the Rust toolchain: `cargo install sirene` (add `--no-default-features` for the CLI only).
+
 ## Usage
 
 ```
@@ -21,8 +37,8 @@ sirene svg diagram.mmd       # print SVG (--theme light|dark, -o FILE)
 sirene png diagram.mmd       # write diagram.png (--scale 2, --theme, -o FILE)
 ```
 
-`svg`, `png`, and `ascii` never open a window. `cargo install --path crates/sirene
---no-default-features` builds a CLI-only binary that does not link the GUI. PNG text uses the
+`svg`, `png`, and `ascii` never open a window. `--no-default-features` builds a CLI-only
+binary that does not link the GUI. PNG text uses the
 embedded Noto Sans (`crates/sirene-core/fonts`, SIL OFL 1.1), so images are the same on every
 machine.
 
@@ -56,5 +72,5 @@ Bump `version` in the root `Cargo.toml` (and the matching `[workspace.dependenci
 merge to `main`. `.github/workflows/release.yml` sees the new version is not on crates.io,
 verifies all three crates and builds a universal `Sirene.app` zip and Homebrew cask, then, after
 approval in the `release` environment, publishes `sirene-core`, `sirene-gui`, and `sirene`,
-tags `vX.Y.Z`, creates the GitHub release, and attaches the zip and cask. The app is not signed. See `spec/workspace.md` (WORKSP-8) and
-`spec/macos-packaging.md`.
+tags `vX.Y.Z`, creates the GitHub release, attaches the zip and cask, and commits the cask to
+`Casks/sirene.rb` on `main`. See `spec/workspace.md` (WORKSP-8) and `spec/macos-packaging.md`.
