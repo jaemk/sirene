@@ -658,12 +658,22 @@ pub fn group(src: &str, nodes: &[&str], title: &str) -> Option<(String, TextEdit
 }
 
 /// Removes subgraph `id`, keeping its statements one level less indented, and its `direction`,
-/// `style`, and `class` statements. `None` when there is no such subgraph, an edge starts or
-/// ends at it, or its `subgraph` line or `end` shares a line with another statement.
+/// `style`, and `class` statements. Mentions of the subgraph in other statements, such as an
+/// edge to it, name its members instead (`A --> B & C`), and `linkStyle` indexes follow. `None`
+/// when there is no such subgraph, an edge to it has an id or it has no members, or its
+/// `subgraph` line or `end` shares a line with another statement.
 pub fn ungroup(src: &str, id: &str) -> Option<TextEdit> {
     let doc = Doc::new(src);
     let sg = doc.chart.subgraph(id)?;
-    if doc.chart.edges.iter().any(|e| e.from == id || e.to == id) {
+    let linked = doc.chart.edges.iter().any(|e| e.from == id || e.to == id);
+    if linked
+        && (sg.members.is_empty()
+            || doc
+                .chart
+                .edges
+                .iter()
+                .any(|e| (e.from == id || e.to == id) && e.id.is_some()))
+    {
         return None;
     }
     let block = doc.subgraph_syntax(sg)?;
@@ -735,16 +745,35 @@ pub fn ungroup(src: &str, id: &str) -> Option<TextEdit> {
                     edits.push((span(list.text_range()), kept.join(",")));
                 }
             }
+            NODE if token(&stmt, IDENT).is_some_and(|t| t.text() == id)
+                && stmt.ancestors().any(|a| a.kind() == VERTEX_STMT) =>
+            {
+                edits.push((span(stmt.text_range()), sg.members.join(" & ")));
+            }
             _ => {}
         }
     }
-    doc.finish(edits)
+    let new = doc.finish(edits)?.apply(src);
+    if !linked {
+        return TextEdit::between(src, &new);
+    }
+    let members = sg.members.clone();
+    let after = super::parse(&new).lower().flowchart;
+    let map = match_edges(&doc.chart.edges, &after.edges, |end| {
+        if end == id {
+            members.clone()
+        } else {
+            vec![end.to_owned()]
+        }
+    });
+    TextEdit::between(src, &relink(&new, &map))
 }
 
 /// Moves node `id` into subgraph `target`, or out to the top level when `target` is `None`.
 /// From the top level, a bare mention is added to the target; from a subgraph, the statements
-/// in it that mention the node move, and each must be the node alone (`A` or `A[label]`).
-/// `None` when nothing would change or the node's statements cannot move.
+/// in it that mention the node move. Other nodes of a moved statement (`A --> B`) that would
+/// leave the subgraph with it get a bare mention there, and `linkStyle` indexes follow the
+/// moved edges. `None` when nothing would change or the result would move other nodes.
 pub fn move_to_subgraph(src: &str, id: &str, target: Option<&str>) -> Option<TextEdit> {
     let doc = Doc::new(src);
     doc.chart.node(id)?;
@@ -758,21 +787,26 @@ pub fn move_to_subgraph(src: &str, id: &str, target: Option<&str>) -> Option<Tex
     };
     let mut edits = Vec::new();
     let mut lines = Vec::new();
+    // Other nodes of the moved statements, and the subgraph they are in.
+    let mut others: Vec<String> = Vec::new();
+    let mut from = None;
     match current {
         None => lines.push(id.to_owned()),
         Some(c) => {
             let block = doc.subgraph_syntax(doc.chart.subgraph(c)?)?;
             for stmt in block.children().filter(|n| n.kind() == VERTEX_STMT) {
-                let nodes: Vec<SyntaxNode> =
-                    stmt.descendants().filter(|n| n.kind() == NODE).collect();
-                if !nodes
-                    .iter()
-                    .any(|n| token(n, IDENT).is_some_and(|t| t.text() == id))
-                {
+                let ids: Vec<String> = stmt
+                    .descendants()
+                    .filter(|n| n.kind() == NODE)
+                    .filter_map(|n| token(&n, IDENT).map(|t| t.text().to_owned()))
+                    .collect();
+                if !ids.iter().any(|i| i == id) {
                     continue;
                 }
-                if nodes.len() != 1 || child(&stmt, EDGE).is_some() {
-                    return None;
+                for i in ids {
+                    if i != id && !others.contains(&i) {
+                        others.push(i);
+                    }
                 }
                 lines.push(stmt.text().to_string());
                 edits.push(doc.remove(&stmt));
@@ -780,10 +814,40 @@ pub fn move_to_subgraph(src: &str, id: &str, target: Option<&str>) -> Option<Tex
             if lines.is_empty() {
                 return None;
             }
+            from = Some(block);
         }
     }
     edits.push(doc.insert_lines(scope.as_ref(), &lines));
-    doc.finish(edits)
+    let moved = doc.finish(edits.clone())?.apply(src);
+    let after = super::parse(&moved).lower().flowchart;
+    let parent = |chart: &Flowchart, n: &str| {
+        chart
+            .subgraphs
+            .iter()
+            .find(|s| s.members.iter().any(|m| m == n))
+            .map(|s| s.id.clone())
+    };
+    // Those that left keep a mention where they were.
+    let stay: Vec<String> = others
+        .iter()
+        .filter(|n| doc.parent(n) == current && parent(&after, n).as_deref() != current)
+        .cloned()
+        .collect();
+    let new = if stay.is_empty() {
+        moved
+    } else {
+        edits.push(doc.insert_lines(from.as_ref(), &stay));
+        doc.finish(edits)?.apply(src)
+    };
+    let after = super::parse(&new).lower().flowchart;
+    let kept = others
+        .iter()
+        .all(|n| parent(&after, n) == parent(&doc.chart, n));
+    if parent(&after, id).as_deref() != target || !kept {
+        return None;
+    }
+    let map = match_edges(&doc.chart.edges, &after.edges, |end| vec![end.to_owned()]);
+    TextEdit::between(src, &relink(&new, &map))
 }
 
 /// Swaps the statement with node `id`'s first mention and the statement before it (or, with
@@ -1383,6 +1447,70 @@ impl<'a> Doc<'a> {
 }
 
 /// The canonical stroke for an edge's kind, arrowheads, and length.
+/// For each edge of `old`, the indexes in `new` of the edges it became: the first unused edges
+/// alike in all but their ends, one per pair of ends from `ends` (the ends an end became). An
+/// edge with no match keeps its index.
+fn match_edges(old: &[Edge], new: &[Edge], ends: impl Fn(&str) -> Vec<String>) -> Vec<Vec<usize>> {
+    let alike = |a: &Edge, b: &Edge| {
+        (a.stroke, a.start, a.end, a.length, &a.label, &a.id)
+            == (b.stroke, b.start, b.end, b.length, &b.label, &b.id)
+    };
+    let mut used = vec![false; new.len()];
+    old.iter()
+        .enumerate()
+        .map(|(i, e)| {
+            let mut found = Vec::new();
+            for from in ends(&e.from) {
+                for to in ends(&e.to) {
+                    let hit = (0..new.len()).find(|&j| {
+                        !used[j] && new[j].from == from && new[j].to == to && alike(e, &new[j])
+                    });
+                    if let Some(j) = hit {
+                        used[j] = true;
+                        found.push(j);
+                    }
+                }
+            }
+            if found.is_empty() {
+                found.push(i);
+            }
+            found.sort_unstable();
+            found
+        })
+        .collect()
+}
+
+/// `src` (an edited document whose `linkStyle` statements still use the old edge indexes) with
+/// each index replaced by the new indexes `map` gives it.
+fn relink(src: &str, map: &[Vec<usize>]) -> String {
+    let root = super::parse(src).syntax();
+    let mut edits: Vec<(Range<usize>, String)> = Vec::new();
+    for stmt in root.descendants().filter(|n| n.kind() == LINKSTYLE_STMT) {
+        let Some(list) = child(&stmt, ID_LIST) else {
+            continue;
+        };
+        let old: Vec<String> = tokens(&list)
+            .filter(|t| t.kind() == NUMBER)
+            .map(|t| t.text().to_owned())
+            .collect();
+        let mut new: Vec<String> = Vec::new();
+        for n in &old {
+            match n.parse::<usize>().ok().and_then(|i| map.get(i)) {
+                Some(to) => new.extend(to.iter().map(usize::to_string)),
+                None => new.push(n.clone()),
+            }
+        }
+        if new != old {
+            edits.push((span(list.text_range()), new.join(",")));
+        }
+    }
+    let mut out = src.to_owned();
+    for (range, text) in edits.into_iter().rev() {
+        out.replace_range(range, &text);
+    }
+    out
+}
+
 fn stroke_text(e: &Edge) -> String {
     let n = usize::from(e.length);
     let head = |a: Option<Arrow>, point: char| match a {

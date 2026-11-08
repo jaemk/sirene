@@ -189,11 +189,15 @@ Edits that steer the layout without positions, as source edits (WYSIWY-8) and ac
   first unused. No edit when the nodes are in different subgraphs.
 - `ungroup`: removes the `subgraph` and `end` lines, takes one indent level off the lines
   between, and removes the subgraph's own `direction`, its `style` statements, and its id from
-  `class` lists. No edit when an edge starts or ends at the subgraph, or the `subgraph` or `end`
-  line has another statement on it.
+  `class` lists. Other mentions of the subgraph in node and edge statements become its members
+  joined with `&`, so `s --> C` becomes `A & B --> C`, and `linkStyle` indexes of an edge that
+  became several list them all. No edit when an edge at the subgraph has an id or the subgraph
+  has no members, or the `subgraph` or `end` line has another statement on it.
 - `move_to_subgraph`: from the top level, adds a bare mention at the end of the target; from a
-  subgraph, moves the node's statements in it, which must each be the node alone, to the end
-  of the target or of the document.
+  subgraph, moves the node's statements in it to the end of the target or of the document. A
+  moved statement's other nodes that would no longer be in the subgraph get a bare mention at
+  its end. `linkStyle` indexes follow the moved edges. No edit when the result would change
+  another node's subgraph (a target before the subgraph would take them first).
 - `move_node` and `move_edge`: swap the statement with the node's first mention, or the edge,
   with the statement before or after it in the same subgraph or document, when that is a node
   or edge statement or a subgraph. `linkStyle` indexes follow their edges.
