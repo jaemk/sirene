@@ -48,6 +48,9 @@ pub struct Viewer {
     pub(crate) future: Vec<(String, String)>,
     /// Fit the drawing once the drawing area is known (GUISHE-8).
     pub(crate) fit_pending: bool,
+    /// The outcome of the last export or copy, shown in the status bar until the document
+    /// changes (GUISHE-9).
+    pub notice: Option<String>,
     scene: Option<Rc<Scene>>,
     /// The drawing area from the last paint.
     pub(crate) viewport: Rc<Cell<Bounds<Pixels>>>,
@@ -118,6 +121,7 @@ impl Viewer {
             history: Vec::new(),
             future: Vec::new(),
             fit_pending: true,
+            notice: None,
             scene: None,
             viewport: Rc::default(),
             focus: cx.focus_handle(),
@@ -140,6 +144,7 @@ impl Viewer {
     /// Redraws after the document changed: drawing, diagnostics, and title.
     fn refresh(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.scene = None;
+        self.notice = None;
         self.prune();
         let problems = &self.doc.problems;
         self.source.update(cx, |s, cx| {
@@ -479,7 +484,7 @@ impl Viewer {
     }
 
     pub fn status(&self) -> String {
-        self.doc.status()
+        self.notice.clone().unwrap_or_else(|| self.doc.status())
     }
 }
 
@@ -587,6 +592,9 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::actual_size))
             .on_action(cx.listener(Self::fit_window))
             .on_action(cx.listener(Self::zoom_to_selection))
+            .on_action(cx.listener(Self::export_png))
+            .on_action(cx.listener(Self::export_svg))
+            .on_action(cx.listener(Self::copy_image))
             .on_action(cx.listener(Self::reload))
             .on_action(cx.listener(Self::toggle_source))
             .on_action(cx.listener(Self::save_action))

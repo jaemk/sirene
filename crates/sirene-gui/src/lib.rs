@@ -3,6 +3,7 @@
 
 pub mod document;
 pub mod drawing;
+pub mod export;
 pub mod navigation;
 pub mod paint;
 pub mod viewer;
@@ -66,6 +67,12 @@ actions!(
         SelectNext,
         /// Select the previous node in source order.
         SelectPrevious,
+        /// Write the drawing to a chosen PNG file.
+        ExportPng,
+        /// Write the drawing to a chosen SVG file.
+        ExportSvg,
+        /// Put the drawing on the clipboard as an image.
+        CopyImage,
     ]
 );
 
@@ -130,6 +137,8 @@ pub fn key_bindings() -> Vec<KeyBinding> {
         KeyBinding::new(secondary!("a"), SelectAll, Some("Drawing")),
         KeyBinding::new("tab", SelectNext, Some("Drawing")),
         KeyBinding::new("shift-tab", SelectPrevious, Some("Drawing")),
+        KeyBinding::new(secondary!("shift-e"), ExportPng, None),
+        KeyBinding::new(secondary!("shift-c"), CopyImage, None),
     ]
 }
 
@@ -154,6 +163,9 @@ pub fn menus() -> Vec<Menu> {
                 MenuItem::action("Save As...", SaveAs),
                 MenuItem::action("Reload", Reload),
                 MenuItem::separator(),
+                MenuItem::action("Export as PNG...", ExportPng),
+                MenuItem::action("Export as SVG...", ExportSvg),
+                MenuItem::separator(),
                 MenuItem::action("Close Window", CloseWindow),
             ],
         ),
@@ -162,6 +174,8 @@ pub fn menus() -> Vec<Menu> {
             vec![
                 MenuItem::action("Undo", Undo),
                 MenuItem::action("Redo", Redo),
+                MenuItem::separator(),
+                MenuItem::action("Copy Image", CopyImage),
                 MenuItem::separator(),
                 MenuItem::action("Add Node", AddNode),
                 MenuItem::action("Rename", Rename),
@@ -445,7 +459,7 @@ mod tests {
             .flat_map(|m| &m.items)
             .filter(|i| !matches!(i, MenuItem::Separator))
             .count();
-        assert_eq!(items, 26);
-        assert_eq!(key_bindings().len(), 32);
+        assert_eq!(items, 29);
+        assert_eq!(key_bindings().len(), 34);
     }
 }
