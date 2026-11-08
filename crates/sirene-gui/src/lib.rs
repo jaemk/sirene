@@ -6,6 +6,7 @@ pub mod drawing;
 pub mod export;
 pub mod navigation;
 pub mod paint;
+pub mod settings;
 pub mod viewer;
 
 use std::path::{Path, PathBuf};
@@ -18,6 +19,7 @@ use gpui::{
 
 use document::Document;
 use navigation::{PAN_FAR, PAN_STEP};
+use settings::{Appearance, Settings};
 use viewer::Viewer;
 
 actions!(
@@ -73,8 +75,23 @@ actions!(
         ExportSvg,
         /// Put the drawing on the clipboard as an image.
         CopyImage,
+        /// Draw light or dark as the system does.
+        AppearanceSystem,
+        /// Always draw light.
+        AppearanceLight,
+        /// Always draw dark.
+        AppearanceDark,
+        /// Forget the recent files.
+        ClearRecent,
     ]
 );
+
+/// Open a file from File > Open Recent.
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct OpenRecent {
+    pub path: PathBuf,
+}
 
 /// Move the drawing by `x` and `y` screen pixels (the arrow keys show more of the side they
 /// point to, so the drawing moves the other way).
@@ -150,7 +167,16 @@ fn menu(name: &str, items: Vec<MenuItem>) -> Menu {
     }
 }
 
-pub fn menus() -> Vec<Menu> {
+/// The app menus, with `recent` under File > Open Recent (GUISHE-10).
+pub fn menus(recent: &[PathBuf]) -> Vec<Menu> {
+    let mut recent: Vec<MenuItem> = recent
+        .iter()
+        .map(|p| MenuItem::action(p.display().to_string(), OpenRecent { path: p.clone() }))
+        .collect();
+    if !recent.is_empty() {
+        recent.push(MenuItem::separator());
+    }
+    recent.push(MenuItem::action("Clear Recent", ClearRecent));
     vec![
         menu("sirene", vec![MenuItem::action("Quit sirene", Quit)]),
         menu(
@@ -158,6 +184,7 @@ pub fn menus() -> Vec<Menu> {
             vec![
                 MenuItem::action("New", New),
                 MenuItem::action("Open...", Open),
+                MenuItem::submenu(menu("Open Recent", recent)),
                 MenuItem::separator(),
                 MenuItem::action("Save", Save),
                 MenuItem::action("Save As...", SaveAs),
@@ -191,6 +218,14 @@ pub fn menus() -> Vec<Menu> {
             "View",
             vec![
                 MenuItem::action("Show or Hide Source", ToggleSource),
+                MenuItem::submenu(menu(
+                    "Appearance",
+                    vec![
+                        MenuItem::action("Follow System", AppearanceSystem),
+                        MenuItem::action("Light", AppearanceLight),
+                        MenuItem::action("Dark", AppearanceDark),
+                    ],
+                )),
                 MenuItem::separator(),
                 MenuItem::action("Zoom In", ZoomIn),
                 MenuItem::action("Zoom Out", ZoomOut),
@@ -211,12 +246,15 @@ pub fn menus() -> Vec<Menu> {
 pub fn init(cx: &mut App) {
     gpui::init(cx);
     cx.bind_keys(key_bindings());
-    cx.set_menus(menus());
+    refresh_menus(cx);
     cx.on_action(|_: &Quit, cx| {
         let quit = confirm_quit(cx);
         cx.spawn(async move |cx| {
             if quit.await {
-                cx.update(|cx| cx.quit());
+                cx.update(|cx| {
+                    settings::get(cx).save();
+                    cx.quit()
+                });
             }
         })
         .detach();
@@ -225,17 +263,43 @@ pub fn init(cx: &mut App) {
         open_or_report(Document::untitled(), cx);
     });
     cx.on_action(|_: &Open, cx| prompt_open(cx));
+    cx.on_action(|a: &OpenRecent, cx| open_paths(std::slice::from_ref(&a.path), cx));
+    cx.on_action(|_: &ClearRecent, cx| {
+        settings::update(cx, |s| s.recent.clear());
+        refresh_menus(cx);
+    });
+    cx.on_action(|_: &AppearanceSystem, cx| set_appearance(Appearance::System, cx));
+    cx.on_action(|_: &AppearanceLight, cx| set_appearance(Appearance::Light, cx));
+    cx.on_action(|_: &AppearanceDark, cx| set_appearance(Appearance::Dark, cx));
 }
 
-/// Opens a window showing `doc`.
+/// Sets the menus from the current settings.
+pub fn refresh_menus(cx: &mut App) {
+    let recent = settings::get(cx).recent.clone();
+    cx.set_menus(menus(&recent));
+}
+
+fn set_appearance(appearance: Appearance, cx: &mut App) {
+    log::debug!("appearance: {appearance:?}");
+    settings::update(cx, |s| s.appearance = appearance);
+}
+
+/// Puts `path` first in File > Open Recent.
+pub fn note_recent(path: &Path, cx: &mut App) {
+    settings::update(cx, |s| s.add_recent(path));
+    refresh_menus(cx);
+}
+
+/// Opens a window showing `doc`, at the last window size.
 pub fn open_window(
     doc: Document,
     cx: &mut App,
 ) -> anyhow::Result<(AnyWindowHandle, Entity<Viewer>)> {
+    let (w, h) = settings::get(cx).window.unwrap_or((1200.0, 760.0));
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
             None,
-            size(px(1200.0), px(760.0)),
+            size(px(w), px(h)),
             cx,
         ))),
         titlebar: Some(TitlebarOptions {
@@ -251,6 +315,9 @@ pub fn open_window(
 }
 
 fn open_or_report(doc: Document, cx: &mut App) {
+    if let Some(p) = &doc.path {
+        note_recent(p, cx);
+    }
     let name = doc.name();
     match open_window(doc, cx) {
         Ok(_) => log::debug!("opened a window for {name}"),
@@ -406,6 +473,9 @@ pub fn run(paths: Vec<PathBuf>) {
         let _ = tx.unbounded_send(urls);
     });
     app.run(move |cx| {
+        if let Some(file) = settings::default_file() {
+            cx.set_global(Settings::load(file));
+        }
         init(cx);
         log::debug!("app started; opening {paths:?}");
         if paths.is_empty() {
@@ -453,13 +523,28 @@ mod tests {
 
     #[test]
     fn every_action_has_a_menu_item_and_key() {
-        let menus = menus();
-        let items = menus
-            .iter()
-            .flat_map(|m| &m.items)
-            .filter(|i| !matches!(i, MenuItem::Separator))
-            .count();
-        assert_eq!(items, 29);
+        /// The actions in `items`, in submenus too.
+        fn actions(items: &[MenuItem]) -> Vec<String> {
+            items
+                .iter()
+                .flat_map(|i| match i {
+                    MenuItem::Action { name, .. } => vec![name.to_string()],
+                    MenuItem::Submenu(m) => actions(&m.items),
+                    _ => Vec::new(),
+                })
+                .collect()
+        }
+        let all = |recent: &[PathBuf]| -> Vec<String> {
+            menus(recent)
+                .iter()
+                .flat_map(|m| actions(&m.items))
+                .collect()
+        };
+        assert_eq!(all(&[]).len(), 33);
+        let recent = [PathBuf::from("/a.mmd"), PathBuf::from("/b/c.mmd")];
+        let names = all(&recent);
+        assert_eq!(names.len(), 35);
+        assert!(names.contains(&"/b/c.mmd".to_owned()));
         assert_eq!(key_bindings().len(), 34);
     }
 }

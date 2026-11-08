@@ -8,7 +8,8 @@ the drawing itself, written back to the source. Tests: `crates/sirene-gui/tests/
 
 Each window has a source pane to the left of the drawing: a code editor (gpui-component's
 `Editor`) with line numbers, undo/redo, and search over the document's text. ToggleSource
-(secondary-e) shows and hides it; it is shown by default. Hiding it keeps its text, undo history,
+(secondary-e) shows and hides it; it is shown by default, and new windows show or hide it as it
+last was (GUISHE-11). Hiding it keeps its text, undo history,
 and cursor.
 
 ## WYSIWY-2 Live drawing
