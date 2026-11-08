@@ -32,7 +32,8 @@ the rename, the file keeps its permissions, owner, and group, a symlinked file s
 (its target is written), and anything already at the temporary name is replaced, not written
 through. When the owner cannot be kept (another user's file), the file is overwritten in place
 instead. A read-only file is not saved: `cannot write PATH: the file is read-only`. Save As (secondary-shift-s), and
-Save on an Untitled document, ask for a path first; the window then shows that file. A failed
+Save on an Untitled document, ask for a path first (starting in the directory an export would,
+GUISHE-9, with `diagram.mmd` for Untitled); the window then shows that file. A failed
 write leaves the document edited and shows the error in the status bar.
 
 ## WYSIWY-5 Changes on disk

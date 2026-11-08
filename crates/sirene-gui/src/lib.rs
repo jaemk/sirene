@@ -18,6 +18,7 @@ use gpui::{
 };
 
 use document::Document;
+use gpui::component::input as text;
 use navigation::{PAN_FAR, PAN_STEP};
 use settings::{Appearance, Settings};
 use viewer::Viewer;
@@ -202,6 +203,9 @@ pub fn menus(recent: &[PathBuf]) -> Vec<Menu> {
                 MenuItem::action("Undo", Undo),
                 MenuItem::action("Redo", Redo),
                 MenuItem::separator(),
+                MenuItem::action("Cut", text::Cut),
+                MenuItem::action("Copy", text::Copy),
+                MenuItem::action("Paste", text::Paste),
                 MenuItem::action("Copy Image", CopyImage),
                 MenuItem::separator(),
                 MenuItem::action("Add Node", AddNode),
@@ -273,9 +277,17 @@ pub fn init(cx: &mut App) {
     cx.on_action(|_: &AppearanceDark, cx| set_appearance(Appearance::Dark, cx));
 }
 
-/// Sets the menus from the current settings.
+/// Whether windows draw the app menus themselves: everywhere but macOS, whose menu bar is the
+/// only one gpui shows (GUISHE-12).
+pub const IN_WINDOW_MENUS: bool = !cfg!(target_os = "macos");
+
+/// Sets the menus from the current settings, for the platform and for menu bars drawn in
+/// windows.
 pub fn refresh_menus(cx: &mut App) {
     let recent = settings::get(cx).recent.clone();
+    gpui::component::GlobalState::init(cx);
+    gpui::component::GlobalState::global_mut(cx)
+        .set_app_menus(menus(&recent).into_iter().map(Menu::owned).collect());
     cx.set_menus(menus(&recent));
 }
 
@@ -296,12 +308,10 @@ pub fn open_window(
     cx: &mut App,
 ) -> anyhow::Result<(AnyWindowHandle, Entity<Viewer>)> {
     let (w, h) = settings::get(cx).window.unwrap_or((1200.0, 760.0));
+    let size = size(px(w), px(h));
+    let bounds = cascade(size, cx).unwrap_or_else(|| Bounds::centered(None, size, cx));
     let options = WindowOptions {
-        window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
-            None,
-            size(px(w), px(h)),
-            cx,
-        ))),
+        window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: Some(TitlebarOptions {
             title: Some(doc.title().into()),
             ..Default::default()
@@ -312,6 +322,31 @@ pub fn open_window(
     gpui::open_window(options, cx, |window, cx| {
         cx.new(|cx| Viewer::new(doc, window, cx))
     })
+}
+
+/// How far each new window is moved from the last one (GUISHE-11).
+pub const CASCADE: f32 = 28.0;
+
+/// Bounds of `size` below and right of the newest window, when they stay on its display.
+fn cascade(size: gpui::Size<gpui::Pixels>, cx: &mut App) -> Option<Bounds<gpui::Pixels>> {
+    let last = cx
+        .active_window()
+        .or_else(|| cx.windows().last().copied())?;
+    let (origin, display) = last
+        .update(cx, |_, window, cx| {
+            (
+                window.bounds().origin,
+                window.display(cx).map(|d| d.bounds()),
+            )
+        })
+        .ok()?;
+    let bounds = Bounds::new(origin + gpui::point(px(CASCADE), px(CASCADE)), size);
+    let fits = display.is_none_or(|d| {
+        d.contains(&bounds.origin)
+            && bounds.bottom_right().x <= d.bottom_right().x
+            && bounds.bottom_right().y <= d.bottom_right().y
+    });
+    fits.then_some(bounds)
 }
 
 fn open_or_report(doc: Document, cx: &mut App) {
@@ -380,6 +415,29 @@ pub fn focus_existing(path: &Path, cx: &mut App) -> bool {
         }
     }
     false
+}
+
+/// Where Save As and Export dialogs start (GUISHE-9, WYSIWY-4): the document's directory, else
+/// the working directory, unless that is the filesystem root (as for an app started from
+/// Finder), then the home directory.
+pub fn dialog_dir(doc: Option<&Path>) -> PathBuf {
+    let home = ["HOME", "USERPROFILE"]
+        .iter()
+        .find_map(|k| std::env::var_os(k).filter(|v| !v.is_empty()))
+        .map(PathBuf::from);
+    dialog_dir_from(doc, std::env::current_dir().ok(), home)
+}
+
+/// `dialog_dir`, given the working and home directories.
+pub fn dialog_dir_from(doc: Option<&Path>, cwd: Option<PathBuf>, home: Option<PathBuf>) -> PathBuf {
+    if let Some(dir) = doc
+        .and_then(Path::parent)
+        .filter(|d| !d.as_os_str().is_empty())
+    {
+        return dir.to_owned();
+    }
+    let usable = cwd.filter(|d| d.parent().is_some());
+    usable.or(home).unwrap_or_default()
 }
 
 /// The editor in `window`, if it shows one.
@@ -522,6 +580,36 @@ mod tests {
     }
 
     #[test]
+    fn dialog_dirs() {
+        let p = PathBuf::from;
+        let (cwd, home) = (Some(p("/work")), Some(p("/home/me")));
+        assert_eq!(
+            dialog_dir_from(Some(Path::new("/d/a.mmd")), cwd.clone(), home.clone()),
+            p("/d")
+        );
+        // A bare file name has an empty parent; use the working directory.
+        assert_eq!(
+            dialog_dir_from(Some(Path::new("a.mmd")), cwd.clone(), home.clone()),
+            p("/work")
+        );
+        assert_eq!(dialog_dir_from(None, cwd, home.clone()), p("/work"));
+        // An app started from Finder runs in `/`.
+        let root = std::env::current_dir()
+            .unwrap()
+            .ancestors()
+            .last()
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            dialog_dir_from(None, Some(root), home.clone()),
+            p("/home/me")
+        );
+        assert_eq!(dialog_dir_from(None, None, home), p("/home/me"));
+        assert_eq!(dialog_dir_from(None, None, None), p(""));
+        assert!(dialog_dir(None).is_absolute());
+    }
+
+    #[test]
     fn every_action_has_a_menu_item_and_key() {
         /// The actions in `items`, in submenus too.
         fn actions(items: &[MenuItem]) -> Vec<String> {
@@ -540,10 +628,10 @@ mod tests {
                 .flat_map(|m| actions(&m.items))
                 .collect()
         };
-        assert_eq!(all(&[]).len(), 33);
+        assert_eq!(all(&[]).len(), 36);
         let recent = [PathBuf::from("/a.mmd"), PathBuf::from("/b/c.mmd")];
         let names = all(&recent);
-        assert_eq!(names.len(), 35);
+        assert_eq!(names.len(), 38);
         assert!(names.contains(&"/b/c.mmd".to_owned()));
         assert_eq!(key_bindings().len(), 34);
     }

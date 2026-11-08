@@ -1,7 +1,8 @@
 # GUI Shell
 
 The app window (`crates/sirene-gui`): one window per diagram file. Tests:
-`crates/sirene-gui/tests/viewer.rs` and the unit tests in `document.rs` and `lib.rs`.
+`crates/sirene-gui/tests/viewer.rs`, the files each section names, and the unit tests in
+`document.rs`, `settings.rs`, and `lib.rs`.
 
 ## GUISHE-1 Launching
 
@@ -52,11 +53,12 @@ the zoom.
 | Rename | enter on the drawing | edit the selected item's label (WYSIWY-10) |
 | Delete | backspace or delete on the drawing | delete the selection (WYSIWY-12) |
 | Deselect | escape on the drawing | clear the selection (WYSIWY-9) |
-| Undo | secondary-z on the drawing | undo a drawing change (WYSIWY-13) |
-| Redo | secondary-shift-z on the drawing | redo a drawing change (WYSIWY-13) |
+| Undo | secondary-z on the drawing | undo a drawing change (WYSIWY-13), or text (GUISHE-12) |
+| Redo | secondary-shift-z on the drawing | redo a drawing change (WYSIWY-13), or text (GUISHE-12) |
+| Cut, Copy, Paste | the text field's own keys | edit the focused text (GUISHE-12) |
 | ZoomToSelection | secondary-8 | fit the selection (GUISHE-8) |
 | Pan | arrow keys on the drawing, shift for further | move the drawing (GUISHE-8) |
-| SelectAll | secondary-a on the drawing | select every node and edge (GUISHE-8) |
+| SelectAll | secondary-a on the drawing | select every node and edge (GUISHE-8), or text (GUISHE-12) |
 | SelectNext, SelectPrevious | tab, shift-tab on the drawing | select the next or previous node (GUISHE-8) |
 | ExportPng | secondary-shift-e | export as PNG (GUISHE-9) |
 | ExportSvg | (menu) | export as SVG (GUISHE-9) |
@@ -64,7 +66,7 @@ the zoom.
 | AppearanceSystem, AppearanceLight, AppearanceDark | (menu) | set the Appearance (GUISHE-6) |
 | OpenRecent, ClearRecent | (menu) | open a recent file, or forget them (GUISHE-10) |
 
-The same actions are in the app menus (sirene, File, Edit, View). The window is built on GPUI Kit
+The same actions are in the app menus (sirene, File, Edit, View; GUISHE-12). The window is built on GPUI Kit
 (`gpui-kit`: gpui-pre, gpui-base, gpui-component), whose light or dark theme follows GUISHE-6.
 
 ## GUISHE-6 Appearance
@@ -76,7 +78,8 @@ whatever the system's appearance (GUISHE-10).
 
 ## GUISHE-7 Status bar
 
-The status bar shows the first of: a save error (WYSIWY-4), a change on disk under unsaved edits
+The status bar shows the first of: the outcome of the last export or copy until the document next
+changes (GUISHE-9), a save error (WYSIWY-4), a change on disk under unsaved edits
 (WYSIWY-5), the read error, the first error (else first warning) as `LINE:COL: SEVERITY: MESSAGE`
 with `(+N more)` when there are others, or the window title (WYSIWY-3); and the zoom as a
 percentage.
@@ -96,8 +99,9 @@ While a label is being edited these keys go to its field. Tests:
 
 ## GUISHE-9 Export and copy
 
-ExportPng and ExportSvg ask for a path (in the document's directory, or the working directory for
-Untitled, named after the document with `.png` or `.svg`, else `diagram`) and write the drawing
+ExportPng and ExportSvg ask for a path (in the document's directory; for Untitled, the working
+directory, or the home directory when that is the filesystem root, as for an app started from
+Finder; named after the document with `.png` or `.svg`, else `diagram`) and write the drawing
 there in the window's theme: PNG as `sirene png` writes it at fine quality (DISPLA-12), SVG as
 `sirene svg` does. CopyImage puts the drawing on the clipboard as a PNG at normal quality. The
 status bar shows `exported PATH`, `copied the drawing as an image`, or the error (`cannot write
@@ -124,7 +128,24 @@ the unit tests in `settings.rs`.
 ## GUISHE-11 Window layout
 
 New windows open at the last window size (1200x760 at first) and with the source pane shown or
-hidden as it last was. The divider between the source pane and the drawing can be dragged; the
+hidden as it last was. The first window is centered; later ones open 28px right of and below the
+active window, or centered when that would leave its display. Tests: `new_windows_cascade` in
+`crates/sirene-gui/tests/shell.rs`. The divider between the source pane and the drawing can be dragged; the
 pane is 480px wide at first, at least 160px, keeps its width when the window is resized, and new
 windows use the width it was last dragged to. Tests: `windows_remember_their_layout` in
 `crates/sirene-gui/tests/settings.rs`.
+
+## GUISHE-12 Menus, text editing, and focus
+
+On macOS the menus are the system menu bar. Elsewhere, where gpui shows no menu bar, each window
+draws the same menus (GPUI Kit's `AppMenuBar`) in a 30px bar above the panes, rebuilt when
+File > Open Recent changes; a menu item acts on whatever had the keyboard before the menu opened.
+
+Edit > Undo, Redo, and Select All act on the drawing while it has the keyboard (WYSIWY-13,
+GUISHE-8). While the source pane or a label field has it, they act on that text, as the field's
+own keys do, and leave the drawing's selection alone. Edit > Cut, Copy, and Paste act on the
+focused text and do nothing elsewhere.
+
+While the drawing has the keyboard (after clicking it, or hiding the source pane), a 2px frame
+in the theme's accent color is drawn just inside it; the keys marked "on the drawing" in
+GUISHE-5 go to it only then. Tests: `crates/sirene-gui/tests/shell.rs`.
