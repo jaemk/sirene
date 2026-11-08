@@ -232,13 +232,31 @@ fn parse(source: &str) -> (Flowchart, Vec<Problem>) {
     (lowered.flowchart, problems)
 }
 
-/// Writes `text` to a temporary file beside `path`, then renames it over `path`.
+/// Writes `text` to a temporary file beside `path`, then renames it over `path`. A symlink is
+/// followed, so the link stays and its target changes; the file keeps its permissions; and the
+/// text is on disk before the rename.
 fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let path = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_owned());
     let name = path
         .file_name()
-        .map_or_else(|| "file".into(), |n| n.to_string_lossy());
+        .map_or_else(|| "file".into(), |n| n.to_string_lossy().into_owned());
     let tmp = path.with_file_name(format!(".{name}.sirene-save"));
-    let result = std::fs::write(&tmp, text).and_then(|()| std::fs::rename(&tmp, path));
+    // A leftover temporary file, or anything planted there, is replaced, never written through.
+    let _ = std::fs::remove_file(&tmp);
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
+        if let Ok(meta) = std::fs::metadata(&path) {
+            file.set_permissions(meta.permissions())?;
+        }
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+        std::fs::rename(&tmp, &path)
+    })();
     if result.is_err() {
         let _ = std::fs::remove_file(&tmp);
     }
@@ -358,6 +376,49 @@ mod tests {
         assert_eq!(d.save_as(other.clone()), Ok(()));
         assert_eq!(d.name(), "b.mmd");
         assert_eq!(std::fs::read_to_string(&other).unwrap(), STARTER);
+    }
+
+    /// A save keeps the file's mode, writes through a symlink, and never writes through
+    /// whatever sits at the temporary name.
+    #[cfg(unix)]
+    #[test]
+    fn saves_keep_modes_and_links() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("real.mmd");
+        std::fs::write(&target, "flowchart LR\nA\n").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let link = dir.path().join("link.mmd");
+        symlink(&target, &link).unwrap();
+        // Planted at the temporary name: must not receive the text.
+        let victim = dir.path().join("victim");
+        std::fs::write(&victim, "keep").unwrap();
+        symlink(&victim, dir.path().join(".real.mmd.sirene-save")).unwrap();
+
+        let mut d = Document::open(&link);
+        d.set_source("flowchart LR\nA --> B\n".into());
+        assert_eq!(d.save(), Ok(()));
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(
+            std::fs::read_to_string(&target).unwrap(),
+            "flowchart LR\nA --> B\n"
+        );
+        let mode = std::fs::metadata(&target).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep");
+        let mut names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["link.mmd", "real.mmd", "victim"]);
+        assert_eq!(d.poll(), Disk::Unchanged);
     }
 
     #[test]
