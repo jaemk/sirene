@@ -3,9 +3,10 @@
 use proptest::prelude::*;
 use sirene_core::Severity;
 use sirene_core::flowchart::edit::{
-    TextEdit, add_edge, add_node, delete, label_source, set_edge_label, set_node_label,
+    Line, MAX_LENGTH, TextEdit, add_edge, add_node, delete, label_source, reverse_edge,
+    set_edge_label, set_edge_line, set_node_label, set_node_shape,
 };
-use sirene_core::flowchart::{self, Flowchart};
+use sirene_core::flowchart::{self, Arrow, Flowchart, Shape, Stroke};
 
 fn chart(src: &str) -> Flowchart {
     flowchart::parse(src).lower().flowchart
@@ -174,6 +175,165 @@ fn canonical_strokes() {
             "{src} -> {after}"
         );
     }
+}
+
+#[test]
+fn node_shapes() {
+    let src = "flowchart\n    A[Start] --> B\n    A\n";
+    assert_eq!(
+        applied(src, set_node_shape(src, "A", Shape::Diamond)),
+        "flowchart\n    A{Start} --> B\n    A\n"
+    );
+    // A node without delimiters gets them, with its label, after its first mention.
+    assert_eq!(
+        applied(src, set_node_shape(src, "B", Shape::Stadium)),
+        "flowchart\n    A[Start] --> B([B])\n    A\n"
+    );
+    // Unquoted text that is not plain words is quoted; quoted text is kept.
+    let src = "flowchart\n    A[x-y] --> B[\"q\"]\n";
+    assert_eq!(
+        applied(src, set_node_shape(src, "A", Shape::Rounded)),
+        "flowchart\n    A(\"x-y\") --> B[\"q\"]\n"
+    );
+    assert_eq!(
+        applied(src, set_node_shape(src, "B", Shape::TrapezoidTop)),
+        "flowchart\n    A[x-y] --> B[\\\"q\"/]\n"
+    );
+    // Named shapes go in metadata, which a classic shape then drops.
+    let src = "flowchart\n    A[Doc] --> B\n";
+    let named = applied(src, set_node_shape(src, "A", Shape::Document));
+    assert_eq!(named, "flowchart\n    A[Doc]@{ shape: doc } --> B\n");
+    assert_eq!(
+        applied(&named, set_node_shape(&named, "A", Shape::Cloud)),
+        "flowchart\n    A[Doc]@{ shape: cloud } --> B\n"
+    );
+    assert_eq!(
+        applied(&named, set_node_shape(&named, "A", Shape::Hexagon)),
+        "flowchart\n    A{{Doc}} --> B\n"
+    );
+    let src = "flowchart\n    A@{ label: \"x\", shape: doc }\n    B@{ label: \"y\" }\n    C@{}\n";
+    assert_eq!(
+        applied(src, set_node_shape(src, "A", Shape::Rect)),
+        "flowchart\n    A[x]@{ label: \"x\" }\n    B@{ label: \"y\" }\n    C@{}\n"
+    );
+    assert_eq!(
+        applied(src, set_node_shape(src, "B", Shape::Bolt)),
+        "flowchart\n    A@{ label: \"x\", shape: doc }\n    B@{ shape: bolt, label: \"y\" }\n    C@{}\n"
+    );
+    assert_eq!(
+        applied(src, set_node_shape(src, "C", Shape::Bolt)),
+        "flowchart\n    A@{ label: \"x\", shape: doc }\n    B@{ label: \"y\" }\n    C@{ shape: bolt }\n"
+    );
+    // Every shape round-trips and keeps the label.
+    let src = "flowchart\n    A[\"Hi there\"] --> B\n";
+    for &shape in Shape::ALL {
+        let out = match set_node_shape(src, "A", shape) {
+            Some(e) => e.apply(src),
+            None => src.to_owned(),
+        };
+        let a = chart(&out).nodes[0].clone();
+        assert_eq!(
+            (a.shape, a.label.text.as_str()),
+            (shape, "Hi there"),
+            "{out}"
+        );
+        assert_eq!(errors(&out), 0, "{out}");
+    }
+    assert_eq!(set_node_shape(src, "A", Shape::Rect), None);
+    assert_eq!(set_node_shape(src, "Z", Shape::Rect), None);
+}
+
+#[test]
+fn edge_lines() {
+    let line = |stroke, start, end, length| Line {
+        stroke,
+        start,
+        end,
+        length,
+    };
+    let src = "flowchart\n    A -- yes --> B -.-> C\n    C e1@==>|go| D\n";
+    assert_eq!(
+        applied(
+            src,
+            set_edge_line(src, 0, line(Stroke::Dotted, None, Some(Arrow::Point), 1))
+        ),
+        "flowchart\n    A -.->|yes| B -.-> C\n    C e1@==>|go| D\n"
+    );
+    assert_eq!(
+        applied(
+            src,
+            set_edge_line(
+                src,
+                2,
+                line(Stroke::Normal, Some(Arrow::Point), Some(Arrow::Point), 3)
+            )
+        ),
+        "flowchart\n    A -- yes --> B -.-> C\n    C e1@<---->|go| D\n"
+    );
+    assert_eq!(
+        applied(
+            src,
+            set_edge_line(src, 1, line(Stroke::Invisible, None, None, 1))
+        ),
+        "flowchart\n    A -- yes --> B ~~~ C\n    C e1@==>|go| D\n"
+    );
+    let e = chart(src).edges[1].clone();
+    let longest = applied(
+        src,
+        set_edge_line(
+            src,
+            1,
+            Line {
+                length: 99,
+                ..Line::of(&e)
+            },
+        ),
+    );
+    assert_eq!(chart(&longest).edges[1].length, MAX_LENGTH);
+    assert_eq!(set_edge_line(src, 1, Line::of(&e)), None);
+    assert_eq!(
+        set_edge_line(
+            src,
+            1,
+            Line {
+                length: 0,
+                ..Line::of(&e)
+            }
+        ),
+        None
+    );
+    assert_eq!(set_edge_line(src, 9, Line::of(&e)), None);
+}
+
+#[test]
+fn reversing_edges() {
+    let src = "flowchart\n    A[Start] -->|go| B{Ok?}\n    B --> C --> D\n    E & F --> G\n";
+    assert_eq!(
+        applied(src, reverse_edge(src, 0)),
+        "flowchart\n    B{Ok?} -->|go| A[Start]\n    B --> C --> D\n    E & F --> G\n"
+    );
+    // In a chain, the edge goes (as `delete` takes it, keeping where D is first mentioned) and
+    // comes back reversed at the end.
+    let out = applied(src, reverse_edge(src, 2));
+    assert_eq!(
+        out,
+        "flowchart\n    A[Start] -->|go| B{Ok?}\n    B --> C\n    D\n    E & F --> G\n    D --> C\n"
+    );
+    let c = chart(&out);
+    let ends: Vec<(&str, &str)> = c
+        .edges
+        .iter()
+        .map(|e| (e.from.as_str(), e.to.as_str()))
+        .collect();
+    assert_eq!(
+        ends,
+        [("A", "B"), ("B", "C"), ("E", "G"), ("F", "G"), ("D", "C")]
+    );
+    // Shared strokes and ids in chains are left alone.
+    assert_eq!(reverse_edge(src, 3), None);
+    let src = "flowchart\n    A e1@--> B --> C\n";
+    assert_eq!(reverse_edge(src, 0), None);
+    assert_eq!(reverse_edge(src, 9), None);
 }
 
 #[test]

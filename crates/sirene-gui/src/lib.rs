@@ -4,6 +4,7 @@
 pub mod document;
 pub mod drawing;
 pub mod export;
+pub mod menu;
 pub mod navigation;
 pub mod paint;
 pub mod settings;
@@ -21,6 +22,7 @@ use document::Document;
 use gpui::component::input as text;
 use navigation::{PAN_FAR, PAN_STEP};
 use settings::{Appearance, Settings};
+use sirene_core::flowchart::{Arrow, Shape, Stroke};
 use viewer::Viewer;
 
 actions!(
@@ -84,8 +86,52 @@ actions!(
         AppearanceDark,
         /// Forget the recent files.
         ClearRecent,
+        /// Add a node with an edge from it to the selected node.
+        AddNodeBefore,
+        /// Reverse the selected edges.
+        ReverseEdge,
+        /// Make the selected edges span one more rank.
+        LongerEdge,
+        /// Make the selected edges span one rank fewer.
+        ShorterEdge,
     ]
 );
+
+/// Give the selected nodes a shape (WYSIWY-14).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetShape {
+    pub shape: Shape,
+}
+
+/// Give the selected edges a stroke (WYSIWY-14).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetStroke {
+    pub stroke: Stroke,
+}
+
+/// Give the selected edges arrowheads (WYSIWY-14).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetArrows {
+    pub start: Option<Arrow>,
+    pub end: Option<Arrow>,
+}
+
+/// Add an edge from each selected node to node `id` (WYSIWY-14).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct ConnectTo {
+    pub id: String,
+}
+
+/// Add an edge from node `id` to each selected node (WYSIWY-14).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct ConnectFrom {
+    pub id: String,
+}
 
 /// Open a file from File > Open Recent.
 #[derive(Clone, PartialEq, Debug, gpui::Action)]
@@ -209,7 +255,11 @@ pub fn menus(recent: &[PathBuf]) -> Vec<Menu> {
                 MenuItem::action("Copy Image", CopyImage),
                 MenuItem::separator(),
                 MenuItem::action("Add Node", AddNode),
+                MenuItem::action("Add Node Before", AddNodeBefore),
                 MenuItem::action("Rename", Rename),
+                MenuItem::action("Reverse Edge", ReverseEdge),
+                MenuItem::action("Longer Edge", LongerEdge),
+                MenuItem::action("Shorter Edge", ShorterEdge),
                 MenuItem::action("Delete", Delete),
                 MenuItem::separator(),
                 MenuItem::action("Select All", SelectAll),
@@ -643,10 +693,10 @@ mod tests {
                 .flat_map(|m| actions(&m.items))
                 .collect()
         };
-        assert_eq!(all(&[]).len(), 36);
+        assert_eq!(all(&[]).len(), 40);
         let recent = [PathBuf::from("/a.mmd"), PathBuf::from("/b/c.mmd")];
         let names = all(&recent);
-        assert_eq!(names.len(), 38);
+        assert_eq!(names.len(), 42);
         assert!(names.contains(&"/b/c.mmd".to_owned()));
         assert_eq!(key_bindings().len(), 34);
     }
