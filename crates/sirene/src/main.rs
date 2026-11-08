@@ -13,13 +13,14 @@ use sirene_core::scene::{self, Approx, Theme};
 
 /// Mermaid diagram editor and viewer.
 ///
-/// With no command, opens each FILE in a viewer window, or an empty window.
+/// With no command, opens each FILE in an editor window, or a new document with a starter
+/// flowchart.
 #[derive(Debug, Parser)]
 #[command(name = "sirene", version, about)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
-    /// Mermaid files to view.
+    /// Mermaid files to edit.
     files: Vec<PathBuf>,
     /// Print what each step does, with timings, to stderr.
     #[arg(short, long, global = true)]
@@ -178,7 +179,44 @@ fn main() -> ExitCode {
     code
 }
 
+/// The subcommand a missing FILE was probably meant to be, e.g. `asci` for `ascii`.
+fn misspelled_command(files: &[PathBuf]) -> Option<(String, &'static str)> {
+    let first = files.first()?;
+    let name = first.to_str()?;
+    if first.exists() || name.contains(['/', '\\', '.']) {
+        return None;
+    }
+    let near = |cmd: &str| {
+        let (a, b): (Vec<char>, Vec<char>) = (name.chars().collect(), cmd.chars().collect());
+        // Levenshtein distance, one row at a time.
+        let mut row: Vec<usize> = (0..=b.len()).collect();
+        for (i, ca) in a.iter().enumerate() {
+            let mut prev = row[0];
+            row[0] = i + 1;
+            for (j, cb) in b.iter().enumerate() {
+                let next = (prev + usize::from(ca != cb)).min(row[j] + 1).min(row[j + 1] + 1);
+                prev = row[j + 1];
+                row[j + 1] = next;
+            }
+        }
+        row[b.len()] <= 2
+    };
+    ["ascii", "svg", "png", "help"]
+        .into_iter()
+        .find(|cmd| near(cmd))
+        .map(|cmd| (name.to_owned(), cmd))
+}
+
 fn run(cli: Cli) -> ExitCode {
+    if cli.command.is_none()
+        && let Some((name, cmd)) = misspelled_command(&cli.files)
+    {
+        eprintln!(
+            "error: no file or command named '{name}'; did you mean 'sirene {cmd}'? \
+             (to open a new file with that name, use './{name}')"
+        );
+        return ExitCode::from(2);
+    }
     match cli.command {
         None => gui(cli.files),
         Some(Command::Ascii {
@@ -542,6 +580,28 @@ mod tests {
         // A file named like a command needs a path that is not one.
         let cli = parse(&["./ascii"]);
         assert_eq!(cli.files, [PathBuf::from("./ascii")]);
+    }
+
+    #[test]
+    fn misspelled_commands() {
+        let check = |args: &[&str]| misspelled_command(&parse(args).files);
+        assert_eq!(check(&["asci", "a.mmd"]), Some(("asci".into(), "ascii")));
+        assert_eq!(check(&["asciii"]), Some(("asciii".into(), "ascii")));
+        assert_eq!(check(&["sgv"]), Some(("sgv".into(), "svg")));
+        assert_eq!(check(&["pgn"]), Some(("pgn".into(), "png")));
+        assert_eq!(check(&["hlep"]), Some(("hlep".into(), "help")));
+        for ok in [
+            &["./asci"][..],
+            &["asci.mmd"],
+            &["diagram"],
+            &["a.mmd", "asci"],
+            &[],
+        ] {
+            assert_eq!(check(ok), None, "{ok:?}");
+        }
+        // A path that exists is used, whatever its name (tests run in `crates/sirene`).
+        assert!(Path::new("src").exists());
+        assert_eq!(check(&["src"]), None);
     }
 
     /// A watch pass renders new and changed inputs only, and forgets inputs that are gone.
