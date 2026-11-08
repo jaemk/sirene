@@ -186,13 +186,11 @@ pub fn delete(src: &str, nodes: &[&str], edges: &[usize]) -> Option<TextEdit> {
     let doc = Doc::new(src);
     let chart = &doc.chart;
     let mut dead: HashSet<&str> = nodes.iter().copied().collect();
-    let mut dead_edges = HashSet::new();
-    for e in edges.iter().filter_map(|&i| chart.edges.get(i)) {
-        dead_edges.insert(e.range);
-        if let Some(id) = &e.id {
-            dead.insert(id);
-        }
-    }
+    let dead_edges: HashSet<TextRange> = edges
+        .iter()
+        .filter_map(|&i| chart.edges.get(i))
+        .map(|e| e.range)
+        .collect();
     // Model edges that go, for renumbering `linkStyle`.
     let gone: Vec<bool> = chart
         .edges
@@ -203,6 +201,12 @@ pub fn delete(src: &str, nodes: &[&str], edges: &[usize]) -> Option<TextEdit> {
                 || dead.contains(e.to.as_str())
         })
         .collect();
+    // The ids of edges that go, so their `id@{ ... }`, `class`, and `style` statements go too.
+    for (e, _) in chart.edges.iter().zip(&gone).filter(|(_, g)| **g) {
+        if let Some(id) = &e.id {
+            dead.insert(id);
+        }
+    }
 
     let mut edits = Vec::new();
     let mut chains = Vec::new();
@@ -500,11 +504,22 @@ impl<'a> Doc<'a> {
         }
     }
 
-    /// The first id of `A` to `Z`, then `n1`, `n2`, ..., not used by a node, subgraph, or edge.
+    /// The first id of `A` to `Z`, then `n1`, `n2`, ..., not used by a node, subgraph, or edge,
+    /// nor named in the source (as by a `class` statement for a node not written yet).
     fn fresh_id(&self) -> String {
         let chart = &self.chart;
+        let named: HashSet<String> = self
+            .root
+            .descendants_with_tokens()
+            .filter_map(|e| e.into_token())
+            .filter(|t| t.kind() == IDENT)
+            .map(|t| t.text().to_owned())
+            .collect();
         let used = |id: &str| {
-            chart.node(id).is_some() || chart.subgraph(id).is_some() || chart.edge(id).is_some()
+            named.contains(id)
+                || chart.node(id).is_some()
+                || chart.subgraph(id).is_some()
+                || chart.edge(id).is_some()
         };
         ('A'..='Z')
             .map(String::from)

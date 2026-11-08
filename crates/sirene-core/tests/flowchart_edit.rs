@@ -113,6 +113,16 @@ fn node_labels() {
     assert_eq!(set_node_label(src, "Z", "x"), None);
     let src = "flowchart\n    A@{ label: \"meta\" }\n";
     assert_eq!(set_node_label(src, "A", "x"), None);
+    // Metadata without a label keeps its shape.
+    let src = "flowchart\n    A@{ shape: hex }\n";
+    let out = applied(src, set_node_label(src, "A", "x"));
+    let a = chart(&out).nodes[0].clone();
+    assert_eq!(
+        (a.label.text.as_str(), a.shape),
+        ("x", chart(src).nodes[0].shape),
+        "{out}"
+    );
+    assert_eq!(errors(&out), 0, "{out}");
 }
 
 #[test]
@@ -186,6 +196,9 @@ fn adding() {
     let taken: String = ('A'..='Z').map(|c| format!("    {c}\n")).collect();
     let src = format!("flowchart\n{taken}    n1\n    subgraph n2\n    end\n    A n3@--> B\n");
     assert_eq!(add_node(&src, "").0, "n4");
+    // Ids that statements refer to, without a node yet, are taken too.
+    let src = "flowchart\n    A\n    style B fill:red\n    class C hot\n    click D cb\n";
+    assert_eq!(add_node(src, "").0, "E");
 
     let src = "flowchart\n    subgraph s\n        A\n    end\n";
     assert_eq!(
@@ -285,6 +298,9 @@ fn deleting_cleans_up_references() {
         applied(src, delete(src, &[], &[0])),
         "flowchart\n    A\n    B\n"
     );
+    // Also when the edge goes with a deleted node.
+    let src = "flowchart\n    A e1@--> B\n    e1@{ animate: true }\n    class e1 hot\n";
+    assert_eq!(applied(src, delete(src, &["A"], &[])), "flowchart\n    B\n");
 }
 
 #[test]
