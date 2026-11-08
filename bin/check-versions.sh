@@ -3,7 +3,7 @@
 # Assert the workspace crate versions agree, before anything is published.
 #
 # The release workflow decides whether to publish from one signal: the root
-# crate's version is not on the crates.io index yet. That signal says nothing
+# version has no `vVERSION` GitHub release yet. That signal says nothing
 # about the other crates, so a half-bumped workspace would pass it:
 #
 #   1. A crate is bumped but a dependent's pin on it is not. `cargo publish`

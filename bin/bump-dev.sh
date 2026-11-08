@@ -15,7 +15,7 @@ set -euo pipefail
 version="${1:?usage: bump-dev.sh VERSION [MANIFEST]}"
 manifest="${2:-Cargo.toml}"
 
-if ! grep -qx "version = \"${version}\"" "$manifest"; then
+if ! grep -qxF "version = \"${version}\"" "$manifest"; then
   echo "$manifest is not on ${version}; leaving it alone" >&2
   exit 0
 fi

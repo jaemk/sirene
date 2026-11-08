@@ -662,21 +662,53 @@ fn install_does_not_fall_back_on_macos() {
     assert_eq!(fx.installed().as_deref(), Some("MAC"));
 }
 
-/// SIRENE_TARGET picks the gnu (GUI) build, and SIRENE_VERSION skips the
-/// latest-release lookup.
+/// SIRENE_TARGET picks the gnu (GUI) build, and SIRENE_VERSION, with or
+/// without a leading `v`, skips the latest-release lookup.
 #[test]
 fn install_honors_the_target_and_version_overrides() {
+    for version in ["9.9.9", "v9.9.9"] {
+        let fx = Install::new("Linux", "x86_64");
+        let gnu = fx.publish("x86_64-unknown-linux-gnu", "GNU");
+        fx.sums(&[&gnu], None);
+        let out = fx.run(&[
+            ("SIRENE_TARGET", "x86_64-unknown-linux-gnu"),
+            ("SIRENE_VERSION", version),
+        ]);
+        assert!(out.status.success(), "{}", stderr(&out));
+        assert_eq!(fx.installed().as_deref(), Some("GNU"));
+        assert_eq!(fx.assets_requested(), [gnu]);
+        let urls = read(&fx.path("urls.log"));
+        assert!(!urls.contains("releases/latest"), "{urls}");
+        assert!(!urls.contains("/vv"), "{urls}");
+    }
+}
+
+/// An explicit SIRENE_TARGET is never swapped for another build.
+#[test]
+fn install_does_not_fall_back_from_an_explicit_target() {
     let fx = Install::new("Linux", "x86_64");
     let gnu = fx.publish("x86_64-unknown-linux-gnu", "GNU");
     fx.sums(&[&gnu], None);
-    let out = fx.run(&[
-        ("SIRENE_TARGET", "x86_64-unknown-linux-gnu"),
-        ("SIRENE_VERSION", "9.9.9"),
-    ]);
-    assert!(out.status.success(), "{}", stderr(&out));
-    assert_eq!(fx.installed().as_deref(), Some("GNU"));
-    assert_eq!(fx.assets_requested(), [gnu]);
-    assert!(!read(&fx.path("urls.log")).contains("releases/latest"));
+    let out = fx.run(&[("SIRENE_TARGET", "x86_64-unknown-linux-musl")]);
+    assert!(!out.status.success());
+    assert_eq!(
+        fx.assets_requested(),
+        ["sirene-9.9.9-x86_64-unknown-linux-musl.tar.gz"]
+    );
+    assert_eq!(fx.installed(), None);
+}
+
+/// Only main releases: a dispatch from another branch would publish that
+/// branch and commit its formula and cask to main.
+#[test]
+fn the_release_workflow_runs_only_on_main() {
+    let workflow = read(&repo_root().join(".github/workflows/release.yml"));
+    assert!(
+        workflow.contains(
+            "    if: github.repository == 'jaemk/sirene' && github.ref == 'refs/heads/main'\n"
+        ),
+        "decide must check the ref"
+    );
 }
 
 #[test]
