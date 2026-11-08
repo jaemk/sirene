@@ -178,9 +178,62 @@ fn disk_changes_reach_the_editor(cx: &mut TestAppContext) {
     );
     let status = viewer.read_with(cx, |v, _| v.status());
     assert_eq!(status, "a.mmd changed on disk; Reload discards your edits");
+    // Reload asks before dropping the edits; Cancel keeps them.
     cx.dispatch_action(Reload);
     cx.run_until_parked();
+    assert!(cx.has_pending_prompt());
+    cx.simulate_prompt_answer("Cancel");
+    cx.run_until_parked();
+    assert_eq!(
+        source(&viewer, cx),
+        "flowchart LR\nA --> B --> X\nB --> D\n"
+    );
+    cx.dispatch_action(Reload);
+    cx.run_until_parked();
+    cx.simulate_prompt_answer("Reload");
+    cx.run_until_parked();
     assert_eq!(source(&viewer, cx), "flowchart LR\nA --> Theirs\n");
+    assert_eq!(title(cx), "a.mmd");
+
+    // Unedited, Reload does not ask.
+    write(dir.path(), "a.mmd", "flowchart LR\nA --> Again\n");
+    cx.dispatch_action(Reload);
+    cx.run_until_parked();
+    assert!(!cx.has_pending_prompt());
+    assert_eq!(source(&viewer, cx), "flowchart LR\nA --> Again\n");
+}
+
+/// Saving over changes made on disk asks first.
+#[gpui::test]
+fn saving_over_disk_changes_asks(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = write(dir.path(), "a.mmd", "flowchart LR\nA\n");
+    let (viewer, cx) = open(cx, Document::open(&path));
+    type_at(&viewer, cx, 1, 1, " --> Mine");
+    write(dir.path(), "a.mmd", "flowchart LR\nA --> Theirs\n");
+    cx.executor().advance_clock(POLL);
+    cx.run_until_parked();
+
+    let saved = viewer.update_in(cx, |v, window, cx| v.save(window, cx));
+    cx.run_until_parked();
+    assert!(cx.has_pending_prompt());
+    cx.simulate_prompt_answer("Cancel");
+    cx.run_until_parked();
+    assert_eq!(saved.now_or_never(), Some(false));
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "flowchart LR\nA --> Theirs\n"
+    );
+    assert_eq!(title(cx), "a.mmd (edited)");
+
+    cx.dispatch_action(Save);
+    cx.run_until_parked();
+    cx.simulate_prompt_answer("Overwrite");
+    cx.run_until_parked();
+    assert_eq!(
+        std::fs::read_to_string(&path).unwrap(),
+        "flowchart LR\nA --> Mine\n"
+    );
     assert_eq!(title(cx), "a.mmd");
 }
 
