@@ -563,7 +563,9 @@ fn watch_renders_changes() {
         svg("a.svg").contains(">Broken</text>")
     });
     // The status line follows the write.
-    eventually("the third `wrote a.svg`", || err().matches(&wrote_a).count() >= 3);
+    eventually("the third `wrote a.svg`", || {
+        err().matches(&wrote_a).count() >= 3
+    });
     assert!(child.0.try_wait().unwrap().is_none(), "watch exited");
 
     let err = err();
