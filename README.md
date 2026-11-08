@@ -48,6 +48,7 @@ $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
 sirene diagram.mmd           # edit the source beside a live drawing; follows changes on disk
 sirene svg diagram.mmd       # print SVG (--theme light|dark, -o FILE)
 sirene png diagram.mmd       # write diagram.png (--quality draft|normal|fine, --scale N, --theme, -o FILE)
+sirene png --watch docs/     # write a .png beside each .mmd under docs/, again on each change
 ```
 
 `-v`/`--verbose`, before or after the command, prints each step (reading, parsing, layout,

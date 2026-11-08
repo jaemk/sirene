@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::io::{IsTerminal, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::Instant;
+use std::time::{Duration, Instant, SystemTime};
 
 use clap::{Parser, Subcommand, ValueEnum};
 use sirene_core::Severity;
@@ -72,22 +73,33 @@ enum Command {
         /// Characters to draw with.
         #[arg(long, value_enum, default_value_t = CharsetArg::Unicode)]
         charset: CharsetArg,
+        /// Print again each time FILE changes, until interrupted.
+        #[arg(short, long)]
+        watch: bool,
     },
-    /// Print a diagram as SVG.
+    /// Print a diagram as SVG, or write one per diagram in a directory.
     Svg {
-        /// Mermaid file to read; stdin when omitted or `-`.
+        /// Mermaid file or directory to read; stdin when omitted or `-`. A directory's `.mmd`
+        /// and `.mermaid` files are written as `.svg` beside them, or under --output.
         file: Option<PathBuf>,
+        /// Write again each time an input changes, until interrupted.
+        #[arg(short, long)]
+        watch: bool,
         /// Colors to draw with.
         #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
         theme: ThemeArg,
-        /// Write the SVG here instead of stdout.
+        /// Write the SVG here instead of stdout; for a directory, the directory to write into.
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
-    /// Write a diagram as a PNG image.
+    /// Write a diagram as a PNG image, or one per diagram in a directory.
     Png {
-        /// Mermaid file to read; stdin when omitted or `-`.
+        /// Mermaid file or directory to read; stdin when omitted or `-`. A directory's `.mmd`
+        /// and `.mermaid` files are written as `.png` beside them, or under --output.
         file: Option<PathBuf>,
+        /// Write again each time an input changes, until interrupted.
+        #[arg(short, long)]
+        watch: bool,
         /// Colors to draw with.
         #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
         theme: ThemeArg,
@@ -98,6 +110,7 @@ enum Command {
         #[arg(long)]
         scale: Option<f32>,
         /// Where to write the PNG; defaults to FILE with a .png extension, or stdout for stdin.
+        /// For a directory, the directory to write into.
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
@@ -168,31 +181,46 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> ExitCode {
     match cli.command {
         None => gui(cli.files),
-        Some(Command::Ascii { file, charset }) => {
+        Some(Command::Ascii {
+            file,
+            charset,
+            watch,
+        }) => {
             let charset = match charset {
                 CharsetArg::Unicode => Charset::Unicode,
                 CharsetArg::Ascii => Charset::Ascii,
             };
-            render_with(file, None, |l| {
+            convert(file, None, None, watch, |l| {
                 Ok(ascii::render(&l.flowchart, &Options { charset }).into_bytes())
             })
         }
         Some(Command::Svg {
             file,
+            watch,
             theme,
             output,
-        }) => render_with(file, output, |l| {
+        }) => convert(file, output, Some("svg"), watch, |l| {
             let scene = scene::flowchart(&l.flowchart, &Approx, &theme.theme());
             Ok(scene::svg::write(&scene).into_bytes())
         }),
         Some(Command::Png {
             file,
+            watch,
             theme,
             quality,
             scale,
             output,
         }) => {
             let quality = quality.quality();
+            let render = |l: &Lowered| {
+                let scene = scene::flowchart(&l.flowchart, &FontMetrics, &theme.theme());
+                // A given scale is kept (and may be too large); the quality's own shrinks to fit.
+                let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
+                png::write(&scene, png::Options { scale, quality })
+            };
+            if file.as_ref().is_some_and(|f| f.is_dir()) {
+                return convert(file, output, Some("png"), watch, render);
+            }
             let output = output.or_else(|| {
                 let default = file
                     .as_ref()
@@ -207,12 +235,7 @@ fn run(cli: Cli) -> ExitCode {
                 eprintln!("error: refusing to write a PNG to a terminal; use --output");
                 return ExitCode::FAILURE;
             }
-            render_with(file, output, |l| {
-                let scene = scene::flowchart(&l.flowchart, &FontMetrics, &theme.theme());
-                // A given scale is kept (and may be too large); the quality's own shrinks to fit.
-                let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
-                png::write(&scene, png::Options { scale, quality })
-            })
+            convert(file, output, Some("png"), watch, render)
         }
     }
 }
@@ -260,14 +283,37 @@ fn read(file: Option<PathBuf>) -> Result<(String, String), String> {
     }
 }
 
-/// Reports diagnostics on stderr and writes `render`'s output to `output` (stdout when `None`),
-/// failing if there were errors.
-fn render_with(
+/// How often `--watch` looks for changes.
+const POLL: Duration = Duration::from_millis(500);
+
+/// Renders `file` (stdin when `None` or `-`) to `output` (stdout when `None`), or with an
+/// extension, every diagram under a directory `file` to the same relative path under `output`
+/// (or beside it). With `watch`, renders again whenever an input changes and never returns.
+fn convert(
     file: Option<PathBuf>,
     output: Option<PathBuf>,
-    render: impl FnOnce(&Lowered) -> Result<Vec<u8>, String>,
+    ext: Option<&str>,
+    watch: bool,
+    render: impl Fn(&Lowered) -> Result<Vec<u8>, String>,
 ) -> ExitCode {
-    if let (Some(src), Some(out)) = (&file, &output)
+    let file = file.filter(|f| f.as_os_str() != "-");
+    let dir = file.clone().filter(|f| f.is_dir());
+    let jobs = || match (&dir, ext) {
+        (Some(d), Some(ext)) => scan(d, output.as_deref().unwrap_or(d), ext)
+            .into_iter()
+            .map(|(i, o)| (Some(i), Some(o)))
+            .collect(),
+        _ => vec![(file.clone(), output.clone())],
+    };
+    if let Some(d) = &dir {
+        if ext.is_none() {
+            eprintln!(
+                "error: {} is a directory; ascii reads one file",
+                d.display()
+            );
+            return ExitCode::FAILURE;
+        }
+    } else if let (Some(src), Some(out)) = (&file, &output)
         && same_file(src, out)
     {
         eprintln!(
@@ -276,23 +322,154 @@ fn render_with(
         );
         return ExitCode::FAILURE;
     }
-    let (name, src) = match read(file) {
+    let make_dirs = dir.is_some();
+
+    if !watch {
+        let jobs = jobs();
+        if let Some(d) = &dir
+            && jobs.is_empty()
+        {
+            eprintln!("error: no .mmd or .mermaid files in {}", d.display());
+            return ExitCode::FAILURE;
+        }
+        log::debug!("rendering {} file(s)", jobs.len());
+        let mut ok = true;
+        for (input, output) in &jobs {
+            let done = render_one(input.as_deref(), output.as_deref(), make_dirs, &render);
+            ok &= done.written && done.clean;
+        }
+        return if ok {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
+    }
+
+    let Some(watched) = &file else {
+        eprintln!("error: --watch needs a FILE or directory, not stdin");
+        return ExitCode::FAILURE;
+    };
+    eprintln!("watching {} (Ctrl-C to stop)", watched.display());
+    let mut seen = Seen::new();
+    loop {
+        for line in watch_pass(&mut seen, &jobs(), make_dirs, &render) {
+            eprintln!("{line}");
+        }
+        std::thread::sleep(POLL);
+    }
+}
+
+/// What a file looked like when last rendered: its modification time and length.
+type Stamp = (SystemTime, u64);
+
+/// The stamp of each watched input when it was last rendered.
+type Seen = HashMap<PathBuf, Option<Stamp>>;
+
+/// Renders each of `jobs` whose input changed since `seen`, and returns the status lines.
+fn watch_pass(
+    seen: &mut Seen,
+    jobs: &[(Option<PathBuf>, Option<PathBuf>)],
+    make_dirs: bool,
+    render: &impl Fn(&Lowered) -> Result<Vec<u8>, String>,
+) -> Vec<String> {
+    seen.retain(|p, _| jobs.iter().any(|(i, _)| i.as_ref() == Some(p)));
+    let mut lines = Vec::new();
+    for (input, output) in jobs {
+        let input = input.as_ref().expect("a watched input is a path");
+        let now = stamp(input);
+        if seen.get(input) == Some(&now) {
+            continue;
+        }
+        log::debug!("{} changed", input.display());
+        seen.insert(input.clone(), now);
+        let done = render_one(Some(input), output.as_deref(), make_dirs, render);
+        if done.written {
+            lines.push(match output {
+                Some(o) => format!("wrote {}", o.display()),
+                None => format!("printed {}", input.display()),
+            });
+        }
+    }
+    lines
+}
+
+fn stamp(path: &Path) -> Option<Stamp> {
+    let meta = std::fs::metadata(path).ok()?;
+    Some((meta.modified().ok()?, meta.len()))
+}
+
+/// The `.mmd` and `.mermaid` files under `dir`, sorted, each with its output: the same path
+/// relative to `out`, with extension `ext`. Hidden entries and symlinked directories are skipped.
+fn scan(dir: &Path, out: &Path, ext: &str) -> Vec<(PathBuf, PathBuf)> {
+    let mut found = Vec::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        let entries = match std::fs::read_dir(&d) {
+            Ok(entries) => entries,
+            Err(e) => {
+                log::debug!("cannot list {}: {e}", d.display());
+                continue;
+            }
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if entry.file_name().to_string_lossy().starts_with('.') {
+                continue;
+            }
+            if entry.file_type().is_ok_and(|t| t.is_dir()) {
+                stack.push(path);
+            } else if path.is_file()
+                && path
+                    .extension()
+                    .is_some_and(|x| x == "mmd" || x == "mermaid")
+            {
+                let rel = path.strip_prefix(dir).expect("found under dir");
+                let target = out.join(rel).with_extension(ext);
+                found.push((path, target));
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
+/// How a render went.
+struct Done {
+    /// The output was written.
+    written: bool,
+    /// The input was read and had no errors.
+    clean: bool,
+}
+
+/// Reports diagnostics on stderr and writes `render`'s output to `output` (stdout when `None`),
+/// creating its directory first when `make_dirs` is set.
+fn render_one(
+    file: Option<&Path>,
+    output: Option<&Path>,
+    make_dirs: bool,
+    render: &impl Fn(&Lowered) -> Result<Vec<u8>, String>,
+) -> Done {
+    let failed = Done {
+        written: false,
+        clean: false,
+    };
+    let (name, src) = match read(file.map(Path::to_path_buf)) {
         Ok(read) => read,
         Err(message) => {
             eprintln!("error: {message}");
-            return ExitCode::FAILURE;
+            return failed;
         }
     };
     log::debug!("read {name}: {} bytes", src.len());
     let start = Instant::now();
     let lowered = flowchart::parse(&src).lower();
     log::debug!("parsed and lowered in {:.1?}", start.elapsed());
-    let mut failed = false;
+    let mut errors = false;
     for d in &lowered.diagnostics {
         let (line, col) = d.line_col(&src);
         let severity = match d.severity {
             Severity::Error => {
-                failed = true;
+                errors = true;
                 "error"
             }
             Severity::Warning => "warning",
@@ -302,26 +479,32 @@ fn render_with(
     let start = Instant::now();
     let written = render(&lowered).and_then(|bytes| {
         log::debug!("rendered {} bytes in {:.1?}", bytes.len(), start.elapsed());
-        let target = output
-            .as_ref()
-            .map_or_else(|| "<stdout>".to_owned(), |p| p.display().to_string());
+        let target = output.map_or_else(|| "<stdout>".to_owned(), |p| p.display().to_string());
         log::debug!("writing {target}");
-        match &output {
-            Some(path) => std::fs::write(path, bytes)
-                .map_err(|e| format!("cannot write {}: {e}", path.display())),
-            None => std::io::stdout()
-                .write_all(&bytes)
-                .map_err(|e| format!("cannot write <stdout>: {e}")),
+        match output {
+            Some(path) => {
+                if make_dirs && let Some(parent) = path.parent() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
+                }
+                std::fs::write(path, bytes)
+                    .map_err(|e| format!("cannot write {}: {e}", path.display()))
+            }
+            None => {
+                let mut out = std::io::stdout().lock();
+                out.write_all(&bytes)
+                    .and_then(|()| out.flush())
+                    .map_err(|e| format!("cannot write <stdout>: {e}"))
+            }
         }
     });
     if let Err(message) = written {
         eprintln!("error: {message}");
-        return ExitCode::FAILURE;
+        return failed;
     }
-    if failed {
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
+    Done {
+        written: true,
+        clean: !errors,
     }
 }
 
@@ -359,5 +542,81 @@ mod tests {
         // A file named like a command needs a path that is not one.
         let cli = parse(&["./ascii"]);
         assert_eq!(cli.files, [PathBuf::from("./ascii")]);
+    }
+
+    /// A watch pass renders new and changed inputs only, and forgets inputs that are gone.
+    #[test]
+    fn watch_passes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        let out = dir.join("out");
+        let render = |l: &Lowered| Ok(format!("{} nodes", l.flowchart.nodes.len()).into_bytes());
+        let jobs = || -> Vec<_> {
+            scan(dir, &out, "txt")
+                .into_iter()
+                .map(|(i, o)| (Some(i), Some(o)))
+                .collect()
+        };
+        let read = |name: &str| std::fs::read_to_string(out.join(name)).unwrap();
+        let mut seen = Seen::new();
+        assert!(watch_pass(&mut seen, &jobs(), true, &render).is_empty());
+
+        std::fs::write(dir.join("a.mmd"), "flowchart\nA\n").unwrap();
+        let lines = watch_pass(&mut seen, &jobs(), true, &render);
+        assert_eq!(lines, [format!("wrote {}", out.join("a.txt").display())]);
+        assert_eq!(read("a.txt"), "1 nodes");
+        assert!(watch_pass(&mut seen, &jobs(), true, &render).is_empty());
+
+        std::fs::write(dir.join("a.mmd"), "flowchart\nA --> B\n").unwrap();
+        assert_eq!(watch_pass(&mut seen, &jobs(), true, &render).len(), 1);
+        assert_eq!(read("a.txt"), "2 nodes");
+
+        std::fs::remove_file(dir.join("a.mmd")).unwrap();
+        assert!(watch_pass(&mut seen, &jobs(), true, &render).is_empty());
+        assert!(seen.is_empty());
+
+        // One file to stdout; a missing file reports once, then renders when it is back.
+        let file = dir.join("b.mmd");
+        let jobs = [(Some(file.clone()), None)];
+        let mut seen = Seen::new();
+        assert!(watch_pass(&mut seen, &jobs, false, &render).is_empty());
+        assert!(watch_pass(&mut seen, &jobs, false, &render).is_empty());
+        std::fs::write(&file, "flowchart\nB\n").unwrap();
+        assert_eq!(
+            watch_pass(&mut seen, &jobs, false, &render),
+            [format!("printed {}", file.display())]
+        );
+    }
+
+    #[test]
+    fn scan_skips_hidden_and_other_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        std::fs::create_dir_all(dir.join("x/y")).unwrap();
+        std::fs::create_dir_all(dir.join(".git")).unwrap();
+        for f in [
+            "b.mmd",
+            "x/a.mermaid",
+            "x/y/c.mmd",
+            ".git/d.mmd",
+            "e.md",
+            ".f.mmd",
+        ] {
+            std::fs::write(dir.join(f), "").unwrap();
+        }
+        let found = scan(dir, Path::new("o"), "png");
+        let rel: Vec<_> = found
+            .iter()
+            .map(|(i, o)| (i.strip_prefix(dir).unwrap().to_owned(), o.clone()))
+            .collect();
+        assert_eq!(
+            rel,
+            [
+                (PathBuf::from("b.mmd"), PathBuf::from("o/b.png")),
+                (PathBuf::from("x/a.mermaid"), PathBuf::from("o/x/a.png")),
+                (PathBuf::from("x/y/c.mmd"), PathBuf::from("o/x/y/c.png")),
+            ]
+        );
+        assert!(scan(&dir.join("missing"), dir, "png").is_empty());
     }
 }
