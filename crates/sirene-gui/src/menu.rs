@@ -2,9 +2,11 @@
 
 use gpui::component::menu::PopupMenu;
 use gpui::{Context, WeakEntity, Window, px};
-use sirene_core::flowchart::edit::{self, Line, MAX_LENGTH};
+use sirene_core::flowchart::edit::Line;
 use sirene_core::flowchart::{Arrow, Direction, Flowchart, Node, Shape, Stroke};
 
+use crate::drawing::Item;
+use crate::refusal;
 use crate::viewer::Viewer;
 use crate::{
     AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, Group, KeepTogether,
@@ -88,8 +90,12 @@ pub(crate) fn build(
         };
         menu = direction_items(menu, subgraph.clone(), current, window, cx);
         if let Some(id) = subgraph {
-            let stuck = edit::ungroup(&src, &id).is_none();
-            menu = menu.menu_with_disabled("Ungroup", Box::new(Ungroup { id }), stuck);
+            let why = refusal::ungroup(&src, &chart, &id);
+            menu = menu.menu_with_disabled(
+                refusal::label("Ungroup", why),
+                Box::new(Ungroup { id }),
+                why.is_some(),
+            );
         }
         return menu
             .separator()
@@ -109,18 +115,7 @@ pub(crate) fn build(
     if let [edge] = edges.as_slice()
         && nodes.is_empty()
     {
-        menu = menu
-            .separator()
-            .menu_with_disabled(
-                "Move Earlier",
-                Box::new(MoveEarlier),
-                edit::move_edge(&src, *edge, false).is_none(),
-            )
-            .menu_with_disabled(
-                "Move Later",
-                Box::new(MoveLater),
-                edit::move_edge(&src, *edge, true).is_none(),
-            );
+        menu = move_items(menu.separator(), &src, &[Item::Edge(*edge)]);
     }
     menu.separator().menu("Delete", Box::new(Delete))
 }
@@ -158,10 +153,11 @@ fn layout_items(
     cx: &mut Context<PopupMenu>,
 ) -> PopupMenu {
     let ids: Vec<&str> = nodes.iter().map(String::as_str).collect();
+    let why = refusal::group(src, &ids);
     let mut menu = menu.separator().menu_with_disabled(
-        "Group",
+        refusal::label("Group", why),
         Box::new(Group),
-        edit::group(src, &ids, "").is_none(),
+        why.is_some(),
     );
     if nodes.len() == 2 {
         menu = menu.menu("Keep Together", Box::new(KeepTogether));
@@ -212,19 +208,25 @@ fn layout_items(
         });
     }
     if let [id] = nodes {
-        menu = menu
-            .menu_with_disabled(
-                "Move Earlier",
-                Box::new(MoveEarlier),
-                edit::move_node(src, id, false).is_none(),
-            )
-            .menu_with_disabled(
-                "Move Later",
-                Box::new(MoveLater),
-                edit::move_node(src, id, true).is_none(),
-            );
+        menu = move_items(menu, src, &[Item::Node(id.clone())]);
     }
     menu
+}
+
+/// Move Earlier and Move Later for the one item in `selection`, with why either is disabled.
+fn move_items(menu: PopupMenu, src: &str, selection: &[Item]) -> PopupMenu {
+    let earlier = refusal::move_item(src, selection, false);
+    let later = refusal::move_item(src, selection, true);
+    menu.menu_with_disabled(
+        refusal::label("Move Earlier", earlier),
+        Box::new(MoveEarlier),
+        earlier.is_some(),
+    )
+    .menu_with_disabled(
+        refusal::label("Move Later", later),
+        Box::new(MoveLater),
+        later.is_some(),
+    )
 }
 
 fn node_items(
@@ -310,6 +312,14 @@ fn edge_items(
         [i] => chart.edges.get(*i).map(Line::of),
         _ => None,
     };
+    let lines: Vec<Line> = edges
+        .iter()
+        .filter_map(|&i| chart.edges.get(i).map(Line::of))
+        .collect();
+    let (longer, shorter) = (
+        refusal::length(&lines, true),
+        refusal::length(&lines, false),
+    );
     menu.submenu("Line", window, cx, move |m, _, _| {
         STROKES.iter().fold(m, |m, &(name, stroke)| {
             m.menu_with_check(
@@ -330,13 +340,13 @@ fn edge_items(
     })
     .menu("Reverse", Box::new(ReverseEdge))
     .menu_with_disabled(
-        "Longer",
+        refusal::label("Longer", longer),
         Box::new(LongerEdge),
-        line.is_some_and(|l| l.length >= MAX_LENGTH),
+        longer.is_some(),
     )
     .menu_with_disabled(
-        "Shorter",
+        refusal::label("Shorter", shorter),
         Box::new(ShorterEdge),
-        line.is_some_and(|l| l.length <= 1),
+        shorter.is_some(),
     )
 }

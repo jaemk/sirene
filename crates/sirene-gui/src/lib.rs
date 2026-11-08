@@ -7,6 +7,7 @@ pub mod export;
 pub mod menu;
 pub mod navigation;
 pub mod paint;
+pub mod refusal;
 pub mod settings;
 pub mod shape_bar;
 pub mod styles;

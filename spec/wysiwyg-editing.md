@@ -252,3 +252,20 @@ selected edge: Color (`stroke`) and Text (`color`) pickers, Width 1 to 4, and Li
 Dashed. Each applies to every selected edge as one drawing change. Tests: `edges_get_link_styles`
 in `crates/sirene-gui/tests/styles.rs`, and `link_styles` in
 `crates/sirene-core/tests/flowchart_edit.rs`.
+
+## WYSIWY-19 Refused edits
+
+An edit from the menus or keys that would change nothing says why (`sirene_gui::refusal`). In
+the right-click menu, Group, Ungroup, Move Earlier, Move Later, Longer, and Shorter are disabled
+with the reason after the name, e.g. `Ungroup (an edge to it has an id)`. From a key or the menu
+bar, the status bar shows `Can't ACTION: REASON` until the document changes. The reasons:
+
+- Group: no nodes are selected; the nodes are in different subgraphs.
+- Ungroup: an edge to it has an id; it is empty and has edges; its first or last line has
+  another statement.
+- Move Earlier or Later: select one node or edge; nothing before (or after) it to swap with.
+- Longer or Shorter: no edges are selected; already the longest (or shortest).
+- Move To, or a drag onto a subgraph: it would move other nodes too. A node already in the
+  target is not refused.
+
+Tests: `crates/sirene-gui/tests/refusals.rs`.

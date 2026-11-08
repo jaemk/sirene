@@ -39,6 +39,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `flowchart::edit::set_direction`, `keep_together`, `group`, `ungroup`, `move_to_subgraph`,
   `move_node`, and `move_edge`. Ungroup sends edges at the subgraph to its members, and moving
   a node out of a subgraph takes its chains with it.
+- Editor: a disabled right-click item says why it is disabled, and a refused key shows the reason
+  in the status bar.
 - Editor: a styles panel (View > Show or Hide Styles) that applies classes to the selected
   nodes and edits a class's colors, width, and dashes.
 - `flowchart::edit::set_class_style`, `apply_class`, `remove_class`, and `fresh_class_name`.
