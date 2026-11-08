@@ -30,7 +30,8 @@ When FILE cannot be read, sirene prints `error: cannot read FILE: REASON` to std
 `sirene svg [FILE]` reads a flowchart as `sirene ascii` does and prints it to stdout as a
 standalone SVG document (`display-list.md`), with text measured by the monospace estimate.
 `--theme light|dark` picks the colors; the default is `light`. `-o, --output PATH` writes the
-SVG to PATH instead of stdout. Diagnostics and exit status follow CLI-3 and CLI-4.
+SVG to PATH instead of stdout; a PATH that is FILE itself is refused before anything is read
+(`error: refusing to overwrite the input FILE; use --output`, exit 1). Diagnostics and exit status follow CLI-3 and CLI-4.
 
 ## CLI-6 `sirene png`
 
@@ -38,7 +39,8 @@ SVG to PATH instead of stdout. Diagnostics and exit status follow CLI-3 and CLI-
 (DISPLA-11), with text measured by the embedded font, without opening a window. `--theme` is as
 for `sirene svg`; `--scale N` sets pixels per diagram unit (default 2). The PNG goes to
 `-o, --output PATH`; without it, to FILE with its extension replaced by `.png`, or to stdout
-when reading stdin. Writing a PNG to a terminal is refused. Diagnostics and exit status follow
+when reading stdin. Writing a PNG to a terminal, or over FILE (as for `sirene svg`), is
+refused. Diagnostics and exit status follow
 CLI-3 and CLI-4; a write or render failure prints `error: ...` and exits 1.
 
 ## CLI-7 Headless builds

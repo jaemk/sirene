@@ -287,6 +287,36 @@ fn png_failures() {
         ));
 }
 
+/// Output never replaces its own source: PNG by default or with `--output`,
+/// SVG with `--output`.
+#[test]
+fn output_does_not_overwrite_the_input() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("diagram.png");
+    let text = "flowchart\nA\n";
+    std::fs::write(&src, text).unwrap();
+    let message = format!(
+        "error: refusing to overwrite the input {}; use --output\n",
+        src.display()
+    );
+    let src = src.to_str().unwrap();
+    let other = tmp.path().join(".").join("diagram.png");
+    let other = other.to_str().unwrap();
+    for args in [
+        vec!["png", src],
+        vec!["png", src, "-o", other],
+        vec!["svg", src, "-o", other],
+    ] {
+        sirene()
+            .args(&args)
+            .assert()
+            .failure()
+            .stdout("")
+            .stderr(message.clone());
+    }
+    assert_eq!(std::fs::read_to_string(src).unwrap(), text);
+}
+
 #[cfg(not(feature = "gui"))]
 #[test]
 fn no_gui() {

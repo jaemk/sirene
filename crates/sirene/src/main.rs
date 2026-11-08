@@ -142,6 +142,14 @@ fn gui(_: Vec<PathBuf>) -> ExitCode {
     ExitCode::FAILURE
 }
 
+/// Whether `a` and `b` name the same existing file.
+fn same_file(a: &std::path::Path, b: &std::path::Path) -> bool {
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    }
+}
+
 /// Reads the source named on the command line: a file, or stdin for `None` or `-`.
 fn read(file: Option<PathBuf>) -> Result<(String, String), String> {
     match file.filter(|f| f.as_os_str() != "-") {
@@ -168,6 +176,15 @@ fn render_with(
     output: Option<PathBuf>,
     render: impl FnOnce(&Lowered) -> Result<Vec<u8>, String>,
 ) -> ExitCode {
+    if let (Some(src), Some(out)) = (&file, &output)
+        && same_file(src, out)
+    {
+        eprintln!(
+            "error: refusing to overwrite the input {}; use --output",
+            src.display()
+        );
+        return ExitCode::FAILURE;
+    }
     let (name, src) = match read(file) {
         Ok(read) => read,
         Err(message) => {
