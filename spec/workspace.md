@@ -41,8 +41,8 @@ that drops below the threshold fails.
 
 ## WORKSP-7
 
-CI (GitHub Actions) runs on pushes to `main` and on pull requests, on both `ubuntu-latest` and
-`macos-latest`. On Linux, gpui needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan
+CI (GitHub Actions) runs on pushes to `main` and on pull requests, on both `ubuntu-24.04` (pinned, as
+in the release workflow) and `macos-latest`. On Linux, gpui needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan
 development packages installed first. An `audit` job runs `cargo audit` against `Cargo.lock` on
 the same triggers and weekly, with the ignores in `.cargo/audit.toml`.
 
