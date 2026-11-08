@@ -32,7 +32,8 @@ Statements after the error parse normally.
 
 The first statement is `flowchart`, `graph`, or `flowchart-elk`, optionally followed by
 whitespace and a direction: `TB`, `TD`, `BT`, `RL`, `LR`, or the aliases `>` (LR), `<` (RL),
-`^` (BT), `v` (TB). The header ends at a newline or `;`. Any other first statement is an error.
+`^` (BT), `v` (TB). The header ends at a newline or `;`. Any other first statement is an error
+(`expected flowchart or graph header`), except another Mermaid diagram type (FLOWCH-16).
 
 ## FLOWCH-5 Statements
 
@@ -161,3 +162,12 @@ the next `}` and may span lines.
 vertex statement and as a statement of its own (e.g. `e1@{ animate: true }`). The body runs to
 the first `}` outside double-quoted strings (bodies do not nest) and may span lines. Its content
 is interpreted by the model. An unclosed block ends at the end of its line, with a diagnostic.
+
+## FLOWCH-16 Other diagram types
+
+A document whose first statement starts with another Mermaid diagram keyword (`sequenceDiagram`,
+`classDiagram`, `stateDiagram`, `erDiagram`, `gantt`, `pie`, `gitGraph`, `mindmap`, `timeline`,
+and the rest of mermaid's types, with their `-v2` and `-beta` forms) is one `ERROR` node from that
+keyword to the end, with one diagnostic on the keyword, e.g.
+`` `pie` diagrams are not supported; sirene draws flowcharts ``. Nothing of it is drawn. Tests: `other_diagram_types_are_one_error` in
+`crates/sirene-core/tests/flowchart_model.rs`.

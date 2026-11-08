@@ -114,6 +114,39 @@ fn header_directions() {
     }
 }
 
+// ---- FLOWCH-16 ----
+
+#[test]
+fn other_diagram_types_are_one_error() {
+    let src = "%% a comment\nsequenceDiagram\n  A->>B: hi\n  B-->>A: ok\n";
+    let lowered = lower(src);
+    assert!(lowered.flowchart.nodes.is_empty() && lowered.flowchart.edges.is_empty());
+    assert_eq!(
+        messages(src),
+        [(
+            Severity::Error,
+            "`sequenceDiagram` diagrams are not supported; sirene draws flowcharts".to_owned()
+        )]
+    );
+    let d = &lowered.diagnostics[0];
+    assert_eq!(d.line_col(src), (2, 1));
+    assert_eq!(flowchart::parse(src).syntax().to_string(), src);
+    for kind in ["classDiagram-v2", "pie", "gantt", "xychart-beta"] {
+        let src = format!("{kind} title x\n  a: 1\n");
+        let lowered = lower(&src);
+        assert!(lowered.flowchart.nodes.is_empty(), "{kind}");
+        assert!(lowered.diagnostics[0].message.contains(kind), "{kind}");
+    }
+    // Words that only start like one, and unknown headers, keep the usual error.
+    for src in ["pies\nA\n", "Sequencediagram\n"] {
+        assert_eq!(
+            messages(src)[0].1,
+            "expected `flowchart` or `graph` header",
+            "{src}"
+        );
+    }
+}
+
 #[test]
 fn top_level_direction_is_ignored() {
     let lowered = lower("flowchart LR\ndirection TB\n");
