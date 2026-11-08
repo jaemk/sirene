@@ -665,6 +665,201 @@ fn watch_a_file() {
     eventually("the third drawing", || text().contains("Three"));
 }
 
+/// `check` prints only diagnostics, for files, directories, Markdown blocks, and stdin, and
+/// fails when any has an error.
+#[test]
+fn check() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    std::fs::write(dir.join("good.mmd"), "flowchart\nA --> B\n").unwrap();
+    std::fs::write(dir.join("warn.mmd"), "flowchart\nclick Z cb\n").unwrap();
+    sirene()
+        .arg("check")
+        .arg(dir.join("good.mmd"))
+        .arg(dir.join("warn.mmd"))
+        .assert()
+        .success()
+        .stdout("")
+        .stderr(predicate::str::contains("warn.mmd:2:7: warning:"));
+
+    // Errors fail the run, and every file is still checked.
+    std::fs::write(dir.join("bad.mmd"), "flowchart\nA -->\n").unwrap();
+    sirene()
+        .arg("check")
+        .arg(dir.join("bad.mmd"))
+        .arg(dir.join("missing.mmd"))
+        .arg(dir.join("warn.mmd"))
+        .assert()
+        .failure()
+        .stdout("")
+        .stderr(
+            predicate::str::contains("bad.mmd:2:6: error: expected a node after the edge")
+                .and(predicate::str::contains("error: cannot read"))
+                .and(predicate::str::contains("warn.mmd:2:7: warning:")),
+        );
+    // A directory: each diagram under it.
+    sirene()
+        .arg("check")
+        .arg(dir)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("bad.mmd:2:6: error"));
+    let empty = dir.join("empty");
+    std::fs::create_dir(&empty).unwrap();
+    sirene()
+        .arg("check")
+        .arg(&empty)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "error: no .mmd or .mermaid files in",
+        ));
+    // Stdin.
+    sirene()
+        .args(["check", "-"])
+        .write_stdin("flowchart\nA\n")
+        .assert()
+        .success()
+        .stderr("");
+    // Markdown: positions are in the Markdown file; other diagram types are skipped.
+    let md = dir.join("doc.md");
+    std::fs::write(
+        &md,
+        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  sequenceDiagram\n  ```\n",
+    )
+    .unwrap();
+    sirene()
+        .arg("check")
+        .arg(&md)
+        .assert()
+        .failure()
+        .stdout("")
+        .stderr(
+            predicate::str::contains("doc.md:5:8: error: expected a node after the edge").and(
+                predicate::str::contains(
+                    "doc.md:11:3: warning: skipping a `sequenceDiagram` diagram",
+                ),
+            ),
+        );
+    sirene()
+        .arg("check")
+        .arg(dir.join("missing.md"))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("error: cannot read"));
+    // `check` needs a file.
+    sirene().arg("check").assert().failure();
+}
+
+/// `svg` and `png` on a Markdown file write one image per flowchart block and never change the
+/// blocks; `--link` adds a link after each, once.
+#[test]
+fn markdown_images() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    let md = dir.join("doc.md");
+    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\npie\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
+    std::fs::write(&md, text).unwrap();
+    sirene()
+        .arg("svg")
+        .arg(&md)
+        .assert()
+        .success()
+        .stdout("")
+        .stderr(
+            predicate::str::contains("doc.md:9:1: warning: skipping a `pie` diagram")
+                .and(predicate::str::contains("doc-1.svg"))
+                .and(predicate::str::contains("doc-3.svg")),
+        );
+    let svg = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap_or_default();
+    assert!(svg("doc-1.svg").contains(">A</text>"));
+    assert!(!dir.join("doc-2.svg").exists());
+    assert!(svg("doc-3.svg").contains(">C</text>"));
+    // Without --link, the Markdown is left alone.
+    assert_eq!(std::fs::read_to_string(&md).unwrap(), text);
+
+    // --link adds links after the blocks, and only once.
+    for _ in 0..2 {
+        sirene()
+            .args(["png", "--link", "--quality", "draft"])
+            .arg(&md)
+            .arg("-o")
+            .arg(dir.join("img"))
+            .assert()
+            .success();
+    }
+    let linked = std::fs::read_to_string(&md).unwrap();
+    assert_eq!(
+        linked,
+        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\npie\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
+    );
+    assert!(dir.join("img/doc-1.png").exists());
+    // Every mermaid block is still there, unchanged.
+    for block in [
+        "```mermaid\nflowchart LR\n  A --> B\n```",
+        "~~~mermaid\ngraph TD\n  C\n~~~",
+    ] {
+        assert!(linked.contains(block));
+    }
+
+    // Errors are reported at their Markdown positions and fail the run; the image is written.
+    std::fs::write(&md, "```mermaid\nflowchart\n  A -->\n```\n").unwrap();
+    sirene()
+        .arg("svg")
+        .arg(&md)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("doc.md:3:8: error"));
+    assert!(dir.join("doc-1.svg").exists());
+    // An output that is a file, a missing file, and no blocks.
+    sirene()
+        .arg("svg")
+        .arg(&md)
+        .arg("-o")
+        .arg(dir.join("doc-1.svg"))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("is not a directory"));
+    sirene()
+        .arg("svg")
+        .arg(dir.join("none.md"))
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("error: cannot read"));
+    std::fs::write(&md, "no diagrams\n").unwrap();
+    sirene()
+        .arg("svg")
+        .arg(&md)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("no mermaid blocks"));
+}
+
+/// Watching a Markdown file renders its blocks again when it changes.
+#[test]
+fn watch_markdown() {
+    let tmp = tempfile::tempdir().unwrap();
+    let md = tmp.path().join("w.md");
+    std::fs::write(&md, "```mermaid\nflowchart\n  One\n```\n").unwrap();
+    let child = std::process::Command::new(assert_cmd::cargo::cargo_bin("sirene"))
+        .args(["svg", "--watch", "--link"])
+        .arg(&md)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let _child = Running(child);
+    let svg = || std::fs::read_to_string(tmp.path().join("w-1.svg")).unwrap_or_default();
+    eventually("the first image", || svg().contains(">One</text>"));
+    eventually("the link", || {
+        std::fs::read_to_string(&md)
+            .unwrap_or_default()
+            .contains("![diagram 1](w-1.svg)")
+    });
+    std::fs::write(&md, "```mermaid\nflowchart\n  Two\n```\n").unwrap();
+    eventually("the second image", || svg().contains(">Two</text>"));
+}
+
 #[cfg(not(feature = "gui"))]
 #[test]
 fn no_gui() {

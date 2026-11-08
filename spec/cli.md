@@ -97,3 +97,33 @@ start, then `wrote OUTPUT` (or `printed FILE` for stdout) after each render, alo
 diagnostics and read or write errors; none of these stop the watch. Watching stdin is an error
 (`error: --watch needs a FILE or directory, not stdin`). Tests: `watch_needs_a_path`,
 `watch_renders_changes`, and `watch_a_file` in `crates/sirene/tests/cli.rs`.
+
+## CLI-11 `sirene check`
+
+`sirene check FILE...` (at least one) reads each FILE, draws nothing, writes nothing to stdout,
+and prints diagnostics as in CLI-3. A FILE may be a diagram, `-` for stdin, a directory (each
+`.mmd` and `.mermaid` file under it, as in CLI-9; none is `error: no .mmd or .mermaid files in
+DIR`), or a Markdown file (`.md` or `.markdown`), whose mermaid blocks (MARKDO-1) are checked with
+positions in the Markdown file; a block of another Mermaid diagram type (MARKDO-2) is skipped with
+`NAME:LINE:COL: warning: skipping a `KIND` diagram; sirene draws flowcharts`. Every FILE is
+checked. The exit status is 1 when any FILE cannot be read or has an error, else 0. A mistyped
+`check` is suggested as in CLI-1. Tests: `check` in `crates/sirene/tests/cli.rs`.
+
+## CLI-12 Markdown files
+
+`sirene svg FILE.md` and `sirene png FILE.md` (or `.markdown`) write each flowchart block
+(MARKDO-1) of the file as its own image, `STEM-N.svg` or `STEM-N.png` beside it, where N counts
+the file's mermaid blocks from 1; `-o DIR` writes them into DIR instead (created as needed; an
+existing file there is `error: DIR is not a directory; a Markdown file renders one image per
+block into one`). Each image written is reported as `wrote PATH`; a file with no mermaid blocks
+prints `NAME: no mermaid blocks`. Blocks of other diagram types are skipped as in CLI-11, and
+diagnostics have positions in the Markdown file. The exit status is 1 when the file cannot be
+read, a block has an error, or an image cannot be written.
+
+The Markdown file is never changed, except with `--link`: then, after each closed block that
+was written, a line `![diagram N](PATH)` (PATH relative to the Markdown file's directory when
+the image is under it) is inserted unless the line after the block already is that line, and
+`linked the images in NAME` is printed. The mermaid blocks themselves are never removed or
+changed. `--watch` renders again whenever the file changes; the links it adds do not count as
+a change. Tests: `markdown_images` and `watch_markdown` in `crates/sirene/tests/cli.rs`, and
+the unit tests in `crates/sirene/src/markdown.rs`.

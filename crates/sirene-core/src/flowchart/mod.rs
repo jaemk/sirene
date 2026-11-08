@@ -37,6 +37,20 @@ impl Parse {
         &self.diagnostics
     }
 
+    /// The keyword of the other Mermaid diagram type the source is, e.g. `pie` (FLOWCH-16).
+    pub fn other_diagram(&self) -> Option<String> {
+        let root = self.syntax();
+        if root
+            .children()
+            .any(|n| n.kind() == crate::syntax::SyntaxKind::HEADER)
+        {
+            return None;
+        }
+        root.children()
+            .filter(|n| n.kind() == crate::syntax::SyntaxKind::ERROR)
+            .find_map(|n| parser::other_diagram(&n.text().to_string()).map(str::to_owned))
+    }
+
     /// Indented dump of the tree with kinds, ranges, and token text.
     pub fn debug_tree(&self) -> String {
         format!("{:#?}", self.syntax())

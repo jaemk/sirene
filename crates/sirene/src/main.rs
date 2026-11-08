@@ -5,7 +5,6 @@ use std::process::ExitCode;
 use std::time::{Duration, Instant, SystemTime};
 
 use clap::{Parser, Subcommand, ValueEnum};
-use sirene_core::Severity;
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::flowchart::{self, Lowered};
 use sirene_core::scene::png::{self, FontMetrics};
@@ -65,8 +64,17 @@ fn verbose(on: bool) {
     }
 }
 
+mod markdown;
+
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Check diagrams for errors without drawing them; prints only diagnostics.
+    Check {
+        /// Mermaid files, directories of them, or Markdown files (their mermaid blocks); `-`
+        /// for stdin.
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
     /// Print a diagram as text.
     Ascii {
         /// Mermaid file to read; stdin when omitted or `-`.
@@ -78,14 +86,18 @@ enum Command {
         #[arg(short, long)]
         watch: bool,
     },
-    /// Print a diagram as SVG, or write one per diagram in a directory.
+    /// Print a diagram as SVG, or write one per diagram in a directory or Markdown file.
     Svg {
         /// Mermaid file or directory to read; stdin when omitted or `-`. A directory's `.mmd`
-        /// and `.mermaid` files are written as `.svg` beside them, or under --output.
+        /// and `.mermaid` files are written as `.svg` beside them, or under --output. A
+        /// Markdown file's mermaid blocks are written as NAME-1.svg, NAME-2.svg, ...
         file: Option<PathBuf>,
         /// Write again each time an input changes, until interrupted.
         #[arg(short, long)]
         watch: bool,
+        /// For a Markdown file: add a link to each image after its block. The blocks are kept.
+        #[arg(long)]
+        link: bool,
         /// Colors to draw with.
         #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
         theme: ThemeArg,
@@ -93,14 +105,18 @@ enum Command {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
-    /// Write a diagram as a PNG image, or one per diagram in a directory.
+    /// Write a diagram as a PNG image, or one per diagram in a directory or Markdown file.
     Png {
         /// Mermaid file or directory to read; stdin when omitted or `-`. A directory's `.mmd`
-        /// and `.mermaid` files are written as `.png` beside them, or under --output.
+        /// and `.mermaid` files are written as `.png` beside them, or under --output. A
+        /// Markdown file's mermaid blocks are written as NAME-1.png, NAME-2.png, ...
         file: Option<PathBuf>,
         /// Write again each time an input changes, until interrupted.
         #[arg(short, long)]
         watch: bool,
+        /// For a Markdown file: add a link to each image after its block. The blocks are kept.
+        #[arg(long)]
+        link: bool,
         /// Colors to draw with.
         #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
         theme: ThemeArg,
@@ -203,7 +219,7 @@ fn misspelled_command(files: &[PathBuf]) -> Option<(String, &'static str)> {
         }
         row[b.len()] <= 2
     };
-    ["ascii", "svg", "png", "help"]
+    ["ascii", "svg", "png", "check", "help"]
         .into_iter()
         .find(|cmd| near(cmd))
         .map(|cmd| (name.to_owned(), cmd))
@@ -221,6 +237,15 @@ fn run(cli: Cli) -> ExitCode {
     }
     match cli.command {
         None => gui(cli.files),
+        Some(Command::Check { files }) => {
+            // Every file is checked, whatever the ones before it had.
+            let failed = files.iter().filter(|f| !markdown::check(f)).count();
+            if failed == 0 {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
         Some(Command::Ascii {
             file,
             charset,
@@ -237,15 +262,26 @@ fn run(cli: Cli) -> ExitCode {
         Some(Command::Svg {
             file,
             watch,
+            link,
             theme,
             output,
-        }) => convert(file, output, Some("svg"), watch, |l| {
-            let scene = scene::flowchart(&l.flowchart, &Approx, &theme.theme());
-            Ok(scene::svg::write(&scene).into_bytes())
-        }),
+        }) => {
+            let render = |l: &Lowered| {
+                let scene = scene::flowchart(&l.flowchart, &Approx, &theme.theme());
+                Ok(scene::svg::write(&scene).into_bytes())
+            };
+            if let Some(md) = file
+                .as_ref()
+                .filter(|f| sirene_core::markdown::is_markdown(f))
+            {
+                return render_markdown(md, output.as_deref(), "svg", link, watch, &render);
+            }
+            convert(file, output, Some("svg"), watch, render)
+        }
         Some(Command::Png {
             file,
             watch,
+            link,
             theme,
             quality,
             scale,
@@ -258,6 +294,12 @@ fn run(cli: Cli) -> ExitCode {
                 let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
                 png::write(&scene, png::Options { scale, quality })
             };
+            if let Some(md) = file
+                .as_ref()
+                .filter(|f| sirene_core::markdown::is_markdown(f))
+            {
+                return render_markdown(md, output.as_deref(), "png", link, watch, &render);
+            }
             if file.as_ref().is_some_and(|f| f.is_dir()) {
                 return convert(file, output, Some("png"), watch, render);
             }
@@ -277,6 +319,36 @@ fn run(cli: Cli) -> ExitCode {
             }
             convert(file, output, Some("png"), watch, render)
         }
+    }
+}
+
+/// Renders Markdown file `md`'s mermaid blocks (CLI-12); with `watch`, again whenever it changes,
+/// never returning.
+fn render_markdown(
+    md: &Path,
+    out: Option<&Path>,
+    ext: &str,
+    link: bool,
+    watch: bool,
+    render: &impl Fn(&Lowered) -> Result<Vec<u8>, String>,
+) -> ExitCode {
+    if !watch {
+        return if markdown::render(md, out, ext, link, render) {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
+    }
+    eprintln!("watching {} (Ctrl-C to stop)", md.display());
+    let mut seen = None;
+    loop {
+        let now = stamp(md);
+        if now != seen {
+            markdown::render(md, out, ext, link, render);
+            // Adding links changes the file; that is not a change to render again.
+            seen = stamp(md);
+        }
+        std::thread::sleep(POLL);
     }
 }
 
@@ -551,18 +623,7 @@ fn render_one(
     let start = Instant::now();
     let lowered = flowchart::parse(&src).lower();
     log::debug!("parsed and lowered in {:.1?}", start.elapsed());
-    let mut errors = false;
-    for d in &lowered.diagnostics {
-        let (line, col) = d.line_col(&src);
-        let severity = match d.severity {
-            Severity::Error => {
-                errors = true;
-                "error"
-            }
-            Severity::Warning => "warning",
-        };
-        eprintln!("{name}:{line}:{col}: {severity}: {}", d.message);
-    }
+    let errors = markdown::report(&name, &src, &lowered, |l, c| (l, c));
     let start = Instant::now();
     let written = render(&lowered).and_then(|bytes| {
         log::debug!("rendered {} bytes in {:.1?}", bytes.len(), start.elapsed());

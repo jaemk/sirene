@@ -51,7 +51,12 @@ sirene diagram.mmd           # edit the source beside a live drawing; follows ch
 sirene svg diagram.mmd       # print SVG (--theme light|dark, -o FILE)
 sirene png diagram.mmd       # write diagram.png (--quality draft|normal|fine, --scale N, --theme, -o FILE)
 sirene png --watch docs/     # write a .png beside each .mmd under docs/, again on each change
+sirene svg README.md         # write README-1.svg, ... for each ```mermaid block (--link to add image links)
+sirene check docs/ a.md      # report errors only; exit 1 if any
 ```
+
+Markdown files are never changed except by `--link`, which adds an image link after each
+block; the mermaid blocks are kept as written.
 
 `-v`/`--verbose`, before or after the command, prints each step (reading, parsing, layout,
 rendering, writing, and in the GUI opening, reloading, and saving files) with timings to stderr.
