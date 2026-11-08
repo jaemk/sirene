@@ -15,8 +15,11 @@ There is a 16px margin around the drawing.
 
 An element is a path or one line of text. A path is a list of segments (move, line, elliptical
 arc with SVG flag semantics, cubic Bezier, close) with an optional fill and an optional stroke
-(width, color, optional dash and gap). Text is centered on a point both ways, with a size and
-color.
+(width, color, optional dash and gap). Text is one run on a line, centered on a point both ways,
+with a size, color, and style (bold, italic). A label line with markdown emphasis is several runs
+laid out left to right and centered together. Labels wider than 200px wrap at spaces (a longer
+word keeps its own line); a diamond or triangle whose one-line label is wider than 120px wraps
+it to the line count (1 to 4) that makes the smallest shape.
 
 ## DISPLA-3 Owners
 
@@ -26,8 +29,9 @@ a cluster, by index into the flowchart's lists.
 ## DISPLA-4 Text metrics
 
 Text is measured through the `TextMetrics` trait, supplied by the backend that will draw the
-scene, so labels fit the font that renders them. `Approx` estimates 0.6 em per terminal column
-(wide characters count double) and is used for SVG output and tests.
+scene, so labels fit the font that renders them; `styled_width` measures bold and italic runs
+and defaults to the regular width. `Approx` estimates 0.6 em per terminal column (wide characters
+count double) and is used for SVG output and tests.
 
 ## DISPLA-5 Themes
 
@@ -69,8 +73,8 @@ the drawing.
 
 `scene::svg::write` writes a scene as a standalone SVG document with a background rect, one
 `path` per path element, and one `text` per text element (anchored at its center). Numbers have
-at most two decimals; translucent colors use `fill-opacity`/`stroke-opacity`; text is
-XML-escaped.
+at most two decimals; translucent colors use `fill-opacity`/`stroke-opacity`; bold and italic
+runs carry `font-weight="bold"` and `font-style="italic"`; text is XML-escaped.
 
 ## DISPLA-10 Hit testing
 
@@ -84,8 +88,9 @@ tests in `crates/sirene-core/src/scene/hit.rs`.
 
 With the `png` feature, `scene::png::write(scene, scale)` draws a scene's SVG (DISPLA-9) into an
 RGBA PNG of `ceil(width * scale)` by `ceil(height * scale)` pixels, with all text
-in the embedded Noto Sans Regular (`crates/sirene-core/fonts`, SIL OFL 1.1). No system fonts are
-read, so the output is the same on every machine; characters Noto Sans lacks are not drawn.
-`png::FontMetrics` measures text with the same font (DISPLA-4), using `Approx` for characters it
+in the embedded Noto Sans Regular, Bold, Italic, and Bold Italic (`crates/sirene-core/fonts`,
+SIL OFL 1.1). No system fonts are read, so the output is the same on every machine; characters
+Noto Sans lacks are not drawn. `png::FontMetrics` measures text with the face of each run's
+style (DISPLA-4), using `Approx` for characters it
 lacks. A scale that is not finite and positive, an image over 16384 pixels on a side, or a scene
 with no area is an error. Tests: `crates/sirene-core/tests/png.rs`.

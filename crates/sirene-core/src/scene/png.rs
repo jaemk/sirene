@@ -5,37 +5,64 @@ use std::sync::{Arc, OnceLock};
 use resvg::tiny_skia::{Pixmap, Transform};
 use resvg::usvg::{self, fontdb};
 
-use super::{Approx, Scene, TextMetrics};
+use super::{Approx, Scene, TextMetrics, TextStyle};
 
-/// Noto Sans Regular, the only font PNG output uses.
+/// Noto Sans Regular, the font of unstyled PNG text.
 pub const FONT: &[u8] = include_bytes!("../../fonts/NotoSans-Regular.ttf");
+/// Noto Sans Bold, Italic, and Bold Italic, for markdown emphasis.
+pub const BOLD: &[u8] = include_bytes!("../../fonts/NotoSans-Bold.ttf");
+pub const ITALIC: &[u8] = include_bytes!("../../fonts/NotoSans-Italic.ttf");
+pub const BOLD_ITALIC: &[u8] = include_bytes!("../../fonts/NotoSans-BoldItalic.ttf");
 const FAMILY: &str = "Noto Sans";
 /// The largest image side, in pixels.
 pub const MAX_SIDE: u32 = 16384;
 
-fn face() -> &'static ttf_parser::Face<'static> {
-    static FACE: OnceLock<ttf_parser::Face<'static>> = OnceLock::new();
-    FACE.get_or_init(|| ttf_parser::Face::parse(FONT, 0).expect("the embedded font parses"))
+/// The embedded font file for `style`.
+fn font(style: TextStyle) -> &'static [u8] {
+    match (style.bold, style.italic) {
+        (false, false) => FONT,
+        (true, false) => BOLD,
+        (false, true) => ITALIC,
+        (true, true) => BOLD_ITALIC,
+    }
+}
+
+fn face(style: TextStyle) -> &'static ttf_parser::Face<'static> {
+    static FACES: OnceLock<[ttf_parser::Face<'static>; 4]> = OnceLock::new();
+    let faces = FACES.get_or_init(|| {
+        [FONT, BOLD, ITALIC, BOLD_ITALIC]
+            .map(|f| ttf_parser::Face::parse(f, 0).expect("the embedded fonts parse"))
+    });
+    let i = usize::from(style.bold) + 2 * usize::from(style.italic);
+    &faces[i]
 }
 
 fn fonts() -> Arc<fontdb::Database> {
     static DB: OnceLock<Arc<fontdb::Database>> = OnceLock::new();
     DB.get_or_init(|| {
         let mut db = fontdb::Database::new();
-        db.load_font_data(FONT.to_vec());
+        for bold in [false, true] {
+            for italic in [false, true] {
+                db.load_font_data(font(TextStyle { bold, italic }).to_vec());
+            }
+        }
         db.set_sans_serif_family(FAMILY);
         Arc::new(db)
     })
     .clone()
 }
 
-/// Text widths in the embedded font.
+/// Text widths in the embedded fonts.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FontMetrics;
 
 impl TextMetrics for FontMetrics {
     fn width(&self, text: &str, size: f32) -> f32 {
-        let face = face();
+        self.styled_width(text, size, TextStyle::default())
+    }
+
+    fn styled_width(&self, text: &str, size: f32, style: TextStyle) -> f32 {
+        let face = face(style);
         let em = f32::from(face.units_per_em());
         let mut buf = [0u8; 4];
         text.chars()

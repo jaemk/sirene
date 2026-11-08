@@ -51,13 +51,139 @@ impl Label {
     /// Display lines: markdown emphasis markers dropped and control characters replaced with
     /// spaces.
     pub fn lines(&self) -> Vec<String> {
-        let text = if self.markdown {
-            self.text.replace("**", "").replace('*', "")
-        } else {
-            self.text.clone()
-        };
-        text.split('\n').map(clean).collect()
+        self.spans()
+            .iter()
+            .map(|line| line.iter().map(|s| s.text.as_str()).collect())
+            .collect()
     }
+
+    /// Display lines as styled spans: markdown `**bold**`, `__bold__`, `*italic*`, and
+    /// `_italic_` become styles (FLOWMO-6); markers without a partner stay as text. Plain labels
+    /// are one unstyled span per line.
+    pub fn spans(&self) -> Vec<Vec<Span>> {
+        self.text
+            .split('\n')
+            .map(|line| {
+                let line = clean(line);
+                if self.markdown {
+                    markdown_spans(&line)
+                } else {
+                    vec![Span::plain(line)]
+                }
+            })
+            .collect()
+    }
+}
+
+/// A run of label text in one style.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Span {
+    pub text: String,
+    pub bold: bool,
+    pub italic: bool,
+}
+
+impl Span {
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            ..Self::default()
+        }
+    }
+}
+
+/// An emphasis marker in a markdown line: `true` for bold.
+enum Token<'a> {
+    Text(&'a str),
+    Marker { bold: bool, raw: &'a str },
+}
+
+fn markdown_spans(line: &str) -> Vec<Span> {
+    // Split into text and markers. `_` marks only at a word edge, so `snake_case` stays text.
+    let mut tokens = Vec::new();
+    let mut start = 0;
+    let chars: Vec<(usize, char)> = line.char_indices().collect();
+    let mut k = 0;
+    while k < chars.len() {
+        let (i, c) = chars[k];
+        let double = chars.get(k + 1).is_some_and(|&(_, d)| d == c);
+        let len = if double { 2 } else { 1 };
+        let marker = match c {
+            '*' => true,
+            '_' => {
+                let before = k.checked_sub(1).map(|j| chars[j].1);
+                let after = chars.get(k + len).map(|&(_, a)| a);
+                !(before.is_some_and(char::is_alphanumeric)
+                    && after.is_some_and(char::is_alphanumeric))
+            }
+            _ => false,
+        };
+        if marker {
+            if start < i {
+                tokens.push(Token::Text(&line[start..i]));
+            }
+            let end = i + c.len_utf8() * len;
+            tokens.push(Token::Marker {
+                bold: double,
+                raw: &line[i..end],
+            });
+            start = end;
+            k += len;
+        } else {
+            k += 1;
+        }
+    }
+    if start < line.len() {
+        tokens.push(Token::Text(&line[start..]));
+    }
+
+    // Pair each marker with the next unpaired one of the same kind and character.
+    let mut paired = vec![false; tokens.len()];
+    for i in 0..tokens.len() {
+        let Token::Marker { bold, raw } = tokens[i] else {
+            continue;
+        };
+        if paired[i] {
+            continue;
+        }
+        let partner = (i + 1..tokens.len()).find(|&j| {
+            !paired[j]
+                && matches!(tokens[j], Token::Marker { bold: b, raw: r } if b == bold && r == raw)
+        });
+        if let Some(j) = partner {
+            paired[i] = true;
+            paired[j] = true;
+        }
+    }
+
+    let (mut bold, mut italic) = (false, false);
+    let mut spans: Vec<Span> = Vec::new();
+    for (i, t) in tokens.iter().enumerate() {
+        let text = match *t {
+            Token::Marker { bold: b, .. } if paired[i] => {
+                if b {
+                    bold = !bold;
+                } else {
+                    italic = !italic;
+                }
+                continue;
+            }
+            Token::Marker { raw, .. } => raw,
+            Token::Text(text) => text,
+        };
+        match spans.last_mut() {
+            Some(s) if s.bold == bold && s.italic == italic => s.text.push_str(text),
+            _ => spans.push(Span {
+                text: text.to_owned(),
+                bold,
+                italic,
+            }),
+        }
+    }
+    if spans.is_empty() {
+        spans.push(Span::default());
+    }
+    spans
 }
 
 /// Replaces control characters, which have no width, with spaces.

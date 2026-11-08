@@ -379,6 +379,105 @@ impl TextMetrics for Dyn<'_> {
     }
 }
 
+fn runs(s: &Scene, owner: Owner) -> Vec<(String, Pt, TextStyle)> {
+    owned(s, owner)
+        .into_iter()
+        .filter_map(|p| match p {
+            Primitive::Text {
+                text,
+                center,
+                style,
+                ..
+            } => Some((text.clone(), *center, *style)),
+            Primitive::Path { .. } => None,
+        })
+        .collect()
+}
+
+/// Markdown emphasis draws as bold and italic runs, left to right on one line.
+#[test]
+fn markdown_runs() {
+    let s = flowchart(
+        &chart("flowchart\nA[\"`a **bold** and _it_ end`\"]\n"),
+        &png::FontMetrics,
+        &Theme::LIGHT,
+    );
+    let r = runs(&s, Owner::Node(0));
+    let texts: Vec<(&str, bool, bool)> = r
+        .iter()
+        .map(|(t, _, st)| (t.as_str(), st.bold, st.italic))
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            ("a", false, false),
+            ("bold", true, false),
+            ("and", false, false),
+            ("it", false, true),
+            ("end", false, false)
+        ]
+    );
+    assert!(
+        r.windows(2)
+            .all(|w| w[0].1.x < w[1].1.x && w[0].1.y == w[1].1.y)
+    );
+    // The runs are centered as a line: the outer gaps to the node's middle match.
+    let m = &png::FontMetrics;
+    let left = r[0].1.x - m.width("a", 14.0) / 2.0;
+    let right = r[4].1.x + m.width("end", 14.0) / 2.0;
+    let Primitive::Path { segments, .. } = owned(&s, Owner::Node(0))[0] else {
+        panic!("no body")
+    };
+    let xs: Vec<f32> = shapes::flatten(segments).iter().map(|p| p.x).collect();
+    let mid = (xs.iter().copied().fold(f32::MAX, f32::min)
+        + xs.iter().copied().fold(f32::MIN, f32::max))
+        / 2.0;
+    assert!(
+        ((left + right) / 2.0 - mid).abs() < 0.5,
+        "{left} {right} {mid}"
+    );
+}
+
+/// Long labels wrap at spaces near 200px; diamonds wrap to stay compact.
+#[test]
+fn long_labels_wrap() {
+    let long = "a label long enough that it has to wrap onto more lines than one";
+    let s = flowchart(
+        &chart(&format!(
+            "flowchart\nA[{long}]\nB -->|{long}| C\nD{{Coverage at least 98%?}}\nE[short]\nF{{Is it ok?}}\n"
+        )),
+        &png::FontMetrics,
+        &Theme::LIGHT,
+    );
+    let lines = |owner| {
+        let mut ys: Vec<i32> = runs(&s, owner).iter().map(|r| r.1.y as i32).collect();
+        ys.dedup();
+        ys.len()
+    };
+    let words = |owner| -> String {
+        runs(&s, owner)
+            .iter()
+            .map(|r| r.0.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    assert!(lines(Owner::Node(0)) >= 2, "{:?}", runs(&s, Owner::Node(0)));
+    assert_eq!(words(Owner::Node(0)), long);
+    assert!(lines(Owner::Edge(0)) >= 2);
+    assert_eq!(words(Owner::Edge(0)), long);
+    assert!((2..=3).contains(&lines(Owner::Node(3))));
+    assert_eq!(words(Owner::Node(3)), "Coverage at least 98%?");
+    assert_eq!(lines(Owner::Node(4)), 1);
+    // Short decisions stay on one line.
+    assert_eq!(lines(Owner::Node(5)), 1);
+    for (text, at, _) in runs(&s, Owner::Node(0)) {
+        assert!(
+            png::FontMetrics.width(&text, 14.0) <= 200.0,
+            "{text} at {at:?}"
+        );
+    }
+}
+
 #[test]
 fn colors_over() {
     let white = Color::rgb(0xffffff);
@@ -547,6 +646,20 @@ fn svg_details() {
                     center: Pt::new(0.333, 4.0),
                     size: 12.0,
                     color: Color::rgb(0),
+                    style: TextStyle::default(),
+                },
+            },
+            Element {
+                owner: Owner::Diagram,
+                primitive: Primitive::Text {
+                    text: "b".into(),
+                    center: Pt::new(1.0, 4.0),
+                    size: 12.0,
+                    color: Color::rgb(0),
+                    style: TextStyle {
+                        bold: true,
+                        italic: true,
+                    },
                 },
             },
         ],
@@ -560,6 +673,8 @@ fn svg_details() {
          stroke-width=\"1.25\" stroke-dasharray=\"2 1\"/>\n\
          <text x=\"0.33\" y=\"4\" font-size=\"12\" text-anchor=\"middle\" \
          dominant-baseline=\"central\" fill=\"#000000\">a&lt;b&gt;&amp;&quot;c&quot;</text>\n\
+         <text x=\"1\" y=\"4\" font-size=\"12\" font-weight=\"bold\" font-style=\"italic\" \
+         text-anchor=\"middle\" dominant-baseline=\"central\" fill=\"#000000\">b</text>\n\
          </svg>\n"
     );
 }

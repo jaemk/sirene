@@ -2,29 +2,32 @@
 source: crates/sirene-core/tests/svg.rs
 expression: "graph TD\n    id1[\"This is the (text) in the box\"]\n    A[\"A double quote:#quot;\"] --> B[\"A dec char:#9829;\"]\n    md[\"`**bold** and _italic_`\"]\n    uni[Ünïcödé 🐟 text]\n    multi[first\n    second]\n    spaced[ padded label ]\n    endpoint --> classes\n"
 ---
-<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="165" viewBox="0 0 1254 165" font-family="trebuchet ms, verdana, arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="1170" height="165" viewBox="0 0 1170 165" font-family="trebuchet ms, verdana, arial, sans-serif">
 <rect width="100%" height="100%" fill="#ffffff"/>
-<path d="M395 113 L390.5 104 L399.5 104 Z" fill="#333333"/>
-<path d="M395 62 L395 105" fill="none" stroke="#333333" stroke-width="1.5"/>
-<path d="M1192 113 L1187.5 104 L1196.5 104 Z" fill="#333333"/>
-<path d="M1192 62 L1192 105" fill="none" stroke="#333333" stroke-width="1.5"/>
-<path d="M16 26 L284 26 L284 62 L16 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="150" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">This is the (text) in the box</text>
-<path d="M315 26 L474 26 L474 62 L315 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="394.5" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">A double quote:&quot;</text>
-<path d="M332 113 L457 113 L457 149 L332 149 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="394.5" y="131" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">A dec char:♥</text>
-<path d="M505 26 L672 26 L672 62 L505 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="588.5" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">bold and _italic_</text>
-<path d="M703 26 L853 26 L853 62 L703 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="778" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">Ünïcödé 🐟 text</text>
-<path d="M884 16 L959 16 L959 72 L884 72 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="921.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">first</text>
-<text x="921.5" y="54" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">second</text>
-<path d="M990 26 L1115 26 L1115 62 L990 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="1052.5" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">padded label</text>
-<path d="M1146 26 L1238 26 L1238 62 L1146 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="1192" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">endpoint</text>
-<path d="M1150 113 L1233 113 L1233 149 L1150 149 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="1191.5" y="131" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">classes</text>
+<path d="M328 113 L323.5 104 L332.5 104 Z" fill="#333333"/>
+<path d="M328 62 L328 105" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M1108 113 L1103.5 104 L1112.5 104 Z" fill="#333333"/>
+<path d="M1108 62 L1108 105" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M16 16 L217 16 L217 72 L16 72 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="116.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">This is the (text) in</text>
+<text x="116.5" y="54" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">the box</text>
+<path d="M248 26 L407 26 L407 62 L248 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="327.5" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">A double quote:&quot;</text>
+<path d="M265 113 L390 113 L390 149 L265 149 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="327.5" y="131" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">A dec char:♥</text>
+<path d="M438 26 L588 26 L588 62 L438 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="466.8" y="44" font-size="14" font-weight="bold" text-anchor="middle" dominant-baseline="central" fill="#333333">bold</text>
+<text x="504.6" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">and</text>
+<text x="550.8" y="44" font-size="14" font-style="italic" text-anchor="middle" dominant-baseline="central" fill="#333333">italic</text>
+<path d="M619 26 L769 26 L769 62 L619 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="694" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">Ünïcödé 🐟 text</text>
+<path d="M800 16 L875 16 L875 72 L800 72 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="837.5" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">first</text>
+<text x="837.5" y="54" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">second</text>
+<path d="M906 26 L1031 26 L1031 62 L906 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="968.5" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">padded label</text>
+<path d="M1062 26 L1154 26 L1154 62 L1062 62 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="1108" y="44" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">endpoint</text>
+<path d="M1066 113 L1149 113 L1149 149 L1066 149 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="1107.5" y="131" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">classes</text>
 </svg>
