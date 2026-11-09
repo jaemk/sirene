@@ -22,6 +22,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Flowchart Model | done | [flowchart-model.md](flowchart-model.md) |
 | Markdown | done | [markdown.md](markdown.md) |
 | Agent Skill | done | [agent-skill.md](agent-skill.md) |
+| Self Update | done | [self-update.md](self-update.md) |
 
 ## Conventions
 

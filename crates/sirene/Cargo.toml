@@ -23,6 +23,18 @@ gui = ["dep:sirene-gui"]
 [dependencies]
 clap = { version = "4.6.7", features = ["derive"] }
 log = { version = "0.4.35", features = ["std"] }
+semver = "1"
+# `sirene update` (UPDATE-1): GitHub releases over ureq and rustls, which builds for musl;
+# `native-certs` trusts the system's certificate store, for proxies that re-sign HTTPS.
+self_update = { version = "1.3", default-features = false, features = [
+    "ureq",
+    "rustls",
+    "native-certs",
+    "github",
+    "progress-bar",
+    "compression-tar-gz",
+    "checksums",
+] }
 sirene-core = { workspace = true, features = ["png"] }
 sirene-gui = { workspace = true, optional = true }
 

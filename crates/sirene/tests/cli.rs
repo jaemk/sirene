@@ -898,6 +898,51 @@ fn other_diagram_types() {
         );
 }
 
+/// `update` decisions with `--to` make no network request (UPDATE-1, UPDATE-3, UPDATE-6).
+#[test]
+fn update() {
+    let current = env!("CARGO_PKG_VERSION");
+    let target = predicate::str::is_match(
+        r"\(target (x86_64|aarch64)-(apple-darwin|unknown-linux-(gnu|musl))\)\n$",
+    )
+    .unwrap();
+    sirene()
+        .args(["update", "--check", "--to", "v99.0.0"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with(format!(
+            "update available: {current} -> 99.0.0 (target "
+        )))
+        .stdout(target.clone());
+    sirene()
+        .args(["update", "--check", "--to", current])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with(format!(
+            "sirene {current} is up to date"
+        )))
+        .stdout(target);
+    sirene()
+        .args(["update", "--check", "--to", "0.0.1"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(format!(
+            "sirene {current} is newer than 0.0.1; not downgrading"
+        )));
+    sirene()
+        .args(["update", "--to", "../0.2.0"])
+        .assert()
+        .failure()
+        .stderr("error: --to '../0.2.0' is not a version like 0.2.0\n");
+    // Without a terminal, only --yes updates.
+    sirene()
+        .args(["update", "--to", "99.0.0"])
+        .assert()
+        .failure()
+        .stdout("")
+        .stderr("error: not a terminal; pass --yes to update without asking\n");
+}
+
 #[test]
 fn rejects_unknown_flag() {
     sirene()
