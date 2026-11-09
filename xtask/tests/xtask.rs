@@ -201,8 +201,6 @@ cask "sirene" do
   desc "Mermaid diagram editor and viewer"
   homepage "https://example.com"
 
-  depends_on macos: ">= :catalina"
-
   app "Sirene.app"
   binary "#{{appdir}}/Sirene.app/Contents/MacOS/sirene"
 end
