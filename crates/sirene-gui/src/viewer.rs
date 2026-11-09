@@ -17,7 +17,7 @@ use gpui::{
     ScrollEvent, Subscription, Task, Window, WindowAppearance, canvas, div, prelude::*, px,
 };
 use sirene_core::Severity;
-use sirene_core::scene::{self, Owner, Scene, Theme};
+use sirene_core::scene::{Owner, Scene, Theme};
 
 use crate::document::{Disk, Document};
 use crate::drawing::{Drag, Item, LabelEdit};
@@ -366,7 +366,7 @@ impl Viewer {
                     window,
                     font: window.text_style().font(),
                 };
-                Rc::new(scene::flowchart(&doc.chart, &metrics, &theme))
+                Rc::new(doc.scene(&metrics, &theme))
             })
             .clone()
     }

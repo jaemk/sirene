@@ -894,8 +894,34 @@ fn other_diagram_types() {
         .failure()
         .stderr(
             "<stdin>:1:1: error: `sequenceDiagram` diagrams are not supported; \
-             sirene draws flowchart, state, class, and ER diagrams\n",
+             sirene draws flowchart, state, class, ER, and git graph diagrams\n",
         );
+}
+
+/// A git graph draws in text and as an image (MGIT-5, LANGS-4).
+#[test]
+fn git_graphs() {
+    let src = "gitGraph\n  commit id: \"a\"\n  branch dev\n  commit id: \"b\"\n  checkout main\n  \
+               merge dev id: \"m\"\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout("main\n| dev\n* |  a\n+-*  b\n@-+  m\n");
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(">dev</text>"));
+    sirene()
+        .arg("check")
+        .arg("-")
+        .write_stdin("gitGraph\n  merge main\n")
+        .assert()
+        .failure()
+        .stderr("<stdin>:2:9: error: cannot merge `main` into itself\n");
 }
 
 /// A state diagram draws from stdin, a file, and a Markdown block (MSTATE-1, LANGS-4).

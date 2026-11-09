@@ -26,6 +26,7 @@
 - [State diagrams](state.md)
 - [Class diagrams](class.md)
 - [ER diagrams](er.md)
+- [Git graphs](git.md)
 
 # Project
 

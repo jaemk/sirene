@@ -1,6 +1,9 @@
 //! Terminal text rendering of flowcharts (ASCIIR-*).
 
 mod canvas;
+mod git;
+
+pub use git::render as git_graph;
 
 use unicode_width::UnicodeWidthStr;
 

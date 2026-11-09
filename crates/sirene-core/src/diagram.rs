@@ -1,6 +1,10 @@
 //! The entry point for every Mermaid diagram type sirene draws (LANGS-2).
 
-use crate::flowchart::{self, Lowered, scan};
+use crate::ascii::{self, Options};
+use crate::diagnostic::Diagnostic;
+use crate::flowchart::{self, Flowchart, scan};
+use crate::git::{self, GitGraph};
+use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::{class, er, state};
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
@@ -10,18 +14,23 @@ pub enum Kind {
     State,
     Class,
     Er,
+    Git,
 }
 
 impl Kind {
     /// The type of the diagram `src` starts with; a flowchart unless the header says otherwise.
     pub fn of(src: &str) -> Kind {
         let word = header(src);
+        // `gitGraph:` and `gitGraph TB:` name the direction in the same word or the next.
+        let word = word.strip_suffix(':').unwrap_or(word);
         if state::HEADERS.contains(&word) {
             Kind::State
         } else if class::HEADERS.contains(&word) {
             Kind::Class
         } else if er::HEADERS.contains(&word) {
             Kind::Er
+        } else if git::HEADERS.contains(&word) {
+            Kind::Git
         } else {
             Kind::Flowchart
         }
@@ -29,7 +38,71 @@ impl Kind {
 }
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
-pub const DRAWN: &str = "flowchart, state, class, and ER diagrams";
+pub const DRAWN: &str = "flowchart, state, class, ER, and git graph diagrams";
+
+/// A lowered diagram of any type (LANGS-2).
+#[derive(Debug, Clone, PartialEq)]
+pub enum Diagram {
+    /// Flowcharts, and the state, class, and ER diagrams lowered to the graph model.
+    Graph(Flowchart),
+    Git(GitGraph),
+}
+
+impl Default for Diagram {
+    fn default() -> Self {
+        Diagram::Graph(Flowchart::default())
+    }
+}
+
+impl Diagram {
+    /// The graph model, for the types lowered to it.
+    pub fn graph(&self) -> Option<&Flowchart> {
+        match self {
+            Diagram::Graph(f) => Some(f),
+            Diagram::Git(_) => None,
+        }
+    }
+
+    /// The graph model, or an empty one for the other types.
+    pub fn into_graph(self) -> Flowchart {
+        match self {
+            Diagram::Graph(f) => f,
+            Diagram::Git(_) => Flowchart::default(),
+        }
+    }
+
+    /// The drawing, with text measured by `metrics` (DISPLA-1).
+    pub fn scene(&self, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
+        match self {
+            Diagram::Graph(f) => scene::flowchart(f, metrics, theme),
+            Diagram::Git(g) => scene::git_graph(g, metrics, theme),
+        }
+    }
+
+    /// The drawing as text (ASCIIR-1).
+    pub fn ascii(&self, options: &Options) -> String {
+        match self {
+            Diagram::Graph(f) => ascii::render(f, options),
+            Diagram::Git(g) => ascii::git_graph(g, options),
+        }
+    }
+}
+
+/// A diagram and the problems found reading it.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Lowered {
+    pub diagram: Diagram,
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+impl From<flowchart::Lowered> for Lowered {
+    fn from(l: flowchart::Lowered) -> Self {
+        Lowered {
+            diagram: Diagram::Graph(l.flowchart),
+            diagnostics: l.diagnostics,
+        }
+    }
+}
 
 /// The first word of `src` after frontmatter, comments, and directives.
 fn header(src: &str) -> &str {
@@ -66,10 +139,17 @@ fn header(src: &str) -> &str {
 /// Parses and lowers `src` with the parser its header picks (LANGS-2).
 pub fn lower(src: &str) -> Lowered {
     match Kind::of(src) {
-        Kind::Flowchart => flowchart::parse(src).lower(),
-        Kind::State => state::parse(src).lower(),
-        Kind::Class => class::parse(src).lower(),
-        Kind::Er => er::parse(src).lower(),
+        Kind::Flowchart => flowchart::parse(src).lower().into(),
+        Kind::State => state::parse(src).lower().into(),
+        Kind::Class => class::parse(src).lower().into(),
+        Kind::Er => er::parse(src).lower().into(),
+        Kind::Git => {
+            let (graph, diagnostics) = git::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Git(graph),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -92,6 +172,9 @@ mod tests {
         assert_eq!(Kind::of("classDiagram\n"), Kind::Class);
         assert_eq!(Kind::of("classDiagram-v2\n"), Kind::Class);
         assert_eq!(Kind::of("erDiagram\n"), Kind::Er);
+        assert_eq!(Kind::of("gitGraph\n"), Kind::Git);
+        assert_eq!(Kind::of("gitGraph:\n"), Kind::Git);
+        assert_eq!(Kind::of("gitGraph TB:\n"), Kind::Git);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -106,6 +189,7 @@ mod tests {
     fn other_diagrams() {
         assert_eq!(other_diagram("pie\n"), Some("pie".to_owned()));
         assert_eq!(other_diagram("stateDiagram-v2\n"), None);
+        assert_eq!(other_diagram("gitGraph\n"), None);
         assert_eq!(other_diagram("flowchart\n"), None);
     }
 }

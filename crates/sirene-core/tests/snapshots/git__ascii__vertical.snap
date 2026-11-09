@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/git.rs
+expression: "gitGraph TB:\n    commit id: \"a\"\n    branch hotfix\n    commit id: \"b\" tag: \"v1\"\n    checkout main\n    commit id: \"c\"\n    merge hotfix\n"
+---
+main
+| hotfix
+* |  a
++-*  b [v1]
+* |  c
+@-+  3-b38c3a5

@@ -89,6 +89,10 @@ syntax_kinds! {
     MEMBER,
     // ER diagrams: an attribute key list such as `PK, FK`.
     KEYS,
+    // Git graphs: `commit`, `branch`, `checkout`, `switch`, `merge`, or `cherry-pick`, and an
+    // attribute name such as `id` or `tag`.
+    GIT_KW,
+    ATTR_KEY,
     ERROR_TOKEN,
 
     // Nodes.
@@ -132,6 +136,8 @@ syntax_kinds! {
     ENTITY,
     ENTITY_REF,
     ATTRIBUTE,
+    GIT_STMT,
+    ATTR,
     ERROR,
 }
 

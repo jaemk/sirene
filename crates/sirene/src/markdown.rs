@@ -3,8 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use sirene_core::Severity;
-use sirene_core::diagram;
-use sirene_core::flowchart::Lowered;
+use sirene_core::diagram::{self, Lowered};
 use sirene_core::markdown::{self, Block};
 
 /// Prints `lowered`'s diagnostics as `NAME:LINE:COL: SEVERITY: MESSAGE`, with each position

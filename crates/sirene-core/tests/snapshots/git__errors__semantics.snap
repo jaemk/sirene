@@ -1,0 +1,28 @@
+---
+source: crates/sirene-core/tests/git.rs
+expression: "gitGraph\n    merge main\n    commit id: \"a\"\n    commit id: \"a\"\n    branch main\n    checkout nowhere\n    branch dev\n    merge main\n    merge ghost\n    branch empty\n    checkout main\n    merge empty\n    checkout dev\n    commit id: \"b\" order: 2\n    commit type: SIDEWAYS\n    checkout main\n    merge dev id: \"M\"\n    branch other\n    cherry-pick id: \"M\"\n    cherry-pick id: \"M\" parent: \"zzz\"\n    cherry-pick id: \"nope\"\n    cherry-pick id: \"M\" parent: \"b\"\n    checkout main\n    cherry-pick id: \"a\"\n    cherry-pick tag: \"x\"\n"
+---
+2:11: error: cannot merge `main` into itself
+4:16: error: commit id `a` is already used
+5:12: error: branch `main` already exists
+6:14: error: unknown branch `nowhere`
+8:11: error: `main` and `dev` have the same head
+9:11: error: unknown branch `ghost`
+12:11: error: `empty` and `main` have the same head
+14:20: error: `order` does not apply to `commit`
+15:18: error: expected `NORMAL`, `REVERSE`, or `HIGHLIGHT`
+19:21: error: `M` is a merge: name one of its parents with `parent:`
+20:33: error: `zzz` is not a parent of `M`
+21:21: error: unknown commit `nope`
+22:33: error: `b` is not a parent of `M`
+24:21: error: commit `a` is already on this branch
+25:5: error: `cherry-pick` needs `id: "..."`
+
+main
+│ dev
+│ │ empty
+│ │   other
+● │      a
+├─●      b
+│ ●      2-96be644
+◉─┘      M

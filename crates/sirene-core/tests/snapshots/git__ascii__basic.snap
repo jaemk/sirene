@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/git.rs
+expression: "---\ntitle: Example Git diagram\n---\ngitGraph\n    commit\n    commit\n    branch develop\n    checkout develop\n    commit\n    commit\n    checkout main\n    merge develop\n    commit\n    commit\n"
+---
+Example Git diagram
+
+main
+| develop
+* |  0-2245cbe
+* |  1-8d5b41b
++-*  2-55bb342
+| *  3-f92e781
+@-+  4-6578b1a
+*    5-aba60d7
+*    6-813e0fc

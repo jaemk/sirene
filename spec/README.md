@@ -32,6 +32,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Graphviz DOT | pending | [graphviz-dot.md](graphviz-dot.md) |
 | D2 | research | [d2.md](d2.md) |
 | PlantUML | research | [plantuml.md](plantuml.md) |
+| Mermaid Git Graphs | done | [mermaid-git-graphs.md](mermaid-git-graphs.md) |
 
 ## Conventions
 

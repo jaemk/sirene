@@ -31,9 +31,9 @@ fn export_png_and_svg(cx: &mut TestAppContext) {
     cx.run_until_parked();
     let bytes = std::fs::read(&png).unwrap();
     assert!(bytes.starts_with(PNG));
-    let chart = viewer.read_with(vcx, |v, _| v.doc.chart.clone());
+    let doc = viewer.read_with(vcx, |v, _| v.doc.clone());
     let fine = Format::Png
-        .render(&chart, &sirene_core::scene::Theme::LIGHT, Quality::Fine)
+        .render(&doc, &sirene_core::scene::Theme::LIGHT, Quality::Fine)
         .unwrap();
     assert_eq!(bytes, fine);
     let status = viewer.read_with(vcx, |v, _| v.status());
@@ -96,9 +96,9 @@ fn copy_image(cx: &mut TestAppContext) {
     };
     assert_eq!(image.format(), ImageFormat::Png);
     assert!(image.bytes().starts_with(PNG));
-    let chart = viewer.read_with(vcx, |v, _| v.doc.chart.clone());
+    let doc = viewer.read_with(vcx, |v, _| v.doc.clone());
     let normal = Format::Png
-        .render(&chart, &sirene_core::scene::Theme::LIGHT, Quality::Normal)
+        .render(&doc, &sirene_core::scene::Theme::LIGHT, Quality::Normal)
         .unwrap();
     assert_eq!(image.bytes(), normal.as_slice());
     let status = viewer.read_with(vcx, |v, _| v.status());

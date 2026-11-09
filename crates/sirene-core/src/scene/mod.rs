@@ -1,5 +1,6 @@
 //! Backend-independent drawing of diagrams as paths and text (DISPLA-*).
 
+mod git;
 mod hit;
 mod paint;
 #[cfg(feature = "png")]
@@ -10,6 +11,7 @@ pub mod svg;
 
 use unicode_width::UnicodeWidthStr;
 
+pub use git::git_graph;
 pub use paint::{CONFIG, flowchart};
 pub use style::parse_color;
 

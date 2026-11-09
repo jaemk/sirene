@@ -1104,7 +1104,7 @@ fn step(p: Pt, d: Pt, k: f32) -> Pt {
 
 /// A polyline whose corners are rounded with radius up to `radius`. A short jog between two
 /// parallel runs becomes one S-curve.
-fn rounded_polyline(points: &[Pt], radius: f32) -> Vec<Segment> {
+pub(super) fn rounded_polyline(points: &[Pt], radius: f32) -> Vec<Segment> {
     let n = points.len();
     let mut out = vec![Segment::Move(points[0])];
     let mut k = 1;

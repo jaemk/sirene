@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/git.rs
+expression: "gitGraph LR:\n    commit id: \"ok\"\n    branch\n    commit id: \"unclosed\n    commit foo\n    commit tag:\n    push origin\n    branch feature order: high\n    commit\n"
+---
+3:11: error: expected a branch name
+4:16: error: unclosed string: expected `"`
+5:12: error: expected an attribute such as `id: "..."`
+6:16: error: expected a value
+7:5: error: expected `commit`, `branch`, `checkout`, `merge`, or `cherry-pick`
+8:27: error: `order` takes a whole number
+
+main
+│ feature
+● │  ok
+└─●  1-c9405c4

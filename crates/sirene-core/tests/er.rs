@@ -6,8 +6,8 @@ use std::fs;
 use std::path::Path;
 
 use sirene_core::ascii::{self, Charset, Options};
-use sirene_core::diagram::{self, Kind};
-use sirene_core::flowchart::{Arrow, Direction, Flowchart, Lowered, Stroke};
+use sirene_core::diagram::{self, Kind, Lowered};
+use sirene_core::flowchart::{Arrow, Direction, Flowchart, Stroke};
 use sirene_core::scene::{self, Approx, Primitive, Theme};
 use sirene_core::{Severity, er};
 
@@ -62,14 +62,11 @@ fn snapshots() {
             }
             let mut out = diagnostics(&src, &lowered);
             out.push('\n');
-            out.push_str(&ascii::render(
-                &lowered.flowchart,
-                &Options {
-                    charset: Charset::Unicode,
-                },
-            ));
+            out.push_str(&lowered.diagram.ascii(&Options {
+                charset: Charset::Unicode,
+            }));
             insta::assert_snapshot!(format!("{dir}__{name}"), out, &src);
-            let s = scene::flowchart(&lowered.flowchart, &Approx, &Theme::LIGHT);
+            let s = lowered.diagram.scene(&Approx, &Theme::LIGHT);
             assert!(!s.elements.is_empty(), "{name}");
         }
     }
@@ -78,7 +75,7 @@ fn snapshots() {
 #[test]
 fn ascii_charset_snapshots() {
     for (name, src) in fixtures("valid") {
-        let chart = diagram::lower(&src).flowchart;
+        let chart = diagram::lower(&src).diagram.into_graph();
         let out = ascii::render(
             &chart,
             &Options {
@@ -96,7 +93,7 @@ fn chart(src: &str) -> Flowchart {
         "{:?}\n{src}",
         lowered.diagnostics
     );
-    lowered.flowchart
+    lowered.diagram.into_graph()
 }
 
 /// MER-1, MER-2: each relationship's two markers and line, from symbols and from words.

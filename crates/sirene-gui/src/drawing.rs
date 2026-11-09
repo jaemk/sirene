@@ -54,7 +54,7 @@ pub struct LabelEdit {
 
 /// The flowchart `src` describes.
 fn chart(src: &str) -> Flowchart {
-    sirene_core::diagram::lower(src).flowchart
+    sirene_core::diagram::lower(src).diagram.into_graph()
 }
 
 /// How far, in screen pixels, a click may miss a stroke.

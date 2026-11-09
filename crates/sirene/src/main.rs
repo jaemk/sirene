@@ -5,9 +5,8 @@ use std::process::ExitCode;
 use std::time::{Duration, Instant, SystemTime};
 
 use clap::{Parser, Subcommand, ValueEnum};
-use sirene_core::ascii::{self, Charset, Options};
-use sirene_core::diagram;
-use sirene_core::flowchart::Lowered;
+use sirene_core::ascii::{Charset, Options};
+use sirene_core::diagram::{self, Lowered};
 use sirene_core::scene::png::{self, FontMetrics};
 use sirene_core::scene::{self, Approx, Theme};
 
@@ -271,7 +270,7 @@ fn run(cli: Cli) -> ExitCode {
                 CharsetArg::Ascii => Charset::Ascii,
             };
             convert(file, None, None, watch, |l| {
-                Ok(ascii::render(&l.flowchart, &Options { charset }).into_bytes())
+                Ok(l.diagram.ascii(&Options { charset }).into_bytes())
             })
         }
         Some(Command::Svg {
@@ -282,7 +281,7 @@ fn run(cli: Cli) -> ExitCode {
             output,
         }) => {
             let render = |l: &Lowered| {
-                let scene = scene::flowchart(&l.flowchart, &Approx, &theme.theme());
+                let scene = l.diagram.scene(&Approx, &theme.theme());
                 Ok(scene::svg::write(&scene).into_bytes())
             };
             if let Some(md) = file
@@ -304,7 +303,7 @@ fn run(cli: Cli) -> ExitCode {
         }) => {
             let quality = quality.quality();
             let render = |l: &Lowered| {
-                let scene = scene::flowchart(&l.flowchart, &FontMetrics, &theme.theme());
+                let scene = l.diagram.scene(&FontMetrics, &theme.theme());
                 // A given scale is kept (and may be too large); the quality's own shrinks to fit.
                 let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
                 png::write(&scene, png::Options { scale, quality })
@@ -735,7 +734,10 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path();
         let out = dir.join("out");
-        let render = |l: &Lowered| Ok(format!("{} nodes", l.flowchart.nodes.len()).into_bytes());
+        let render = |l: &Lowered| {
+            let nodes = l.diagram.graph().map_or(0, |g| g.nodes.len());
+            Ok(format!("{nodes} nodes").into_bytes())
+        };
         let jobs = || -> Vec<_> {
             scan(dir, &out, "txt")
                 .into_iter()

@@ -29,10 +29,15 @@ Each language has a parser to a lossless syntax tree with diagnostics (the `synt
   (LAYOUT), the scene builder (DISPLA), the ASCII renderer, and hit testing.
 - the sequence model (MSEQ-2), for Mermaid and PlantUML sequence diagrams, with its own layout,
   scene builder, and ASCII renderer.
-- chart models (MCHART), each with its own scene builder.
+- chart models (MCHART), each with its own layout, scene builder, and ASCII renderer.
 
 SVG, PNG, themes, and text metrics (DISPLA-4 to DISPLA-12) are shared by all of them. A
 diagnostic's position is in the source the user wrote, as now.
+
+`diagram::lower` returns a `diagram::Diagram`: `Graph` (a `Flowchart`) or one of the other models
+(`Git`, MGIT-2). `Diagram::scene` and `Diagram::ascii` draw any of them, and the CLI, Markdown
+rendering, and the editor's drawing and export go through them. Only a graph is hit-tested and
+edited; the others draw read-only (LANGS-5) with every element owned by the diagram.
 
 ## LANGS-3 Graph model additions
 
@@ -78,10 +83,11 @@ as `flowchart::edit` does; a language without one has a read-only drawing, and t
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
-State, class, and ER diagrams are read-only this way: `Document::read_only` gives the reason,
-the drawing's menu holds only the disabled Add Node, Select All, and Fit Window, a press on a
-node pans instead of connecting, and every edit action says `Can't ...: drawing edits are not
-supported for state diagrams yet` (or class or ER diagrams). Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
+State, class, and ER diagrams and git graphs are read-only this way: `Document::read_only` gives
+the reason, the drawing's menu holds only the disabled Add Node, Select All, and Fit Window, a
+press on a node pans instead of connecting, and every edit action says `Can't ...: drawing edits
+are not supported for state diagrams yet` (or class diagrams, ER diagrams, or git graphs). A git
+graph is drawn from `Document::other` and has nothing to select. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 
@@ -92,11 +98,15 @@ flowchart corpus has.
 
 ## LANGS-7 Order
 
+Every Mermaid type comes first, so that any Mermaid file draws:
+
 1. Graph model additions (LANGS-3) and language detection (LANGS-1).
 2. Mermaid state, then class, then ER: the most-used Mermaid types after flowcharts and sequence,
    and all graph-model.
-3. Graphviz DOT: a small, well-defined grammar on the same layout.
+3. Mermaid git graphs (MGIT) and timelines, with the `diagram::Diagram` split (LANGS-2).
 4. Mermaid sequence: the sequence model and its layout.
-5. PlantUML sequence and activity, on the sequence and graph models.
-6. Edit modules for state and class.
-7. D2, Mermaid charts, and the rest of PlantUML, after their research.
+5. The rest of the Mermaid charts (MCHART-1), one spec each.
+6. Graphviz DOT: a small, well-defined grammar on the same layout.
+7. PlantUML sequence and activity, on the sequence and graph models.
+8. Edit modules for state and class.
+9. D2 and the rest of PlantUML, after their research.
