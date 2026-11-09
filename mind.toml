@@ -1,0 +1,6 @@
+# sirene as a mind source: `mind meld jaemk/sirene` offers the skills under skills/,
+# installed as sirene:<name>.
+[source]
+description = "Render Mermaid flowcharts to PNG, SVG, and terminal text with sirene"
+namespace = "sirene"
+min-mind-version = "0.36"
