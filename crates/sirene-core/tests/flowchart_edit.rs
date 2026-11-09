@@ -547,14 +547,38 @@ fn ungrouping() {
     assert_eq!(chart(&out).subgraph("s"), None);
     assert_eq!(chart(&out).subgraph("t").unwrap().members, ["C"]);
 
-    // Edges at the subgraph, a missing subgraph, and a one-line block are left alone.
+    // Edges at the subgraph go to its members instead; `linkStyle` indexes follow.
+    let linked = "flowchart TD\n    X --> Y\n    subgraph s\n        A\n        B\n    end\n    \
+                  s --> C\n    D --> E\n    linkStyle 1 stroke:red\n    linkStyle 2 stroke:blue\n";
+    let out = applied(linked, ungroup(linked, "s"));
+    assert_eq!(
+        out,
+        "flowchart TD\n    X --> Y\n    A\n    B\n    A & B --> C\n    D --> E\n    \
+         linkStyle 1,2 stroke:red\n    linkStyle 3 stroke:blue\n"
+    );
+    let c = chart(&out);
+    assert_eq!(
+        c.edges
+            .iter()
+            .map(|e| (e.from.as_str(), e.to.as_str()))
+            .collect::<Vec<_>>(),
+        [("X", "Y"), ("A", "C"), ("B", "C"), ("D", "E")]
+    );
+    assert_eq!(c.edges[3].styles, chart(linked).edges[2].styles);
+    assert_eq!(errors(&out), 0);
+    // An edge id can't be shared, and an empty subgraph has nothing to link.
     assert_eq!(
         ungroup(
-            "flowchart TD\n    subgraph s\n        A\n    end\n    s --> B\n",
+            "flowchart TD\n    subgraph s\n        A\n        B\n    end\n    s e1@--> C\n",
             "s"
         ),
         None
     );
+    assert_eq!(
+        ungroup("flowchart TD\n    subgraph s\n    end\n    s --> C\n", "s"),
+        None
+    );
+    // A missing subgraph and a one-line block are left alone.
     assert_eq!(ungroup(src, "nope"), None);
     assert_eq!(ungroup("flowchart TD\n    subgraph s; A; end\n", "s"), None);
 }
@@ -577,12 +601,41 @@ fn moving_into_subgraphs() {
     );
     assert_eq!(chart(&back).subgraph("s").unwrap().members, ["C"]);
 
-    // Nothing to do, a missing node or subgraph, and a node in a chain inside a subgraph.
+    // Nothing to do, and a missing node or subgraph.
     assert_eq!(move_to_subgraph(src, "A", None), None);
     assert_eq!(move_to_subgraph(src, "Z", Some("s")), None);
     assert_eq!(move_to_subgraph(src, "A", Some("nope")), None);
-    let chain = "flowchart TD\n    subgraph s\n        A --> B\n    end\n    subgraph t\n    end\n";
-    assert_eq!(move_to_subgraph(chain, "A", Some("t")), None);
+
+    // A chain moves whole; the other node keeps a mention where it was, and the link styles
+    // follow the moved edge.
+    let chain = "flowchart TD\n    subgraph s\n        A --> B\n        C\n    end\n    \
+                 subgraph t\n    end\n    D --> E\n    linkStyle 0 stroke:red\n";
+    let out = applied(chain, move_to_subgraph(chain, "A", Some("t")));
+    assert_eq!(
+        out,
+        "flowchart TD\n    subgraph s\n        C\n        B\n    end\n    subgraph t\n        \
+         A --> B\n    end\n    D --> E\n    linkStyle 0 stroke:red\n"
+    );
+    let c = chart(&out);
+    assert_eq!(c.subgraph("s").unwrap().members, ["C", "B"]);
+    assert_eq!(c.subgraph("t").unwrap().members, ["A"]);
+    let out = applied(&out, move_to_subgraph(&out, "A", None));
+    assert_eq!(
+        out,
+        "flowchart TD\n    subgraph s\n        C\n        B\n    end\n    subgraph t\n    end\n    \
+         D --> E\n    linkStyle 1 stroke:red\n    A --> B\n"
+    );
+    let c = chart(&out);
+    assert_eq!(
+        (c.edges[1].from.as_str(), c.edges[1].to.as_str()),
+        ("A", "B")
+    );
+    assert_eq!(c.edges[0].styles, []);
+    assert_eq!(c.subgraph("s").unwrap().members, ["C", "B"]);
+    // A target before the subgraph would take the other node too: refused.
+    let before =
+        "flowchart TD\n    subgraph t\n    end\n    subgraph s\n        A --> B\n    end\n";
+    assert_eq!(move_to_subgraph(before, "A", Some("t")), None);
     // A target whose `end` follows a statement on its line.
     let tight = "flowchart TD\n    X\n    subgraph t\n        Y; end\n";
     assert_eq!(

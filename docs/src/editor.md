@@ -55,9 +55,10 @@ Mermaid has no positions, so sirene changes the layout through the source:
 
 - Direction sets `flowchart TD`, `LR`, and so on, or a subgraph's `direction` line.
 - Group (secondary-g) puts the selected nodes in a new subgraph; Ungroup removes one and keeps
-  its contents. Ungroup is refused when an edge starts or ends at the subgraph itself.
+  its contents. An edge to the subgraph then goes to each of its members (`A & B --> C`).
 - Move To moves a node into another subgraph, or out to the top level. Dragging a node onto a
-  subgraph does the same.
+  subgraph does the same. A statement such as `A --> B` moves with the node, and B keeps a
+  mention in the subgraph it was in.
 - Keep Together adds an invisible `~~~` edge between two nodes, which places them next to each
   other.
 - Move Earlier and Move Later (alt-up, alt-down) swap a statement with its neighbor; the layout
