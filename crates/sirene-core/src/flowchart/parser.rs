@@ -189,7 +189,9 @@ impl<'a> Parser<'a> {
             self.error(
                 start,
                 start + kind.len(),
-                format!("`{kind}` diagrams are not supported; sirene draws flowcharts"),
+                format!(
+                    "`{kind}` diagrams are not supported; sirene draws flowchart and state diagrams"
+                ),
             );
             self.finish();
             return;

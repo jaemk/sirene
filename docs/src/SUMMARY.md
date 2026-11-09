@@ -21,6 +21,10 @@
 - [Shapes](shapes.md)
 - [Examples](examples.md)
 
+# Other diagrams
+
+- [State diagrams](state.md)
+
 # Project
 
 - [Development](development.md)

@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/state.rs
+expression: "---\ntitle: Styled\n---\n%%{init: {\"theme\": \"dark\"}}%%\nstateDiagram-v2\n    accTitle: Movement\n    accDescr: How a thing moves\n    %% A comment\n    direction LR\n    classDef movement font-style:italic\n    classDef badBadEvent fill:#f00,color:white,font-weight:bold\n    [*] --> Still:::movement\n    Still --> Moving\n    Moving --> Crash\n    class Crash badBadEvent\n    style Moving stroke:#333,stroke-width:3px\n    Crash --> [*]\n"
+---
+                    Styled
+
+     .-------.    .--------.    .-------.
+*--->| Still +--->| Moving +--->| Crash +--->@
+     '-------'    '--------'    '-------'

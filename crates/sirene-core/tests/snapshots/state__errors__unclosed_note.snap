@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/state.rs
+expression: "stateDiagram-v2\n    A --> B\n    note left of A\n        never closed\n"
+---
+3:19: error: unclosed note: expected `end note`
+
+┌──────────────╮  ╭───╮
+│ never closed │┄┄│ A │
+└──────────────┘  ╰─┬─╯
+                    │
+                    ▼
+                  ╭───╮
+                  │ B │
+                  ╰───╯

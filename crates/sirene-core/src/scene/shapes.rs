@@ -279,13 +279,16 @@ pub(super) fn outline(shape: Shape, b: BoxF) -> Outline {
                 .push(ellipse(b.center(), rx - 5.0, ry - 5.0).to_vec());
             ellipse(b.center(), rx, ry)
         }
+        // Round whatever room the layout gave them.
         Geo::Dot => {
             out.solid = true;
-            ellipse(b.center(), rx, ry)
+            let r = rx.min(ry);
+            ellipse(b.center(), r, r)
         }
         Geo::Stop => {
-            out.dots.push(ellipse(b.center(), rx - 4.0, ry - 4.0));
-            ellipse(b.center(), rx, ry)
+            let r = rx.min(ry);
+            out.dots.push(ellipse(b.center(), r - 4.0, r - 4.0));
+            ellipse(b.center(), r, r)
         }
         Geo::Diamond => polygon(&[(cx, y), (r, cy), (cx, bottom), (x, cy)]),
         Geo::Hexagon => {

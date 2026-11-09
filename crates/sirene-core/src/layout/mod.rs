@@ -106,6 +106,16 @@ pub struct EdgeSpec {
     pub label: Option<Size>,
 }
 
+/// A box placed beside a node, in the same rank (LANGS-3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteSpec {
+    pub node: usize,
+    pub size: Size,
+    /// On the cross axis's far side (right, or below in a horizontal container) rather than
+    /// its near side.
+    pub after: bool,
+}
+
 /// Layout input. Endpoint and parent indexes must be in range.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Graph {
@@ -113,6 +123,7 @@ pub struct Graph {
     pub nodes: Vec<NodeSpec>,
     pub clusters: Vec<ClusterSpec>,
     pub edges: Vec<EdgeSpec>,
+    pub notes: Vec<NoteSpec>,
 }
 
 /// Spacing for one orientation, in canonical terms: the cross axis runs along a rank and the
@@ -162,6 +173,8 @@ pub struct Layout {
     pub titles: Vec<Option<Rect>>,
     /// `None` for unroutable edges (LAYOUT-10).
     pub edges: Vec<Option<Route>>,
+    /// One rect per note, in input order.
+    pub notes: Vec<Rect>,
 }
 
 /// Lays out `graph`.
@@ -267,6 +280,7 @@ struct Placed {
     pieces: Vec<(usize, i32, Vec<Point>)>,
     labels: Vec<(usize, Rect)>,
     loops: Vec<(usize, Vec<Point>, Option<Rect>)>,
+    notes: Vec<(usize, Rect)>,
     title: Option<Rect>,
     /// Canonical cross offset of each border crossing from the block's anchor.
     ports: HashMap<(usize, Side), i32>,
@@ -506,6 +520,7 @@ impl<'a> Builder<'a> {
         let mut pieces: Vec<Vec<(i32, Vec<Point>)>> = vec![Vec::new(); self.graph.edges.len()];
         let mut labels = vec![None; self.graph.edges.len()];
         let mut loops = vec![None; self.graph.edges.len()];
+        let mut notes = vec![Rect::default(); self.graph.notes.len()];
         for &s in order.iter().rev() {
             let (dx, dy) = offset[s];
             let p = &placed[s];
@@ -514,6 +529,9 @@ impl<'a> Builder<'a> {
             }
             for &(n, r) in &p.nodes {
                 nodes[n] = r.translate(dx, dy);
+            }
+            for &(n, r) in &p.notes {
+                notes[n] = r.translate(dx, dy);
             }
             for &(c, r) in &p.clusters {
                 clusters[c] = r.translate(dx, dy);
@@ -562,6 +580,7 @@ impl<'a> Builder<'a> {
             clusters,
             titles,
             edges,
+            notes,
         }
     }
 }
@@ -604,8 +623,12 @@ struct Elem {
     main: i32,
     /// Extra cross-axis room on the far side, for self-loops.
     extra: i32,
-    /// Main-axis size of the tallest self-loop label.
+    /// Main-axis size of the tallest self-loop label or note.
     loop_main: i32,
+    /// Cross-axis room on the near side, for notes.
+    before: i32,
+    /// Cross-axis room on the far side beyond `extra`, for notes.
+    after: i32,
 }
 
 /// One edge's route through this scope: elements from the upper end to the lower end.
@@ -668,6 +691,8 @@ impl<'a, 'b> Placer<'a, 'b> {
             main: size.h,
             extra: 0,
             loop_main: 0,
+            before: 0,
+            after: 0,
         });
         self.elems.len() - 1
     }
@@ -757,6 +782,17 @@ impl<'a, 'b> Placer<'a, 'b> {
             let room = if label.w > 0 { 1 + label.w } else { 0 };
             el.extra = el.extra.max(self.sp.loop_size + room);
             el.loop_main = el.loop_main.max(label.h);
+        }
+        for note in self.notes() {
+            let size = swap_if(self.dir, note.size);
+            let gap = self.sp.loop_size;
+            let el = &mut self.elems[self.item_elem[&Item::Node(note.node)]];
+            if note.after {
+                el.after += gap + size.w;
+            } else {
+                el.before += gap + size.w;
+            }
+            el.loop_main = el.loop_main.max(size.h);
         }
         if let Some(c) = self.cluster_spec() {
             let title = c.title;
@@ -880,8 +916,8 @@ impl<'a, 'b> Placer<'a, 'b> {
             .map(|e| {
                 let el = self.elems[e];
                 Span {
-                    left: el.cross / 2,
-                    right: el.cross - 1 - el.cross / 2 + el.extra,
+                    left: el.cross / 2 + el.before,
+                    right: el.cross - 1 - el.cross / 2 + el.extra + el.after,
                     line: matches!(el.kind, Kind::Dummy | Kind::Proxy(_)),
                     floating: el.kind == Kind::Title
                         || matches!(el.kind, Kind::Proxy(_))
@@ -1096,11 +1132,55 @@ impl<'a, 'b> Placer<'a, 'b> {
             });
             placed.loops.push((e, points, label));
         }
+
+        // Notes, outward from their node in input order, centered on its layer.
+        let mut reach: HashMap<(usize, bool), i32> = HashMap::new();
+        for (k, note) in self.b.graph.notes.iter().enumerate() {
+            let Some(&el) = self.item_elem.get(&Item::Node(note.node)) else {
+                continue;
+            };
+            let r = rect(el);
+            let size = swap_if(self.dir, note.size);
+            let gap = self.sp.loop_size;
+            let layer = self.elems[el].layer;
+            let y = tops[layer] + (heights[layer] - size.h) / 2;
+            let edge = reach.entry((el, note.after)).or_insert(if note.after {
+                r.right() + self.elems[el].extra
+            } else {
+                r.x
+            });
+            let x = if note.after {
+                let x = *edge + gap + 1;
+                *edge = x + size.w - 1;
+                x
+            } else {
+                let x = *edge - gap - size.w;
+                *edge = x;
+                x
+            };
+            placed
+                .notes
+                .push((k, real_rect(Rect::new(x, y, size.w, size.h))));
+        }
         placed
     }
 
     fn cluster_spec(&self) -> Option<&'a ClusterSpec> {
         self.s.checked_sub(1).map(|c| &self.b.graph.clusters[c])
+    }
+
+    /// Notes on nodes of this scope.
+    fn notes(&self) -> Vec<NoteSpec> {
+        self.b
+            .graph
+            .notes
+            .iter()
+            .filter(|n| {
+                n.node < self.b.graph.nodes.len()
+                    && self.b.node_parent[n.node].map_or(0, |c| c + 1) == self.s
+            })
+            .cloned()
+            .collect()
     }
 }
 

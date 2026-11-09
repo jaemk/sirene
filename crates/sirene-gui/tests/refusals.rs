@@ -10,7 +10,10 @@ use sirene_gui::document::Document;
 use sirene_gui::drawing::Item;
 use sirene_gui::refusal;
 use sirene_gui::viewer::Viewer;
-use sirene_gui::{Group, LongerEdge, MoveEarlier, MoveLater, MoveTo, ShorterEdge, Ungroup};
+use sirene_gui::{
+    AddNode, Delete, Group, LongerEdge, MoveEarlier, MoveLater, MoveTo, Rename, ShorterEdge,
+    Ungroup,
+};
 
 fn node(id: &str) -> Item {
     Item::Node(id.to_owned())
@@ -143,6 +146,37 @@ fn refused_actions_say_why(cx: &mut TestAppContext) {
     cx.dispatch_action(LongerEdge);
     assert!(source(&viewer, cx).contains("A ---> B"));
     assert!(!status(&viewer, cx).starts_with("Can't"));
+}
+
+/// A diagram type without an edit module draws read-only; edits say why (LANGS-5).
+#[gpui::test]
+fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
+    let src = "stateDiagram-v2\n    [*] --> A\n    A --> B\n";
+    let (viewer, cx) = open_src(cx, src);
+    let why = "drawing edits are not supported for state diagrams yet";
+    viewer.read_with(cx, |v, _| {
+        assert_eq!(v.doc.read_only(), Some(why));
+        assert!(v.doc.problems.is_empty());
+        assert!(v.doc.chart.node("A").is_some());
+    });
+    // A click focuses the drawing and selects A.
+    let a = viewer
+        .update_in(cx, |v, window, _| v.item_center(&node("A"), window))
+        .expect("A is drawn");
+    cx.simulate_click(a, gpui::Modifiers::default());
+    viewer.read_with(cx, |v, _| assert_eq!(v.selection, [node("A")]));
+    cx.dispatch_action(AddNode);
+    assert_eq!(status(&viewer, cx), format!("Can't add a node: {why}"));
+    cx.dispatch_action(Rename);
+    assert_eq!(status(&viewer, cx), format!("Can't rename: {why}"));
+    viewer.read_with(cx, |v, _| assert!(v.label.is_none()));
+    cx.dispatch_action(Delete);
+    assert_eq!(status(&viewer, cx), format!("Can't delete: {why}"));
+    viewer.read_with(cx, |v, _| assert_eq!(v.selection, [node("A")]));
+    assert_eq!(source(&viewer, cx), src);
+    // Flowcharts stay editable.
+    let flow = Document::from_source(None, "flowchart\n  A\n".to_owned());
+    assert_eq!(flow.read_only(), None);
 }
 
 #[gpui::test]

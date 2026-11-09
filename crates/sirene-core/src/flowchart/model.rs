@@ -278,6 +278,27 @@ pub struct Subgraph {
     pub metadata: Metadata,
     /// Range of the whole `subgraph` ... `end` block.
     pub range: TextRange,
+    /// A concurrent region of a state (LANGS-3): untitled, unfilled, with a dashed border.
+    pub region: bool,
+}
+
+/// Which side of its target a note sits on (LANGS-3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NoteSide {
+    /// Left of the target in a vertical layout, above it in a horizontal one.
+    Before,
+    /// Right of the target in a vertical layout, below it in a horizontal one.
+    After,
+}
+
+/// A note beside a node, joined to it by a dashed line (LANGS-3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Note {
+    /// The node the note is about.
+    pub target: String,
+    pub side: NoteSide,
+    pub label: Label,
+    pub range: TextRange,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -300,6 +321,8 @@ pub struct Flowchart {
     /// In declaration order.
     pub subgraphs: Vec<Subgraph>,
     pub classes: Vec<ClassDef>,
+    /// Notes beside nodes, in source order.
+    pub notes: Vec<Note>,
     /// Styles from `linkStyle default`.
     pub default_edge_styles: Vec<Style>,
     /// Curve from `linkStyle default interpolate`.

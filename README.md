@@ -1,8 +1,9 @@
 # sirene
 
 A local WYSIWYG editor and viewer for Mermaid flowcharts, with SVG, PNG, and terminal ASCII
-output. Only flowcharts (`flowchart` and `graph`) are drawn; other Mermaid diagram types are
-reported as unsupported.
+output. Flowcharts (`flowchart` and `graph`) and state diagrams (`stateDiagram-v2`) are drawn;
+state diagrams are read-only in the editor's drawing. Other Mermaid diagram types are reported as
+unsupported.
 
 Docs: <https://jaemk.github.io/sirene/>. See `spec/README.md` for the feature status table.
 

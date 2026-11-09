@@ -54,7 +54,7 @@ pub struct LabelEdit {
 
 /// The flowchart `src` describes.
 fn chart(src: &str) -> Flowchart {
-    flowchart::parse(src).lower().flowchart
+    sirene_core::diagram::lower(src).flowchart
 }
 
 /// How far, in screen pixels, a click may miss a stroke.
@@ -154,6 +154,10 @@ impl Viewer {
 
     /// Applies a drawing change to the source pane's text (WYSIWY-13).
     pub fn apply(&mut self, edit: TextEdit, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(why) = self.doc.read_only() {
+            self.refused("edit the drawing", Some(why), cx);
+            return;
+        }
         let before = self.doc.source.clone();
         let after = edit.apply(&before);
         self.history.push((before, after));
@@ -248,6 +252,8 @@ impl Viewer {
                     self.select(vec![item.clone()], cx);
                 }
                 self.drag = match item {
+                    // A read-only drawing pans from anywhere.
+                    _ if self.doc.read_only().is_some() => Some(Drag::Pan { last: e.position }),
                     Item::Node(from) => Some(Drag::Connect {
                         from,
                         start: e.position,
@@ -344,6 +350,10 @@ impl Viewer {
         if self.label.is_some() {
             return;
         }
+        if let Some(why) = self.doc.read_only() {
+            self.refused("delete", Some(why), cx);
+            return;
+        }
         let nodes: Vec<&str> = self
             .selection
             .iter()
@@ -395,6 +405,10 @@ impl Viewer {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if let Some(why) = self.doc.read_only() {
+            self.refused("add a node", Some(why), cx);
+            return;
+        }
         let src = self.doc.source.clone();
         let (id, add) = edit::add_node(&src, NEW_NODE);
         let mut out = add.apply(&src);
@@ -804,6 +818,10 @@ impl Viewer {
 
     /// Opens the label field over `item` (WYSIWY-10).
     pub fn edit_label(&mut self, item: Item, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(why) = self.doc.read_only() {
+            self.refused("rename", Some(why), cx);
+            return;
+        }
         let chart = &self.doc.chart;
         let text = match &item {
             Item::Node(id) => chart.node(id).map(|n| n.label.text.clone()),

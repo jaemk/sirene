@@ -5,16 +5,16 @@ mod graph;
 mod lower;
 mod model;
 mod parser;
-mod scan;
+pub(crate) mod scan;
 mod shape;
-mod text;
+pub(crate) mod text;
 
 use rowan::GreenNode;
 
 pub use graph::Measure;
 pub use model::{
-    Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Metadata, Node, Shape, Span, Stroke,
-    Style, Subgraph, clean,
+    Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Metadata, Node, Note, NoteSide,
+    Shape, Span, Stroke, Style, Subgraph, clean,
 };
 
 use crate::diagnostic::Diagnostic;
