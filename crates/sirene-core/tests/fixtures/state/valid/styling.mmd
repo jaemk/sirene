@@ -1,0 +1,17 @@
+---
+title: Styled
+---
+%%{init: {"theme": "dark"}}%%
+stateDiagram-v2
+    accTitle: Movement
+    accDescr: How a thing moves
+    %% A comment
+    direction LR
+    classDef movement font-style:italic
+    classDef badBadEvent fill:#f00,color:white,font-weight:bold
+    [*] --> Still:::movement
+    Still --> Moving
+    Moving --> Crash
+    class Crash badBadEvent
+    style Moving stroke:#333,stroke-width:3px
+    Crash --> [*]

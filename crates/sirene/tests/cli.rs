@@ -894,8 +894,36 @@ fn other_diagram_types() {
         .failure()
         .stderr(
             "<stdin>:1:1: error: `sequenceDiagram` diagrams are not supported; \
-             sirene draws flowcharts\n",
+             sirene draws flowchart and state diagrams\n",
         );
+}
+
+/// A state diagram draws from stdin, a file, and a Markdown block (MSTATE-1, LANGS-4).
+#[test]
+fn state_diagrams() {
+    let src = "stateDiagram-v2\n  [*] --> Still\n  Still --> Moving : push\n  Moving --> [*]\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stderr("")
+        .stdout(predicate::str::contains("| Still |").and(predicate::str::contains("push")));
+    sirene()
+        .arg("check")
+        .arg("-")
+        .write_stdin("stateDiagram-v2\n  click a \"x\"\n")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "<stdin>:2:3: warning: `click` is not supported in state diagrams",
+        ));
+    let tmp = tempfile::tempdir().unwrap();
+    let md = tmp.path().join("doc.md");
+    std::fs::write(&md, format!("```mermaid\n{src}```\n")).unwrap();
+    sirene().arg("svg").arg(&md).assert().success();
+    let svg = std::fs::read_to_string(tmp.path().join("doc-1.svg")).unwrap();
+    assert!(svg.contains(">Still<"), "{svg}");
 }
 
 /// `update` decisions with `--to` make no network request (UPDATE-1, UPDATE-3, UPDATE-6).

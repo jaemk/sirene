@@ -69,7 +69,7 @@ pub(crate) fn build(
     let Some(viewer) = viewer.upgrade() else {
         return menu;
     };
-    let (nodes, edges, chart, src, subgraph, focus) = {
+    let (nodes, edges, chart, src, subgraph, focus, read_only) = {
         let v = viewer.read(cx);
         (
             v.selected_nodes(),
@@ -78,9 +78,22 @@ pub(crate) fn build(
             v.doc.source.clone(),
             v.menu_subgraph.clone(),
             v.drawing_focus.clone(),
+            v.doc.read_only(),
         )
     };
     let mut menu = menu.action_context(focus);
+    // A diagram type without an edit module: only what does not edit (LANGS-5).
+    if let Some(why) = read_only {
+        return menu
+            .menu_with_disabled(
+                refusal::label("Add Node", Some(why)),
+                Box::new(AddNode),
+                true,
+            )
+            .separator()
+            .menu("Select All", Box::new(SelectAll))
+            .menu("Fit Window", Box::new(FitWindow));
+    }
     if nodes.is_empty() && edges.is_empty() {
         menu = menu.menu("Add Node", Box::new(AddNode)).separator();
         // On a subgraph: its direction, and Ungroup (WYSIWY-16).

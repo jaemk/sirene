@@ -4,7 +4,8 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use sirene_core::Severity;
-use sirene_core::flowchart::{self, Flowchart};
+use sirene_core::diagram::{self, Kind};
+use sirene_core::flowchart::Flowchart;
 use sirene_core::markdown::{Block, is_markdown, mermaid_blocks};
 
 /// The text of a new document (WYSIWY-7).
@@ -113,6 +114,14 @@ impl Document {
             read_error: None,
             write_error: None,
             disk_changed: false,
+        }
+    }
+
+    /// Why drawing edits are off for this diagram's type, when they are (LANGS-5).
+    pub fn read_only(&self) -> Option<&'static str> {
+        match Kind::of(&self.source) {
+            Kind::Flowchart => None,
+            Kind::State => Some("drawing edits are not supported for state diagrams yet"),
         }
     }
 
@@ -376,7 +385,7 @@ impl Document {
 }
 
 fn parse(source: &str) -> (Flowchart, Vec<Problem>) {
-    let lowered = flowchart::parse(source).lower();
+    let lowered = diagram::lower(source);
     let problems = lowered
         .diagnostics
         .iter()

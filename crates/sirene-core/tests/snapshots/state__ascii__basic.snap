@@ -1,0 +1,34 @@
+---
+source: crates/sirene-core/tests/state.rs
+expression: "stateDiagram-v2\n    [*] --> Still\n    Still --> [*]\n    Still --> Moving : push\n    Moving --> Still\n    Moving --> Crash\n    Crash --> [*]\n"
+---
+       *
+       |
+       v
+   .-------.
+   | Still |
+   '-+-+---'
+     | | ^
++----+++ +-+
+|     |    |
+|   push   |
+|     |    |
+|     ++   |
+|      v   |
+|   .------+-.
+|   | Moving |
+|   '----+---'
+|        |
+|        |
+|       ++
+|       v
+|   .-------.
+|   | Crash |
+|   '---+---'
+|       |
+|     +-+
+|     |
+|     |
++-++--+
+  vv
+   @

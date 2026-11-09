@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/state.rs
+expression: "stateDiagram-v2\n    State1 : The state with a note\n    note right of State1\n        Important information!\n        You can write notes.\n    end note\n    State1 --> State2\n    note left of State2 : This is the note to the left.\n"
+---
+
+                            ╭───────────────────────╮  ┌────────────────────────╮
+                            │ The state with a note │┄┄│ Important information! │
+                            ╰───────────┬───────────╯  │  You can write notes.  │
+                                        │              └────────────────────────┘
+                                        │
+                                        ▼
+┌───────────────────────────────╮  ╭────────╮
+│ This is the note to the left. │┄┄│ State2 │
+└───────────────────────────────┘  ╰────────╯

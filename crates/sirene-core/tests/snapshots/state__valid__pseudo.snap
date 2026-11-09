@@ -1,0 +1,43 @@
+---
+source: crates/sirene-core/tests/state.rs
+expression: "stateDiagram-v2\n    state fork_state <<fork>>\n    [*] --> fork_state\n    fork_state --> State2\n    fork_state --> State3\n\n    state join_state <<join>>\n    State2 --> join_state\n    State3 --> join_state\n    join_state --> State4\n\n    state if_state <<choice>>\n    State4 --> if_state\n    if_state --> False : if n < 0\n    if_state --> True : if n >= 0\n"
+---
+
+            ●
+            │
+            ▼
+          ━┬━┬━
+           │ │
+        ┌──┘ └──┐
+        │       │
+        │       │
+     ┌──┘       └──┐
+     ▼             ▼
+╭────────╮    ╭────────╮
+│ State2 │    │ State3 │
+╰────┬───╯    ╰────┬───╯
+     │             │
+     └──┐       ┌──┘
+        │       │
+        │       │
+        └──┐ ┌──┘
+           ▼ ▼
+          ━━┬━━
+            │
+            ▼
+       ╭────────╮
+       │ State4 │
+       ╰────┬───╯
+            │
+            ▼
+            ◇
+           ││
+      ┌────┘└────┐
+      │          │
+  if n < 0   if n >= 0
+      │          │
+     ┌┘          └┐
+     ▼            ▼
+ ╭───────╮    ╭──────╮
+ │ False │    │ True │
+ ╰───────╯    ╰──────╯

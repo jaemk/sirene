@@ -3,7 +3,8 @@
 use std::path::{Path, PathBuf};
 
 use sirene_core::Severity;
-use sirene_core::flowchart::{self, Lowered};
+use sirene_core::diagram;
+use sirene_core::flowchart::Lowered;
 use sirene_core::markdown::{self, Block};
 
 /// Prints `lowered`'s diagnostics as `NAME:LINE:COL: SEVERITY: MESSAGE`, with each position
@@ -32,10 +33,10 @@ pub fn report(
 
 /// A block of another Mermaid diagram type: reported as skipped. Returns whether it was one.
 fn skipped(name: &str, block: &Block) -> bool {
-    match flowchart::parse(&block.code).other_diagram() {
+    match diagram::other_diagram(&block.code) {
         Some(kind) => {
             eprintln!(
-                "{name}:{}:{}: warning: skipping a `{kind}` diagram; sirene draws flowcharts",
+                "{name}:{}:{}: warning: skipping a `{kind}` diagram; sirene draws flowchart and state diagrams",
                 block.line,
                 block.indent + 1
             );
@@ -84,7 +85,7 @@ pub fn check(path: &Path) -> bool {
             if skipped(&name, block) {
                 continue;
             }
-            let lowered = flowchart::parse(&block.code).lower();
+            let lowered = diagram::lower(&block.code);
             ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
         }
         return ok;
@@ -96,7 +97,7 @@ pub fn check(path: &Path) -> bool {
 fn check_source(path: Option<&Path>) -> bool {
     match crate::read(path.map(Path::to_path_buf)) {
         Ok((name, src)) => {
-            let lowered = flowchart::parse(&src).lower();
+            let lowered = diagram::lower(&src);
             !report(&name, &src, &lowered, |l, c| (l, c))
         }
         Err(message) => {
@@ -204,7 +205,7 @@ pub fn render(
             links.push((block, None));
             continue;
         }
-        let lowered = flowchart::parse(&block.code).lower();
+        let lowered = diagram::lower(&block.code);
         ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
         let image = image_path(md, out, n, ext);
         let written = render(&lowered).and_then(|bytes| {

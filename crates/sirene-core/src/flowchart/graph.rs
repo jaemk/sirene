@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 
-use super::model::{Flowchart, Label, Node, Subgraph};
-use crate::layout::{ClusterSpec, EdgeSpec, Graph, Item, NodeSpec, Size};
+use super::model::{Direction, Flowchart, Label, Node, Note, NoteSide, Shape, Subgraph};
+use crate::layout::{ClusterSpec, EdgeSpec, Graph, Item, NodeSpec, NoteSpec, Size};
 
 /// Sizes of flowchart elements in layout cells.
 pub trait Measure {
@@ -12,11 +12,22 @@ pub trait Measure {
     fn edge_label(&self, label: &Label) -> Option<Size>;
     /// The size of a subgraph's title, starting on its top border; empty for no title.
     fn subgraph_title(&self, subgraph: &Subgraph) -> Size;
+    /// The size of a note's box.
+    fn note(&self, label: &Label) -> Size;
 }
 
 impl Flowchart {
+    /// Each note whose target is a node, with that node's index, in the order of the layout
+    /// graph's notes.
+    pub fn placed_notes(&self) -> impl Iterator<Item = (usize, &Note)> {
+        self.notes.iter().filter_map(|n| {
+            let i = self.nodes.iter().position(|node| node.id == n.target)?;
+            Some((i, n))
+        })
+    }
+
     /// The layout graph of this chart: node `i` is `nodes[i]`, cluster `i` is `subgraphs[i]`,
-    /// and edge `i` is `edges[i]`.
+    /// edge `i` is `edges[i]`, and note `i` is the `i`th note whose target is a node.
     ///
     /// # Panics
     ///
@@ -45,6 +56,21 @@ impl Flowchart {
                 }
             }
         }
+        // The direction a node is laid out in: its nearest subgraph's, or the chart's.
+        let direction_of = |mut parent: Option<usize>| -> Direction {
+            let mut steps = 0;
+            while let Some(c) = parent {
+                if let Some(d) = self.subgraphs[c].direction {
+                    return d;
+                }
+                parent = cluster_parent[c];
+                steps += 1;
+                if steps > self.subgraphs.len() {
+                    break;
+                }
+            }
+            self.direction
+        };
         let item = |id: &str| -> Item {
             match clusters.get(id) {
                 Some(&c) => Item::Cluster(c),
@@ -56,16 +82,25 @@ impl Flowchart {
             nodes: self
                 .nodes
                 .iter()
-                .zip(node_parent)
-                .map(|(n, parent)| NodeSpec {
-                    size: measure.node(n),
-                    parent,
+                .zip(&node_parent)
+                .map(|(n, &parent)| {
+                    let mut size = measure.node(n);
+                    // A fork bar lies across the direction of flow.
+                    if n.shape == Shape::Fork
+                        && matches!(
+                            direction_of(parent),
+                            Direction::LeftRight | Direction::RightLeft
+                        )
+                    {
+                        size = Size::new(size.h, size.w);
+                    }
+                    NodeSpec { size, parent }
                 })
                 .collect(),
             clusters: self
                 .subgraphs
                 .iter()
-                .zip(cluster_parent)
+                .zip(cluster_parent.iter().copied())
                 .map(|(s, parent)| ClusterSpec {
                     parent,
                     direction: s.direction,
@@ -80,6 +115,14 @@ impl Flowchart {
                     to: item(&e.to),
                     min_len: u32::from(e.length),
                     label: e.label.as_ref().and_then(|l| measure.edge_label(l)),
+                })
+                .collect(),
+            notes: self
+                .placed_notes()
+                .map(|(node, n)| NoteSpec {
+                    node,
+                    size: measure.note(&n.label),
+                    after: n.side == NoteSide::After,
                 })
                 .collect(),
         }

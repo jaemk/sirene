@@ -6,7 +6,8 @@ use std::time::{Duration, Instant, SystemTime};
 
 use clap::{Parser, Subcommand, ValueEnum};
 use sirene_core::ascii::{self, Charset, Options};
-use sirene_core::flowchart::{self, Lowered};
+use sirene_core::diagram;
+use sirene_core::flowchart::Lowered;
 use sirene_core::scene::png::{self, FontMetrics};
 use sirene_core::scene::{self, Approx, Theme};
 
@@ -635,7 +636,7 @@ fn render_one(
     };
     log::debug!("read {name}: {} bytes", src.len());
     let start = Instant::now();
-    let lowered = flowchart::parse(&src).lower();
+    let lowered = diagram::lower(&src);
     log::debug!("parsed and lowered in {:.1?}", start.elapsed());
     let errors = markdown::report(&name, &src, &lowered, |l, c| (l, c));
     let start = Instant::now();

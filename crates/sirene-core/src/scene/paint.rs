@@ -170,6 +170,10 @@ impl<M: TextMetrics> Px<'_, M> {
 
 impl<M: TextMetrics> Measure for Px<'_, M> {
     fn node(&self, node: &Node) -> Size {
+        // An unlabeled diamond, such as a state diagram's choice, is a small square one.
+        if node.shape == Shape::Diamond && node.label.text.is_empty() {
+            return Size::new(cells(28.0), cells(28.0));
+        }
         let (tw, th) = if shapes::has_label(node.shape) {
             self.text_size(&self.label_lines(&node.label, Some(node.shape)))
         } else {
@@ -192,7 +196,18 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
         let tw = self.metrics.width(&t, self.theme.font_size);
         Size::new(cells(tw + 12.0), cells(self.theme.line_height + 6.0))
     }
+
+    fn note(&self, label: &Label) -> Size {
+        let (tw, th) = self.text_size(&self.label_lines(label, None));
+        Size::new(
+            cells(tw + 2.0 * shapes::PAD_X + FOLD),
+            cells(th + 2.0 * shapes::PAD_Y),
+        )
+    }
 }
+
+/// The size of a note's folded corner.
+const FOLD: f32 = 8.0;
 
 fn subgraph_title(s: &Subgraph) -> String {
     s.title.lines().join(" ").trim().to_owned()
@@ -253,11 +268,16 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
         let classes: Vec<&str> = s.classes.iter().map(String::as_str).collect();
         let r = style::resolve(&[], &classes, &s.styles, &chart.classes);
         let b = at(layout.clusters[i]);
+        let (fill, dash) = if s.region {
+            (r.fill, Some((5.0, 4.0)))
+        } else {
+            (Some(r.fill.unwrap_or(theme.cluster_fill)), None)
+        };
         p.path(
             Owner::Cluster(i),
             rect(b),
-            Some(r.fill.unwrap_or(theme.cluster_fill)),
-            Some(stroke(&r, theme.cluster_stroke, 1.0, None)),
+            fill,
+            Some(stroke(&r, theme.cluster_stroke, 1.0, dash)),
         );
         if let Some(t) = layout.titles[i] {
             p.lines(
@@ -329,6 +349,68 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
         let s = style::resolve(&[], &classes, &n.styles, &chart.classes);
         let lines = px.label_lines(&n.label, Some(n.shape));
         p.node(i, n, &lines, &s, at(r), o);
+    }
+
+    for (note, &r) in chart.placed_notes().zip(&layout.notes) {
+        let (target, note) = note;
+        let (b, nb) = (at(r), at(layout.nodes[target]));
+        let owner = Owner::Node(target);
+        // A dashed line from the node's side to the note's, through the node's center.
+        let c = nb.center();
+        let (a, z) = if b.x > nb.right() {
+            (Pt::new(nb.right(), c.y), Pt::new(b.x, c.y))
+        } else if b.right() < nb.x {
+            (Pt::new(nb.x, c.y), Pt::new(b.right(), c.y))
+        } else if b.y > nb.bottom() {
+            (Pt::new(c.x, nb.bottom()), Pt::new(c.x, b.y))
+        } else {
+            (Pt::new(c.x, nb.y), Pt::new(c.x, b.bottom()))
+        };
+        p.path(
+            owner,
+            vec![Segment::Move(a), Segment::Line(z)],
+            None,
+            Some(Stroke {
+                width: 1.0,
+                color: theme.edge,
+                dash: Some((3.0, 3.0)),
+            }),
+        );
+        let (right, bottom) = (b.right(), b.bottom());
+        let line = Stroke {
+            width: 1.0,
+            color: theme.cluster_stroke,
+            dash: None,
+        };
+        p.path(
+            owner,
+            shapes::polygon(&[
+                (b.x, b.y),
+                (right - FOLD, b.y),
+                (right, b.y + FOLD),
+                (right, bottom),
+                (b.x, bottom),
+            ]),
+            Some(theme.cluster_fill),
+            Some(line),
+        );
+        p.path(
+            owner,
+            vec![
+                Segment::Move(Pt::new(right - FOLD, b.y)),
+                Segment::Line(Pt::new(right - FOLD, b.y + FOLD)),
+                Segment::Line(Pt::new(right, b.y + FOLD)),
+            ],
+            None,
+            Some(line),
+        );
+        let text = BoxF { w: b.w - FOLD, ..b };
+        p.lines(
+            owner,
+            &px.label_lines(&note.label, None),
+            text.center(),
+            theme.text,
+        );
     }
 
     for (i, (e, route)) in chart.edges.iter().zip(&layout.edges).enumerate() {

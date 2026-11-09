@@ -344,14 +344,29 @@ fn edge_paths_outside_the_layout_contract() {
     let line = [Point::new(0, 0), Point::new(5, 0)];
     let mut canvas = Canvas::new(6, 1);
     // Entirely inside the source, entirely inside the target, or source and target overlapping.
-    draw_edge(&mut canvas, e, &line, Rect::new(0, 0, 6, 1), far, None);
-    draw_edge(&mut canvas, e, &line, far, Rect::new(0, 0, 6, 1), None);
+    let (box_, far) = (|r| (r, false), (far, false));
     draw_edge(
         &mut canvas,
         e,
         &line,
-        Rect::new(0, 0, 4, 1),
-        Rect::new(2, 0, 4, 1),
+        box_(Rect::new(0, 0, 6, 1)),
+        far,
+        None,
+    );
+    draw_edge(
+        &mut canvas,
+        e,
+        &line,
+        far,
+        box_(Rect::new(0, 0, 6, 1)),
+        None,
+    );
+    draw_edge(
+        &mut canvas,
+        e,
+        &line,
+        box_(Rect::new(0, 0, 4, 1)),
+        box_(Rect::new(2, 0, 4, 1)),
         None,
     );
     assert_eq!(canvas.render(Charset::Unicode), "\n");

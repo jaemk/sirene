@@ -1,0 +1,30 @@
+---
+source: crates/sirene-core/tests/state.rs
+expression: "stateDiagram-v2\n    A --> : missing target\n    }\n    direction up\n    state \"unclosed as B\n    state \"named\" B\n    note above A : nope\n    A --> B extra\n    state Open {\n        C --> D\n"
+---
+2:11: error: expected a state after `-->`
+3:5: error: unexpected `}`
+4:15: error: expected `TB`, `BT`, `LR`, or `RL`
+5:11: error: unclosed string: expected `"`
+6:19: error: expected `as`
+7:10: error: expected `left of` or `right of`
+8:13: error: expected the end of the line
+11:1: error: unclosed composite state: expected `}`
+
+        ┌─ Open ─┐
+        │        │
+        │  ╭───╮ │
+        │  │ C │ │
+╭───╮   │  ╰─┬─╯ │
+│ A │   │    │   │
+╰─┬─╯   │    ▼   │
+  │     │  ╭───╮ │
+  │     │  │ D │ │
+  │     │  ╰───╯ │
+  │     │        │
+  │     └────────┘
+  │
+  ▼
+╭───╮
+│ B │
+╰───╯

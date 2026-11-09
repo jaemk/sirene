@@ -11,6 +11,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `sirene update` replaces the running binary with the latest release (`--check`, `--to
   VERSION`, `--yes`), checked against `SHA256SUMS` and its build provenance; it refuses for a
   Homebrew or `cargo install` binary and names the command to use instead.
+- Mermaid state diagrams (`stateDiagram`, `stateDiagram-v2`) in every command and in the
+  editor, where the drawing is read-only: states, transitions, `[*]`, composite states,
+  concurrent regions, fork, join, and choice, notes, `direction`, and styling.
+
+### Changed
+
+- In ASCII, start and stop circles (`sm-circ`, `f-circ`, `fr-circ`) are one character, a `fork`
+  is a heavy bar, and an unlabeled diamond is `◇`.
 
 ### Fixed
 

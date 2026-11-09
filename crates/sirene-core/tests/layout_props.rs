@@ -109,6 +109,7 @@ fn graph() -> impl Strategy<Value = Graph> {
                 nodes,
                 clusters,
                 edges,
+                notes: Vec::new(),
             }
         })
     })

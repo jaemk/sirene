@@ -1,0 +1,17 @@
+stateDiagram-v2
+    state Split {
+        a --> b
+        --
+        c --> d
+    }
+    b --> c
+    a --> d
+    state h <<history>>
+    note "floating" as N1
+    click a "https://example.com"
+    --
+    state Split2 {
+        x
+    }
+    note right of Split2 : on a composite
+    class nowhere bad

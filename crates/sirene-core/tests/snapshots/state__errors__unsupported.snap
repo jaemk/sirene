@@ -1,0 +1,29 @@
+---
+source: crates/sirene-core/tests/state.rs
+expression: "stateDiagram-v2\n    state Split {\n        a --> b\n        --\n        c --> d\n    }\n    b --> c\n    a --> d\n    state h <<history>>\n    note \"floating\" as N1\n    click a \"https://example.com\"\n    --\n    state Split2 {\n        x\n    }\n    note right of Split2 : on a composite\n    class nowhere bad\n"
+---
+7:5: warning: transitions between concurrent regions are not supported; ignoring `b --> c`
+8:5: warning: transitions between concurrent regions are not supported; ignoring `a --> d`
+9:5: warning: `<<history>>` states are not supported; drawing a plain state
+10:5: warning: floating notes are not supported; ignoring it
+11:5: warning: `click` is not supported in state diagrams; ignoring it
+12:5: warning: `--` separates regions only inside a composite state
+16:5: warning: notes on composite states are not supported; ignoring the note on `Split2`
+17:11: warning: unknown state `nowhere`
+
+        ┌──────── Split ────────┐
+        │                       │
+        │ ┌┄┄┄┄┄┄┄┐   ┌┄┄┄┄┄┄┄┐ │
+        │ ┆       ┆   ┆       ┆ │
+        │ ┆ ╭───╮ ┆   ┆ ╭───╮ ┆ │   ┌─ Split2 ─┐
+        │ ┆ │ a │ ┆   ┆ │ c │ ┆ │   │          │
+╭───╮   │ ┆ ╰─┬─╯ ┆   ┆ ╰─┬─╯ ┆ │   │   ╭───╮  │
+│ h │   │ ┆   │   ┆   ┆   │   ┆ │   │   │ x │  │
+╰───╯   │ ┆   ▼   ┆   ┆   ▼   ┆ │   │   ╰───╯  │
+        │ ┆ ╭───╮ ┆   ┆ ╭───╮ ┆ │   │          │
+        │ ┆ │ b │ ┆   ┆ │ d │ ┆ │   └──────────┘
+        │ ┆ ╰───╯ ┆   ┆ ╰───╯ ┆ │
+        │ ┆       ┆   ┆       ┆ │
+        │ └┄┄┄┄┄┄┄┘   └┄┄┄┄┄┄┄┘ │
+        │                       │
+        └───────────────────────┘

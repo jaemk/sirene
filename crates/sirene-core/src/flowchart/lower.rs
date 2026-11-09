@@ -434,6 +434,7 @@ impl Lowerer {
                 styles: Vec::new(),
                 metadata: Vec::new(),
                 range: syntax.text_range(),
+                region: false,
             }),
         }
         id

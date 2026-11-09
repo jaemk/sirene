@@ -41,6 +41,10 @@ syntax_kinds! {
     INTERPOLATE_KW,
     ACC_TITLE_KW,
     ACC_DESCR_KW,
+    STATE_KW,
+    AS_KW,
+    NOTE_KW,
+    OF_KW,
 
     // Other tokens.
     DIR,
@@ -70,6 +74,12 @@ syntax_kinds! {
     R_BRACE,
     ACC_TEXT,
     LINK_TARGET,
+    // State diagrams: `left` or `right` in a note, `[*]`, `<<fork>>`, and `--` between
+    // concurrent regions.
+    SIDE,
+    STAR,
+    STEREOTYPE,
+    REGION_SEP,
     ERROR_TOKEN,
 
     // Nodes.
@@ -96,6 +106,13 @@ syntax_kinds! {
     ACC_TITLE_STMT,
     ACC_DESCR_STMT,
     ID_LIST,
+    STATE_REF,
+    STATE_STMT,
+    TRANSITION_STMT,
+    DESCRIPTION_STMT,
+    COMPOSITE,
+    NOTE_STMT,
+    REGION_STMT,
     ERROR,
 }
 

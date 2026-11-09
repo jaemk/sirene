@@ -2,10 +2,12 @@
 
 pub mod ascii;
 pub mod diagnostic;
+pub mod diagram;
 pub mod flowchart;
 pub mod layout;
 pub mod markdown;
 pub mod scene;
+pub mod state;
 pub mod syntax;
 
 pub use diagnostic::{Diagnostic, Severity};

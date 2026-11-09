@@ -50,6 +50,17 @@ ASCII, and hit-tests as its node or edge:
   the target;
 - region separators: a cluster split into concurrent regions by dashed lines.
 
+Done so far: notes (`Flowchart::notes`, laid out beside their node in its rank by
+`layout::NoteSpec`), regions (`Subgraph::region`: untitled sub-clusters with dashed borders), and
+the state shapes, which reuse the flowchart shapes `sm-circ`, `fr-circ`, `fork`, and an unlabeled
+`diam`. A fork bar turns across a horizontal flow, and in ASCII the round ones and an unlabeled
+diamond are one character. Compartments, end markers, and end labels come with class and ER
+diagrams.
+
+Within Mermaid, `diagram::Kind::of` reads the header keyword after frontmatter, comments, and
+directives, and `diagram::lower` sends the source to its parser; the CLI and the editor go through
+it. Languages other than Mermaid, and `--lang`, come with DOT.
+
 ## LANGS-4 Commands
 
 `check`, `ascii`, `svg`, `png`, `--watch`, directories, and Markdown files work for every
@@ -63,6 +74,11 @@ export, and copy. Drawing edits (WYSIWY) need a per-language edit module that wr
 as `flowchart::edit` does; a language without one has a read-only drawing, and the edit items
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
+
+State diagrams are read-only this way: `Document::read_only` gives the reason, the drawing's menu
+holds only the disabled Add Node, Select All, and Fit Window, a press on a node pans instead of
+connecting, and every edit action says `Can't ...: drawing edits are not supported for state
+diagrams yet`. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 

@@ -1,0 +1,17 @@
+stateDiagram
+    [*] --> First
+    state First {
+        [*] --> second
+        second --> [*]
+    }
+    state "The second one" as Second {
+        direction LR
+        [*] --> a
+        a --> b
+        state Inner {
+            [*] --> deep
+        }
+        b --> Inner
+    }
+    First --> Second
+    Second --> [*]
