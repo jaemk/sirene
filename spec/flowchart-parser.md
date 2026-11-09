@@ -169,7 +169,7 @@ A document whose first statement starts with another Mermaid diagram keyword (`s
 `classDiagram`, `stateDiagram`, `erDiagram`, `gantt`, `pie`, `gitGraph`, `mindmap`, `timeline`,
 and the rest of mermaid's types, with their `-v2` and `-beta` forms) is one `ERROR` node from that
 keyword to the end, with one diagnostic on the keyword, e.g.
-`` `pie` diagrams are not supported; sirene draws flowchart and state diagrams ``. Nothing of it is
-drawn. A `stateDiagram` document never reaches this parser: `diagram::lower` sends it to the state
-parser (MSTATE-1). Tests: `other_diagram_types_are_one_error` in
+`` `pie` diagrams are not supported; sirene draws flowchart, state, and class diagrams `` (the list
+is `diagram::DRAWN`). Nothing of it is drawn. A type sirene draws never reaches this parser:
+`diagram::lower` sends it to its own (MSTATE-1, MCLASS-1). Tests: `other_diagram_types_are_one_error` in
 `crates/sirene-core/tests/flowchart_model.rs`.

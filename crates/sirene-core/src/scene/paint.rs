@@ -6,7 +6,7 @@ use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
 };
 use crate::flowchart::{
-    Arrow, Edge, Flowchart, Label, Measure, Node, Shape, Span, Stroke as Line, Subgraph,
+    Arrow, Edge, Flowchart, Label, Measure, Node, Row, Shape, Span, Stroke as Line, Subgraph,
 };
 use crate::layout::{self, Config, Rect, Size, Spacing};
 
@@ -170,6 +170,10 @@ impl<M: TextMetrics> Px<'_, M> {
 
 impl<M: TextMetrics> Measure for Px<'_, M> {
     fn node(&self, node: &Node) -> Size {
+        if !node.sections.is_empty() {
+            let c = Compartments::of(node, self.metrics, self.theme);
+            return Size::new(cells(c.width), cells(c.height));
+        }
         // An unlabeled diamond, such as a state diagram's choice, is a small square one.
         if node.shape == Shape::Diamond && node.label.text.is_empty() {
             return Size::new(cells(28.0), cells(28.0));
@@ -208,6 +212,70 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
 
 /// The size of a note's folded corner.
 const FOLD: f32 = 8.0;
+/// Space between the columns of a compartment's rows.
+const COLUMN_GAP: f32 = 12.0;
+/// Space above and below the rows of a compartment.
+const SECTION_PAD: f32 = 6.0;
+
+fn row_style(r: &Row) -> TextStyle {
+    TextStyle {
+        bold: false,
+        italic: r.italic,
+    }
+}
+
+/// The measured parts of a compartment node (LANGS-3).
+struct Compartments {
+    width: f32,
+    height: f32,
+    /// Height of the title area.
+    title: f32,
+    /// Column widths of each section.
+    columns: Vec<Vec<f32>>,
+}
+
+impl Compartments {
+    fn of(node: &Node, metrics: &(impl TextMetrics + ?Sized), theme: &Theme) -> Self {
+        let size = theme.font_size;
+        let title_w = node
+            .label
+            .spans()
+            .iter()
+            .map(|l| {
+                l.iter()
+                    .map(|s| metrics.styled_width(&s.text, size, style_of(s)))
+                    .sum::<f32>()
+            })
+            .fold(0.0, f32::max);
+        let title = node.label.spans().len() as f32 * theme.line_height + 2.0 * shapes::PAD_Y;
+        let mut width = title_w;
+        let mut height = title;
+        let mut columns = Vec::new();
+        for section in &node.sections {
+            let mut cols: Vec<f32> = Vec::new();
+            for row in section {
+                for (k, cell) in row.cells.iter().enumerate() {
+                    let w = metrics.styled_width(cell, size, row_style(row));
+                    match cols.get_mut(k) {
+                        Some(c) => *c = c.max(w),
+                        None => cols.push(w),
+                    }
+                }
+            }
+            let used = cols.iter().filter(|&&w| w > 0.0).count();
+            let w = cols.iter().sum::<f32>() + COLUMN_GAP * used.saturating_sub(1) as f32;
+            width = width.max(w);
+            height += section.len() as f32 * theme.line_height + 2.0 * SECTION_PAD;
+            columns.push(cols);
+        }
+        Compartments {
+            width: width + 2.0 * shapes::PAD_X,
+            height,
+            title,
+            columns,
+        }
+    }
+}
 
 fn subgraph_title(s: &Subgraph) -> String {
     s.title.lines().join(" ").trim().to_owned()
@@ -601,9 +669,82 @@ impl Painter<'_> {
         for d in o.dots {
             self.path(owner, d, ink, None);
         }
-        if shapes::has_label(node.shape) {
+        if !node.sections.is_empty() {
+            self.compartments(owner, node, lines, s, b);
+        } else if shapes::has_label(node.shape) {
             let center = shapes::text_box(node.shape, b).center();
             self.lines(owner, lines, center, text_color(s, theme));
+        }
+    }
+
+    /// The title, rules, and rows of a compartment node (LANGS-3).
+    fn compartments(
+        &mut self,
+        owner: Owner,
+        node: &Node,
+        title: &[Vec<Span>],
+        s: &Resolved,
+        b: BoxF,
+    ) {
+        let theme = self.theme;
+        let c = Compartments::of(node, self.metrics, theme);
+        let color = text_color(s, theme);
+        let rule = stroke(s, theme.node_stroke, 1.0, None);
+        let center = Pt::new(b.x + b.w / 2.0, b.y + c.title / 2.0);
+        self.lines(owner, title, center, color);
+        let (lh, size) = (theme.line_height, theme.font_size);
+        let mut y = b.y + c.title;
+        for (section, cols) in node.sections.iter().zip(&c.columns) {
+            self.path(
+                owner,
+                vec![
+                    Segment::Move(Pt::new(b.x, y)),
+                    Segment::Line(Pt::new(b.right(), y)),
+                ],
+                None,
+                Some(rule),
+            );
+            y += SECTION_PAD;
+            for row in section {
+                let style = row_style(row);
+                let mid = y + lh / 2.0;
+                let mut x = b.x + shapes::PAD_X;
+                for (k, cell) in row.cells.iter().enumerate() {
+                    let w = self.metrics.styled_width(cell, size, style);
+                    if !cell.is_empty() {
+                        self.text(
+                            owner,
+                            cell.clone(),
+                            Pt::new(x + w / 2.0, mid),
+                            size,
+                            color,
+                            style,
+                        );
+                        if row.underline {
+                            let under = mid + size * 0.55;
+                            self.path(
+                                owner,
+                                vec![
+                                    Segment::Move(Pt::new(x, under)),
+                                    Segment::Line(Pt::new(x + w, under)),
+                                ],
+                                None,
+                                Some(Stroke {
+                                    width: 1.0,
+                                    color,
+                                    dash: None,
+                                }),
+                            );
+                        }
+                    }
+                    let col = cols.get(k).copied().unwrap_or(w);
+                    if col > 0.0 {
+                        x += col + COLUMN_GAP;
+                    }
+                }
+                y += lh;
+            }
+            y += SECTION_PAD;
         }
     }
 
@@ -639,22 +780,90 @@ impl Painter<'_> {
         let n = points.len();
         let owner = Owner::Edge(i);
         let solid = Stroke { dash: None, ..line };
+        // Labels beside each end, before the markers move the line's ends (LANGS-3).
+        let ends = [
+            (e.start_label.as_ref(), points[0], points[1]),
+            (e.end_label.as_ref(), points[n - 1], points[n - 2]),
+        ];
+        // The markers of class and ER diagrams go over the line.
+        let mut late = Vec::new();
         for (at_end, arrow) in [(false, e.start), (true, e.end)] {
             if let Some(a) = arrow {
                 let (end, prev) = if at_end { (n - 1, n - 2) } else { (0, 1) };
                 let (marks, inner) = cap(a, points[prev], points[end], line.width);
-                for (segments, filled) in marks {
-                    if filled {
-                        self.path(owner, segments, Some(line.color), None);
-                    } else {
-                        self.path(owner, segments, None, Some(solid));
+                if matches!(a, Arrow::Point | Arrow::Cross | Arrow::Circle) {
+                    for m in marks {
+                        self.mark(owner, m, line.color, solid);
                     }
+                } else {
+                    late.extend(marks);
                 }
                 points[end] = inner;
             }
         }
         self.path(owner, rounded_polyline(&points, CORNER), None, Some(line));
+        for m in late {
+            self.mark(owner, m, line.color, solid);
+        }
+        for (label, tip, toward) in ends {
+            if let Some(l) = label {
+                let d = unit(tip, toward);
+                // Back from the end, past any marker, and off to one side of the line.
+                let at = Pt::new(
+                    tip.x + d.x * 22.0 - d.y * 12.0,
+                    tip.y + d.y * 22.0 + d.x * 12.0,
+                );
+                let spans = l.spans();
+                let w = spans
+                    .iter()
+                    .map(|line| {
+                        line.iter()
+                            .map(|s| {
+                                self.metrics.styled_width(
+                                    &s.text,
+                                    self.theme.font_size,
+                                    style_of(s),
+                                )
+                            })
+                            .sum::<f32>()
+                    })
+                    .fold(0.0, f32::max);
+                // Clear of the line on the side it leans to.
+                let shift = if d.y.abs() > d.x.abs() {
+                    Pt::new(-d.y.signum() * w / 2.0, 0.0)
+                } else {
+                    Pt::new(0.0, d.x.signum() * self.theme.line_height / 2.0)
+                };
+                let center = Pt::new(at.x + shift.x, at.y + shift.y);
+                self.lines(owner, &spans, center, self.theme.text);
+            }
+        }
     }
+
+    fn mark(
+        &mut self,
+        owner: Owner,
+        (segments, mark): (Vec<Segment>, Mark),
+        ink: Color,
+        line: Stroke,
+    ) {
+        match mark {
+            Mark::Fill => self.path(owner, segments, Some(ink), None),
+            Mark::Stroke => self.path(owner, segments, None, Some(line)),
+            Mark::Hollow => self.path(owner, segments, Some(self.theme.background), Some(line)),
+        }
+    }
+}
+
+/// How a marker's path is painted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mark {
+    /// Filled with the line's color.
+    Fill,
+    /// Stroked like the line, solid.
+    Stroke,
+    /// Filled with the background and stroked, hiding the line under it.
+    Hollow,
 }
 
 /// Removes a jog shorter than `NUDGE` between parallel runs at either end of a route, by moving
@@ -745,8 +954,18 @@ fn cap_len(arrow: Arrow, scale: f32) -> f32 {
         Arrow::Point => ARROW * scale,
         Arrow::Circle => 8.0 * scale,
         Arrow::Cross => 7.0 * scale + 1.0,
+        Arrow::Triangle => TRIANGLE * scale,
+        Arrow::Diamond | Arrow::HollowDiamond => DIAMOND * scale,
+        Arrow::ZeroOne | Arrow::One | Arrow::ZeroMany | Arrow::OneMany => CROW * scale,
     }
 }
+
+/// Length of a hollow triangle.
+const TRIANGLE: f32 = 13.0;
+/// Length of a diamond.
+const DIAMOND: f32 = 16.0;
+/// How far back from the end a crow's-foot marker reaches.
+const CROW: f32 = 22.0;
 
 /// The longest jog `straighten` removes.
 const NUDGE: f32 = 2.0;
@@ -763,31 +982,94 @@ fn unit(a: Pt, b: Pt) -> Pt {
     Pt::new(dx / len, dy / len)
 }
 
-/// The marks of an arrowhead at `tip`, pointing away from `prev`, as `(path, filled)`, and the
-/// point where the line should stop.
-fn cap(arrow: Arrow, prev: Pt, tip: Pt, width: f32) -> (Vec<(Vec<Segment>, bool)>, Pt) {
+/// The marks of an arrowhead at `tip`, pointing away from `prev`, and the point where the line
+/// should stop.
+fn cap(arrow: Arrow, prev: Pt, tip: Pt, width: f32) -> (Vec<(Vec<Segment>, Mark)>, Pt) {
     let d = unit(prev, tip);
     let n = Pt::new(-d.y, d.x);
     let scale = arrow_scale(width);
     let along =
         |k: f32, side: f32| Pt::new(tip.x - d.x * k + n.x * side, tip.y - d.y * k + n.y * side);
+    let poly = |pts: &[Pt]| shapes::polygon(&pts.iter().map(|p| (p.x, p.y)).collect::<Vec<_>>());
+    let bar = |k: f32| -> Vec<Segment> {
+        vec![
+            Segment::Move(along(k, 6.0 * scale)),
+            Segment::Line(along(k, -6.0 * scale)),
+        ]
+    };
+    let ring = |k: f32| {
+        let r = 4.0 * scale;
+        (shapes::ellipse(along(k, 0.0), r, r), Mark::Hollow)
+    };
+    // Three lines from a point on the line out to the end, spread across it.
+    let foot = || -> Vec<(Vec<Segment>, Mark)> {
+        let root = along(11.0 * scale, 0.0);
+        [-7.0, 0.0, 7.0]
+            .into_iter()
+            .map(|side| {
+                (
+                    vec![Segment::Move(root), Segment::Line(along(0.0, side * scale))],
+                    Mark::Stroke,
+                )
+            })
+            .collect()
+    };
     match arrow {
         Arrow::Point => {
             let len = ARROW * scale;
             let half = len / 2.0;
-            let head = shapes::polygon(&[
-                (tip.x, tip.y),
-                (along(len, half).x, along(len, half).y),
-                (along(len, -half).x, along(len, -half).y),
-            ]);
-            (vec![(head, true)], along(len - 1.0, 0.0))
+            let head = poly(&[tip, along(len, half), along(len, -half)]);
+            (vec![(head, Mark::Fill)], along(len - 1.0, 0.0))
         }
         Arrow::Circle => {
             let r = 4.0 * scale;
             (
-                vec![(shapes::ellipse(along(r, 0.0), r, r), true)],
+                vec![(shapes::ellipse(along(r, 0.0), r, r), Mark::Fill)],
                 along(r, 0.0),
             )
+        }
+        Arrow::Triangle => {
+            let len = TRIANGLE * scale;
+            let half = len * 0.55;
+            let head = poly(&[tip, along(len, half), along(len, -half)]);
+            (vec![(head, Mark::Hollow)], along(len, 0.0))
+        }
+        Arrow::Diamond | Arrow::HollowDiamond => {
+            let len = DIAMOND * scale;
+            let half = len * 0.35;
+            let head = poly(&[
+                tip,
+                along(len / 2.0, half),
+                along(len, 0.0),
+                along(len / 2.0, -half),
+            ]);
+            let mark = if arrow == Arrow::Diamond {
+                Mark::Fill
+            } else {
+                Mark::Hollow
+            };
+            (vec![(head, mark)], along(len, 0.0))
+        }
+        Arrow::One => (
+            vec![
+                (bar(6.0 * scale), Mark::Stroke),
+                (bar(11.0 * scale), Mark::Stroke),
+            ],
+            tip,
+        ),
+        Arrow::ZeroOne => (
+            vec![(bar(6.0 * scale), Mark::Stroke), ring(16.0 * scale)],
+            tip,
+        ),
+        Arrow::OneMany => {
+            let mut marks = foot();
+            marks.push((bar(15.0 * scale), Mark::Stroke));
+            (marks, tip)
+        }
+        Arrow::ZeroMany => {
+            let mut marks = foot();
+            marks.push(ring(17.0 * scale));
+            (marks, tip)
         }
         Arrow::Cross => {
             let r = 3.5 * scale;
@@ -804,7 +1086,10 @@ fn cap(arrow: Arrow, prev: Pt, tip: Pt, width: f32) -> (Vec<(Vec<Segment>, bool)
                     )),
                 ]
             };
-            (vec![(arm(1.0), false), (arm(-1.0), false)], tip)
+            (
+                vec![(arm(1.0), Mark::Stroke), (arm(-1.0), Mark::Stroke)],
+                tip,
+            )
         }
     }
 }

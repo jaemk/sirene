@@ -1,0 +1,23 @@
+---
+title: Shapes
+---
+classDiagram
+    direction LR
+    accTitle: Shapes
+    accDescr: Two namespaces of shapes
+    namespace BaseShapes {
+        class Triangle
+        class Rectangle {
+          double width
+          double height
+        }
+    }
+    namespace Curves {
+        class Circle~T~["A circle"]
+    }
+    %% A comment
+    <<abstract>> Polygon
+    Polygon <|-- Triangle
+    Polygon <|-- Rectangle
+    class List~T~
+    List~T~ o-- Circle

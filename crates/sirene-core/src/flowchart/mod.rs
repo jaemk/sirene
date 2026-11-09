@@ -13,7 +13,7 @@ use rowan::GreenNode;
 
 pub use graph::Measure;
 pub use model::{
-    Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Metadata, Node, Note, NoteSide,
+    Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Metadata, Node, Note, NoteSide, Row,
     Shape, Span, Stroke, Style, Subgraph, clean,
 };
 

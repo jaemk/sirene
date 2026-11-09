@@ -894,7 +894,7 @@ fn other_diagram_types() {
         .failure()
         .stderr(
             "<stdin>:1:1: error: `sequenceDiagram` diagrams are not supported; \
-             sirene draws flowchart and state diagrams\n",
+             sirene draws flowchart, state, and class diagrams\n",
         );
 }
 

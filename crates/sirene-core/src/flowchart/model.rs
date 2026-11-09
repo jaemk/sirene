@@ -210,11 +210,31 @@ pub enum Click {
     Link { url: String, target: Option<String> },
 }
 
+/// One row of a compartment: cells aligned in columns across the section (LANGS-3).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Row {
+    pub cells: Vec<String>,
+    pub italic: bool,
+    pub underline: bool,
+}
+
+impl Row {
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self {
+            cells: vec![text.into()],
+            ..Self::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
     pub id: String,
     pub label: Label,
     pub shape: Shape,
+    /// Compartments under the label, each a list of rows, separated by rules (LANGS-3); empty
+    /// for an ordinary node.
+    pub sections: Vec<Vec<Row>>,
     pub classes: Vec<String>,
     pub styles: Vec<Style>,
     pub click: Option<Click>,
@@ -233,12 +253,27 @@ pub enum Stroke {
     Invisible,
 }
 
-/// Arrowhead at one end of an edge (FLOWMO-8).
+/// Arrowhead at one end of an edge (FLOWMO-8), and the markers of class and ER diagrams
+/// (LANGS-3), which flowcharts never use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Arrow {
     Point,
     Cross,
     Circle,
+    /// A hollow triangle: inheritance, realization.
+    Triangle,
+    /// A filled diamond: composition.
+    Diamond,
+    /// A hollow diamond: aggregation.
+    HollowDiamond,
+    /// Crow's foot: zero or one (`|o`).
+    ZeroOne,
+    /// Crow's foot: exactly one (`||`).
+    One,
+    /// Crow's foot: zero or more (`}o`).
+    ZeroMany,
+    /// Crow's foot: one or more (`}|`).
+    OneMany,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -255,6 +290,9 @@ pub struct Edge {
     /// Minimum rank span, 1 to 10.
     pub length: u8,
     pub label: Option<Label>,
+    /// Labels beside the source and target ends, such as multiplicities (LANGS-3).
+    pub start_label: Option<Label>,
+    pub end_label: Option<Label>,
     pub classes: Vec<String>,
     pub styles: Vec<Style>,
     /// Curve name from `linkStyle ... interpolate` or `@{ curve }`.

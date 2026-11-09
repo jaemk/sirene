@@ -125,7 +125,7 @@ fn other_diagram_types_are_one_error() {
         messages(src),
         [(
             Severity::Error,
-            "`sequenceDiagram` diagrams are not supported; sirene draws flowchart and state diagrams"
+            "`sequenceDiagram` diagrams are not supported; sirene draws flowchart, state, and class diagrams"
                 .to_owned()
         )]
     );

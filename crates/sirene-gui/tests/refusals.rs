@@ -174,9 +174,15 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
     assert_eq!(status(&viewer, cx), format!("Can't delete: {why}"));
     viewer.read_with(cx, |v, _| assert_eq!(v.selection, [node("A")]));
     assert_eq!(source(&viewer, cx), src);
-    // Flowcharts stay editable.
+    // Flowcharts stay editable; class diagrams are read-only too.
     let flow = Document::from_source(None, "flowchart\n  A\n".to_owned());
     assert_eq!(flow.read_only(), None);
+    let class = Document::from_source(None, "classDiagram\n  A <|-- B\n".to_owned());
+    assert_eq!(
+        class.read_only(),
+        Some("drawing edits are not supported for class diagrams yet")
+    );
+    assert_eq!(class.chart.edges.len(), 1);
 }
 
 #[gpui::test]

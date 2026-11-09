@@ -190,7 +190,8 @@ impl<'a> Parser<'a> {
                 start,
                 start + kind.len(),
                 format!(
-                    "`{kind}` diagrams are not supported; sirene draws flowchart and state diagrams"
+                    "`{kind}` diagrams are not supported; sirene draws {}",
+                    crate::diagram::DRAWN
                 ),
             );
             self.finish();

@@ -36,9 +36,10 @@ fn skipped(name: &str, block: &Block) -> bool {
     match diagram::other_diagram(&block.code) {
         Some(kind) => {
             eprintln!(
-                "{name}:{}:{}: warning: skipping a `{kind}` diagram; sirene draws flowchart and state diagrams",
+                "{name}:{}:{}: warning: skipping a `{kind}` diagram; sirene draws {}",
                 block.line,
-                block.indent + 1
+                block.indent + 1,
+                diagram::DRAWN
             );
             true
         }

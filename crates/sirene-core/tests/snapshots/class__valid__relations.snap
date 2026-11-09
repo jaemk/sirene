@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/class.rs
+expression: "classDiagram\n    classA <|-- classB : Inheritance\n    classC *-- classD : Composition\n    classE o-- classF : Aggregation\n    classG <-- classH : Association\n    classI -- classJ : Link\n    classK <.. classL : Dependency\n    classM <|.. classN : Realization\n    classO .. classP : Dashed\n    classQ <|--|> classR : Both\n    Customer \"1\" --> \"*\" Ticket\n"
+---
+
+┌────────┐    ┌────────┐    ┌────────┐    ┌────────┐   ┌────────┐   ┌────────┐   ┌────────┐   ┌────────┐   ┌────────┐   ┌──────────┐
+│ classA │    │ classC │    │ classE │    │ classG │   │ classI │   │ classK │   │ classM │   │ classO │   │ classQ │   │ Customer │
+└────────┘    └────────┘    └────────┘    └────────┘   └────┬───┘   └────────┘   └────────┘   └────┬───┘   └────────┘   └─────┬────┘
+     △             ◆             ◇             ▲            │            ▲            △            ┆            △             │1
+Inheritance   Composition   Aggregation   Association     Link      Dependency   Realization    Dashed        Both            │
+     │             │             │             │            │            ┆            ┆            ┆            ▽             ▼*
+┌────┴───┐    ┌────┴───┐    ┌────┴───┐    ┌────┴───┐   ┌────┴───┐   ┌────┴───┐   ┌────┴───┐   ┌────┴───┐   ┌────────┐    ┌────────┐
+│ classB │    │ classD │    │ classF │    │ classH │   │ classJ │   │ classL │   │ classN │   │ classP │   │ classR │    │ Ticket │
+└────────┘    └────────┘    └────────┘    └────────┘   └────────┘   └────────┘   └────────┘   └────────┘   └────────┘    └────────┘
