@@ -23,6 +23,15 @@ can be built). Keep each row's status current with `spec.py set`.
 | Markdown | done | [markdown.md](markdown.md) |
 | Agent Skill | done | [agent-skill.md](agent-skill.md) |
 | Self Update | done | [self-update.md](self-update.md) |
+| Diagram Languages | pending | [diagram-languages.md](diagram-languages.md) |
+| Mermaid State Diagrams | pending | [mermaid-state-diagrams.md](mermaid-state-diagrams.md) |
+| Mermaid Class Diagrams | pending | [mermaid-class-diagrams.md](mermaid-class-diagrams.md) |
+| Mermaid ER Diagrams | pending | [mermaid-er-diagrams.md](mermaid-er-diagrams.md) |
+| Mermaid Sequence Diagrams | pending | [mermaid-sequence-diagrams.md](mermaid-sequence-diagrams.md) |
+| Mermaid Charts | research | [mermaid-charts.md](mermaid-charts.md) |
+| Graphviz DOT | pending | [graphviz-dot.md](graphviz-dot.md) |
+| D2 | research | [d2.md](d2.md) |
+| PlantUML | research | [plantuml.md](plantuml.md) |
 
 ## Conventions
 
