@@ -1,10 +1,12 @@
 #![doc = include_str!("../README.md")]
 
 pub mod ascii;
+pub mod class;
 pub mod diagnostic;
 pub mod diagram;
 pub mod flowchart;
 pub mod layout;
+mod lines;
 pub mod markdown;
 pub mod scene;
 pub mod state;

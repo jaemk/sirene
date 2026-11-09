@@ -1,0 +1,29 @@
+classDiagram
+    note for Duck "can fly\ncan swim"
+    Animal <|-- Duck
+    Animal <|-- Fish
+    Animal <|-- Zebra
+    Animal : +int age
+    Animal : +String gender
+    Animal: +isMammal() bool
+    Animal: +mate()
+    class Duck{
+        +String beakColor
+        +swim()
+        +quack()
+    }
+    class Fish{
+        -int sizeInFeet
+        -canEat()
+    }
+    class Zebra{
+        +bool is_wild
+        +run()$
+    }
+    class Shape{
+        <<interface>>
+        noOfVertices
+        draw()*
+    }
+    Zebra "1" *-- "many" Shape : has
+    Fish o.. Shape

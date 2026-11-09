@@ -1,0 +1,63 @@
+# Class diagrams
+
+sirene draws Mermaid class diagrams (`classDiagram` and `classDiagram-v2`) with the same layout,
+themes, and outputs as flowcharts:
+
+```
+$ sirene ascii shapes.mmd
+┌────────────────┐
+│  «interface»   │
+│     Shape      │
+├────────────────┤
+├────────────────┤
+│ +area() double │
+└────────────────┘
+         △
+         ┆
+   ┌─────┴─────┐
+   │  Circle   │
+   ├───────────┤
+   │ +double r │
+   ├───────────┤
+   └───────────┘
+```
+
+```
+classDiagram
+  class Shape {
+    <<interface>>
+    +area() double
+  }
+  class Circle {
+    +double r
+  }
+  Shape <|.. Circle
+```
+
+In the editor a class diagram is read-only on the drawing side, as state diagrams are.
+
+## What is read
+
+| Syntax | Drawn as |
+|---|---|
+| `class A`, `class A["Label"]`, `class List~T~` | a box titled `A`, `Label`, or `List<T>` |
+| `class A { ... }`, `A : +int id` | members: attributes, then methods (a member with `(`) |
+| `+make()$`, `+draw()*` | static members underlined, abstract ones italic |
+| `<<interface>>` in a body, or `<<interface>> A` | `«interface»` above the name |
+| `<\|--`, `*--`, `o--`, `-->`, `--` | hollow triangle, filled diamond, hollow diamond, arrow, plain line |
+| `..>`, `..\|>`, `..` | the same, dotted |
+| `A "1" --> "*" B : label` | cardinalities beside each end, the label in the middle |
+| `namespace N { ... }` | a box around its classes |
+| `note for A "text"` | a note beside the class |
+| `direction`, `classDef`, `cssClass "A,B" name`, `A:::name`, `style` | as in flowcharts |
+
+An edge runs from the left class to the right one, so in `Super <|-- Sub` the superclass is drawn
+above. Write a relation with space around an `o` end: `A o-- B`.
+
+In ASCII the markers are `△` (`^`), `◆` (`*`), and `◇` (`o`), pointing the way the triangle
+does.
+
+## Not drawn
+
+These are warnings, and the rest of the diagram is drawn: `click`, `callback`, `link`, notes not
+attached to a class (`note "text"`), and styling of a class that does not exist.

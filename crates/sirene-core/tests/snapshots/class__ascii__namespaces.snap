@@ -1,0 +1,26 @@
+---
+source: crates/sirene-core/tests/class.rs
+expression: "---\ntitle: Shapes\n---\nclassDiagram\n    direction LR\n    accTitle: Shapes\n    accDescr: Two namespaces of shapes\n    namespace BaseShapes {\n        class Triangle\n        class Rectangle {\n          double width\n          double height\n        }\n    }\n    namespace Curves {\n        class Circle~T~[\"A circle\"]\n    }\n    %% A comment\n    <<abstract>> Polygon\n    Polygon <|-- Triangle\n    Polygon <|-- Rectangle\n    class List~T~\n    List~T~ o-- Circle\n"
+---
+                  Shapes
+
+                    +- BaseShapes --------+
+                    |    +----------+     |
+                  +-+----+ Triangle |     |
+               +--+ |    +----------+     |
++------------+ |    |                     |
+| «abstract» |<+    |                     |
+|  Polygon   |<+    |  +---------------+  |
++------------+ +--+ |  |   Rectangle   |  |
+                  | |  +---------------+  |
+                  +-+--+ double width  |  |
+                    |  | double height |  |
+                    |  +---------------+  |
+                    |  +---------------+  |
+                    +---------------------+
+
+                      +- Curves -------+
+ +---------+          |  +----------+  |
+ | List<T> |o---------+--+ A circle |  |
+ +---------+          |  +----------+  |
+                      +----------------+

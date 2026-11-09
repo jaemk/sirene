@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/class.rs
+expression: "classDiagram\n    A -- > B\n    A <|--\n    class\n    note for A unquoted\n    cssClass A x\n    namespace N\n    }\n    class Open {\n        +x\n"
+---
+2:10: error: expected a class after the relation
+3:11: error: expected a class after the relation
+4:10: error: expected a class id
+5:16: error: expected a quoted note
+6:14: error: expected a quoted list of class ids
+7:16: error: expected `{`
+8:5: error: unexpected `}`
+11:1: error: unclosed class body: expected `}`
+
+┌──────┐
+│ Open │   ┌─ N ─┐
+├──────┤   │     │
+│ +x   │   └─────┘
+├──────┤
+└──────┘

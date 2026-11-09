@@ -25,7 +25,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Self Update | done | [self-update.md](self-update.md) |
 | Diagram Languages | pending | [diagram-languages.md](diagram-languages.md) |
 | Mermaid State Diagrams | done | [mermaid-state-diagrams.md](mermaid-state-diagrams.md) |
-| Mermaid Class Diagrams | pending | [mermaid-class-diagrams.md](mermaid-class-diagrams.md) |
+| Mermaid Class Diagrams | done | [mermaid-class-diagrams.md](mermaid-class-diagrams.md) |
 | Mermaid ER Diagrams | pending | [mermaid-er-diagrams.md](mermaid-er-diagrams.md) |
 | Mermaid Sequence Diagrams | pending | [mermaid-sequence-diagrams.md](mermaid-sequence-diagrams.md) |
 | Mermaid Charts | research | [mermaid-charts.md](mermaid-charts.md) |

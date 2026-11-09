@@ -122,6 +122,7 @@ impl Document {
         match Kind::of(&self.source) {
             Kind::Flowchart => None,
             Kind::State => Some("drawing edits are not supported for state diagrams yet"),
+            Kind::Class => Some("drawing edits are not supported for class diagrams yet"),
         }
     }
 

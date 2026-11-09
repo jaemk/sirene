@@ -54,8 +54,11 @@ Done so far: notes (`Flowchart::notes`, laid out beside their node in its rank b
 `layout::NoteSpec`), regions (`Subgraph::region`: untitled sub-clusters with dashed borders), and
 the state shapes, which reuse the flowchart shapes `sm-circ`, `fr-circ`, `fork`, and an unlabeled
 `diam`. A fork bar turns across a horizontal flow, and in ASCII the round ones and an unlabeled
-diamond are one character. Compartments, end markers, and end labels come with class and ER
-diagrams.
+diamond are one character. Compartments (`Node::sections`, rows of cells aligned in columns),
+end markers (`Arrow::Triangle`, `Diamond`, `HollowDiamond`, and the crow's feet `ZeroOne`, `One`,
+`ZeroMany`, `OneMany`), and end labels (`Edge::start_label`, `Edge::end_label`) came with class
+diagrams. End labels take no room in the layout. In ASCII the crow's feet are `?` (zero or one),
+`1`, `*` (zero or more), and `+` (one or more).
 
 Within Mermaid, `diagram::Kind::of` reads the header keyword after frontmatter, comments, and
 directives, and `diagram::lower` sends the source to its parser; the CLI and the editor go through
@@ -75,10 +78,10 @@ as `flowchart::edit` does; a language without one has a read-only drawing, and t
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
-State diagrams are read-only this way: `Document::read_only` gives the reason, the drawing's menu
+State and class diagrams are read-only this way: `Document::read_only` gives the reason, the drawing's menu
 holds only the disabled Add Node, Select All, and Fit Window, a press on a node pans instead of
 connecting, and every edit action says `Can't ...: drawing edits are not supported for state
-diagrams yet`. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
+diagrams yet` (or class diagrams). Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 

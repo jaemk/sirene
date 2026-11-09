@@ -45,6 +45,9 @@ syntax_kinds! {
     AS_KW,
     NOTE_KW,
     OF_KW,
+    NAMESPACE_KW,
+    CSSCLASS_KW,
+    FOR_KW,
 
     // Other tokens.
     DIR,
@@ -80,6 +83,10 @@ syntax_kinds! {
     STAR,
     STEREOTYPE,
     REGION_SEP,
+    // Class diagrams: `~T~`, a relation like `<|--`, and a member line in a class body.
+    GENERIC,
+    RELATION,
+    MEMBER,
     ERROR_TOKEN,
 
     // Nodes.
@@ -113,6 +120,13 @@ syntax_kinds! {
     COMPOSITE,
     NOTE_STMT,
     REGION_STMT,
+    CLASS_DECL,
+    CLASS_REF,
+    MEMBER_STMT,
+    RELATION_STMT,
+    NAMESPACE,
+    CSSCLASS_STMT,
+    ANNOTATION_STMT,
     ERROR,
 }
 

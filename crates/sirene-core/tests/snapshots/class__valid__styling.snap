@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/class.rs
+expression: "classDiagram\n    classDef hot fill:#f96,stroke:#333\n    classDef cold fill:#9cf\n    class Oven:::hot\n    Oven --> Fridge\n    Fridge --> Freezer\n    cssClass \"Fridge,Freezer\" cold\n    style Freezer stroke-width:3px\n"
+---
+
+ ┌──────┐
+ │ Oven │
+ └───┬──┘
+     │
+     ▼
+┌────────┐
+│ Fridge │
+└────┬───┘
+     │
+     ▼
+┌─────────┐
+│ Freezer │
+└─────────┘

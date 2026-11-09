@@ -14,6 +14,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid state diagrams (`stateDiagram`, `stateDiagram-v2`) in every command and in the
   editor, where the drawing is read-only: states, transitions, `[*]`, composite states,
   concurrent regions, fork, join, and choice, notes, `direction`, and styling.
+- Mermaid class diagrams (`classDiagram`, `classDiagram-v2`), read-only in the editor: classes
+  with attribute and method compartments, annotations, generics, every relation with its
+  markers, cardinalities, and label, namespaces, notes, and styling.
 
 ### Changed
 

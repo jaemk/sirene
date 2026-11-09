@@ -357,6 +357,6 @@ fn other_types() {
     let d = &diagram::lower("pie\n").diagnostics[0];
     assert_eq!(
         d.message,
-        "`pie` diagrams are not supported; sirene draws flowchart and state diagrams"
+        "`pie` diagrams are not supported; sirene draws flowchart, state, and class diagrams"
     );
 }

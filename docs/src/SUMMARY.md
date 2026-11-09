@@ -24,6 +24,7 @@
 # Other diagrams
 
 - [State diagrams](state.md)
+- [Class diagrams](class.md)
 
 # Project
 

@@ -5,7 +5,7 @@ mod canvas;
 use unicode_width::UnicodeWidthStr;
 
 use crate::flowchart::{
-    Arrow, Edge, Flowchart, Label, Measure, Node, Shape, Stroke, Subgraph, clean,
+    Arrow, Edge, Flowchart, Label, Measure, Node, Row, Shape, Stroke, Subgraph, clean,
 };
 use crate::layout::{self, Config, Point, Rect, Size, Spacing};
 use canvas::{Canvas, DOWN, Glyph, LEFT, Line, RIGHT, UP, glyph};
@@ -142,6 +142,12 @@ impl Measure for Cells {
         let lines = lines(&node.label);
         let w = lines.iter().map(|l| width(l)).max().unwrap_or(0);
         let h = lines.len() as i32;
+        if !node.sections.is_empty() {
+            let rows: Vec<Vec<String>> = node.sections.iter().map(|s| section_lines(s)).collect();
+            let rw = rows.iter().flatten().map(|l| width(l)).max().unwrap_or(0);
+            let rh: i32 = rows.iter().map(|s| s.len() as i32 + 1).sum();
+            return Size::new(w.max(rw) + 4, h + 2 + rh);
+        }
         match frame_of(node) {
             Frame::Glyph(_) => Size::new(1, 1),
             Frame::Bar => Size::new(5, 1),
@@ -186,6 +192,37 @@ fn lines(label: &Label) -> Vec<String> {
 
 fn title(s: &Subgraph) -> String {
     lines(&s.title).join(" ").trim().to_owned()
+}
+
+/// A compartment's rows with their cells padded into columns (LANGS-3).
+fn section_lines(rows: &[Row]) -> Vec<String> {
+    let mut cols: Vec<i32> = Vec::new();
+    for row in rows {
+        for (k, c) in row.cells.iter().enumerate() {
+            let w = width(&clean(c));
+            match cols.get_mut(k) {
+                Some(x) => *x = (*x).max(w),
+                None => cols.push(w),
+            }
+        }
+    }
+    rows.iter()
+        .map(|row| {
+            let mut line = String::new();
+            for (k, c) in row.cells.iter().enumerate() {
+                let c = clean(c);
+                if cols[k] == 0 {
+                    continue;
+                }
+                if !line.is_empty() {
+                    line.push(' ');
+                }
+                line.push_str(&c);
+                line.push_str(&" ".repeat((cols[k] - width(&c)).max(0) as usize));
+            }
+            line.trim_end().to_owned()
+        })
+        .collect()
 }
 
 /// Writes `lines` centered in the columns `x..x+w`, from row `y`.
@@ -334,10 +371,28 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
         Frame::Cylinder => canvas.hline(r.x, r.right(), r.y + 1, Line::Light),
         _ => {}
     }
+    // A rule above each compartment, joining the sides.
+    let mut y = r.y + 1 + lines(&node.label).len() as i32;
+    for section in &node.sections {
+        canvas.hline(r.x, r.right(), y, Line::Light);
+        y += 1 + section.len() as i32;
+    }
 }
 
 fn draw_node_text(canvas: &mut Canvas, node: &Node, r: Rect) {
     let lines = lines(&node.label);
+    if !node.sections.is_empty() {
+        draw_lines(canvas, &lines, r.x + 1, r.w - 2, r.y + 1);
+        let mut y = r.y + 2 + lines.len() as i32;
+        for section in &node.sections {
+            for row in section_lines(section) {
+                canvas.text(r.x + 2, y, &row);
+                y += 1;
+            }
+            y += 1;
+        }
+        return;
+    }
     // The interior: columns `x..x+w`, rows `y..y+h`.
     let (x, w, y, h) = match frame_of(node) {
         Frame::Glyph(_) | Frame::Bar => return,
@@ -389,6 +444,19 @@ fn arrow_glyph(arrow: Arrow, toward: u8) -> Glyph {
             RIGHT => glyph('►', '>'),
             _ => glyph('◄', '<'),
         },
+        Arrow::Triangle => match toward {
+            DOWN => glyph('▽', 'v'),
+            UP => glyph('△', '^'),
+            RIGHT => glyph('▷', '>'),
+            _ => glyph('◁', '<'),
+        },
+        Arrow::Diamond => glyph('◆', '*'),
+        Arrow::HollowDiamond => glyph('◇', 'o'),
+        // Crow's feet as multiplicities.
+        Arrow::One => glyph('1', '1'),
+        Arrow::ZeroOne => glyph('?', '?'),
+        Arrow::ZeroMany => glyph('*', '*'),
+        Arrow::OneMany => glyph('+', '+'),
     }
 }
 
@@ -450,6 +518,28 @@ fn draw_edge(
                 canvas.add(i.x, i.y, io, line);
             }
             Some(a) => canvas.arrow(o.x, o.y, arrow_glyph(a, bits(o, i).0)),
+        }
+    }
+    // End labels beside the line's outermost cells: right of a vertical run, above a
+    // horizontal one (LANGS-3).
+    for (label, at, next) in [
+        (&edge.start_label, first, first + 1),
+        (&edge.end_label, last, last.wrapping_sub(1)),
+    ] {
+        let (Some(l), Some(&p)) = (label, path.get(at)) else {
+            continue;
+        };
+        let text = lines(l).join(" ");
+        let vertical = path.get(next).is_none_or(|q| q.x == p.x);
+        if vertical {
+            canvas.text(p.x + 1, p.y, &text);
+        } else {
+            let x = if path.get(next).is_some_and(|q| q.x < p.x) {
+                p.x - width(&text) + 1
+            } else {
+                p.x
+            };
+            canvas.text(x, p.y - 1, &text);
         }
     }
 }

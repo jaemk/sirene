@@ -1,13 +1,14 @@
 //! The entry point for every Mermaid diagram type sirene draws (LANGS-2).
 
 use crate::flowchart::{self, Lowered, scan};
-use crate::state;
+use crate::{class, state};
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Flowchart,
     State,
+    Class,
 }
 
 impl Kind {
@@ -16,11 +17,16 @@ impl Kind {
         let word = header(src);
         if state::HEADERS.contains(&word) {
             Kind::State
+        } else if class::HEADERS.contains(&word) {
+            Kind::Class
         } else {
             Kind::Flowchart
         }
     }
 }
+
+/// The Mermaid types sirene draws, for messages about the others (LANGS-4).
+pub const DRAWN: &str = "flowchart, state, and class diagrams";
 
 /// The first word of `src` after frontmatter, comments, and directives.
 fn header(src: &str) -> &str {
@@ -59,6 +65,7 @@ pub fn lower(src: &str) -> Lowered {
     match Kind::of(src) {
         Kind::Flowchart => flowchart::parse(src).lower(),
         Kind::State => state::parse(src).lower(),
+        Kind::Class => class::parse(src).lower(),
     }
 }
 
@@ -66,7 +73,7 @@ pub fn lower(src: &str) -> Lowered {
 pub fn other_diagram(src: &str) -> Option<String> {
     match Kind::of(src) {
         Kind::Flowchart => flowchart::parse(src).other_diagram(),
-        Kind::State => None,
+        _ => None,
     }
 }
 
@@ -78,6 +85,8 @@ mod tests {
     fn kinds() {
         assert_eq!(Kind::of("stateDiagram-v2\n  A --> B\n"), Kind::State);
         assert_eq!(Kind::of("stateDiagram\n"), Kind::State);
+        assert_eq!(Kind::of("classDiagram\n"), Kind::Class);
+        assert_eq!(Kind::of("classDiagram-v2\n"), Kind::Class);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State

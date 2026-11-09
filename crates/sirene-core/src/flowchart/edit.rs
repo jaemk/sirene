@@ -1513,10 +1513,11 @@ fn relink(src: &str, map: &[Vec<usize>]) -> String {
 
 fn stroke_text(e: &Edge) -> String {
     let n = usize::from(e.length);
+    // Flowcharts have only the first three; the rest come from other diagram types.
     let head = |a: Option<Arrow>, point: char| match a {
-        Some(Arrow::Point) => point.to_string(),
         Some(Arrow::Cross) => "x".to_owned(),
         Some(Arrow::Circle) => "o".to_owned(),
+        Some(_) => point.to_string(),
         None => String::new(),
     };
     let run = if e.end.is_some() { n + 1 } else { n + 2 };
