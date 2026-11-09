@@ -5,8 +5,8 @@ use sirene_core::Severity;
 use sirene_core::flowchart::edit::{
     Line, MAX_LENGTH, TextEdit, add_edge, add_node, apply_class, delete, fresh_class_name, group,
     keep_together, label_source, move_edge, move_node, move_to_subgraph, remove_class,
-    reverse_edge, set_class_style, set_direction, set_edge_label, set_edge_line, set_node_label,
-    set_node_shape, ungroup,
+    reverse_edge, set_class_style, set_direction, set_edge_label, set_edge_line, set_link_style,
+    set_node_label, set_node_shape, ungroup,
 };
 use sirene_core::flowchart::{self, Arrow, Direction, Flowchart, Shape, Stroke};
 
@@ -396,6 +396,81 @@ fn class_styles() {
         fresh_class_name("flowchart TD\n    classDef style1 fill:#fff\n    style2\n"),
         "style3"
     );
+}
+
+#[test]
+fn link_styles() {
+    let src = "flowchart TD\n    A --> B --> C\n";
+    // An unstyled edge gets a `linkStyle`; later properties go in it, replaced in place.
+    let out = applied(src, set_link_style(src, 1, "stroke", Some("#f00")));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B --> C\n    linkStyle 1 stroke:#f00\n"
+    );
+    let out = applied(&out, set_link_style(&out, 1, "stroke-width", Some("3px")));
+    let out = applied(&out, set_link_style(&out, 1, "stroke", Some("#00f")));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B --> C\n    linkStyle 1 stroke:#00f,stroke-width:3px\n"
+    );
+    assert_eq!(chart(&out).edges[1].styles.len(), 2);
+    assert!(chart(&out).edges[0].styles.is_empty());
+    assert_eq!(set_link_style(&out, 1, "stroke", Some("#00f")), None);
+    // Removing properties; the last one takes the statement with it.
+    let out = applied(&out, set_link_style(&out, 1, "stroke", None));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B --> C\n    linkStyle 1 stroke-width:3px\n"
+    );
+    assert_eq!(
+        applied(&out, set_link_style(&out, 1, "stroke-width", None)),
+        src
+    );
+    assert_eq!(set_link_style(src, 0, "stroke", None), None);
+    assert_eq!(set_link_style(src, 2, "stroke", Some("red")), None);
+
+    // A shared statement drops the index; the edge gets its own with every property, and
+    // keeps its curve.
+    let shared = "flowchart TD\n    A --> B --> C\n    linkStyle 0,1 interpolate step color:red\n";
+    let out = applied(shared, set_link_style(shared, 1, "stroke", Some("#000")));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B --> C\n    linkStyle 0 interpolate step color:red\n    \
+         linkStyle 1 interpolate step color:red,stroke:#000\n"
+    );
+    assert_eq!(chart(&out).edges[0].styles, chart(shared).edges[0].styles);
+    assert_eq!(chart(&out).edges[1].curve.as_deref(), Some("step"));
+
+    // The last statement naming only the edge is rewritten with the styles in effect (a later
+    // `linkStyle` replaces earlier ones); an earlier one loses its styles, keeping its curve,
+    // and a later one is removed.
+    let many = "flowchart TD\n    A --> B\n    linkStyle 0 interpolate basis color:red\n    \
+                linkStyle 0 stroke:#111\n    linkStyle 0,0 color:blue\n";
+    assert_eq!(
+        applied(many, set_link_style(many, 0, "stroke-width", Some("2px"))),
+        "flowchart TD\n    A --> B\n    linkStyle 0 interpolate basis\n    \
+         linkStyle 0 color:blue,stroke-width:2px\n"
+    );
+    // Curve only: the styles go after it, and come out again leaving the curve.
+    let curve = "flowchart TD\n    A --> B\n    linkStyle 0 interpolate basis\n";
+    let out = applied(curve, set_link_style(curve, 0, "stroke", Some("red")));
+    assert_eq!(
+        out,
+        "flowchart TD\n    A --> B\n    linkStyle 0 interpolate basis stroke:red\n"
+    );
+    assert_eq!(
+        applied(&out, set_link_style(&out, 0, "stroke", None)),
+        curve
+    );
+    // `linkStyle default` stays.
+    let default = "flowchart TD\n    A --> B\n    linkStyle default stroke:#999\n";
+    assert_eq!(
+        applied(default, set_link_style(default, 0, "stroke", Some("red"))),
+        "flowchart TD\n    A --> B\n    linkStyle default stroke:#999\n    linkStyle 0 stroke:red\n"
+    );
+    for s in [&out, shared, many, default] {
+        assert_eq!(errors(s), 0, "{s}");
+    }
 }
 
 #[test]

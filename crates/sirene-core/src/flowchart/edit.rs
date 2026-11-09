@@ -389,6 +389,119 @@ pub fn set_class_style(
     doc.finish(vec![edit])
 }
 
+/// Sets `property` of edge `edge` (its source-order index) to `value`, or removes it when `value`
+/// is `None`, keeping its other `linkStyle` declarations. The edge's last `linkStyle` naming only
+/// it is rewritten (removed when left empty), or a new one is added at the end; other
+/// `linkStyle` statements that style it drop its index, so the result is its only style.
+/// `linkStyle default` is left alone. `None` when nothing changes.
+pub fn set_link_style(
+    src: &str,
+    edge: usize,
+    property: &str,
+    value: Option<&str>,
+) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let e = doc.chart.edges.get(edge)?;
+    let mut out: Vec<String> = Vec::new();
+    let mut set = false;
+    for s in &e.styles {
+        if s.property != property {
+            out.push(format!("{}:{}", s.property, s.value));
+        } else if let (Some(v), false) = (value, set) {
+            out.push(format!("{property}:{v}"));
+            set = true;
+        }
+    }
+    if let (Some(v), false) = (value, set) {
+        out.push(format!("{property}:{v}"));
+    }
+    let old: Vec<String> = e
+        .styles
+        .iter()
+        .map(|s| format!("{}:{}", s.property, s.value))
+        .collect();
+    if out == old {
+        return None;
+    }
+    let new = out.join(",");
+    let index = |stmt: &SyntaxNode| -> Vec<usize> {
+        child(stmt, ID_LIST).map_or_else(Vec::new, |l| {
+            tokens(&l)
+                .filter(|t| t.kind() == NUMBER)
+                .filter_map(|t| t.text().parse().ok())
+                .collect()
+        })
+    };
+    let stmts: Vec<(SyntaxNode, Vec<usize>)> = doc
+        .root
+        .descendants()
+        .filter(|n| n.kind() == LINKSTYLE_STMT && token(n, DEFAULT_KW).is_none())
+        .map(|n| {
+            let nums = index(&n);
+            (n, nums)
+        })
+        .filter(|(_, nums)| nums.contains(&edge))
+        .collect();
+    let own = stmts
+        .iter()
+        .rposition(|(_, nums)| nums.as_slice() == [edge]);
+    // The style text of `stmt` with the blanks before it, to remove it alone.
+    let style_span = |stmt: &SyntaxNode| {
+        token(stmt, STYLE_TEXT).map(|t| {
+            let r = span(t.text_range());
+            let start = src[..r.start].trim_end_matches([' ', '\t']).len();
+            start..r.end
+        })
+    };
+    let mut edits = Vec::new();
+    let mut curve = None;
+    for (i, (stmt, nums)) in stmts.iter().enumerate() {
+        if Some(i) == own || token(stmt, STYLE_TEXT).is_none() {
+            continue;
+        }
+        let interpolate = token(stmt, INTERPOLATE_KW).is_some();
+        if nums.iter().all(|&n| n == edge) {
+            edits.push(match style_span(stmt) {
+                Some(r) if interpolate => (r, String::new()),
+                _ => doc.remove(stmt),
+            });
+        } else {
+            if interpolate {
+                curve = token(stmt, IDENT).map(|t| t.text().to_owned());
+            }
+            let kept: Vec<String> = nums
+                .iter()
+                .filter(|&&n| n != edge)
+                .map(usize::to_string)
+                .collect();
+            let list = child(stmt, ID_LIST)?;
+            edits.push((span(list.text_range()), kept.join(",")));
+        }
+    }
+    match own.map(|i| &stmts[i].0) {
+        Some(stmt) => match (token(stmt, STYLE_TEXT), out.is_empty()) {
+            (Some(_), true) if token(stmt, INTERPOLATE_KW).is_some() => {
+                edits.push((style_span(stmt)?, String::new()));
+            }
+            (_, true) => edits.push(doc.remove(stmt)),
+            (Some(t), false) => edits.push((span(t.text_range()), new)),
+            (None, false) => {
+                let end = usize::from(stmt.text_range().end());
+                edits.push((end..end, format!(" {new}")));
+            }
+        },
+        None if !out.is_empty() => {
+            let curve = curve
+                .map(|c| format!(" interpolate {c}"))
+                .unwrap_or_default();
+            let line = doc.append(&format!("linkStyle {edge}{curve} {new}"));
+            edits.push((line.range, line.text));
+        }
+        None => {}
+    }
+    doc.finish(edits)
+}
+
 /// Gives each node of `ids` class `name` with a `class` statement at the end, skipping nodes
 /// that have it. `None` when every node has it or none exists.
 pub fn apply_class(src: &str, ids: &[&str], name: &str) -> Option<TextEdit> {

@@ -76,6 +76,10 @@ View > Show or Hide Styles (secondary-i) opens a panel listing the document's cl
 The panel writes `classDef` and `class` statements, so one change restyles every node with that
 class.
 
+With edges selected, an Edge section sets their line color, label color, width, and dashes. It
+writes one `linkStyle N ...` per edge, replacing any other `linkStyle` that named it (except
+`linkStyle default`).
+
 ## Moving around
 
 - Scroll or drag empty space to pan; the arrow keys pan by a step, shift for further.

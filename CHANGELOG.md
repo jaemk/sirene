@@ -41,6 +41,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Editor: a styles panel (View > Show or Hide Styles) that applies classes to the selected
   nodes and edits a class's colors, width, and dashes.
 - `flowchart::edit::set_class_style`, `apply_class`, `remove_class`, and `fresh_class_name`.
+- Editor: the styles panel sets the selected edges' color, label color, width, and dashes with
+  `linkStyle`; `flowchart::edit::set_link_style`.
 - `sirene check FILE...` prints diagnostics only, for diagrams, directories, and Markdown files.
 - `sirene svg FILE.md` and `sirene png FILE.md` write one image per mermaid block; `--link`
   adds an image link after each block, keeping the blocks.
