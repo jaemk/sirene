@@ -171,9 +171,10 @@ pub fn gh_could_not_check(stderr: &str) -> bool {
     .any(|m| lower.contains(m))
 }
 
-/// Runs `gh attestation verify` on `archive`; `None` when `gh` is not installed.
-pub fn provenance(gh: &str, archive: &Path) -> Option<Provenance> {
-    let out = match Command::new(gh)
+/// Runs `gh attestation verify` on `archive`, with `gh` the command that starts `gh`; `None`
+/// when `gh` is not installed.
+pub fn provenance(mut gh: Command, archive: &Path) -> Option<Provenance> {
+    let out = match gh
         .arg("attestation")
         .arg("verify")
         .arg(archive)
@@ -202,7 +203,7 @@ pub fn provenance(gh: &str, archive: &Path) -> Option<Provenance> {
 
 /// The `self_update` hook run on the downloaded archive, before it is extracted.
 fn verify(archive: &Path) -> Result<(), self_update::Error> {
-    match provenance("gh", archive) {
+    match provenance(Command::new("gh"), archive) {
         None => Ok(()),
         Some(Provenance::Verified) => {
             println!("build provenance verified");
@@ -437,32 +438,37 @@ mod tests {
 
     #[test]
     fn missing_gh_is_skipped() {
-        assert_eq!(provenance("sirene-no-such-gh", Path::new("a.tar.gz")), None);
+        assert_eq!(
+            provenance(Command::new("sirene-no-such-gh"), Path::new("a.tar.gz")),
+            None
+        );
     }
 
     #[cfg(unix)]
     #[test]
     fn gh_outcomes() {
-        use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
+        // Each fake `gh` is a script run by `sh`, not executed itself: executing a file just
+        // written fails with ETXTBSY when another test thread forks while it is open.
         let fake = |name: &str, body: &str| {
             let path = dir.path().join(name);
-            std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-            path.to_str().unwrap().to_owned()
+            std::fs::write(&path, format!("{body}\n")).unwrap();
+            let mut sh = Command::new("sh");
+            sh.arg(path);
+            sh
         };
         let archive = Path::new("sirene.tar.gz");
         // The archive and repo are passed through.
         let args = dir.path().join("args");
         let ok = fake("ok", &format!("echo \"$@\" > {}", args.display()));
-        assert_eq!(provenance(&ok, archive), Some(Provenance::Verified));
+        assert_eq!(provenance(ok, archive), Some(Provenance::Verified));
         assert_eq!(
             std::fs::read_to_string(&args).unwrap(),
             "attestation verify sirene.tar.gz --repo jaemk/sirene\n"
         );
         let offline = fake("offline", "echo 'dial tcp: i/o timeout' >&2; exit 1");
         assert_eq!(
-            provenance(&offline, archive),
+            provenance(offline, archive),
             Some(Provenance::Unchecked("dial tcp: i/o timeout".into()))
         );
         let none = fake(
@@ -470,7 +476,7 @@ mod tests {
             "printf 'Error: no attestations found\\033[0m' >&2; exit 1",
         );
         assert_eq!(
-            provenance(&none, archive),
+            provenance(none, archive),
             Some(Provenance::Rejected(
                 "Error: no attestations found [0m".into()
             ))
