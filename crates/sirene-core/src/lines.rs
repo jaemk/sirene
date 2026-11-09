@@ -136,7 +136,8 @@ impl<'a> Base<'a> {
         }
     }
 
-    fn frontmatter(&mut self) {
+    /// A frontmatter block at the start of the source, if any.
+    pub fn frontmatter(&mut self) {
         let first = scan::line_len(self.src);
         if self.src[..first].trim_end() != "---" {
             return;

@@ -6,6 +6,7 @@ pub mod diagnostic;
 pub mod diagram;
 pub mod er;
 pub mod flowchart;
+pub mod git;
 pub mod layout;
 mod lines;
 pub mod markdown;

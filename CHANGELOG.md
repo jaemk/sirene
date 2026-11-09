@@ -20,6 +20,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid ER diagrams (`erDiagram`), read-only in the editor: entities with attribute columns
   (type, name, keys, comment), aliases, relationships with crow's-foot markers in symbol or word
   form, and styling.
+- Mermaid git graphs (`gitGraph`), read-only in the editor: commits, branches, checkout, merges,
+  and cherry-picks on lanes in each direction (`LR`, `TB`, `BT`), with commit types and tags; in
+  text, one commit per row as `git log --graph` draws them.
 
 ### Changed
 

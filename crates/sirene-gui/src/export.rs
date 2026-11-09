@@ -3,10 +3,10 @@
 use std::path::{Path, PathBuf};
 
 use gpui::{ClipboardItem, Context, Image, ImageFormat, Task, Window};
-use sirene_core::flowchart::Flowchart;
 use sirene_core::scene::png::{self, FontMetrics, Quality};
 use sirene_core::scene::{self, Approx, Theme};
 
+use crate::document::Document;
 use crate::viewer::Viewer;
 use crate::{CopyImage, ExportPng, ExportSvg};
 
@@ -25,21 +25,22 @@ impl Format {
         }
     }
 
-    /// `chart` in this format, as `sirene png` and `sirene svg` write it, at `quality` for PNG.
+    /// `doc`'s diagram in this format, as `sirene png` and `sirene svg` write it, at `quality`
+    /// for PNG.
     pub fn render(
         self,
-        chart: &Flowchart,
+        doc: &Document,
         theme: &Theme,
         quality: Quality,
     ) -> Result<Vec<u8>, String> {
         match self {
             Format::Png => {
-                let scene = scene::flowchart(chart, &FontMetrics, theme);
+                let scene = doc.scene(&FontMetrics, theme);
                 let scale = png::fit(&scene, quality.scale());
                 png::write(&scene, png::Options { scale, quality })
             }
             Format::Svg => {
-                let scene = scene::flowchart(chart, &Approx, theme);
+                let scene = doc.scene(&Approx, theme);
                 Ok(scene::svg::write(&scene).into_bytes())
             }
         }
@@ -68,7 +69,7 @@ impl Viewer {
     /// Writes the drawing to `path`, reporting the outcome in the status bar.
     pub fn export_to(&mut self, format: Format, path: &Path, cx: &mut Context<Self>) -> bool {
         let written = format
-            .render(&self.doc.chart, &self.theme(), Quality::Fine)
+            .render(&self.doc, &self.theme(), Quality::Fine)
             .and_then(|bytes| {
                 std::fs::write(path, bytes)
                     .map_err(|e| format!("cannot write {}: {e}", path.display()))
@@ -130,7 +131,7 @@ impl Viewer {
     /// Puts the drawing on the clipboard as a PNG, at normal quality.
     pub(crate) fn copy_image(&mut self, _: &CopyImage, _: &mut Window, cx: &mut Context<Self>) {
         self.notice = Some(
-            match Format::Png.render(&self.doc.chart, &self.theme(), Quality::Normal) {
+            match Format::Png.render(&self.doc, &self.theme(), Quality::Normal) {
                 Ok(bytes) => {
                     log::debug!("copied a {} byte PNG", bytes.len());
                     cx.write_to_clipboard(ClipboardItem::new_image(&Image::from_bytes(

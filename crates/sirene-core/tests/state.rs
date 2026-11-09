@@ -6,8 +6,8 @@ use std::fs;
 use std::path::Path;
 
 use sirene_core::ascii::{self, Charset, Options};
-use sirene_core::diagram::{self, Kind};
-use sirene_core::flowchart::{Arrow, Direction, Flowchart, Lowered, NoteSide, Shape};
+use sirene_core::diagram::{self, Kind, Lowered};
+use sirene_core::flowchart::{Arrow, Direction, Flowchart, NoteSide, Shape};
 use sirene_core::scene::{self, Approx, Theme};
 use sirene_core::{Severity, state};
 
@@ -60,15 +60,12 @@ fn snapshots() {
             }
             let mut out = diagnostics(&src, &lowered);
             out.push('\n');
-            out.push_str(&ascii::render(
-                &lowered.flowchart,
-                &Options {
-                    charset: Charset::Unicode,
-                },
-            ));
+            out.push_str(&lowered.diagram.ascii(&Options {
+                charset: Charset::Unicode,
+            }));
             insta::assert_snapshot!(format!("{dir}__{name}"), out, &src);
             // Every fixture draws.
-            let s = scene::flowchart(&lowered.flowchart, &Approx, &Theme::LIGHT);
+            let s = lowered.diagram.scene(&Approx, &Theme::LIGHT);
             assert!(!s.elements.is_empty(), "{name}");
         }
     }
@@ -77,7 +74,7 @@ fn snapshots() {
 #[test]
 fn ascii_charset_snapshots() {
     for (name, src) in fixtures("valid") {
-        let chart = diagram::lower(&src).flowchart;
+        let chart = diagram::lower(&src).diagram.into_graph();
         let out = ascii::render(
             &chart,
             &Options {
@@ -95,7 +92,7 @@ fn chart(src: &str) -> Flowchart {
         "{:?}\n{src}",
         lowered.diagnostics
     );
-    lowered.flowchart
+    lowered.diagram.into_graph()
 }
 
 fn warnings(src: &str) -> Vec<String> {
@@ -296,7 +293,8 @@ fn unsupported_is_a_warning() {
     assert_eq!(w.len(), 1);
     assert!(w[0].contains("between concurrent regions"), "{w:?}");
     let c = diagram::lower("stateDiagram-v2\n  state S {\n    a\n    --\n    b\n  }\n  a --> b\n")
-        .flowchart;
+        .diagram
+        .into_graph();
     assert!(c.edges.is_empty());
 
     for (src, want) in [
@@ -357,6 +355,6 @@ fn other_types() {
     let d = &diagram::lower("pie\n").diagnostics[0];
     assert_eq!(
         d.message,
-        "`pie` diagrams are not supported; sirene draws flowchart, state, class, and ER diagrams"
+        "`pie` diagrams are not supported; sirene draws flowchart, state, class, ER, and git graph diagrams"
     );
 }

@@ -1,0 +1,25 @@
+gitGraph
+    merge main
+    commit id: "a"
+    commit id: "a"
+    branch main
+    checkout nowhere
+    branch dev
+    merge main
+    merge ghost
+    branch empty
+    checkout main
+    merge empty
+    checkout dev
+    commit id: "b" order: 2
+    commit type: SIDEWAYS
+    checkout main
+    merge dev id: "M"
+    branch other
+    cherry-pick id: "M"
+    cherry-pick id: "M" parent: "zzz"
+    cherry-pick id: "nope"
+    cherry-pick id: "M" parent: "b"
+    checkout main
+    cherry-pick id: "a"
+    cherry-pick tag: "x"

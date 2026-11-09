@@ -189,6 +189,24 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for ER diagrams yet")
     );
     assert_eq!(er.chart.edges.len(), 1);
+    // A git graph is not a graph: it draws from `other`, with nothing to select or edit.
+    let git = Document::from_source(None, "gitGraph\n  commit\n  commit\n".to_owned());
+    assert_eq!(
+        git.read_only(),
+        Some("drawing edits are not supported for git graphs yet")
+    );
+    assert!(git.chart.nodes.is_empty() && git.other.is_some());
+    let scene = git.scene(
+        &sirene_core::scene::Approx,
+        &sirene_core::scene::Theme::LIGHT,
+    );
+    assert!(
+        scene
+            .elements
+            .iter()
+            .all(|e| e.owner == sirene_core::scene::Owner::Diagram)
+    );
+    assert!(!scene.elements.is_empty());
 }
 
 #[gpui::test]

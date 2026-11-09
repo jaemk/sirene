@@ -4,9 +4,10 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use sirene_core::Severity;
-use sirene_core::diagram::{self, Kind};
+use sirene_core::diagram::{self, Diagram, Kind};
 use sirene_core::flowchart::Flowchart;
 use sirene_core::markdown::{Block, is_markdown, mermaid_blocks};
+use sirene_core::scene::{Scene, TextMetrics, Theme};
 
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
@@ -68,7 +69,10 @@ pub struct Document {
     pub saved: String,
     /// The Markdown file around the diagram, for a `.md` or `.markdown` path.
     pub markdown: Option<Markdown>,
+    /// The diagram as a graph: the one drawn, selected, and edited. Empty for the other types.
     pub chart: Flowchart,
+    /// A diagram of a type not lowered to the graph model, drawn read-only (LANGS-2).
+    pub other: Option<Diagram>,
     pub problems: Vec<Problem>,
     /// Why the file could not be read, when it could not.
     pub read_error: Option<String>,
@@ -103,13 +107,14 @@ impl Document {
                 .unwrap_or_default(),
             None => source.clone(),
         };
-        let (chart, problems) = parse(&code);
+        let (chart, other, problems) = parse(&code);
         Self {
             path,
             saved: source,
             source: code,
             markdown,
             chart,
+            other,
             problems,
             read_error: None,
             write_error: None,
@@ -124,6 +129,15 @@ impl Document {
             Kind::State => Some("drawing edits are not supported for state diagrams yet"),
             Kind::Class => Some("drawing edits are not supported for class diagrams yet"),
             Kind::Er => Some("drawing edits are not supported for ER diagrams yet"),
+            Kind::Git => Some("drawing edits are not supported for git graphs yet"),
+        }
+    }
+
+    /// The drawing of whichever diagram the document holds.
+    pub fn scene(&self, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
+        match &self.other {
+            Some(d) => d.scene(metrics, theme),
+            None => sirene_core::scene::flowchart(&self.chart, metrics, theme),
         }
     }
 
@@ -148,7 +162,7 @@ impl Document {
         }
         md.block = i;
         self.source = block.code.clone();
-        (self.chart, self.problems) = parse(&self.source);
+        (self.chart, self.other, self.problems) = parse(&self.source);
         true
     }
 
@@ -200,7 +214,7 @@ impl Document {
         if source == self.source {
             return false;
         }
-        (self.chart, self.problems) = parse(&source);
+        (self.chart, self.other, self.problems) = parse(&source);
         if let Some(md) = &mut self.markdown {
             // The code goes back in its block; a file with no block gets one at the end.
             md.text = match md.blocks.get(md.block) {
@@ -386,7 +400,8 @@ impl Document {
     }
 }
 
-fn parse(source: &str) -> (Flowchart, Vec<Problem>) {
+/// The graph (empty for other types), any other diagram, and the problems in `source`.
+fn parse(source: &str) -> (Flowchart, Option<Diagram>, Vec<Problem>) {
     let lowered = diagram::lower(source);
     let problems = lowered
         .diagnostics
@@ -402,7 +417,10 @@ fn parse(source: &str) -> (Flowchart, Vec<Problem>) {
             }
         })
         .collect();
-    (lowered.flowchart, problems)
+    match lowered.diagram {
+        Diagram::Graph(chart) => (chart, None, problems),
+        other => (Flowchart::default(), Some(other), problems),
+    }
 }
 
 /// Writes `text` to a temporary file beside `path`, then renames it over `path`. A symlink is

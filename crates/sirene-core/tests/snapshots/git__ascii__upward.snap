@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/git.rs
+expression: "gitGraph BT:\n    commit id: \"a\"\n    branch \"cherry-pick\"\n    commit id: \"b\"\n    checkout main\n    commit id: \"c\" type: HIGHLIGHT\n    merge \"cherry-pick\" type: REVERSE\n"
+---
+x-+  3-b38c3a5
+# |  c
++-*  b
+* |  a
+| cherry-pick
+main

@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/git.rs
+expression: "gitGraph\n    commit id: \"init\"\n    commit id: \"fix\" type: REVERSE\n    branch develop\n    commit id: \"dev-1\" tag: \"beta\"\n    branch feature order: 1\n    commit id: \"feat\" type: HIGHLIGHT\n    checkout main\n    commit id: \"hotfix\" tag: \"v1.0.1\"\n    switch develop\n    merge feature id: \"M1\"\n    checkout main\n    cherry-pick id: \"dev-1\"\n    merge develop id: \"release\" tag: \"v2.0\"\n    cherry-pick id: \"feat\" tag: \"picked\"\n"
+---
+
+main
+│ develop
+│ │ feature
+● │ │  init
+⊗ │ │  fix
+├─● │  dev-1 [beta]
+│ ├─■  feat
+● │ │  hotfix [v1.0.1]
+│ ◉─┘  M1
+● │    6-813e0fc [cherry-pick:dev-1]
+◉─┘    release [v2.0]
+●      8-8f13c86 [picked]
