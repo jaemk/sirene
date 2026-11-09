@@ -104,6 +104,15 @@ elsewhere). The full key table is in `spec/gui-shell.md` (GUISHE-5).
 `cargo run -p sirene -- examples/shapes.mmd` from a checkout); a test keeps them free of
 diagnostics.
 
+### Agents
+
+The repo is a [mind](https://github.com/jaemk/mind) source with one skill, `sirene:render`, that
+teaches agents to check and render diagrams with the CLI (`skills/render/SKILL.md`):
+
+```
+mind meld jaemk/sirene
+```
+
 On Linux, building needs the XCB, xkbcommon, Wayland, fontconfig, and Vulkan development
 packages (see `.github/workflows/ci.yml`).
 

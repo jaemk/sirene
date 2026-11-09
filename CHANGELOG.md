@@ -52,6 +52,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `sirene_core::markdown::mermaid_blocks` and `flowchart::Parse::other_diagram`.
 - Editor: `sirene FILE.md` edits a Markdown file's mermaid blocks one at a time, writing each
   edit back into its block; `markdown::Block::replace_code`.
+- The repo is a mind source (`mind meld jaemk/sirene`) offering the `sirene:render` skill, which
+  teaches agents to check and render diagrams with the CLI.
 
 ### Changed
 

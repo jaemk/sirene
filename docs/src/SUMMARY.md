@@ -13,6 +13,7 @@
 - [The editor](editor.md)
 - [Keys](keys.md)
 - [Settings](settings.md)
+- [Agents](agents.md)
 
 # Flowcharts
 
