@@ -80,6 +80,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Reload asks before dropping unsaved edits; Save asks before replacing changes made on disk.
 - Opening a file that is already open brings its window forward.
 - Deleting a node drops the `id@{ ... }` and `class` statements of its edges.
+- The label field covers the label it edits, with its text centered, instead of showing it
+  through a translucent background in the dark theme.
 
 ## [0.1.1] - 2026-11-07
 

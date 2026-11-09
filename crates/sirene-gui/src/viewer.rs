@@ -707,6 +707,8 @@ impl Render for Viewer {
         let band = self.rubber_band(window);
         let ring = self.drawing_focused(window);
         let field = self.label_field(window, px(160.0));
+        // The field covers the label it edits: opaque, with its text centered like a label.
+        let field_bg = paint::color(theme.background);
         let shape_bar = crate::shape_bar::bar(
             self.icons(window),
             font.clone(),
@@ -774,7 +776,7 @@ impl Render for Viewer {
                     .top(at.y)
                     .w(width)
                     .on_action(cx.listener(|v, _: &Escape, window, cx| v.cancel_label(window, cx)))
-                    .child(Input::new(&input))
+                    .child(Input::new(&input).bg(field_bg).text_center())
             }))
             .context_menu(move |menu, window, cx| {
                 crate::menu::build(&menu_viewer, menu, window, cx)
