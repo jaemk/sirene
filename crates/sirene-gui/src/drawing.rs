@@ -11,6 +11,7 @@ use sirene_core::flowchart::{self, Flowchart, Shape};
 use sirene_core::scene::{Owner, Pt};
 
 use crate::paint::Placement;
+use crate::refusal;
 use crate::viewer::{Viewer, place};
 use crate::{
     AddNode, AddNodeBefore, AddShape, ConnectFrom, ConnectTo, Delete, Deselect, Group,
@@ -309,8 +310,9 @@ impl Viewer {
                     let scope = self.subgraph_at(e.position, window);
                     if scope.is_some() && scope != self.parent_of(&from) {
                         let src = &self.doc.source;
-                        if let Some(edit) = edit::move_to_subgraph(src, &from, scope.as_deref()) {
-                            self.apply(edit, window, cx);
+                        match edit::move_to_subgraph(src, &from, scope.as_deref()) {
+                            Some(edit) => self.apply(edit, window, cx),
+                            None => self.refused("move", Some(refusal::MOVE_TO), cx),
                         }
                     } else {
                         self.add_linked(Shape::Rect, Link::From(from), scope, window, cx);
@@ -484,17 +486,33 @@ impl Viewer {
         }
     }
 
+    /// Says in the status bar why `action` changed nothing (WYSIWY-19).
+    fn refused(&mut self, action: &str, reason: Option<&str>, cx: &mut Context<Self>) {
+        if let Some(reason) = reason {
+            self.notice = Some(refusal::notice(action, reason));
+            cx.notify();
+        }
+    }
+
     pub(crate) fn group(&mut self, _: &Group, window: &mut Window, cx: &mut Context<Self>) {
         let nodes = self.selected_nodes();
         let ids: Vec<&str> = nodes.iter().map(String::as_str).collect();
-        if let Some((_, edit)) = edit::group(&self.doc.source, &ids, GROUP) {
-            self.apply(edit, window, cx);
+        match edit::group(&self.doc.source, &ids, GROUP) {
+            Some((_, edit)) => self.apply(edit, window, cx),
+            None => {
+                let why = refusal::group(&self.doc.source, &ids);
+                self.refused("group", why, cx);
+            }
         }
     }
 
     pub(crate) fn ungroup(&mut self, a: &Ungroup, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(edit) = edit::ungroup(&self.doc.source, &a.id) {
-            self.apply(edit, window, cx);
+        match edit::ungroup(&self.doc.source, &a.id) {
+            Some(edit) => self.apply(edit, window, cx),
+            None => {
+                let why = refusal::ungroup(&self.doc.source, &self.doc.chart, &a.id);
+                self.refused("ungroup", why, cx);
+            }
         }
     }
 
@@ -513,13 +531,26 @@ impl Viewer {
     pub(crate) fn move_to(&mut self, a: &MoveTo, window: &mut Window, cx: &mut Context<Self>) {
         let nodes = self.selected_nodes();
         let target = a.subgraph.clone();
+        let mut stuck = false;
         self.change(window, cx, |src| {
             for id in &nodes {
-                if let Some(e) = edit::move_to_subgraph(src, id, target.as_deref()) {
-                    *src = e.apply(src);
+                match edit::move_to_subgraph(src, id, target.as_deref()) {
+                    Some(e) => *src = e.apply(src),
+                    // Already there is not a refusal.
+                    None => {
+                        let now = chart(src)
+                            .subgraphs
+                            .iter()
+                            .find(|s| s.members.iter().any(|m| m == id))
+                            .map(|s| s.id.clone());
+                        stuck |= now != target;
+                    }
                 }
             }
         });
+        if stuck {
+            self.refused("move", Some(refusal::MOVE_TO), cx);
+        }
     }
 
     pub(crate) fn move_earlier(
@@ -552,6 +583,8 @@ impl Viewer {
             _ => return,
         };
         let Some(edit) = edit else {
+            let why = refusal::move_item(&self.doc.source, &self.selection, later);
+            self.refused(if later { "move later" } else { "move earlier" }, why, cx);
             return;
         };
         self.apply(edit, window, cx);
@@ -667,10 +700,7 @@ impl Viewer {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.change_lines(window, cx, |l| Line {
-            length: l.length.saturating_add(1),
-            ..l
-        });
+        self.change_length(true, window, cx);
     }
 
     pub(crate) fn shorter_edge(
@@ -679,8 +709,26 @@ impl Viewer {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.change_length(false, window, cx);
+    }
+
+    /// Makes the selected edges one step longer, or shorter, or says why not.
+    fn change_length(&mut self, longer: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let lines: Vec<Line> = self
+            .selected_edges()
+            .iter()
+            .filter_map(|&i| self.doc.chart.edges.get(i).map(Line::of))
+            .collect();
+        if let Some(why) = refusal::length(&lines, longer) {
+            self.refused(if longer { "lengthen" } else { "shorten" }, Some(why), cx);
+            return;
+        }
         self.change_lines(window, cx, |l| Line {
-            length: l.length.saturating_sub(1),
+            length: if longer {
+                l.length.saturating_add(1)
+            } else {
+                l.length.saturating_sub(1)
+            },
             ..l
         });
     }

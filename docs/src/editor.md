@@ -47,7 +47,9 @@ pointer:
 - Empty space: Add Node, the diagram's Direction, Select All, Fit Window.
 - Rename and Delete, for the selection.
 
-With several items selected, the menu applies to all of them.
+With several items selected, the menu applies to all of them. An item that would change nothing
+is disabled with the reason after it, such as `Move Earlier (nothing before it to swap with)`;
+from a key, the status bar says `Can't move earlier: ...` instead.
 
 ## Layout hints
 
