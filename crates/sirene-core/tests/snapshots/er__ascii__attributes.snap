@@ -1,0 +1,26 @@
+---
+source: crates/sirene-core/tests/er.rs
+expression: "erDiagram\n    %% attribute blocks with keys and comments\n    CAR ||--o{ NAMED-DRIVER : allows\n    CAR {\n        string registrationNumber PK\n        string make\n        string model\n        string[] parts\n    }\n    PERSON ||--o{ NAMED-DRIVER : is\n    PERSON {\n        string driversLicense PK \"The license #\"\n        string(99) firstName \"Only 99 characters are allowed\"\n        string lastName\n        int age\n    }\n    NAMED-DRIVER {\n        string carRegistrationNumber PK, FK\n        string driverLicence PK, FK\n        List~string~ notes\n    }\n"
+---
++--------------------------------+   +-------------------------------------------------------------+
+|              CAR               |   |                           PERSON                            |
++--------------------------------+   +-------------------------------------------------------------+
+| string   registrationNumber PK |   | string     driversLicense PK The license #                  |
+| string   make                  |   | string(99) firstName         Only 99 characters are allowed |
+| string   model                 |   | string     lastName                                         |
+| string[] parts                 |   | int        age                                              |
++--------------------------------+   +-------------------------------------------------------------+
+                 1                                                  1
+                 +------+                                    +------+
+                        |                                    |
+                     allows                                 is
+                        |                                    |
+                        +-------+                     +------+
+                                *                     *
+                     +-------------------------------------------+
+                     |               NAMED-DRIVER                |
+                     +-------------------------------------------+
+                     | string       carRegistrationNumber PK, FK |
+                     | string       driverLicence         PK, FK |
+                     | List<string> notes                        |
+                     +-------------------------------------------+

@@ -4,6 +4,7 @@ pub mod ascii;
 pub mod class;
 pub mod diagnostic;
 pub mod diagram;
+pub mod er;
 pub mod flowchart;
 pub mod layout;
 mod lines;

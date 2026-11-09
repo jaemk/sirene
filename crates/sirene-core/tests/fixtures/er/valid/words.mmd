@@ -1,0 +1,11 @@
+erDiagram
+    direction LR
+    p[Person] {
+        string firstName
+    }
+    a["Customer Account"] {
+        string email UK
+    }
+    p one or more to zero or many a : has
+    a only one optionally to 1+ "Billing Plan" : "is on"
+    "Billing Plan" |o.-o| Discount : ""

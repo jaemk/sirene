@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/er.rs
+expression: "erDiagram\n    A ||--o{\n    B ||--o{ C : ok\n    |}--o{ D\n    E {\n        string\n        int count \"unclosed\n    }\n    F ||--|| G\n    style\n    H {\n        string name\n"
+---
+2:13: error: expected an entity after the relationship
+4:5: error: expected an entity, relationship, or other statement
+6:15: error: expected an attribute name after its type
+7:19: error: unclosed comment: expected `"`
+10:10: error: expected an entity name
+13:1: error: unclosed attribute block: expected `}`
+
+                ┌───────────┐           ┌─────────────┐
+┌───┐   ┌───┐   │     E     │   ┌───┐   │      H      │
+│ A │   │ B │   ├───────────┤   │ F │   ├─────────────┤
+└───┘   └───┘   │ int count │   └───┘   │ string name │
+          1     └───────────┘     1     └─────────────┘
+          │                       │
+         ok                       │
+          *                       1
+        ┌───┐                   ┌───┐
+        │ C │                   │ G │
+        └───┘                   └───┘

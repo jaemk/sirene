@@ -17,6 +17,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid class diagrams (`classDiagram`, `classDiagram-v2`), read-only in the editor: classes
   with attribute and method compartments, annotations, generics, every relation with its
   markers, cardinalities, and label, namespaces, notes, and styling.
+- Mermaid ER diagrams (`erDiagram`), read-only in the editor: entities with attribute columns
+  (type, name, keys, comment), aliases, relationships with crow's-foot markers in symbol or word
+  form, and styling.
 
 ### Changed
 

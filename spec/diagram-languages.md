@@ -78,10 +78,10 @@ as `flowchart::edit` does; a language without one has a read-only drawing, and t
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
-State and class diagrams are read-only this way: `Document::read_only` gives the reason, the drawing's menu
-holds only the disabled Add Node, Select All, and Fit Window, a press on a node pans instead of
-connecting, and every edit action says `Can't ...: drawing edits are not supported for state
-diagrams yet` (or class diagrams). Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
+State, class, and ER diagrams are read-only this way: `Document::read_only` gives the reason,
+the drawing's menu holds only the disabled Add Node, Select All, and Fit Window, a press on a
+node pans instead of connecting, and every edit action says `Can't ...: drawing edits are not
+supported for state diagrams yet` (or class or ER diagrams). Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 

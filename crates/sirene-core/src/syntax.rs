@@ -87,6 +87,8 @@ syntax_kinds! {
     GENERIC,
     RELATION,
     MEMBER,
+    // ER diagrams: an attribute key list such as `PK, FK`.
+    KEYS,
     ERROR_TOKEN,
 
     // Nodes.
@@ -127,6 +129,9 @@ syntax_kinds! {
     NAMESPACE,
     CSSCLASS_STMT,
     ANNOTATION_STMT,
+    ENTITY,
+    ENTITY_REF,
+    ATTRIBUTE,
     ERROR,
 }
 

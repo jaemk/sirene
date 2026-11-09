@@ -1,0 +1,30 @@
+---
+source: crates/sirene-core/tests/er.rs
+expression: "---\ntitle: Shop\n---\nerDiagram\n    CUSTOMER ||--o{ ORDER : places\n    ORDER ||--|{ LINE-ITEM : contains\n    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses\n    PRODUCT ||--o{ LINE-ITEM : \"ordered in\"\n"
+---
+
+                     Shop
+
+        ┌──────────┐
+        │ CUSTOMER │
+        └──────────┘
+           1    +
+       ┌───┘    └┄┄┐
+       │           ┆
+    places       uses
+       │           ┆
+    ┌──┘           └┄┄┐
+    *                 +
+┌───────┐   ┌──────────────────┐   ┌─────────┐
+│ ORDER │   │ DELIVERY-ADDRESS │   │ PRODUCT │
+└───────┘   └──────────────────┘   └─────────┘
+    1                                   1
+    └───────┐                    ┌──────┘
+            │                    │
+        contains            ordered in
+            │                    │
+            └──────┐     ┌───────┘
+                   +     *
+                ┌───────────┐
+                │ LINE-ITEM │
+                └───────────┘
