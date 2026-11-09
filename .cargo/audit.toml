@@ -1,13 +1,4 @@
 # cargo-audit settings, read by `cargo audit` and the release workflow's audit
-# gate.
+# gate. List an ignored advisory here with the reason it does not apply.
 [advisories]
-ignore = [
-    # quick-xml 0.38.4: memory exhaustion and quadratic time on hostile XML. It
-    # comes in only through gpui's Linux accessibility stack (gpui-pre-linux ->
-    # accesskit_unix -> atspi -> zbus-lockstep -> zbus_xml 5.1), which parses
-    # D-Bus introspection XML bundled with those crates, never input a sirene
-    # user supplies. zbus_xml 5.x pins quick-xml 0.38; drop these once gpui
-    # moves to zbus_xml 6.
-    "RUSTSEC-2026-0194",
-    "RUSTSEC-2026-0195",
-]
+ignore = []
