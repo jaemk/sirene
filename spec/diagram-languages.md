@@ -35,7 +35,7 @@ SVG, PNG, themes, and text metrics (DISPLA-4 to DISPLA-12) are shared by all of 
 diagnostic's position is in the source the user wrote, as now.
 
 `diagram::lower` returns a `diagram::Diagram`: `Graph` (a `Flowchart`) or one of the other models
-(`Git`, MGIT-2). `Diagram::scene` and `Diagram::ascii` draw any of them, and the CLI, Markdown
+(`Git`, MGIT-2; `Timeline`, TIMELI-2). `Diagram::scene` and `Diagram::ascii` draw any of them, and the CLI, Markdown
 rendering, and the editor's drawing and export go through them. Only a graph is hit-tested and
 edited; the others draw read-only (LANGS-5) with every element owned by the diagram.
 
@@ -83,11 +83,12 @@ as `flowchart::edit` does; a language without one has a read-only drawing, and t
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
-State, class, and ER diagrams and git graphs are read-only this way: `Document::read_only` gives
-the reason, the drawing's menu holds only the disabled Add Node, Select All, and Fit Window, a
-press on a node pans instead of connecting, and every edit action says `Can't ...: drawing edits
-are not supported for state diagrams yet` (or class diagrams, ER diagrams, or git graphs). A git
-graph is drawn from `Document::other` and has nothing to select. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
+State, class, and ER diagrams, git graphs, and timelines are read-only this way:
+`Document::read_only` gives the reason, the drawing's menu holds only the disabled Add Node,
+Select All, and Fit Window, a press on a node pans instead of connecting, and every edit action
+says `Can't ...: drawing edits are not supported for state diagrams yet` (or class diagrams, ER
+diagrams, git graphs, or timelines). A git graph or timeline is drawn from `Document::other`
+and has nothing to select. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 

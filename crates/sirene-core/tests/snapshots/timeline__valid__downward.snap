@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/timeline.rs
+expression: "---\ntitle: Daily standup\n---\ntimeline TD\n    accTitle: A day\n    section Morning\n        09:00 : Coffee\n        10:30 : Standup : Planning\n    section Afternoon\n        14:00 : Reviews\n              : Deploys\n"
+---
+
+                  Daily standup
+
+┌───────────┐ ┌───────┐ │ ┌────────┐
+│           │ │ 09:00 ├─┼─┤ Coffee │
+│           │ └───────┘ │ └────────┘
+│  Morning  │           │
+│           │ ┌───────┐ │ ┌─────────┐ ┌──────────┐
+│           │ │ 10:30 ├─┼─┤ Standup ├─┤ Planning │
+└───────────┘ └───────┘ │ └─────────┘ └──────────┘
+                        │
+┌───────────┐ ┌───────┐ │ ┌─────────┐ ┌─────────┐
+│ Afternoon │ │ 14:00 ├─┼─┤ Reviews ├─┤ Deploys │
+└───────────┘ └───────┘ │ └─────────┘ └─────────┘
+                        │
+                        ▼

@@ -13,6 +13,7 @@ pub mod markdown;
 pub mod scene;
 pub mod state;
 pub mod syntax;
+pub mod timeline;
 
 pub use diagnostic::{Diagnostic, Severity};
 pub use rowan::{TextRange, TextSize};

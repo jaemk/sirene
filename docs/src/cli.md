@@ -88,7 +88,7 @@ again changes nothing. The blocks themselves are never changed or removed.
 ```
 $ sirene svg guide.md --link
 wrote guide-1.svg
-guide.md:9:1: warning: skipping a `pie` diagram; sirene draws flowchart, state, class, ER, and git graph diagrams
+guide.md:9:1: warning: skipping a `pie` diagram; sirene draws flowchart, state, class, ER, git graph, and timeline diagrams
 guide.md:15:8: error: expected a node after the edge
 wrote guide-3.svg
 linked the images in guide.md
@@ -112,7 +112,7 @@ FILE and exits 1 if any has an error, so it fits a pre-commit hook or a CI step:
 
 ```
 $ sirene check guide.md docs/
-guide.md:9:1: warning: skipping a `pie` diagram; sirene draws flowchart, state, class, ER, and git graph diagrams
+guide.md:9:1: warning: skipping a `pie` diagram; sirene draws flowchart, state, class, ER, git graph, and timeline diagrams
 guide.md:15:8: error: expected a node after the edge
 ```
 

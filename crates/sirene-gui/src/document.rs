@@ -130,6 +130,7 @@ impl Document {
             Kind::Class => Some("drawing edits are not supported for class diagrams yet"),
             Kind::Er => Some("drawing edits are not supported for ER diagrams yet"),
             Kind::Git => Some("drawing edits are not supported for git graphs yet"),
+            Kind::Timeline => Some("drawing edits are not supported for timelines yet"),
         }
     }
 

@@ -5,6 +5,7 @@ use crate::diagnostic::Diagnostic;
 use crate::flowchart::{self, Flowchart, scan};
 use crate::git::{self, GitGraph};
 use crate::scene::{self, Scene, TextMetrics, Theme};
+use crate::timeline::{self, Timeline};
 use crate::{class, er, state};
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
@@ -15,6 +16,7 @@ pub enum Kind {
     Class,
     Er,
     Git,
+    Timeline,
 }
 
 impl Kind {
@@ -31,6 +33,8 @@ impl Kind {
             Kind::Er
         } else if git::HEADERS.contains(&word) {
             Kind::Git
+        } else if timeline::HEADERS.contains(&word) {
+            Kind::Timeline
         } else {
             Kind::Flowchart
         }
@@ -38,7 +42,7 @@ impl Kind {
 }
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
-pub const DRAWN: &str = "flowchart, state, class, ER, and git graph diagrams";
+pub const DRAWN: &str = "flowchart, state, class, ER, git graph, and timeline diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -46,6 +50,7 @@ pub enum Diagram {
     /// Flowcharts, and the state, class, and ER diagrams lowered to the graph model.
     Graph(Flowchart),
     Git(GitGraph),
+    Timeline(Timeline),
 }
 
 impl Default for Diagram {
@@ -59,7 +64,7 @@ impl Diagram {
     pub fn graph(&self) -> Option<&Flowchart> {
         match self {
             Diagram::Graph(f) => Some(f),
-            Diagram::Git(_) => None,
+            _ => None,
         }
     }
 
@@ -67,7 +72,7 @@ impl Diagram {
     pub fn into_graph(self) -> Flowchart {
         match self {
             Diagram::Graph(f) => f,
-            Diagram::Git(_) => Flowchart::default(),
+            _ => Flowchart::default(),
         }
     }
 
@@ -76,6 +81,7 @@ impl Diagram {
         match self {
             Diagram::Graph(f) => scene::flowchart(f, metrics, theme),
             Diagram::Git(g) => scene::git_graph(g, metrics, theme),
+            Diagram::Timeline(t) => scene::timeline(t, metrics, theme),
         }
     }
 
@@ -84,6 +90,7 @@ impl Diagram {
         match self {
             Diagram::Graph(f) => ascii::render(f, options),
             Diagram::Git(g) => ascii::git_graph(g, options),
+            Diagram::Timeline(t) => ascii::timeline(t, options),
         }
     }
 }
@@ -150,6 +157,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Timeline => {
+            let (timeline, diagnostics) = timeline::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Timeline(timeline),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -175,6 +189,7 @@ mod tests {
         assert_eq!(Kind::of("gitGraph\n"), Kind::Git);
         assert_eq!(Kind::of("gitGraph:\n"), Kind::Git);
         assert_eq!(Kind::of("gitGraph TB:\n"), Kind::Git);
+        assert_eq!(Kind::of("timeline TD\n"), Kind::Timeline);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State

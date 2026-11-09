@@ -48,7 +48,7 @@ pub(super) fn branch_color(theme: &Theme, k: usize) -> Color {
 }
 
 /// Black or white, whichever reads better on `fill`.
-fn ink(fill: Color) -> Color {
+pub(super) fn ink(fill: Color) -> Color {
     if luminance(fill) > 0.6 {
         Color::rgb(0x222222)
     } else {

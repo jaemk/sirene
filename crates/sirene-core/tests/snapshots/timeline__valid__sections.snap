@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/timeline.rs
+expression: "timeline\n    title Timeline of Industrial Revolution\n    section 17th-20th century\n        Industry 1.0 : Machinery, Water power, Steam <br>power\n        Industry 2.0 : Electricity, Internal combustion engine, Mass production\n        Industry 3.0 : Electronics, Computers, Automation\n    section 21st century\n        Industry 4.0 : Internet, Robotics, Internet of Things\n        Industry 5.0 : Artificial intelligence, Big data, 3D printing\n"
+---
+
+                                                    Timeline of Industrial Revolution
+
+┌─────────────────────────────────────────────────────────────────────────────────┐ ┌──────────────────────────────────────────────────┐
+│                                17th-20th century                                │ │                   21st century                   │
+└─────────────────────────────────────────────────────────────────────────────────┘ └──────────────────────────────────────────────────┘
+┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────┐ ┌──────────────────────────┐
+│      Industry 1.0       │ │      Industry 2.0       │ │      Industry 3.0       │ │    Industry 4.0     │ │       Industry 5.0       │
+└────────────┬────────────┘ └────────────┬────────────┘ └────────────┬────────────┘ └──────────┬──────────┘ └─────────────┬────────────┘
+─────────────┼───────────────────────────┼───────────────────────────┼─────────────────────────┼──────────────────────────┼──────────────►
+┌────────────┴────────────┐ ┌────────────┴────────────┐ ┌────────────┴────────────┐ ┌──────────┴──────────┐ ┌─────────────┴────────────┐
+│ Machinery, Water power, │ │  Electricity, Internal  │ │ Electronics, Computers, │ │ Internet, Robotics, │ │ Artificial intelligence, │
+│          Steam          │ │ combustion engine, Mass │ │       Automation        │ │ Internet of Things  │ │  Big data, 3D printing   │
+│          power          │ │       production        │ └─────────────────────────┘ └─────────────────────┘ └──────────────────────────┘
+└─────────────────────────┘ └─────────────────────────┘

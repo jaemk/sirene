@@ -8,12 +8,14 @@ pub mod png;
 mod shapes;
 mod style;
 pub mod svg;
+mod timeline;
 
 use unicode_width::UnicodeWidthStr;
 
 pub use git::git_graph;
 pub use paint::{CONFIG, flowchart};
 pub use style::parse_color;
+pub use timeline::timeline;
 
 /// A point in scene coordinates (pixels, y down).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
