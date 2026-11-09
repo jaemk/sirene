@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/er.rs
+expression: "erDiagram\n    direction LR\n    p[Person] {\n        string firstName\n    }\n    a[\"Customer Account\"] {\n        string email UK\n    }\n    p one or more to zero or many a : has\n    a only one optionally to 1+ \"Billing Plan\" : \"is on\"\n    \"Billing Plan\" |o.-o| Discount : \"\"\n"
+---
++------------------+       +------------------+
+|      Person      |       | Customer Account |         +--------------+    +----------+
++------------------++-has-*+------------------+1.is on.+| Billing Plan |?..?| Discount |
+| string firstName |       | string email UK  |         +--------------+    +----------+
++------------------+       +------------------+

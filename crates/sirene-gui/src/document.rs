@@ -123,6 +123,7 @@ impl Document {
             Kind::Flowchart => None,
             Kind::State => Some("drawing edits are not supported for state diagrams yet"),
             Kind::Class => Some("drawing edits are not supported for class diagrams yet"),
+            Kind::Er => Some("drawing edits are not supported for ER diagrams yet"),
         }
     }
 

@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/er.rs
+expression: "erDiagram\n    A ||--o{ B : has\n    style X fill:#f00\n    class Y hot\n    classDef bad fill\n"
+---
+3:11: warning: unknown entity `X`
+4:11: warning: unknown entity `Y`
+5:18: warning: ignoring style declaration `fill` without `:`
+
+┌───┐
+│ A │
+└───┘
+  1
+ has
+  *
+┌───┐
+│ B │
+└───┘
