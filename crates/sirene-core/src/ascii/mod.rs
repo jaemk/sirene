@@ -2,8 +2,10 @@
 
 mod canvas;
 mod git;
+mod timeline;
 
 pub use git::render as git_graph;
+pub use timeline::render as timeline;
 
 use unicode_width::UnicodeWidthStr;
 

@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/timeline.rs
+expression: "timeline\n    title History of Social Media Platform\n    2002 : LinkedIn\n    2004 : Facebook\n         : Google\n    2005 : YouTube\n    2006 : Twitter\n"
+---
+         History of Social Media Platform
+
++----------+ +----------+ +---------+ +---------+
+|   2002   | |   2004   | |  2005   | |  2006   |
++-----+----+ +-----+----+ +----+----+ +----+----+
+------+------------+-----------+-----------+------>
++-----+----+ +-----+----+ +----+----+ +----+----+
+| LinkedIn | | Facebook | | YouTube | | Twitter |
++----------+ +-----+----+ +---------+ +---------+
+             +-----+----+
+             |  Google  |
+             +----------+

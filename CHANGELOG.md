@@ -23,6 +23,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid git graphs (`gitGraph`), read-only in the editor: commits, branches, checkout, merges,
   and cherry-picks on lanes in each direction (`LR`, `TB`, `BT`), with commit types and tags; in
   text, one commit per row as `git log --graph` draws them.
+- Mermaid timelines (`timeline`, `LR` and `TD`), read-only in the editor: periods with events,
+  continuation lines, sections with their own colors, `<br>`, and wrapping, in images and text.
 
 ### Changed
 

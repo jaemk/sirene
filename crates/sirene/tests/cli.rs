@@ -894,7 +894,7 @@ fn other_diagram_types() {
         .failure()
         .stderr(
             "<stdin>:1:1: error: `sequenceDiagram` diagrams are not supported; \
-             sirene draws flowchart, state, class, ER, and git graph diagrams\n",
+             sirene draws flowchart, state, class, ER, git graph, and timeline diagrams\n",
         );
 }
 
@@ -922,6 +922,32 @@ fn git_graphs() {
         .assert()
         .failure()
         .stderr("<stdin>:2:9: error: cannot merge `main` into itself\n");
+}
+
+/// A timeline draws in text and as an image (TIMELI-4, LANGS-4).
+#[test]
+fn timelines() {
+    let src = "timeline\n  2002 : A\n  2004 : B\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(
+            "+------+ +------+\n\
+             | 2002 | | 2004 |\n\
+             +---+--+ +---+--+\n\
+             ----+--------+---->\n\
+             +---+--+ +---+--+\n\
+             |  A   | |  B   |\n\
+             +------+ +------+\n",
+        );
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(">2004</text>"));
 }
 
 /// A state diagram draws from stdin, a file, and a Markdown block (MSTATE-1, LANGS-4).

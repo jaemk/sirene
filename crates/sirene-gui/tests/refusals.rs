@@ -207,6 +207,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
             .all(|e| e.owner == sirene_core::scene::Owner::Diagram)
     );
     assert!(!scene.elements.is_empty());
+    let timeline = Document::from_source(None, "timeline\n  2002 : A\n".to_owned());
+    assert_eq!(
+        timeline.read_only(),
+        Some("drawing edits are not supported for timelines yet")
+    );
+    assert!(timeline.chart.nodes.is_empty() && timeline.other.is_some());
 }
 
 #[gpui::test]

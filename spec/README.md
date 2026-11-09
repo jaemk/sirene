@@ -33,6 +33,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | D2 | research | [d2.md](d2.md) |
 | PlantUML | research | [plantuml.md](plantuml.md) |
 | Mermaid Git Graphs | done | [mermaid-git-graphs.md](mermaid-git-graphs.md) |
+| Mermaid Timelines | done | [mermaid-timelines.md](mermaid-timelines.md) |
 
 ## Conventions
 

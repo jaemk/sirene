@@ -93,6 +93,11 @@ syntax_kinds! {
     // attribute name such as `id` or `tag`.
     GIT_KW,
     ATTR_KEY,
+    // Timelines: `title` and `section`, a time period's text, and an event's.
+    TITLE_KW,
+    SECTION_KW,
+    PERIOD,
+    EVENT,
     ERROR_TOKEN,
 
     // Nodes.
@@ -138,6 +143,10 @@ syntax_kinds! {
     ATTRIBUTE,
     GIT_STMT,
     ATTR,
+    TITLE_STMT,
+    SECTION_STMT,
+    PERIOD_STMT,
+    EVENTS_STMT,
     ERROR,
 }
 

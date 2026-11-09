@@ -27,6 +27,7 @@
 - [Class diagrams](class.md)
 - [ER diagrams](er.md)
 - [Git graphs](git.md)
+- [Timelines](timeline.md)
 
 # Project
 
