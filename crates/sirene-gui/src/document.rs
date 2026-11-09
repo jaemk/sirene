@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use sirene_core::Severity;
 use sirene_core::flowchart::{self, Flowchart};
+use sirene_core::markdown::{Block, is_markdown, mermaid_blocks};
 
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
@@ -44,14 +45,28 @@ pub enum Disk {
     Conflict,
 }
 
+/// A Markdown file, edited one mermaid block at a time (WYSIWY-20).
+#[derive(Debug, Clone)]
+pub struct Markdown {
+    /// The whole file's text, with the edits made to its blocks.
+    pub text: String,
+    /// The mermaid blocks of `text`.
+    pub blocks: Vec<Block>,
+    /// The block shown, an index into `blocks`.
+    pub block: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct Document {
     /// The file shown, if any.
     pub path: Option<PathBuf>,
+    /// The diagram's text: the file's, or for a Markdown file the shown block's code.
     pub source: String,
     /// The text last read from or written to the file, or the text an Untitled document opened
     /// with.
     pub saved: String,
+    /// The Markdown file around the diagram, for a `.md` or `.markdown` path.
+    pub markdown: Option<Markdown>,
     pub chart: Flowchart,
     pub problems: Vec<Problem>,
     /// Why the file could not be read, when it could not.
@@ -68,19 +83,70 @@ impl Document {
         Self::from_source(None, STARTER.to_owned())
     }
 
-    /// A document showing `source`, which counts as saved.
+    /// A document showing `source`, which counts as saved. For a Markdown `path`, `source` is the
+    /// file's text and the document shows its first mermaid block.
     pub fn from_source(path: Option<PathBuf>, source: String) -> Self {
-        let (chart, problems) = parse(&source);
+        let markdown = path
+            .as_deref()
+            .filter(|p| is_markdown(p))
+            .map(|_| Markdown {
+                blocks: mermaid_blocks(&source),
+                text: source.clone(),
+                block: 0,
+            });
+        let code = match &markdown {
+            Some(md) => md
+                .blocks
+                .first()
+                .map(|b| b.code.clone())
+                .unwrap_or_default(),
+            None => source.clone(),
+        };
+        let (chart, problems) = parse(&code);
         Self {
             path,
-            saved: source.clone(),
-            source,
+            saved: source,
+            source: code,
+            markdown,
             chart,
             problems,
             read_error: None,
             write_error: None,
             disk_changed: false,
         }
+    }
+
+    /// The text a save writes: the diagram's, or the whole Markdown file's.
+    pub fn text(&self) -> &str {
+        match &self.markdown {
+            Some(md) => &md.text,
+            None => &self.source,
+        }
+    }
+
+    /// Shows mermaid block `i` of a Markdown file. Returns whether the shown block changed.
+    pub fn show_block(&mut self, i: usize) -> bool {
+        let Some(md) = &mut self.markdown else {
+            return false;
+        };
+        let Some(block) = md.blocks.get(i) else {
+            return false;
+        };
+        if i == md.block {
+            return false;
+        }
+        md.block = i;
+        self.source = block.code.clone();
+        (self.chart, self.problems) = parse(&self.source);
+        true
+    }
+
+    /// For a Markdown file: the shown block (from 1), the number of blocks, and the shown
+    /// block's first line in the file.
+    pub fn block_info(&self) -> Option<(usize, usize, usize)> {
+        let md = self.markdown.as_ref()?;
+        let block = md.blocks.get(md.block)?;
+        Some((md.block + 1, md.blocks.len(), block.line))
     }
 
     /// Reads and parses `path`. A file that cannot be read gives an empty document that
@@ -124,13 +190,33 @@ impl Document {
             return false;
         }
         (self.chart, self.problems) = parse(&source);
+        if let Some(md) = &mut self.markdown {
+            // The code goes back in its block; a file with no block gets one at the end.
+            md.text = match md.blocks.get(md.block) {
+                Some(block) => block.replace_code(&md.text, &source),
+                None => {
+                    let mut text = md.text.clone();
+                    if !text.is_empty() && !text.ends_with('\n') {
+                        text.push('\n');
+                    }
+                    if !text.is_empty() {
+                        text.push('\n');
+                    }
+                    let code = source.trim_end_matches('\n');
+                    text.push_str(&format!("```mermaid\n{code}\n```\n"));
+                    text
+                }
+            };
+            md.blocks = mermaid_blocks(&md.text);
+            md.block = md.block.min(md.blocks.len().saturating_sub(1));
+        }
         self.source = source;
         true
     }
 
     /// Whether the text differs from the saved text (WYSIWY-3).
     pub fn is_edited(&self) -> bool {
-        self.source != self.saved
+        self.text() != self.saved
     }
 
     /// Checks the file for changes (WYSIWY-5): an unedited document takes the new text, an
@@ -157,7 +243,7 @@ impl Document {
                     .as_deref()
                     .map_or_else(String::new, |e| format!(": {e}"))
             );
-            *self = next;
+            self.replace(next);
             return Disk::Reloaded;
         }
         if self.disk_changed {
@@ -178,26 +264,33 @@ impl Document {
         };
         log::debug!("reloading {}", path.display());
         let next = Self::open(path);
-        let changed = next.source != self.source;
+        let before = self.source.clone();
+        self.replace(next);
+        self.source != before
+    }
+
+    /// Becomes `next`, a new reading of the same file, still showing the same Markdown block.
+    fn replace(&mut self, next: Self) {
+        let block = self.markdown.as_ref().map_or(0, |md| md.block);
         *self = next;
-        changed
+        self.show_block(block);
     }
 
     /// Writes the text to the file through a temporary file in the same directory
     /// (WYSIWY-4). On failure the document stays edited and records the error.
     pub fn save(&mut self) -> Result<(), String> {
         let result = match &self.path {
-            Some(path) => write_atomic(path, &self.source)
+            Some(path) => write_atomic(path, self.text())
                 .map_err(|e| format!("cannot write {}: {e}", path.display())),
             None => Err("no file to save to".to_owned()),
         };
         match &result {
-            Ok(()) => log::debug!("saved {} bytes to {}", self.source.len(), self.name()),
+            Ok(()) => log::debug!("saved {} bytes to {}", self.text().len(), self.name()),
             Err(e) => log::debug!("save failed: {e}"),
         }
         match &result {
             Ok(()) => {
-                self.saved = self.source.clone();
+                self.saved = self.text().to_owned();
                 self.read_error = None;
                 self.write_error = None;
                 self.disk_changed = false;
@@ -207,8 +300,22 @@ impl Document {
         result
     }
 
-    /// Saves to `path`, which the document then shows.
+    /// Saves to `path`, which the document then shows. Saving a diagram as Markdown writes it in
+    /// a mermaid block; saving a Markdown file's block as a diagram writes the block alone.
     pub fn save_as(&mut self, path: PathBuf) -> Result<(), String> {
+        match (&self.markdown, is_markdown(&path)) {
+            (Some(_), false) => self.markdown = None,
+            (None, true) => {
+                let code = self.source.trim_end_matches('\n');
+                let text = format!("```mermaid\n{code}\n```\n");
+                self.markdown = Some(Markdown {
+                    blocks: mermaid_blocks(&text),
+                    text,
+                    block: 0,
+                });
+            }
+            _ => {}
+        }
         self.path = Some(path);
         self.save()
     }
@@ -244,6 +351,16 @@ impl Document {
         }
         if let Some(e) = &self.read_error {
             return e.clone();
+        }
+        if self
+            .markdown
+            .as_ref()
+            .is_some_and(|md| md.blocks.is_empty())
+        {
+            return format!(
+                "{} has no mermaid blocks; editing adds one at the end",
+                self.name()
+            );
         }
         let first = self
             .problems

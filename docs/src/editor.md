@@ -102,6 +102,18 @@ writes one `linkStyle N ...` per edge, replacing any other `linkStyle` that name
   overwriting the newer file.
 - File > Open Recent lists the last 10 files.
 
+## Markdown files
+
+`sirene notes.md` opens a Markdown file's `mermaid` code blocks one at a time. The source pane
+shows the current block's code, and every edit, typed or made on the drawing, is written back
+into that block; the rest of the file is not touched. Save writes the whole file.
+
+- The status bar shows `Diagram N of M (line L)` with buttons for the previous and next block;
+  secondary-shift-] and secondary-shift-[ do the same.
+- In a file with no mermaid blocks, the first edit adds one at the end.
+- Save As to a `.mmd` file writes the current block on its own.
+- Export suggests `notes-N.png`, the name `sirene png notes.md` gives block N.
+
 ## Export
 
 - File > Export as PNG (secondary-shift-e) and Export as SVG write the drawing in the window's

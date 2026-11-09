@@ -47,9 +47,10 @@ impl Format {
 }
 
 impl Viewer {
-    /// The file name an export suggests: the document's, with the format's extension.
+    /// The file name an export suggests: the document's, with the format's extension; for a
+    /// Markdown file's block, `STEM-N` as `sirene svg FILE.md` names it.
     pub fn export_name(&self, format: Format) -> String {
-        let stem = self
+        let mut stem = self
             .doc
             .path
             .as_deref()
@@ -58,6 +59,9 @@ impl Viewer {
                 || "diagram".to_owned(),
                 |s| s.to_string_lossy().into_owned(),
             );
+        if let Some((n, _, _)) = self.doc.block_info() {
+            stem = format!("{stem}-{n}");
+        }
         format!("{stem}.{}", format.extension())
     }
 
