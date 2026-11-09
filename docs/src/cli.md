@@ -6,6 +6,7 @@ sirene ascii [FILE|-]         print a flowchart as text
 sirene svg [FILE|DIR|-]       print or write SVG
 sirene png [FILE|DIR|-]       write PNG
 sirene check [FILE|DIR|-]...  print diagnostics only
+sirene update                 replace sirene with the latest release
 ```
 
 `svg`, `png`, `ascii`, and `check` never open a window, and work in a build without the GUI. With no FILE,
@@ -114,6 +115,23 @@ $ sirene check guide.md docs/
 guide.md:9:1: warning: skipping a `pie` diagram; sirene draws flowcharts
 guide.md:15:8: error: expected a node after the edge
 ```
+
+## `sirene update`
+
+Replaces the running binary with the latest release, or the one `--to VERSION` names, after
+asking (`--yes` skips the question). `--check` only reports. The download is the same
+`sirene-VERSION-TARGET.tar.gz` the install script uses, for the running build's target, so a GUI
+build stays a GUI build. It is checked against the release's `SHA256SUMS`, and against its build
+provenance when `gh` is installed, before anything is replaced.
+
+```
+$ sirene update --check
+update available: 0.2.0 -> 0.3.0 (target x86_64-unknown-linux-gnu)
+```
+
+It never downgrades. A sirene installed by Homebrew or `cargo install` is refused with the
+command that updates it (`brew upgrade sirene`, `brew upgrade --cask sirene`, or
+`cargo install sirene`). `GH_TOKEN` or `GITHUB_TOKEN` authenticates the requests when set.
 
 ## Watching
 

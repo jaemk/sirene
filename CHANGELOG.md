@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `sirene update` replaces the running binary with the latest release (`--check`, `--to
+  VERSION`, `--yes`), checked against `SHA256SUMS` and its build provenance; it refuses for a
+  Homebrew or `cargo install` binary and names the command to use instead.
+
 ## [0.2.0] - 2026-11-08
 
 ### Added

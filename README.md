@@ -54,6 +54,7 @@ sirene png diagram.mmd       # write diagram.png (--quality draft|normal|fine, -
 sirene png --watch docs/     # write a .png beside each .mmd under docs/, again on each change
 sirene svg README.md         # write README-1.svg, ... for each ```mermaid block (--link to add image links)
 sirene check docs/ a.md      # report errors only; exit 1 if any
+sirene update                # replace sirene with the latest release (--check, --to VERSION)
 ```
 
 `svg`, `png`, and `check` never change a Markdown file except with `--link`, which adds an image

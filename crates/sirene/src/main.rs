@@ -65,6 +65,7 @@ fn verbose(on: bool) {
 }
 
 mod markdown;
+mod update;
 
 #[derive(Debug, Subcommand)]
 enum Command {
@@ -130,6 +131,18 @@ enum Command {
         /// For a directory, the directory to write into.
         #[arg(short, long)]
         output: Option<PathBuf>,
+    },
+    /// Replace this sirene with the latest release, or the one --to names.
+    Update {
+        /// Print whether an update is available, and change nothing.
+        #[arg(long)]
+        check: bool,
+        /// Update without asking.
+        #[arg(short, long)]
+        yes: bool,
+        /// The release to install (e.g. 0.2.0), instead of the latest. Never downgrades.
+        #[arg(long, value_name = "VERSION")]
+        to: Option<String>,
     },
 }
 
@@ -219,7 +232,7 @@ fn misspelled_command(files: &[PathBuf]) -> Option<(String, &'static str)> {
         }
         row[b.len()] <= 2
     };
-    ["ascii", "svg", "png", "check", "help"]
+    ["ascii", "svg", "png", "check", "update", "help"]
         .into_iter()
         .find(|cmd| near(cmd))
         .map(|cmd| (name.to_owned(), cmd))
@@ -237,6 +250,7 @@ fn run(cli: Cli) -> ExitCode {
     }
     match cli.command {
         None => gui(cli.files),
+        Some(Command::Update { check, yes, to }) => update::run(update::Args { check, yes, to }),
         Some(Command::Check { files }) => {
             // Every file is checked, whatever the ones before it had.
             let failed = files.iter().filter(|f| !markdown::check(f)).count();
