@@ -106,7 +106,7 @@ and prints diagnostics as in CLI-3. A FILE may be a diagram, `-` for stdin, a di
 DIR`), or a Markdown file (`.md` or `.markdown`), whose mermaid blocks (MARKDO-1) are checked with
 positions in the Markdown file; a block of another Mermaid diagram type (MARKDO-2) is skipped with
 `NAME:LINE:COL: warning: skipping a `KIND` diagram; sirene draws flowchart, sequence, state, class,
-ER, git graph, timeline, pie, and gantt diagrams` (the list is `diagram::DRAWN`).
+ER, git graph, timeline, pie, gantt, and mindmap diagrams` (the list is `diagram::DRAWN`).
 Every FILE is
 checked. The exit status is 1 when any FILE cannot be read or has an error, else 0. A mistyped
 `check` is suggested as in CLI-1. Tests: `check` in `crates/sirene/tests/cli.rs`.

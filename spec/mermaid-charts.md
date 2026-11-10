@@ -9,7 +9,7 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | Type | Model | Notes |
 |---|---|---|
 | `requirementDiagram`, `C4Context` (and the other C4 types), `architecture-beta`, `block-beta` | graph | New shapes; C4 and architecture use icons, drawn as placeholders. `block-beta` places blocks in a grid, which needs a LAYOUT constraint. |
-| `mindmap` | tree | A radial or two-sided tree layout, not layered. |
+| `mindmap` | tree | A two-sided tree out from the root; ASCII is an outline: `mermaid-mindmaps.md`. |
 | `pie` | chart | Slices with labels and a legend; ASCII is a table with percentage bars: `mermaid-pie-charts.md`. |
 | `xychart-beta`, `quadrantChart`, `radar-beta` | chart | Axes, scales, and points or bars. |
 | `sankey-beta` | chart | Flows between ranked nodes; the ranking could reuse LAYOUT-4. |

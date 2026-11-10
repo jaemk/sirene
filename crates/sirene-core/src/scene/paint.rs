@@ -51,9 +51,9 @@ const LEAD: f32 = 4.0;
 
 /// Sizes in pixels. Layout rects span `x..=x+w-1`, so each size is one more than the drawn
 /// extent.
-struct Px<'a, M> {
-    metrics: &'a M,
-    theme: &'a Theme,
+pub(super) struct Px<'a, M> {
+    pub metrics: &'a M,
+    pub theme: &'a Theme,
 }
 
 fn cells(v: f32) -> i32 {
@@ -93,14 +93,14 @@ impl<M: TextMetrics> Px<'_, M> {
         line.iter().map(|s| self.width(&s.text, style_of(s))).sum()
     }
 
-    fn text_size(&self, lines: &[Vec<Span>]) -> (f32, f32) {
+    pub(super) fn text_size(&self, lines: &[Vec<Span>]) -> (f32, f32) {
         let w = lines.iter().map(|l| self.line_width(l)).fold(0.0, f32::max);
         (w, lines.len() as f32 * self.theme.line_height)
     }
 
     /// `lines` with each line wider than `max` broken at spaces; a word wider than `max` keeps
     /// a line of its own.
-    fn wrap(&self, lines: &[Vec<Span>], max: f32) -> Vec<Vec<Span>> {
+    pub(super) fn wrap(&self, lines: &[Vec<Span>], max: f32) -> Vec<Vec<Span>> {
         let mut out = Vec::new();
         for line in lines {
             if self.line_width(line) <= max {
@@ -562,10 +562,10 @@ fn stroke(r: &Resolved, color: Color, width: f32, dash: Option<(f32, f32)>) -> S
     }
 }
 
-struct Painter<'a> {
-    theme: &'a Theme,
-    metrics: &'a dyn TextMetrics,
-    elements: Vec<Element>,
+pub(super) struct Painter<'a> {
+    pub theme: &'a Theme,
+    pub metrics: &'a dyn TextMetrics,
+    pub elements: Vec<Element>,
 }
 
 impl Painter<'_> {
@@ -573,7 +573,7 @@ impl Painter<'_> {
         self.elements.push(Element { owner, primitive });
     }
 
-    fn path(
+    pub(super) fn path(
         &mut self,
         owner: Owner,
         segments: Vec<Segment>,
@@ -612,7 +612,7 @@ impl Painter<'_> {
     }
 
     /// Lines of styled spans centered as a block on `center`, one text run per span.
-    fn lines(&mut self, owner: Owner, lines: &[Vec<Span>], center: Pt, color: Color) {
+    pub(super) fn lines(&mut self, owner: Owner, lines: &[Vec<Span>], center: Pt, color: Color) {
         let (lh, size) = (self.theme.line_height, self.theme.font_size);
         let width = |text: &str, style| self.metrics.styled_width(text, size, style);
         let top = center.y - lh * (lines.len() as f32 - 1.0) / 2.0;

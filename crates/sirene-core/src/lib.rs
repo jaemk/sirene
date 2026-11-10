@@ -11,6 +11,7 @@ pub mod git;
 pub mod layout;
 mod lines;
 pub mod markdown;
+pub mod mindmap;
 pub mod pie;
 pub mod scene;
 pub mod sequence;

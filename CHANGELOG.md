@@ -35,6 +35,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   durations, and tags (`active`, `done`, `crit`, `milestone`, `vert`), sections, `excludes`,
   `includes`, `weekend`, `inclusiveEndDates`, `todayMarker`, `topAxis`, compact rows, and any
   dayjs `dateFormat` and d3 `axisFormat`, also settable in frontmatter or a directive.
+- Mermaid mindmaps (`mindmap`), read-only in the editor: a tree built from indentation, every
+  node shape, markdown strings, and `:::` classes, drawn out to both sides of the root with a
+  color per branch; in text, an outline of the tree.
 
 ### Changed
 

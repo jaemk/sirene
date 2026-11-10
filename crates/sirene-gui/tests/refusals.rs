@@ -231,6 +231,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for gantt charts yet")
     );
     assert!(gantt.chart.nodes.is_empty() && gantt.other.is_some());
+    let mindmap = Document::from_source(None, "mindmap\n  root\n    a\n".to_owned());
+    assert_eq!(
+        mindmap.read_only(),
+        Some("drawing edits are not supported for mindmaps yet")
+    );
+    assert!(mindmap.chart.nodes.is_empty() && mindmap.other.is_some());
 }
 
 #[gpui::test]

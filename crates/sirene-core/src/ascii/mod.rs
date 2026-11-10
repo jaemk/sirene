@@ -3,12 +3,14 @@
 mod canvas;
 mod gantt;
 mod git;
+mod mindmap;
 mod pie;
 mod sequence;
 mod timeline;
 
 pub use gantt::render as gantt;
 pub use git::render as git_graph;
+pub use mindmap::render as mindmap;
 pub use pie::render as pie;
 pub use sequence::render as sequence;
 pub use timeline::render as timeline;
