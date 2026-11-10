@@ -13,7 +13,7 @@ use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
 use crate::timeline::{self, Timeline};
 use crate::xychart::{self, XyChart};
-use crate::{class, er, state};
+use crate::{class, er, requirement, state};
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,6 +31,7 @@ pub enum Kind {
     Journey,
     Quadrant,
     XyChart,
+    Requirement,
 }
 
 impl Kind {
@@ -63,6 +64,8 @@ impl Kind {
             Kind::Quadrant
         } else if xychart::HEADERS.contains(&word) {
             Kind::XyChart
+        } else if requirement::HEADERS.contains(&word) {
+            Kind::Requirement
         } else {
             Kind::Flowchart
         }
@@ -71,7 +74,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, and XY diagrams";
+     mindmap, journey, quadrant, XY, and requirement diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -207,6 +210,7 @@ pub fn lower(src: &str) -> Lowered {
         Kind::State => state::parse(src).lower().into(),
         Kind::Class => class::parse(src).lower().into(),
         Kind::Er => er::parse(src).lower().into(),
+        Kind::Requirement => requirement::parse(src).lower().into(),
         Kind::Git => {
             let (graph, diagnostics) = git::parse(src).lower();
             Lowered {
@@ -297,6 +301,7 @@ mod tests {
         assert_eq!(Kind::of("quadrantChart\n"), Kind::Quadrant);
         assert_eq!(Kind::of("xychart-beta\n"), Kind::XyChart);
         assert_eq!(Kind::of("xychart horizontal\n"), Kind::XyChart);
+        assert_eq!(Kind::of("requirementDiagram\n"), Kind::Requirement);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -311,6 +316,7 @@ mod tests {
     fn other_diagrams() {
         assert_eq!(other_diagram("zenuml\n"), Some("zenuml".to_owned()));
         assert_eq!(other_diagram("xychart-beta\n"), None);
+        assert_eq!(other_diagram("requirementDiagram\n"), None);
         assert_eq!(other_diagram("quadrantChart\n"), None);
         assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);

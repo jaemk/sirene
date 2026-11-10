@@ -15,6 +15,7 @@ pub mod markdown;
 pub mod mindmap;
 pub mod pie;
 pub mod quadrant;
+pub mod requirement;
 pub mod scene;
 pub mod sequence;
 pub mod state;

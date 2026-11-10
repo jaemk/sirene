@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/requirement.rs
+expression: "---\ntitle: Styled requirements\n---\nrequirementDiagram\n    direction LR\n    %% Classes by shorthand, `class`, and `style`.\n    requirement \"Login works\":::important {\n    id: R1\n    text: \"Users can log in, with a password.\"\n    }\n    element portal {\n    type: service\n    }\n    portal - satisfies -> \"Login works\"\n    portal:::service\n    classDef important fill:#f8d7da, stroke:#c0392b\n    classDef service fill:#d6eaf8\n    style portal stroke-width:3px\n"
+---
+                            Styled requirements
+
++---------------+               +------------------------------------------+
+|   «Element»   |               |              «Requirement»               |
+|    portal     |               |               Login works                |
++---------------+..«satisfies».>+------------------------------------------+
+| Type: service |               | Id:   R1                                 |
++---------------+               | Text: Users can log in, with a password. |
+                                +------------------------------------------+

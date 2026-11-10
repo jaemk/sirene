@@ -47,6 +47,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid XY charts (`xychart-beta`, `xychart`), read-only in the editor: bar and line series
   over category or numeric x-axes, vertical or `horizontal`, with axis titles and ranges, point
   labels, and a legend for named series; in text, a row per position with bars and markers.
+- Mermaid requirement diagrams (`requirementDiagram`), read-only in the editor: every
+  requirement type and elements as boxes with their fields, the seven relationship types in
+  either direction, classes, styles, and `direction`.
 
 ### Changed
 

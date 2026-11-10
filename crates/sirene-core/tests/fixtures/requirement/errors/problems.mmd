@@ -1,0 +1,17 @@
+requirementDiagram
+    requirement r {
+    id: 1
+    risk: huge
+    verifymethod: guess
+    type: x
+    }
+    element e {
+    docref: d
+    id: 2
+    }
+    e - likes -> r
+    e - satisfies -> ghost
+    r:::nothing
+    class missing nothing
+    element unclosed {
+    type: t

@@ -35,6 +35,7 @@
 - [User journeys](journey.md)
 - [Quadrant charts](quadrant.md)
 - [XY charts](xychart.md)
+- [Requirement diagrams](requirement.md)
 
 # Project
 
