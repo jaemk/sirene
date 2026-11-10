@@ -14,6 +14,8 @@ the corpus under `crates/sirene-core/tests/fixtures/mindmap/` (LANGS-6).
   raw text up to the closing delimiter, a `"string"`, or a markdown ``"`string`"``, which may span
   lines.
 - `::icon(name)` and `:::class names` on lines of their own.
+- `@{ ... }` metadata after a node, shared with kanban boards (MKAN-1); in a mindmap it is a
+  warning and ignored.
 - Comments, directives, frontmatter `title`.
 
 The parser shares `crate::lines` with the other Mermaid parsers and is lossless. Tests:

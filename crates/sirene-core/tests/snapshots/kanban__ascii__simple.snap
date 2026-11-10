@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/kanban.rs
+expression: "kanban\n  backlog[Backlog]\n    item1[Draft onboarding guide]@{ assigned: 'alex', priority: 'Low' }\n    item2[\"Quoted: card (with brackets)\"]\n  doing[In Review]\n    item3[Fix login timeout]@{\n      ticket: BUG-101\n      assigned: 'sam'\n      priority: 'Very High'\n    }\n  done[Done]\n"
+---
++- Backlog ------------------------+ +- In Review ----------------------+ +- Done ---------------------------+
+| .------------------------------. | | .------------------------------. | |                                  |
+| | Draft onboarding guide       | | | | Fix login timeout            | | |                                  |
+| | v Low @alex                  | | | | ^^ Very High BUG-101 @sam    | | |                                  |
+| '------------------------------' | | '------------------------------' | |                                  |
+| .------------------------------. | |                                  | |                                  |
+| | Quoted: card (with brackets) | | |                                  | |                                  |
+| '------------------------------' | |                                  | |                                  |
++----------------------------------+ +----------------------------------+ +----------------------------------+

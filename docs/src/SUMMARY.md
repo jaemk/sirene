@@ -36,6 +36,7 @@
 - [Quadrant charts](quadrant.md)
 - [XY charts](xychart.md)
 - [Requirement diagrams](requirement.md)
+- [Kanban boards](kanban.md)
 
 # Project
 

@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/kanban.rs
+expression: "kanban\n  ::icon(fa fa-book)\n    col[Column]@{ shape: rect }\n      a[Card]@{ priority: 'Medium', owner: x, nonsense }\n      ::icon(fa fa-bug)\n      b[Unclosed\n  orphan[Too far left]\n    c[Card]@{ ticket: T-1\n"
+---
+2:3: error: `::icon(...)` must follow the column or card it applies to
+3:16: warning: ignoring `shape`: a column's metadata is `label`
+4:14: warning: ignoring `nonsense`: expected `key: value`
+4:14: warning: ignoring priority `Medium`: expected `Very High`, `High`, `Low`, or `Very Low`
+4:14: warning: ignoring `owner`: a card's metadata is `assigned`, `ticket`, `priority`, `label`, and `icon`
+5:7: warning: icons are not drawn; ignoring `fa fa-bug`
+6:17: error: unclosed `[`: expected `]`
+7:3: error: `Too far left` is indented less than the first column; indent columns alike and their cards under them
+8:12: error: unclosed `@{`: expected `}`
+
+┌─ Column ─────────┐ ┌─ Card ───────────┐
+│ ╭──────────────╮ │ │                  │
+│ │ Card         │ │ │                  │
+│ ╰──────────────╯ │ │                  │
+│ ╭──────────────╮ │ │                  │
+│ │ Unclosed     │ │ │                  │
+│ ╰──────────────╯ │ │                  │
+└──────────────────┘ └──────────────────┘

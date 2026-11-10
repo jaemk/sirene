@@ -4,7 +4,7 @@ How languages other than Mermaid flowcharts fit the pipeline. Each language has 
 Mermaid state (`mermaid-state-diagrams.md`), class (`mermaid-class-diagrams.md`), ER
 (`mermaid-er-diagrams.md`), sequence (`mermaid-sequence-diagrams.md`), pie
 (`mermaid-pie-charts.md`), gantt (`mermaid-gantt-charts.md`), mindmap
-(`mermaid-mindmaps.md`), journey (`mermaid-journeys.md`), quadrant chart (`mermaid-quadrant-charts.md`), XY chart (`mermaid-xy-charts.md`), requirement (`mermaid-requirement-diagrams.md`), and the remaining Mermaid types (`mermaid-charts.md`); Graphviz DOT (`graphviz-dot.md`); D2 (`d2.md`); PlantUML
+(`mermaid-mindmaps.md`), journey (`mermaid-journeys.md`), quadrant chart (`mermaid-quadrant-charts.md`), XY chart (`mermaid-xy-charts.md`), requirement (`mermaid-requirement-diagrams.md`), kanban (`mermaid-kanban-boards.md`), and the remaining Mermaid types (`mermaid-charts.md`); Graphviz DOT (`graphviz-dot.md`); D2 (`d2.md`); PlantUML
 (`plantuml.md`).
 
 ## LANGS-1 Detecting the language
@@ -36,7 +36,7 @@ SVG, PNG, themes, and text metrics (DISPLA-4 to DISPLA-12) are shared by all of 
 diagnostic's position is in the source the user wrote, as now.
 
 `diagram::lower` returns a `diagram::Diagram`: `Graph` (a `Flowchart`) or one of the other models
-(`Sequence`, MSEQ-2; `Git`, MGIT-2; `Timeline`, TIMELI-2; `Pie`, MPIE-2; `Gantt`, MGANTT-3; `Mindmap`, MMIND-2; `Journey`, MJOUR-2; `Quadrant`, MQUAD-2; `XyChart`, MXY-2). `Diagram::scene` and `Diagram::ascii`
+(`Sequence`, MSEQ-2; `Git`, MGIT-2; `Timeline`, TIMELI-2; `Pie`, MPIE-2; `Gantt`, MGANTT-3; `Mindmap`, MMIND-2; `Journey`, MJOUR-2; `Quadrant`, MQUAD-2; `XyChart`, MXY-2; `Kanban`, MKAN-2). `Diagram::scene` and `Diagram::ascii`
 draw any of them, and the CLI, Markdown rendering, and the editor's drawing and export go through
 them. Only a graph is hit-tested and edited; the others draw read-only (LANGS-5) with every
 element owned by the diagram.
@@ -86,12 +86,13 @@ are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not 
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
 Sequence, state, class, ER, and requirement diagrams, git graphs, timelines, pie and gantt charts,
-mindmaps, user journeys, and quadrant and XY charts are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
+mindmaps, user journeys, quadrant and XY charts, and kanban boards are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
 disabled Add Node, Select All, and Fit Window, a press on a node pans instead of connecting, and
 every edit action says `Can't ...: drawing edits are not supported for state diagrams yet` (or
 class diagrams, ER diagrams, requirement diagrams, git graphs, timelines, sequence diagrams, pie charts, gantt
-charts, mindmaps, user journeys, quadrant charts, or XY charts). A sequence diagram, git graph,
-timeline, pie, gantt, quadrant, or XY chart, mindmap, or user journey is drawn from `Document::other` and has nothing to select. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
+charts, mindmaps, user journeys, quadrant charts, XY charts, or kanban boards). A sequence
+diagram, git graph, timeline, pie, gantt, quadrant, or XY chart, mindmap, user journey, or kanban
+board is drawn from `Document::other` and has nothing to select. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 

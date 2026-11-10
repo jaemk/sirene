@@ -275,6 +275,48 @@ pub(crate) fn frontmatter_title(block: &str) -> Option<String> {
     })
 }
 
+/// The `key: value` lines under `config:` and then `section:` (such as `gantt:`) in a
+/// frontmatter block, with quotes removed.
+pub(crate) fn frontmatter_config(block: &str, section: &str) -> Vec<(String, String)> {
+    let indent = |line: &str| line.len() - line.trim_start().len();
+    let unquote = |s: &str| {
+        let s = s.trim();
+        for q in ['"', '\''] {
+            if s.len() >= 2 && s.starts_with(q) && s.ends_with(q) {
+                return s[1..s.len() - 1].to_owned();
+            }
+        }
+        s.to_owned()
+    };
+    let header = format!("{section}:");
+    let mut out = Vec::new();
+    let mut in_config = false;
+    let mut section_at: Option<usize> = None;
+    for line in block.lines() {
+        if line.trim().is_empty() || line.trim() == "---" {
+            continue;
+        }
+        let at = indent(line);
+        if at == 0 {
+            in_config = line.trim_end() == "config:";
+            section_at = None;
+            continue;
+        }
+        if !in_config {
+            continue;
+        }
+        match section_at {
+            Some(s) if at > s => {
+                if let Some((k, v)) = line.trim().split_once(':') {
+                    out.push((unquote(k), unquote(v)));
+                }
+            }
+            _ => section_at = (line.trim() == header).then_some(at),
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
