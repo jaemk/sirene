@@ -3,6 +3,7 @@
 mod gantt;
 mod git;
 mod hit;
+mod journey;
 mod mindmap;
 mod paint;
 mod pie;
@@ -18,6 +19,7 @@ use unicode_width::UnicodeWidthStr;
 
 pub use gantt::gantt;
 pub use git::git_graph;
+pub use journey::journey;
 pub use mindmap::mindmap;
 pub use paint::{CONFIG, flowchart};
 pub use pie::pie;

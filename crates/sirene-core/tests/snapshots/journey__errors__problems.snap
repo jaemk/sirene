@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/journey.rs
+expression: "journey\n  section Start\n    No score\n    Bad score: high: Me\n    Too happy: 9: Me\n    Extra: 3: Me: more\n    Empty:\n  section\n    Fine: 4: Me\n"
+---
+3:13: error: expected `:` and a score after the task name
+4:16: error: `high` is not a score; expected a number from 1 to 5
+5:16: warning: `9` is outside the scores 1 to 5; drawing it as 5
+6:12: warning: ignoring `: more` after the actors
+7:5: error: `Empty` has no score; expected a number from 1 to 5
+8:3: error: expected a section name
+
+Start
+  Too happy  ●●●●● 5  Me
+  Extra      ●●●○○ 3  Me
+  Fine       ●●●●○ 4  Me

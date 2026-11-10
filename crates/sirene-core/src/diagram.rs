@@ -5,6 +5,7 @@ use crate::diagnostic::Diagnostic;
 use crate::flowchart::{self, Flowchart, scan};
 use crate::gantt::{self, Gantt};
 use crate::git::{self, GitGraph};
+use crate::journey::{self, Journey};
 use crate::mindmap::{self, Mindmap};
 use crate::pie::{self, Pie};
 use crate::scene::{self, Scene, TextMetrics, Theme};
@@ -25,6 +26,7 @@ pub enum Kind {
     Pie,
     Gantt,
     Mindmap,
+    Journey,
 }
 
 impl Kind {
@@ -51,6 +53,8 @@ impl Kind {
             Kind::Gantt
         } else if mindmap::HEADERS.contains(&word) {
             Kind::Mindmap
+        } else if journey::HEADERS.contains(&word) {
+            Kind::Journey
         } else {
             Kind::Flowchart
         }
@@ -59,7 +63,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     and mindmap diagrams";
+     mindmap, and journey diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -72,6 +76,7 @@ pub enum Diagram {
     Pie(Pie),
     Gantt(Gantt),
     Mindmap(Mindmap),
+    Journey(Journey),
 }
 
 impl Default for Diagram {
@@ -107,6 +112,7 @@ impl Diagram {
             Diagram::Pie(p) => scene::pie(p, metrics, theme),
             Diagram::Gantt(g) => scene::gantt(g, metrics, theme),
             Diagram::Mindmap(m) => scene::mindmap(m, metrics, theme),
+            Diagram::Journey(j) => scene::journey(j, metrics, theme),
         }
     }
 
@@ -120,6 +126,7 @@ impl Diagram {
             Diagram::Pie(p) => ascii::pie(p, options),
             Diagram::Gantt(g) => ascii::gantt(g, options),
             Diagram::Mindmap(m) => ascii::mindmap(m, options),
+            Diagram::Journey(j) => ascii::journey(j, options),
         }
     }
 }
@@ -221,6 +228,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Journey => {
+            let (journey, diagnostics) = journey::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Journey(journey),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -251,6 +265,7 @@ mod tests {
         assert_eq!(Kind::of("pie showData\n"), Kind::Pie);
         assert_eq!(Kind::of("gantt\n"), Kind::Gantt);
         assert_eq!(Kind::of("mindmap\n"), Kind::Mindmap);
+        assert_eq!(Kind::of("journey\n"), Kind::Journey);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -263,7 +278,11 @@ mod tests {
 
     #[test]
     fn other_diagrams() {
-        assert_eq!(other_diagram("journey\n"), Some("journey".to_owned()));
+        assert_eq!(
+            other_diagram("quadrantChart\n"),
+            Some("quadrantChart".to_owned())
+        );
+        assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);
         assert_eq!(other_diagram("gantt\n"), None);
         assert_eq!(other_diagram("pie\n"), None);

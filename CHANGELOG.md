@@ -38,6 +38,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid mindmaps (`mindmap`), read-only in the editor: a tree built from indentation, every
   node shape, markdown strings, and `:::` classes, drawn out to both sides of the root with a
   color per branch; in text, an outline of the tree.
+- Mermaid user journeys (`journey`), read-only in the editor: tasks in sections with a score
+  from 1 to 5 drawn as a face, and actors as colored dots with a legend; in text, a score bar per
+  task.
 
 ### Changed
 
