@@ -25,9 +25,10 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | `gitGraph` | timeline | Commits on branch lanes, merges, and cherry-picks: `mermaid-git-graphs.md`. |
 | `zenuml` | sequence | Calls, replies, and fragments in ZenUML's syntax, lowered to the sequence model: `mermaid-zenuml-diagrams.md`. |
 | `info` | text | sirene's version, where Mermaid draws its own: `mermaid-info-diagrams.md`. |
+| `ishikawa-beta` | tree | A fishbone: the effect at the end of a spine, causes on bones; ASCII is an outline: `mermaid-ishikawa-diagrams.md`. |
 | `kanban` | board | Columns of cards, with the mindmap grammar; ASCII is a box per column: `mermaid-kanban-boards.md`. |
 
-Mermaid 12 adds `venn-beta`, `ishikawa-beta`, `wardley-beta`, `treeView-beta`, `usecase-beta`,
+Mermaid 12 also adds `venn-beta`, `wardley-beta`, `treeView-beta`, `usecase-beta`,
 `railroad-beta` (and its `-ebnf`, `-abnf`, and `-peg` forms), `swimlane-beta`, `eventmodeling`,
 `cynefin-beta`, and `agentflow-beta`. Until each is built it is FLOWCH-16's "not supported"
 error.

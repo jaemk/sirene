@@ -82,7 +82,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   assignments and `return`, creations with `new`, `@Starter`, and `if`/`else`, loops, `opt`,
   `par`, and `try`/`catch`/`finally` fragments; calls with no caller come in from the left.
 - Mermaid info diagrams (`info`, `showInfo`), drawn as sirene's version.
-- Mermaid 12's new types (`venn-beta`, `wardley-beta`, `usecase-beta`, and the rest) are
+- Mermaid ishikawa diagrams (`ishikawa-beta`), read-only in the editor: the effect in a head
+  at the end of a spine, causes on bones above and below, and sub-causes nested by
+  indentation; in text, an outline.
+- Mermaid 12's other new types (`venn-beta`, `wardley-beta`, `usecase-beta`, and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 
