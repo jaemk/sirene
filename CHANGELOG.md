@@ -25,6 +25,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   text, one commit per row as `git log --graph` draws them.
 - Mermaid timelines (`timeline`, `LR` and `TD`), read-only in the editor: periods with events,
   continuation lines, sections with their own colors, `<br>`, and wrapping, in images and text.
+- Mermaid sequence diagrams (`sequenceDiagram`), read-only in the editor: participants, actors,
+  and the typed shapes, every message arrow, self-messages, activations, notes, `loop`, `alt`,
+  `opt`, `par`, `critical`, `break`, and `rect` blocks, `box` groups, `create` and `destroy`,
+  and `autonumber`, in images and text.
 
 ### Changed
 

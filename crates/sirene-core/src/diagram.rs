@@ -5,6 +5,7 @@ use crate::diagnostic::Diagnostic;
 use crate::flowchart::{self, Flowchart, scan};
 use crate::git::{self, GitGraph};
 use crate::scene::{self, Scene, TextMetrics, Theme};
+use crate::sequence::{self, Sequence};
 use crate::timeline::{self, Timeline};
 use crate::{class, er, state};
 
@@ -12,6 +13,7 @@ use crate::{class, er, state};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Flowchart,
+    Sequence,
     State,
     Class,
     Er,
@@ -25,7 +27,9 @@ impl Kind {
         let word = header(src);
         // `gitGraph:` and `gitGraph TB:` name the direction in the same word or the next.
         let word = word.strip_suffix(':').unwrap_or(word);
-        if state::HEADERS.contains(&word) {
+        if sequence::HEADERS.contains(&word) {
+            Kind::Sequence
+        } else if state::HEADERS.contains(&word) {
             Kind::State
         } else if class::HEADERS.contains(&word) {
             Kind::Class
@@ -42,13 +46,14 @@ impl Kind {
 }
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
-pub const DRAWN: &str = "flowchart, state, class, ER, git graph, and timeline diagrams";
+pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, and timeline diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Diagram {
     /// Flowcharts, and the state, class, and ER diagrams lowered to the graph model.
     Graph(Flowchart),
+    Sequence(Sequence),
     Git(GitGraph),
     Timeline(Timeline),
 }
@@ -80,6 +85,7 @@ impl Diagram {
     pub fn scene(&self, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
         match self {
             Diagram::Graph(f) => scene::flowchart(f, metrics, theme),
+            Diagram::Sequence(s) => scene::sequence(s, metrics, theme),
             Diagram::Git(g) => scene::git_graph(g, metrics, theme),
             Diagram::Timeline(t) => scene::timeline(t, metrics, theme),
         }
@@ -89,6 +95,7 @@ impl Diagram {
     pub fn ascii(&self, options: &Options) -> String {
         match self {
             Diagram::Graph(f) => ascii::render(f, options),
+            Diagram::Sequence(s) => ascii::sequence(s, options),
             Diagram::Git(g) => ascii::git_graph(g, options),
             Diagram::Timeline(t) => ascii::timeline(t, options),
         }
@@ -147,6 +154,13 @@ fn header(src: &str) -> &str {
 pub fn lower(src: &str) -> Lowered {
     match Kind::of(src) {
         Kind::Flowchart => flowchart::parse(src).lower().into(),
+        Kind::Sequence => {
+            let (seq, diagnostics) = sequence::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Sequence(seq),
+                diagnostics,
+            }
+        }
         Kind::State => state::parse(src).lower().into(),
         Kind::Class => class::parse(src).lower().into(),
         Kind::Er => er::parse(src).lower().into(),
@@ -183,6 +197,7 @@ mod tests {
     fn kinds() {
         assert_eq!(Kind::of("stateDiagram-v2\n  A --> B\n"), Kind::State);
         assert_eq!(Kind::of("stateDiagram\n"), Kind::State);
+        assert_eq!(Kind::of("sequenceDiagram\n"), Kind::Sequence);
         assert_eq!(Kind::of("classDiagram\n"), Kind::Class);
         assert_eq!(Kind::of("classDiagram-v2\n"), Kind::Class);
         assert_eq!(Kind::of("erDiagram\n"), Kind::Er);
@@ -205,6 +220,7 @@ mod tests {
         assert_eq!(other_diagram("pie\n"), Some("pie".to_owned()));
         assert_eq!(other_diagram("stateDiagram-v2\n"), None);
         assert_eq!(other_diagram("gitGraph\n"), None);
+        assert_eq!(other_diagram("sequenceDiagram\n"), None);
         assert_eq!(other_diagram("flowchart\n"), None);
     }
 }

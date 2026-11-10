@@ -1,0 +1,15 @@
+sequenceDiagram
+    title Notes and numbers
+    autonumber
+    participant Alice
+    participant Bob
+    note left of Alice: on the left
+    note right of Bob: on the right
+    Note over Alice: over one
+    Alice->>Bob: ping
+    note over Alice,Bob: across both
+    autonumber 10 5
+    Bob-->>Alice: pong
+    Bob-->>Alice: again
+    autonumber off
+    Alice->>Bob: unnumbered #59; done

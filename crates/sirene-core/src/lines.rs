@@ -24,6 +24,29 @@ pub(crate) fn is_end(s: &str) -> bool {
     scan::is_stmt_end(s) || s.starts_with('}')
 }
 
+/// `s` split into lines at `<br>` (any case, with an optional `/`), each trimmed.
+pub(crate) fn split_br(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = s;
+    loop {
+        let lower = rest.to_ascii_lowercase();
+        let found = ["<br>", "<br/>", "<br />"]
+            .iter()
+            .filter_map(|b| lower.find(b).map(|i| (i, b.len())))
+            .min();
+        match found {
+            Some((i, n)) => {
+                out.push(rest[..i].trim().to_owned());
+                rest = &rest[i + n..];
+            }
+            None => {
+                out.push(rest.trim().to_owned());
+                return out;
+            }
+        }
+    }
+}
+
 impl<'a> Base<'a> {
     pub fn new(src: &'a str) -> Self {
         Base {

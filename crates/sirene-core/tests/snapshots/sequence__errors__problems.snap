@@ -1,0 +1,35 @@
+---
+source: crates/sirene-core/tests/sequence.rs
+expression: "sequenceDiagram\n    A->>B: fine\n    deactivate A\n    else nowhere\n    end\n    link A: Dashboard @ https://example.com\n    autonumber one two three\n    note left of A,B: two sides\n    A->>+B: open\n    loop never closed\n        B-->>A: inside\n"
+---
+3:5: error: `A` is not active
+4:5: error: `else` belongs in an `alt` block
+5:5: error: `end` without a block or `box` to close
+6:5: warning: `link` is not supported in sequence diagrams; ignoring it
+7:5: error: expected `off`, or a start number and a step
+8:20: error: a note beside a participant names one; use `note over A,B` for two
+9:5: warning: `B` is still active at the end
+10:5: error: unclosed `loop`: expected `end`
+
+              ┌───┐   ┌───┐
+              │ A │   │ B │
+              └─┬─┘   └─┬─┘
+                │       │
+                │ fine  │
+                ├──────►│
+                │       │
+  ┌───────────┐ │       │
+  │ two sides │ │       │
+  └───────────┘ │       │
+                │       │
+                │ open  │
+                ├──────►┃
+                │       ┃
+              ┌─loop [never closed]──┐
+              │ │inside ┃            │
+              │ │◄┄┄┄┄┄┄┤            │
+              │ │       ┃            │
+              └─┼───────┼────────────┘
+              ┌─┴─┐   ┌─┴─┐
+              │ A │   │ B │
+              └───┘   └───┘

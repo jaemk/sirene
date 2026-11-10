@@ -1,0 +1,66 @@
+---
+source: crates/sirene-core/tests/sequence.rs
+expression: "sequenceDiagram\n    participant Client\n    participant Server\n    participant Cache\n    loop Every minute\n        Client->>Server: poll\n    end\n    alt hit\n        Server->>Cache: get\n        Cache-->>Server: value\n    else miss\n        Server->>Server: compute\n    end\n    opt verbose\n        Server-->>Client: log\n    end\n    par fan out\n        Server->>Cache: a\n    and\n        Server->>Client: b\n    end\n    critical connect\n        Client->>Server: open\n    option timeout\n        Client->>Client: retry\n    end\n    break failed\n        Server-->>Client: error\n    end\n    rect rgb(200, 220, 255)\n        loop inner\n            Client->>Server: nested\n        end\n    end\n"
+---
+
+┌─────────┐   ┌─────────┐   ┌───────┐
+│ Client  │   │ Server  │   │ Cache │
+└────┬────┘   └────┬────┘   └───┬───┘
+     │             │            │
+   ┌─loop [Every minute]──┐     │
+   │ │    poll     │      │     │
+   │ ├────────────►│      │     │
+   │ │             │      │     │
+   └─┼─────────────┼──────┘     │
+     │           ┌─alt [hit]────┼─┐
+     │           │ │    get     │ │
+     │           │ ├───────────►│ │
+     │           │ │            │ │
+     │           │ │   value    │ │
+     │           │ │◄┄┄┄┄┄┄┄┄┄┄┄┤ │
+     │           │ │            │ │
+     │           ├┄[miss]┄┄┄┄┄┄┄┼┄┤
+     │           │ │ compute    │ │
+     │           │ ├──┐         │ │
+     │           │ ├◄─┘         │ │
+     │           │ │            │ │
+     │           └─┼────────────┼─┘
+   ┌─opt [verbose]─┼─┐          │
+   │ │     log     │ │          │
+   │ │◄┄┄┄┄┄┄┄┄┄┄┄┄┤ │          │
+   │ │             │ │          │
+   └─┼─────────────┼─┘          │
+   ┌─par [fan out]─┼────────────┼─┐
+   │ │             │     a      │ │
+   │ │             ├───────────►│ │
+   │ │             │            │ │
+   ├┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┼┄┤
+   │ │      b      │            │ │
+   │ │◄────────────┤            │ │
+   │ │             │            │ │
+   └─┼─────────────┼────────────┼─┘
+   ┌─critical [connect]──┐      │
+   │ │    open     │     │      │
+   │ ├────────────►│     │      │
+   │ │             │     │      │
+   ├┄[timeout]┄┄┄┄┄┼┄┄┄┄┄┤      │
+   │ │ retry       │     │      │
+   │ ├──┐          │     │      │
+   │ ├◄─┘          │     │      │
+   │ │             │     │      │
+   └─┼─────────────┼─────┘      │
+   ┌─break [failed]┼─┐          │
+   │ │    error    │ │          │
+   │ │◄┄┄┄┄┄┄┄┄┄┄┄┄┤ │          │
+   │ │             │ │          │
+   └─┼─────────────┼─┘          │
+ ┌┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┐        │
+ ┆ ┌─loop [inner]──┼─┐ ┆        │
+ ┆ │ │   nested    │ │ ┆        │
+ ┆ │ ├────────────►│ │ ┆        │
+ ┆ │ │             │ │ ┆        │
+ ┆ └─┼─────────────┼─┘ ┆        │
+ └┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┘        │
+┌────┴────┐   ┌────┴────┐   ┌───┴───┐
+│ Client  │   │ Server  │   │ Cache │
+└─────────┘   └─────────┘   └───────┘

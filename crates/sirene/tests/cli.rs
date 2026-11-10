@@ -725,7 +725,7 @@ fn check() {
     let md = dir.join("doc.md");
     std::fs::write(
         &md,
-        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  sequenceDiagram\n  ```\n",
+        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  pie\n  ```\n",
     )
     .unwrap();
     sirene()
@@ -736,9 +736,7 @@ fn check() {
         .stdout("")
         .stderr(
             predicate::str::contains("doc.md:5:8: error: expected a node after the edge").and(
-                predicate::str::contains(
-                    "doc.md:11:3: warning: skipping a `sequenceDiagram` diagram",
-                ),
+                predicate::str::contains("doc.md:11:3: warning: skipping a `pie` diagram"),
             ),
         );
     sirene()
@@ -889,13 +887,49 @@ fn suggests_a_misspelled_command() {
 fn other_diagram_types() {
     sirene()
         .arg("ascii")
-        .write_stdin("sequenceDiagram\n  A->>B: hi\n")
+        .write_stdin("pie\n  \"a\" : 1\n")
         .assert()
         .failure()
         .stderr(
-            "<stdin>:1:1: error: `sequenceDiagram` diagrams are not supported; \
-             sirene draws flowchart, state, class, ER, git graph, and timeline diagrams\n",
+            "<stdin>:1:1: error: `pie` diagrams are not supported; \
+             sirene draws flowchart, sequence, state, class, ER, git graph, and timeline diagrams\n",
         );
+}
+
+/// A sequence diagram draws in text and as an image (MSEQ-4, LANGS-4).
+#[test]
+fn sequence_diagrams() {
+    let src = "sequenceDiagram\n  A->>B: hi\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(
+            "+---+   +---+\n\
+             | A |   | B |\n\
+             +-+-+   +-+-+\n\
+             \x20 |       |\n\
+             \x20 |  hi   |\n\
+             \x20 +------>|\n\
+             \x20 |       |\n\
+             +-+-+   +-+-+\n\
+             | A |   | B |\n\
+             +---+   +---+\n",
+        );
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(">hi</text>"));
+    sirene()
+        .arg("check")
+        .arg("-")
+        .write_stdin("sequenceDiagram\n  loop x\n")
+        .assert()
+        .failure()
+        .stderr("<stdin>:2:3: error: unclosed `loop`: expected `end`\n");
 }
 
 /// A git graph draws in text and as an image (MGIT-5, LANGS-4).

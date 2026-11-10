@@ -1,0 +1,41 @@
+---
+source: crates/sirene-core/tests/sequence.rs
+expression: "sequenceDiagram\n    title Notes and numbers\n    autonumber\n    participant Alice\n    participant Bob\n    note left of Alice: on the left\n    note right of Bob: on the right\n    Note over Alice: over one\n    Alice->>Bob: ping\n    note over Alice,Bob: across both\n    autonumber 10 5\n    Bob-->>Alice: pong\n    Bob-->>Alice: again\n    autonumber off\n    Alice->>Bob: unnumbered #59; done\n"
+---
+                    Notes and numbers
+
+              +-------+           +-----+
+              | Alice |           | Bob |
+              +---+---+           +--+--+
+                  |                  |
+  +-------------+ |                  |
+  | on the left | |                  |
+  +-------------+ |                  |
+                  |                  |
+                  |                  | +--------------+
+                  |                  | | on the right |
+                  |                  | +--------------+
+                  |                  |
+             +----------+            |
+             | over one |            |
+             +----------+            |
+                  |                  |
+                  |     1. ping      |
+                  +----------------->|
+                  |                  |
+                +----------------------+
+                |     across both      |
+                +----------------------+
+                  |                  |
+                  |     10. pong     |
+                  |<.................+
+                  |                  |
+                  |    15. again     |
+                  |<.................+
+                  |                  |
+                  |unnumbered ; done |
+                  +----------------->|
+                  |                  |
+              +---+---+           +--+--+
+              | Alice |           | Bob |
+              +-------+           +-----+

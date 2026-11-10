@@ -1,0 +1,38 @@
+---
+source: crates/sirene-core/tests/sequence.rs
+expression: "sequenceDiagram\n    box Aqua Front\n        actor Alice\n        participant Web\n    end\n    box Back\n        participant Api\n    end\n    Alice->>Web: sign up\n    Web->>Api: create\n    create participant Worker\n    Api->>Worker: spawn\n    destroy Worker\n    Worker-xApi: finished\n    Api-->>Web: ok\n"
+---
+
+┌┄┄┄┄┄ Front ┄┄┄┄┄┐   ┌┄ Back ┄┄┐
+┆                 ┆   ┆         ┆
+┆   o             ┆   ┆         ┆
+┆  /|\    ┌─────┐ ┆   ┆ ┌─────┐ ┆
+┆  / \    │ Web │ ┆   ┆ │ Api │ ┆
+┆ Alice   └──┬──┘ ┆   ┆ └──┬──┘ ┆
+┆   │        │    ┆   ┆    │    ┆
+┆   │sign up │    ┆   ┆    │    ┆
+┆   ├───────►│    ┆   ┆    │    ┆
+┆   │        │    ┆   ┆    │    ┆
+┆   │        │   create    │    ┆
+┆   │        ├────┼───┼───►│    ┆
+┆   │        │    ┆   ┆    │    ┆
+┆   │        │    ┆   ┆    │    ┆
+┆   │        │    ┆   ┆    │    ┆   ┌─────────┐
+┆   │        │    ┆   ┆    │    ┆   │ Worker  │
+┆   │        │    ┆   ┆    │    ┆   └────┬────┘
+┆   │        │    ┆   ┆    │    ┆        │
+┆   │        │    ┆   ┆    │    spawn    │
+┆   │        │    ┆   ┆    ├────┼───────►│
+┆   │        │    ┆   ┆    │    ┆        │
+┆   │        │    ┆   ┆    │  finished   │
+┆   │        │    ┆   ┆    │×───┼────────×
+┆   │        │    ┆   ┆    │    ┆
+┆   │        │    ┆ok ┆    │    ┆
+┆   │        │◄┄┄┄┼┄┄┄┼┄┄┄┄┤    ┆
+┆   │        │    ┆   ┆    │    ┆
+┆   o     ┌──┴──┐ ┆   ┆ ┌──┴──┐ ┆
+┆  /|\    │ Web │ ┆   ┆ │ Api │ ┆
+┆  / \    └─────┘ ┆   ┆ └─────┘ ┆
+┆ Alice           ┆   ┆         ┆
+┆                 ┆   ┆         ┆
+└┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘   └┄┄┄┄┄┄┄┄┄┘

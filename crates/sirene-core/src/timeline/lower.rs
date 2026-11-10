@@ -75,27 +75,8 @@ fn text_of(node: &SyntaxNode, kind: SyntaxKind) -> Option<String> {
     token(node, kind).map(|t| t.text().trim().to_owned())
 }
 
-/// `s` split into lines at `<br>` (any case, with an optional `/`).
 fn lines(s: &str) -> Text {
-    let mut out = Vec::new();
-    let mut rest = s;
-    loop {
-        let lower = rest.to_ascii_lowercase();
-        let found = ["<br>", "<br/>", "<br />"]
-            .iter()
-            .filter_map(|b| lower.find(b).map(|i| (i, b.len())))
-            .min();
-        match found {
-            Some((i, n)) => {
-                out.push(rest[..i].trim().to_owned());
-                rest = &rest[i + n..];
-            }
-            None => {
-                out.push(rest.trim().to_owned());
-                return out;
-            }
-        }
-    }
+    crate::lines::split_br(s)
 }
 
 /// A statement's events; an empty one is a warning and skipped.

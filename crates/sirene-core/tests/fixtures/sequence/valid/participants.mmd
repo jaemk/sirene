@@ -1,0 +1,13 @@
+---
+title: Participants
+---
+sequenceDiagram
+    actor U as User
+    participant W as Web<br>app
+    participant Q@{ "type": "queue" } as Jobs
+    participant D@{ "type": "database" }
+    participant C@{ "type": "control" }
+    U->>W: click
+    W->>Q: enqueue
+    Q->>D: write
+    D-->>C: done

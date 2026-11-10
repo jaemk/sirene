@@ -1,0 +1,15 @@
+sequenceDiagram
+    box Aqua Front
+        actor Alice
+        participant Web
+    end
+    box Back
+        participant Api
+    end
+    Alice->>Web: sign up
+    Web->>Api: create
+    create participant Worker
+    Api->>Worker: spawn
+    destroy Worker
+    Worker-xApi: finished
+    Api-->>Web: ok
