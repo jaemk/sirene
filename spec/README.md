@@ -41,6 +41,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Quadrant Charts | done | [mermaid-quadrant-charts.md](mermaid-quadrant-charts.md) |
 | Mermaid XY Charts | done | [mermaid-xy-charts.md](mermaid-xy-charts.md) |
 | Mermaid Requirement Diagrams | done | [mermaid-requirement-diagrams.md](mermaid-requirement-diagrams.md) |
+| Mermaid Kanban Boards | done | [mermaid-kanban-boards.md](mermaid-kanban-boards.md) |
 
 ## Conventions
 

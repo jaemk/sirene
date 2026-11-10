@@ -10,9 +10,15 @@ use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
+    parse_with(src, HEADERS)
+}
+
+/// Parses a document of indented nodes under one of `headers`, the first named in the error
+/// for a missing one. Kanban boards share this grammar (MKAN-1).
+pub(crate) fn parse_with(src: &str, headers: &[&str]) -> (GreenNode, Vec<Diagnostic>) {
     let mut p = Parser(Base::new(src));
     p.start(ROOT);
-    p.header(HEADERS, "mindmap", word_len);
+    p.header(headers, headers[0], word_len);
     Base::block(&mut p, 0, "block", STATEMENT, Parser::statement);
     p.finish();
     p.0.finish_tree()
@@ -52,11 +58,14 @@ fn word_len(s: &str) -> usize {
         .unwrap_or(s.len())
 }
 
-/// The length of a node id at the start of `s`: text up to a shape delimiter or the end of the
-/// line, without trailing whitespace.
+/// The length of a node id at the start of `s`: text up to a shape delimiter, `@{`, or the end
+/// of the line, without trailing whitespace.
 fn id_len(s: &str) -> usize {
     let line = &s[..scan::line_len(s)];
-    let end = line.find(['(', '[', ')', '{', '}']).unwrap_or(line.len());
+    let mut end = line.find(['(', '[', ')', '{', '}']).unwrap_or(line.len());
+    if let Some(at) = line.find("@{") {
+        end = end.min(at);
+    }
     scan::trim_end_len(line, end)
 }
 
@@ -109,16 +118,44 @@ impl Parser<'_> {
         self.start(NODE);
         self.token(IDENT, n);
         self.ws();
-        if let Some(&(open, close)) = shape {
-            self.shape(open, close);
-        } else {
-            self.end();
+        let closed = match shape {
+            Some(&(open, close)) => self.shape(open, close),
+            None => true,
+        };
+        if closed {
+            self.ws();
+            if !self.rest().starts_with("@{") || self.metadata() {
+                self.end();
+            }
         }
         self.finish();
     }
 
+    /// `@{ key: value, ... }`, which may span lines. Returns whether it closed.
+    fn metadata(&mut self) -> bool {
+        self.start(METADATA);
+        self.token(META_OPEN, 2);
+        let closed = match self.rest().find('}') {
+            Some(i) => {
+                self.token(META_BODY, i);
+                self.token(META_CLOSE, 1);
+                true
+            }
+            None => {
+                let start = self.pos;
+                let n = scan::line_len(self.rest());
+                self.token(META_BODY, n);
+                self.error(start - 2, start + n, "unclosed `@{`: expected `}`");
+                false
+            }
+        };
+        self.finish();
+        closed
+    }
+
     /// A shape's delimiters around its text: a `"string"`, a markdown ``"`string`"``, or text.
-    fn shape(&mut self, open: &str, close: &str) {
+    /// Returns whether it closed.
+    fn shape(&mut self, open: &str, close: &str) -> bool {
         self.start(SHAPE);
         self.token(SHAPE_OPEN, open.len());
         let r = self.rest();
@@ -133,7 +170,7 @@ impl Parser<'_> {
                 None => {
                     self.fail("unclosed markdown string: expected `` `\" ``");
                     self.finish();
-                    return;
+                    return false;
                 }
             }
             self.ws();
@@ -144,7 +181,7 @@ impl Parser<'_> {
                 None => {
                     self.fail("unclosed string: expected `\"`");
                     self.finish();
-                    return;
+                    return false;
                 }
             }
             self.ws();
@@ -155,10 +192,11 @@ impl Parser<'_> {
         if self.rest().starts_with(close) {
             self.token(SHAPE_CLOSE, close.len());
             self.finish();
-            self.end();
+            true
         } else {
             self.fail(&format!("unclosed `{open}`: expected `{close}`"));
             self.finish();
+            false
         }
     }
 }
@@ -223,6 +261,22 @@ mod tests {
             ["expected the end of the line"]
         );
         assert_eq!(tree("mindmap\n  {x\n").1, [STATEMENT]);
+        assert_eq!(
+            tree("mindmap\n  a[x]@{ k: v\n").1,
+            ["unclosed `@{`: expected `}`"]
+        );
+        assert_eq!(
+            tree("mindmap\n  a[x]@{ k: v } y\n").1,
+            ["expected the end of the line"]
+        );
+    }
+
+    #[test]
+    fn metadata() {
+        let (t, d) = tree("mindmap\n  a[x]@{ k: v }\n  b @{\n    k: v\n  }\n  mail@x.com\n");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(t.matches("METADATA@").count(), 2);
+        assert!(t.contains("\"mail@x.com\""));
     }
 
     #[test]

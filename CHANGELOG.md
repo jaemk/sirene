@@ -50,6 +50,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid requirement diagrams (`requirementDiagram`), read-only in the editor: every
   requirement type and elements as boxes with their fields, the seven relationship types in
   either direction, classes, styles, and `direction`.
+- Mermaid kanban boards (`kanban`), read-only in the editor: columns of cards with `assigned`,
+  `ticket`, and `priority` metadata, drawn with a priority stripe; in text, a box per column.
+- Mindmaps read `@{ ... }` node metadata and warn that it is not used.
 
 ### Changed
 

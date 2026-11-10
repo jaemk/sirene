@@ -264,6 +264,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for XY charts yet")
     );
     assert!(xy.chart.nodes.is_empty() && xy.other.is_some());
+    let board = Document::from_source(None, "kanban\n  todo\n    a[Card]\n".to_owned());
+    assert_eq!(
+        board.read_only(),
+        Some("drawing edits are not supported for kanban boards yet")
+    );
+    assert!(board.chart.nodes.is_empty() && board.other.is_some());
 }
 
 #[gpui::test]

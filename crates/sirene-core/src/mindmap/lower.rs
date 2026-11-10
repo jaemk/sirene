@@ -28,6 +28,12 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
                 let line_start = src[..start].rfind('\n').map_or(0, |i| i + 1);
                 let level = src[line_start..start].chars().count();
                 let mut node = node(&stmt);
+                if let Some(m) = stmt.children().find(|n| n.kind() == METADATA) {
+                    diagnostics.push(Diagnostic::warning(
+                        m.text_range(),
+                        "`@{...}` is not used in mindmaps; ignoring it",
+                    ));
+                }
                 if !map.nodes.is_empty() {
                     let Some(parent) = (0..map.nodes.len()).rev().find(|&j| levels[j] < level)
                     else {
@@ -91,7 +97,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
 }
 
 /// A node line's id, shape, and label.
-fn node(stmt: &SyntaxNode) -> Node {
+pub(crate) fn node(stmt: &SyntaxNode) -> Node {
     let id = text_of(stmt, IDENT).filter(|s| !s.is_empty());
     let shape_node = stmt.children().find(|n| n.kind() == SHAPE);
     let shape = shape_node

@@ -1,7 +1,7 @@
 //! Mermaid mindmaps (MMIND-*): a tree of ideas drawn out from a root.
 
-mod lower;
-mod parser;
+pub(crate) mod lower;
+pub(crate) mod parser;
 
 use rowan::GreenNode;
 

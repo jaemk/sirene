@@ -893,8 +893,34 @@ fn other_diagram_types() {
         .stderr(
             "<stdin>:1:1: error: `zenuml` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, journey, quadrant, XY, and requirement diagrams\n",
+             mindmap, journey, quadrant, XY, requirement, and kanban diagrams\n",
         );
+}
+
+/// A kanban board draws in text and as an image (MKAN-4, LANGS-4).
+#[test]
+fn kanban_boards() {
+    let src =
+        "kanban\n  todo[To do]\n    a[Write docs]@{ ticket: T-1, priority: High }\n  done[Done]\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(
+            "+- To do ----------+ +- Done -----------+\n\
+             | .--------------. | |                  |\n\
+             | | Write docs   | | |                  |\n\
+             | | ^ High T-1   | | |                  |\n\
+             | '--------------' | |                  |\n\
+             +------------------+ +------------------+\n",
+        );
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(">Write docs</text>"));
 }
 
 /// A requirement diagram draws in text and as an image (MREQ-3, LANGS-4).

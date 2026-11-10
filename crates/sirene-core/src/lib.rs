@@ -9,6 +9,7 @@ pub mod flowchart;
 pub mod gantt;
 pub mod git;
 pub mod journey;
+pub mod kanban;
 pub mod layout;
 mod lines;
 pub mod markdown;

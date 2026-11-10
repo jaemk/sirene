@@ -110,38 +110,9 @@ fn unquote(s: &str) -> String {
     s.to_owned()
 }
 
-fn indent(line: &str) -> usize {
-    line.len() - line.trim_start().len()
-}
-
 /// The `key: value` lines under `config:` `gantt:` in a frontmatter block (MGANTT-2).
 fn frontmatter_config(block: &str) -> Vec<(String, String)> {
-    let mut out = Vec::new();
-    let mut in_config = false;
-    let mut gantt_at: Option<usize> = None;
-    for line in block.lines() {
-        if line.trim().is_empty() || line.trim() == "---" {
-            continue;
-        }
-        let at = indent(line);
-        if at == 0 {
-            in_config = line.trim_end() == "config:";
-            gantt_at = None;
-            continue;
-        }
-        if !in_config {
-            continue;
-        }
-        match gantt_at {
-            Some(g) if at > g => {
-                if let Some((k, v)) = line.trim().split_once(':') {
-                    out.push((unquote(k), unquote(v)));
-                }
-            }
-            _ => gantt_at = (line.trim_end().trim_start() == "gantt:").then_some(at),
-        }
-    }
-    out
+    text::frontmatter_config(block, "gantt")
 }
 
 /// The `key: value` pairs of the `gantt` object in an `%%{init: ...}%%` directive (MGANTT-2).
