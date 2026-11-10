@@ -1,0 +1,5 @@
+---
+source: crates/sirene-core/tests/pie.rs
+expression: "pie\n    \"Everything\" : 1\n"
+---
+Everything  ########################################  100%

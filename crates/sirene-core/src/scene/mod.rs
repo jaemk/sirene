@@ -3,6 +3,7 @@
 mod git;
 mod hit;
 mod paint;
+mod pie;
 #[cfg(feature = "png")]
 pub mod png;
 mod sequence;
@@ -15,6 +16,7 @@ use unicode_width::UnicodeWidthStr;
 
 pub use git::git_graph;
 pub use paint::{CONFIG, flowchart};
+pub use pie::pie;
 pub use sequence::sequence;
 pub use style::parse_color;
 pub use timeline::timeline;

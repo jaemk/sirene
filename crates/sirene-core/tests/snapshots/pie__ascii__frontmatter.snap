@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/pie.rs
+expression: "---\ntitle: Time spent\n---\npie\n    accTitle: Hours\n    accDescr { How the week went }\n    \"Work\" : 40\n    \"Sleep\" : 56\n    \"Rounding error\" : 0.1\n    \"Nothing\" : 0\n"
+---
+                          Time spent
+
+Sleep           #######################                    58%
+Work            #################                          42%
+Rounding error                                              0%
+Nothing                                                     0%

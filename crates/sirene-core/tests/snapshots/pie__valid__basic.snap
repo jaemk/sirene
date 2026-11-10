@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/pie.rs
+expression: "pie title Pets adopted by volunteers\n    \"Dogs\" : 386\n    \"Cats\" : 85\n    \"Rats\" : 15\n"
+---
+
+             Pets adopted by volunteers
+
+Dogs  ███████████████████████████████▊           79%
+Cats  ███████                                    17%
+Rats  █▎                                          3%

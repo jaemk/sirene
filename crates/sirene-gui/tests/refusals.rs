@@ -219,6 +219,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for sequence diagrams yet")
     );
     assert!(seq.chart.nodes.is_empty() && seq.other.is_some());
+    let pie = Document::from_source(None, "pie\n  \"a\" : 1\n".to_owned());
+    assert_eq!(
+        pie.read_only(),
+        Some("drawing edits are not supported for pie charts yet")
+    );
+    assert!(pie.chart.nodes.is_empty() && pie.other.is_some());
 }
 
 #[gpui::test]

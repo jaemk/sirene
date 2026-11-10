@@ -29,6 +29,7 @@
 - [ER diagrams](er.md)
 - [Git graphs](git.md)
 - [Timelines](timeline.md)
+- [Pie charts](pie.md)
 
 # Project
 

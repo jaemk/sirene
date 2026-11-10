@@ -4,6 +4,7 @@ use crate::ascii::{self, Options};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::{self, Flowchart, scan};
 use crate::git::{self, GitGraph};
+use crate::pie::{self, Pie};
 use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
 use crate::timeline::{self, Timeline};
@@ -19,6 +20,7 @@ pub enum Kind {
     Er,
     Git,
     Timeline,
+    Pie,
 }
 
 impl Kind {
@@ -39,6 +41,8 @@ impl Kind {
             Kind::Git
         } else if timeline::HEADERS.contains(&word) {
             Kind::Timeline
+        } else if pie::HEADERS.contains(&word) {
+            Kind::Pie
         } else {
             Kind::Flowchart
         }
@@ -46,7 +50,8 @@ impl Kind {
 }
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
-pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, and timeline diagrams";
+pub const DRAWN: &str =
+    "flowchart, sequence, state, class, ER, git graph, timeline, and pie diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -56,6 +61,7 @@ pub enum Diagram {
     Sequence(Sequence),
     Git(GitGraph),
     Timeline(Timeline),
+    Pie(Pie),
 }
 
 impl Default for Diagram {
@@ -88,6 +94,7 @@ impl Diagram {
             Diagram::Sequence(s) => scene::sequence(s, metrics, theme),
             Diagram::Git(g) => scene::git_graph(g, metrics, theme),
             Diagram::Timeline(t) => scene::timeline(t, metrics, theme),
+            Diagram::Pie(p) => scene::pie(p, metrics, theme),
         }
     }
 
@@ -98,6 +105,7 @@ impl Diagram {
             Diagram::Sequence(s) => ascii::sequence(s, options),
             Diagram::Git(g) => ascii::git_graph(g, options),
             Diagram::Timeline(t) => ascii::timeline(t, options),
+            Diagram::Pie(p) => ascii::pie(p, options),
         }
     }
 }
@@ -178,6 +186,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Pie => {
+            let (pie, diagnostics) = pie::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Pie(pie),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -205,6 +220,7 @@ mod tests {
         assert_eq!(Kind::of("gitGraph:\n"), Kind::Git);
         assert_eq!(Kind::of("gitGraph TB:\n"), Kind::Git);
         assert_eq!(Kind::of("timeline TD\n"), Kind::Timeline);
+        assert_eq!(Kind::of("pie showData\n"), Kind::Pie);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -217,7 +233,8 @@ mod tests {
 
     #[test]
     fn other_diagrams() {
-        assert_eq!(other_diagram("pie\n"), Some("pie".to_owned()));
+        assert_eq!(other_diagram("gantt\n"), Some("gantt".to_owned()));
+        assert_eq!(other_diagram("pie\n"), None);
         assert_eq!(other_diagram("stateDiagram-v2\n"), None);
         assert_eq!(other_diagram("gitGraph\n"), None);
         assert_eq!(other_diagram("sequenceDiagram\n"), None);
