@@ -190,6 +190,8 @@ syntax_kinds! {
     // Radar charts: an axis or curve with its optional label, and one of a curve's values.
     ENTRY,
     VALUE,
+    // Sankey diagrams: a `source,target,value` row.
+    FLOW,
     ERROR,
 }
 

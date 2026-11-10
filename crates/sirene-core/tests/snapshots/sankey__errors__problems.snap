@@ -1,0 +1,21 @@
+---
+source: crates/sirene-core/tests/sankey.rs
+expression: "---\nconfig:\n  sankey:\n    linkColor: rainbow\n    nodeAlignment: middle\n---\nsankey-beta\nA,B,10\nB,C,4\nC,A,1\nD,D,2\nE,F,-3\nG,H\n\"open,H,1\nB,C,2,3\nB,C,lots\n"
+---
+1:1: warning: ignoring `linkColor: rainbow`: not a valid value
+1:1: warning: ignoring `nodeAlignment: middle`: not a valid value
+10:1: error: `C` -> `A`: it closes the cycle `C` -> `A` -> `B` -> `C`, which a sankey diagram cannot draw; ignoring it
+11:1: error: `D` -> `D`: `D` flows into itself, which a sankey diagram cannot draw; ignoring it
+12:5: error: `E` -> `F` has a negative value; ignoring it
+13:4: error: expected `,` and the next field: a row is `source,target,value`
+14:1: error: unclosed `"`: expected a closing `"` on the same line
+15:5: error: expected 3 fields: a row is `source,target,value`
+16:5: error: expected a number for the value, such as `12.5`
+
+A  10
+└─ B  10  ████████████████████████
+
+B  10
+└─ C   4  █████████▋
+
+C  4

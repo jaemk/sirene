@@ -893,8 +893,31 @@ fn other_diagram_types() {
         .stderr(
             "<stdin>:1:1: error: `zenuml` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, journey, quadrant, XY, requirement, kanban, packet, and radar diagrams\n",
+             mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, and sankey \
+             diagrams\n",
         );
+}
+
+/// A sankey diagram draws in text and as an image (MSANKEY-4, LANGS-4).
+#[test]
+fn sankey_diagrams() {
+    let src = "sankey\nA,B,2\nA,C,1\n";
+    let full = "#".repeat(24);
+    let half = "#".repeat(12);
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(format!(
+            "A  3\n+- B  2  {full}\n`- C  1  {half}\n\nB  2\n\nC  1\n"
+        ));
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(">A 3</text>"));
 }
 
 /// A radar chart draws in text and as an image (MRADAR-4, LANGS-4).

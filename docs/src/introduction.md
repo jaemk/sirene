@@ -25,7 +25,8 @@ charts](pie.md) (`pie`), [gantt charts](gantt.md) (`gantt`), [mindmaps](mindmap.
 (`mindmap`), [user journeys](journey.md) (`journey`), [quadrant charts](quadrant.md)
 (`quadrantChart`), [XY charts](xychart.md) (`xychart-beta`), [requirement
 diagrams](requirement.md) (`requirementDiagram`), [kanban boards](kanban.md) (`kanban`),
-[packet diagrams](packet.md) (`packet`), and [radar charts](radar.md) (`radar-beta`) are drawn; other Mermaid diagram types are reported
+[packet diagrams](packet.md) (`packet`), [radar charts](radar.md) (`radar-beta`), and [sankey
+diagrams](sankey.md) (`sankey-beta`) are drawn; other Mermaid diagram types are reported
 as unsupported. See [Supported
 syntax](syntax.md) for what is read and how it differs from Mermaid.
 

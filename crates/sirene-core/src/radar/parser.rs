@@ -6,7 +6,7 @@ use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, number_len};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -56,26 +56,6 @@ fn id_len(s: &str) -> usize {
     }
     s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
         .unwrap_or(s.len())
-}
-
-/// A number such as `3`, `-2.5`, or `.5`.
-pub(crate) fn number_len(s: &str) -> usize {
-    let sign = usize::from(s.starts_with('-'));
-    let body = &s[sign..];
-    let int = body
-        .find(|c: char| !c.is_ascii_digit())
-        .unwrap_or(body.len());
-    let mut n = int;
-    if body[n..].starts_with('.') {
-        let frac = body[n + 1..]
-            .find(|c: char| !c.is_ascii_digit())
-            .unwrap_or(body.len() - n - 1);
-        if int + frac == 0 {
-            return 0;
-        }
-        n += 1 + frac;
-    }
-    if n == 0 { 0 } else { sign + n }
 }
 
 impl Parser<'_> {
@@ -239,17 +219,6 @@ mod tests {
             format!("{root:#?}"),
             d.into_iter().map(|d| d.message).collect(),
         )
-    }
-
-    #[test]
-    fn numbers() {
-        assert_eq!(number_len("12,"), 2);
-        assert_eq!(number_len("-2.5}"), 4);
-        assert_eq!(number_len(".5"), 2);
-        assert_eq!(number_len("3."), 2);
-        assert_eq!(number_len("-"), 0);
-        assert_eq!(number_len("."), 0);
-        assert_eq!(number_len("a"), 0);
     }
 
     #[test]

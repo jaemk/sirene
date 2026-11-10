@@ -24,6 +24,38 @@ pub(crate) fn is_end(s: &str) -> bool {
     scan::is_stmt_end(s) || s.starts_with('}')
 }
 
+/// The length of a number such as `3`, `-2.5`, or `.5` at the start of `s`, or 0.
+pub(crate) fn number_len(s: &str) -> usize {
+    let sign = usize::from(s.starts_with('-'));
+    let body = &s[sign..];
+    let int = body
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(body.len());
+    let mut n = int;
+    if body[n..].starts_with('.') {
+        let frac = body[n + 1..]
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(body.len() - n - 1);
+        if int + frac == 0 {
+            return 0;
+        }
+        n += 1 + frac;
+    }
+    if n == 0 { 0 } else { sign + n }
+}
+
+#[cfg(test)]
+#[test]
+fn numbers() {
+    assert_eq!(number_len("12,"), 2);
+    assert_eq!(number_len("-2.5}"), 4);
+    assert_eq!(number_len(".5"), 2);
+    assert_eq!(number_len("3."), 2);
+    assert_eq!(number_len("-"), 0);
+    assert_eq!(number_len("."), 0);
+    assert_eq!(number_len("a"), 0);
+}
+
 /// `s` split into lines at `<br>` (any case, with an optional `/`), each trimmed.
 pub(crate) fn split_br(s: &str) -> Vec<String> {
     let mut out = Vec::new();
