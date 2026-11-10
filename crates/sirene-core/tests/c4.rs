@@ -234,4 +234,31 @@ fn drawing() {
     assert!(s.elements.iter().any(|e| e.owner == Owner::Node(0)
         && matches!(&e.primitive, Primitive::Path { fill: Some(_), .. })));
     assert!(s.elements.iter().any(|e| matches!(e.owner, Owner::Edge(0))));
+    // A long label between elements in a row spreads them apart to fit it.
+    let spread = |label: &str| {
+        let src = format!("C4Context\nSystem(a, A)\nSystem(b, B)\nRel(a, b, \"{label}\")\n");
+        let s = diagram::lower(&src).diagram.scene(&Approx, &Theme::LIGHT);
+        let x = |want: &str| {
+            s.elements
+                .iter()
+                .find_map(|e| match &e.primitive {
+                    Primitive::Text { text, center, .. } if text == want => Some(center.x),
+                    _ => None,
+                })
+                .expect("text")
+        };
+        x("B") - x("A")
+    };
+    assert!(spread("Reads from and writes to the database") > spread("Uses") + 100.0);
+    // A relation's label is drawn over the elements' text.
+    let first_edge = s
+        .elements
+        .iter()
+        .position(|e| matches!(e.owner, Owner::Edge(_)))
+        .expect("an edge");
+    assert!(
+        s.elements[first_edge..]
+            .iter()
+            .all(|e| matches!(e.owner, Owner::Edge(_)))
+    );
 }

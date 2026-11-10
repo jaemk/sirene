@@ -43,14 +43,15 @@ least 1, a style on a boundary, and a relation style with no such relation are w
 
 `c4::layout` places each boundary, and the diagram, as Mermaid does: elements in rows of
 `shapes_in_row` from the left, then child boundaries below them in rows of `boundaries_in_row`,
-rows top-aligned; a boundary is its content with padding and its title.
+rows top-aligned; a boundary is its content with padding and its title. The gap between columns
+is 50 pixels, or wide enough for the widest label of a relation between two elements in one row.
 
 An element is a 216-pixel-wide box with `<<type>>`, a person icon for people, the label in bold,
 `[technology]` in italics, and the wrapped description, in Mermaid's colors for its base and
 `_Ext`; `Db` is an upright cylinder and `Queue` a lying one. A boundary is a box with no fill,
 dashed unless it is a deployment node, titled at its top left with its label, `[kind]`, and
 description. Relations are straight lines between the boxes with their label and
-`[technology]`. `UpdateElementStyle` and `UpdateRelStyle` colors override the defaults. Elements
+`[technology]`, drawn over the elements. `UpdateElementStyle` and `UpdateRelStyle` colors override the defaults. Elements
 are owned by their node, subgraph, or edge. Tests: `drawing` and the layout's unit tests.
 
 ## MC4-4 ASCII
