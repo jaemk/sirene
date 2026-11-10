@@ -171,12 +171,46 @@ pub fn c4(c: &C4, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
         let w = ls.iter().map(|l| t.width(l)).fold(0.0, f32::max);
         (f64::from(w), f64::from(lines_h(ls) + 8.0))
     };
+    // A relation's label holds its technology too.
+    let mut chart = c.chart.clone();
+    for (e, r) in chart.edges.iter_mut().zip(&c.rels) {
+        if let Some(techn) = &r.techn {
+            let text = match &e.label {
+                Some(l) => format!("{}\n[{techn}]", l.text),
+                None => format!("[{techn}]"),
+            };
+            e.label = Some(Label::plain(text));
+        }
+        if let Some(v) = &r.colors.line {
+            e.styles.push(style("stroke", v));
+        }
+        if let Some(v) = &r.colors.font {
+            e.styles.push(style("color", v));
+        }
+    }
+    // Elements side by side in a row are spread apart to fit the label of a relation between them.
+    let row = |i: usize| {
+        let parent = c.node_parent[i];
+        let k = (0..i).filter(|&j| c.node_parent[j] == parent).count();
+        (parent, k / c.shapes_in_row)
+    };
+    let index = |id: &str| c.chart.nodes.iter().position(|n| n.id == id);
+    let gap_x = chart
+        .edges
+        .iter()
+        .filter(|e| match (index(&e.from), index(&e.to)) {
+            (Some(a), Some(b)) => a != b && row(a) == row(b),
+            _ => false,
+        })
+        .filter_map(|e| px.edge_label(e.label.as_ref()?))
+        .map(|s| f64::from(s.w) + 20.0)
+        .fold(50.0, f64::max);
     let placed = layout::layout(
         c,
         &Sizes {
             node: &node_size,
             title: &title,
-            gap_x: 50.0,
+            gap_x,
             gap_y: 50.0,
             pad: 20.0,
         },
@@ -197,23 +231,6 @@ pub fn c4(c: &C4, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
         };
         Some(Point::new(r.x + (r.w - 1) / 2, r.y + (r.h - 1) / 2))
     };
-    // A relation's label holds its technology too.
-    let mut chart = c.chart.clone();
-    for (e, r) in chart.edges.iter_mut().zip(&c.rels) {
-        if let Some(techn) = &r.techn {
-            let text = match &e.label {
-                Some(l) => format!("{}\n[{techn}]", l.text),
-                None => format!("[{techn}]"),
-            };
-            e.label = Some(Label::plain(text));
-        }
-        if let Some(v) = &r.colors.line {
-            e.styles.push(style("stroke", v));
-        }
-        if let Some(v) = &r.colors.font {
-            e.styles.push(style("color", v));
-        }
-    }
     let edges = chart
         .edges
         .iter()
@@ -370,6 +387,10 @@ pub fn c4(c: &C4, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
             y += h;
         }
     }
+    // Relations and their labels go over the elements' text.
+    scene
+        .elements
+        .sort_by_key(|e| matches!(e.owner, Owner::Edge(_)));
     scene
 }
 
