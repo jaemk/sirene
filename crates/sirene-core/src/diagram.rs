@@ -3,6 +3,7 @@
 use crate::architecture::{self, Architecture};
 use crate::ascii::{self, Options};
 use crate::block::{self, Block};
+use crate::c4::{self, C4};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::{self, Flowchart, scan};
 use crate::gantt::{self, Gantt};
@@ -46,6 +47,7 @@ pub enum Kind {
     Treemap,
     Block,
     Architecture,
+    C4,
 }
 
 impl Kind {
@@ -94,6 +96,8 @@ impl Kind {
             Kind::Block
         } else if architecture::HEADERS.contains(&word) {
             Kind::Architecture
+        } else if c4::HEADERS.contains(&word) {
+            Kind::C4
         } else {
             Kind::Flowchart
         }
@@ -102,7 +106,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, and architecture diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, and C4 diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -125,6 +129,7 @@ pub enum Diagram {
     Treemap(Treemap),
     Block(Block),
     Architecture(Architecture),
+    C4(C4),
 }
 
 impl Default for Diagram {
@@ -170,6 +175,7 @@ impl Diagram {
             Diagram::Treemap(t) => scene::treemap(t, metrics, theme),
             Diagram::Block(b) => scene::block(b, metrics, theme),
             Diagram::Architecture(a) => scene::architecture(a, metrics, theme),
+            Diagram::C4(c) => scene::c4(c, metrics, theme),
         }
     }
 
@@ -193,6 +199,7 @@ impl Diagram {
             Diagram::Treemap(t) => ascii::treemap(t, options),
             Diagram::Block(b) => ascii::block(b, options),
             Diagram::Architecture(a) => ascii::architecture(a, options),
+            Diagram::C4(c) => ascii::c4(c, options),
         }
     }
 }
@@ -365,6 +372,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::C4 => {
+            let (c4, diagnostics) = c4::parse(src).lower();
+            Lowered {
+                diagram: Diagram::C4(c4),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -412,6 +426,8 @@ mod tests {
         assert_eq!(Kind::of("block\n"), Kind::Block);
         assert_eq!(Kind::of("architecture-beta\n"), Kind::Architecture);
         assert_eq!(Kind::of("architecture\n"), Kind::Architecture);
+        assert_eq!(Kind::of("C4Context\n"), Kind::C4);
+        assert_eq!(Kind::of("C4Deployment\n"), Kind::C4);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -434,6 +450,7 @@ mod tests {
         assert_eq!(other_diagram("treemap-beta\n"), None);
         assert_eq!(other_diagram("block-beta\n"), None);
         assert_eq!(other_diagram("architecture-beta\n"), None);
+        assert_eq!(other_diagram("C4Container\n"), None);
         assert_eq!(other_diagram("quadrantChart\n"), None);
         assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);

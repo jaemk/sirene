@@ -3,6 +3,7 @@
 pub mod architecture;
 pub mod ascii;
 pub mod block;
+pub mod c4;
 pub mod class;
 pub mod diagnostic;
 pub mod diagram;

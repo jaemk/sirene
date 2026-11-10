@@ -1,0 +1,13 @@
+C4Deployment
+    title Deployment
+
+    Deployment_Node(dc, "Big Bank plc", "Data center") {
+        Deployment_Node(web, "web-server", "Ubuntu 16.04 LTS", "A web server") {
+            Container(api, "API Application", "Java and Spring MVC")
+        }
+        Node(db, "db-server", "Ubuntu 16.04 LTS") {
+            ContainerDb(store, "Database", "Oracle 12c")
+        }
+    }
+
+    Rel(api, store, "Reads from", $techn="JDBC")

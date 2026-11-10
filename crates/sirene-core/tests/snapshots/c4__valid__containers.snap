@@ -1,0 +1,38 @@
+---
+source: crates/sirene-core/tests/c4.rs
+expression: "C4Container\n    title Container diagram for Internet Banking System\n\n    System_Ext(email_system, \"E-Mail System\", \"The internal Microsoft Exchange system\")\n    Person(customer, Customer, \"A customer of the bank\")\n\n    Container_Boundary(c1, \"Internet Banking\") {\n        Container(spa, \"Single-Page App\", \"JavaScript, Angular\", \"Provides banking functionality via the browser\")\n        Container_Ext(mobile_app, \"Mobile App\", \"C#, Xamarin\")\n        Container(web_app, \"Web Application\", \"Java, Spring MVC\")\n        ContainerDb(database, \"Database\", \"SQL Database\", \"Stores user registration information\")\n        ContainerQueue(queue, \"Events\", \"Kafka\")\n        Component(auth, \"Auth\", \"Spring Bean\")\n    }\n\n    Rel(customer, web_app, \"Uses\", \"HTTPS\")\n    Rel_Back(database, web_app, \"Reads from and writes to\", \"JDBC\")\n    Rel(email_system, customer, \"Sends e-mails to\")\n    Rel(web_app, queue, \"Publishes\")\n"
+---
+
+                                     Container diagram for Internet Banking System
+
+╭────────────────────────╮  ╭────────────────────────╮
+│  <<external_system>>   │  │       <<person>>       │
+│     E-Mail System      │  │        Customer        │
+│ The internal Microsoft │  │ A customer of the bank │
+│    Exchange system     │  ╰────────────────────────╯
+╰────────────────────────╯
+
+┌ Internet Banking [CONTAINER] ────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│ ╭────────────────────────────────╮  ╭────────────────────────╮  ╭────────────────────╮  ╭──────────────────────────╮ │
+│ │         <<container>>          │  │ <<external_container>> │  │   <<container>>    │  ├──────────────────────────┤ │
+│ │        Single-Page App         │  │       Mobile App       │  │  Web Application   │  │     <<container_db>>     │ │
+│ │     [JavaScript, Angular]      │  │     [C#, Xamarin]      │  │ [Java, Spring MVC] │  │         Database         │ │
+│ │ Provides banking functionality │  ╰────────────────────────╯  ╰────────────────────╯  │      [SQL Database]      │ │
+│ │        via the browser         │                                                      │ Stores user registration │ │
+│ ╰────────────────────────────────╯                                                      │       information        │ │
+│                                                                                         ╰──────────────────────────╯ │
+│                                                                                                                      │
+│ ╭─────────────────────╮  ╭───────────────╮                                                                           │
+│ ├─────────────────────┤  │ <<component>> │                                                                           │
+│ │ <<container_queue>> │  │     Auth      │                                                                           │
+│ │       Events        │  │ [Spring Bean] │                                                                           │
+│ │       [Kafka]       │  ╰───────────────╯                                                                           │
+│ ╰─────────────────────╯                                                                                              │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+customer --> web_app: Uses [HTTPS]
+web_app --> database: Reads from and writes to [JDBC]
+email_system --> customer: Sends e-mails to
+web_app --> queue: Publishes

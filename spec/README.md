@@ -48,6 +48,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Treemaps | done | [mermaid-treemaps.md](mermaid-treemaps.md) |
 | Mermaid Block Diagrams | done | [mermaid-block-diagrams.md](mermaid-block-diagrams.md) |
 | Mermaid Architecture Diagrams | done | [mermaid-architecture-diagrams.md](mermaid-architecture-diagrams.md) |
+| Mermaid C4 Diagrams | done | [mermaid-c4-diagrams.md](mermaid-c4-diagrams.md) |
 
 ## Conventions
 

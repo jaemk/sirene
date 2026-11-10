@@ -1,0 +1,23 @@
+---
+source: crates/sirene-core/tests/c4.rs
+expression: "C4Deployment\n    title Deployment\n\n    Deployment_Node(dc, \"Big Bank plc\", \"Data center\") {\n        Deployment_Node(web, \"web-server\", \"Ubuntu 16.04 LTS\", \"A web server\") {\n            Container(api, \"API Application\", \"Java and Spring MVC\")\n        }\n        Node(db, \"db-server\", \"Ubuntu 16.04 LTS\") {\n            ContainerDb(store, \"Database\", \"Oracle 12c\")\n        }\n    }\n\n    Rel(api, store, \"Reads from\", $techn=\"JDBC\")\n"
+---
+
+                                  Deployment
+
+┌ Big Bank plc [Data center] ─────────────────────────────────────────────────┐
+│                                                                             │
+│ ┌ web-server [Ubuntu 16.04 LTS] ────┐  ┌ db-server [Ubuntu 16.04 LTS] ────┐ │
+│ │                                   │  │                                  │ │
+│ │ ╭───────────────────────╮         │  │ ╭──────────────────╮             │ │
+│ │ │     <<container>>     │         │  │ ├──────────────────┤             │ │
+│ │ │    API Application    │         │  │ │ <<container_db>> │             │ │
+│ │ │ [Java and Spring MVC] │         │  │ │     Database     │             │ │
+│ │ ╰───────────────────────╯         │  │ │   [Oracle 12c]   │             │ │
+│ │                                   │  │ ╰──────────────────╯             │ │
+│ └───────────────────────────────────┘  │                                  │ │
+│                                        └──────────────────────────────────┘ │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+api --> store: Reads from [JDBC]
