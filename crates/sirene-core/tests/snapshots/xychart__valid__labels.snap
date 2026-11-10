@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/xychart.rs
+expression: "xychart\n    title \"Smallest AI models scoring above 60% on MMLU\"\n    x-axis \"Date\" [\"Apr 2022\", \"Feb 2023\", \"Jul 2023\", \"Sep 2023\", \"Apr 2024\"]\n    y-axis \"Parameters (B)\" 0 --> 600\n    line [540 \"PaLM\", 65 \"LLaMA-65B\", 34 \"Llama 2 34B\", 7 \"Mistral 7B\", 3.8 \"Phi-3-mini\"]\n"
+---
+
+  Smallest AI models scoring above 60% on MMLU
+
+Date      line 1
+Apr 2022                       ●   540 PaLM
+Feb 2023    ●                      65 LLaMA-65B
+Jul 2023   ●                       34 Llama 2 34B
+Sep 2023  ●                        7 Mistral 7B
+Apr 2024  ●                        3.8 Phi-3-mini
+
+Parameters (B): 0 to 600

@@ -12,6 +12,7 @@ use crate::quadrant::{self, QuadrantChart};
 use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
 use crate::timeline::{self, Timeline};
+use crate::xychart::{self, XyChart};
 use crate::{class, er, state};
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
@@ -29,6 +30,7 @@ pub enum Kind {
     Mindmap,
     Journey,
     Quadrant,
+    XyChart,
 }
 
 impl Kind {
@@ -59,6 +61,8 @@ impl Kind {
             Kind::Journey
         } else if quadrant::HEADERS.contains(&word) {
             Kind::Quadrant
+        } else if xychart::HEADERS.contains(&word) {
+            Kind::XyChart
         } else {
             Kind::Flowchart
         }
@@ -67,7 +71,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, and quadrant diagrams";
+     mindmap, journey, quadrant, and XY diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -82,6 +86,7 @@ pub enum Diagram {
     Mindmap(Mindmap),
     Journey(Journey),
     Quadrant(QuadrantChart),
+    XyChart(XyChart),
 }
 
 impl Default for Diagram {
@@ -119,6 +124,7 @@ impl Diagram {
             Diagram::Mindmap(m) => scene::mindmap(m, metrics, theme),
             Diagram::Journey(j) => scene::journey(j, metrics, theme),
             Diagram::Quadrant(q) => scene::quadrant(q, metrics, theme),
+            Diagram::XyChart(c) => scene::xychart(c, metrics, theme),
         }
     }
 
@@ -134,6 +140,7 @@ impl Diagram {
             Diagram::Mindmap(m) => ascii::mindmap(m, options),
             Diagram::Journey(j) => ascii::journey(j, options),
             Diagram::Quadrant(q) => ascii::quadrant(q, options),
+            Diagram::XyChart(c) => ascii::xychart(c, options),
         }
     }
 }
@@ -249,6 +256,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::XyChart => {
+            let (chart, diagnostics) = xychart::parse(src).lower();
+            Lowered {
+                diagram: Diagram::XyChart(chart),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -281,6 +295,8 @@ mod tests {
         assert_eq!(Kind::of("mindmap\n"), Kind::Mindmap);
         assert_eq!(Kind::of("journey\n"), Kind::Journey);
         assert_eq!(Kind::of("quadrantChart\n"), Kind::Quadrant);
+        assert_eq!(Kind::of("xychart-beta\n"), Kind::XyChart);
+        assert_eq!(Kind::of("xychart horizontal\n"), Kind::XyChart);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -293,10 +309,8 @@ mod tests {
 
     #[test]
     fn other_diagrams() {
-        assert_eq!(
-            other_diagram("xychart-beta\n"),
-            Some("xychart-beta".to_owned())
-        );
+        assert_eq!(other_diagram("zenuml\n"), Some("zenuml".to_owned()));
+        assert_eq!(other_diagram("xychart-beta\n"), None);
         assert_eq!(other_diagram("quadrantChart\n"), None);
         assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);

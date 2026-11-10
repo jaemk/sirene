@@ -15,6 +15,7 @@ mod shapes;
 mod style;
 pub mod svg;
 mod timeline;
+mod xychart;
 
 use unicode_width::UnicodeWidthStr;
 
@@ -28,6 +29,7 @@ pub use quadrant::quadrant;
 pub use sequence::sequence;
 pub use style::parse_color;
 pub use timeline::timeline;
+pub use xychart::xychart;
 
 /// A point in scene coordinates (pixels, y down).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

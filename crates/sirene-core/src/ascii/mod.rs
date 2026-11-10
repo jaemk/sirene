@@ -9,6 +9,7 @@ mod pie;
 mod quadrant;
 mod sequence;
 mod timeline;
+mod xychart;
 
 pub use gantt::render as gantt;
 pub use git::render as git_graph;
@@ -18,6 +19,7 @@ pub use pie::render as pie;
 pub use quadrant::render as quadrant;
 pub use sequence::render as sequence;
 pub use timeline::render as timeline;
+pub use xychart::render as xychart;
 
 use unicode_width::UnicodeWidthStr;
 

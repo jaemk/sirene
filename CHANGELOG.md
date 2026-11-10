@@ -44,6 +44,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid quadrant charts (`quadrantChart`), read-only in the editor: axis and quadrant labels,
   and points styled directly or by `classDef` (`radius`, `color`, `stroke-color`,
   `stroke-width`); in text, the points plotted by name in a box split in four.
+- Mermaid XY charts (`xychart-beta`, `xychart`), read-only in the editor: bar and line series
+  over category or numeric x-axes, vertical or `horizontal`, with axis titles and ranges, point
+  labels, and a legend for named series; in text, a row per position with bars and markers.
 
 ### Changed
 

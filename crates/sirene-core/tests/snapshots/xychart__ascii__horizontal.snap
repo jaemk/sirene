@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/xychart.rs
+expression: "---\ntitle: Genres in top 100 book survey\n---\nxychart horizontal\n    %% Categories down the side, values across.\n    x-axis Genre [comedy, romance, mystery, crime, \"non fiction\", other]\n    y-axis \"Number of Books\" 0 --> 30\n    bar \"books\" [12, 2, 20, 25, 17, 24]\n"
+---
+     Genres in top 100 book survey
+
+Genre        books
+comedy       ##########               12
+romance      ##                       2
+mystery      ################         20
+crime        ####################     25
+non fiction  ##############           17
+other        ###################      24
+
+Number of Books: 0 to 30

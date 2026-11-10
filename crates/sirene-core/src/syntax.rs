@@ -117,6 +117,9 @@ syntax_kinds! {
     QUADRANT_KW,
     L_BRACKET,
     R_BRACKET,
+    // XY charts: `line` or `bar`, and `horizontal` or `vertical` after the header keyword.
+    SERIES_KW,
+    ORIENTATION,
     ERROR_TOKEN,
 
     // Nodes.
@@ -176,6 +179,7 @@ syntax_kinds! {
     AXIS_STMT,
     QUADRANT_STMT,
     POINT_STMT,
+    SERIES_STMT,
     ERROR,
 }
 
