@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/architecture.rs
+expression: "architecture-beta\n    group api(cloud)[API]\n\n    service db(database)[Database] in api\n    service disk1(disk)[Storage] in api\n    service disk2(disk)[Storage] in api\n    service server(server)[Server] in api\n\n    db:L -- R:server\n    disk1:T -- B:server\n    disk2:T -- B:db\n"
+---
++ API (cloud) -------------------------------------+
+|                                                  |
+| +-----------------+      +---------------------+ |
+| | Server (server) +------+ Database (database) | |
+| +--------+--------+      +----------+----------+ |
+|          |                          |            |
+|          |                          |            |
+|          |                          |            |
+|  +-------+--------+         +-------+--------+   |
+|  | Storage (disk) |         | Storage (disk) |   |
+|  +----------------+         +----------------+   |
+|                                                  |
++--------------------------------------------------+

@@ -1,0 +1,15 @@
+architecture-beta
+    title Edges and junctions
+    group public(internet)[Public]
+    group private(cloud)[Private]
+
+    service gateway(internet)[Gateway] in public
+    service web(server)[Web] in private
+    service jobs(server)[Jobs] in private
+    service store(database)[Store]
+    junction hub
+
+    gateway{group}:R --> L:web{group}
+    web:R -[queue]- L:jobs
+    jobs:B <--> T:hub
+    hub:R --> L:store

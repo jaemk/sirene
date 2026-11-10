@@ -68,6 +68,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid block diagrams (`block-beta`, `block`), read-only in the editor: blocks in a grid of
   `columns` with widths and `space`, nested `block` groups, block arrows, edges, and styles,
   placed as Mermaid places them; in text, the grid with the edges listed below.
+- Mermaid architecture diagrams (`architecture-beta`), read-only in the editor: services with
+  their icons (`cloud`, `database`, `disk`, `internet`, `server`), junctions, nested groups,
+  edges by side with arrows, labels, and `{group}` ends, and `align`, placed on a grid from
+  the edge sides; in text, boxes with the icon name.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 
 ### Changed

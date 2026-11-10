@@ -47,6 +47,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Sankey Diagrams | done | [mermaid-sankey-diagrams.md](mermaid-sankey-diagrams.md) |
 | Mermaid Treemaps | done | [mermaid-treemaps.md](mermaid-treemaps.md) |
 | Mermaid Block Diagrams | done | [mermaid-block-diagrams.md](mermaid-block-diagrams.md) |
+| Mermaid Architecture Diagrams | done | [mermaid-architecture-diagrams.md](mermaid-architecture-diagrams.md) |
 
 ## Conventions
 

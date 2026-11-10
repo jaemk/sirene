@@ -1,5 +1,6 @@
 //! The entry point for every Mermaid diagram type sirene draws (LANGS-2).
 
+use crate::architecture::{self, Architecture};
 use crate::ascii::{self, Options};
 use crate::block::{self, Block};
 use crate::diagnostic::Diagnostic;
@@ -44,6 +45,7 @@ pub enum Kind {
     Sankey,
     Treemap,
     Block,
+    Architecture,
 }
 
 impl Kind {
@@ -90,6 +92,8 @@ impl Kind {
             Kind::Treemap
         } else if block::HEADERS.contains(&word) {
             Kind::Block
+        } else if architecture::HEADERS.contains(&word) {
+            Kind::Architecture
         } else {
             Kind::Flowchart
         }
@@ -98,7 +102,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, and block diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, and architecture diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -120,6 +124,7 @@ pub enum Diagram {
     Sankey(Sankey),
     Treemap(Treemap),
     Block(Block),
+    Architecture(Architecture),
 }
 
 impl Default for Diagram {
@@ -164,6 +169,7 @@ impl Diagram {
             Diagram::Sankey(s) => scene::sankey(s, metrics, theme),
             Diagram::Treemap(t) => scene::treemap(t, metrics, theme),
             Diagram::Block(b) => scene::block(b, metrics, theme),
+            Diagram::Architecture(a) => scene::architecture(a, metrics, theme),
         }
     }
 
@@ -186,6 +192,7 @@ impl Diagram {
             Diagram::Sankey(s) => ascii::sankey(s, options),
             Diagram::Treemap(t) => ascii::treemap(t, options),
             Diagram::Block(b) => ascii::block(b, options),
+            Diagram::Architecture(a) => ascii::architecture(a, options),
         }
     }
 }
@@ -351,6 +358,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Architecture => {
+            let (arch, diagnostics) = architecture::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Architecture(arch),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -396,6 +410,8 @@ mod tests {
         assert_eq!(Kind::of("treemap\n"), Kind::Treemap);
         assert_eq!(Kind::of("block-beta\n"), Kind::Block);
         assert_eq!(Kind::of("block\n"), Kind::Block);
+        assert_eq!(Kind::of("architecture-beta\n"), Kind::Architecture);
+        assert_eq!(Kind::of("architecture\n"), Kind::Architecture);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -417,6 +433,7 @@ mod tests {
         assert_eq!(other_diagram("sankey-beta\n"), None);
         assert_eq!(other_diagram("treemap-beta\n"), None);
         assert_eq!(other_diagram("block-beta\n"), None);
+        assert_eq!(other_diagram("architecture-beta\n"), None);
         assert_eq!(other_diagram("quadrantChart\n"), None);
         assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);

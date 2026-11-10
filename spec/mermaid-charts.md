@@ -9,7 +9,8 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | Type | Model | Notes |
 |---|---|---|
 | `requirementDiagram` | graph | Requirements and elements as compartment boxes, labeled relationships: `mermaid-requirement-diagrams.md`. |
-| `C4Context` (and the other C4 types), `architecture-beta` | graph | New shapes; C4 and architecture use icons, drawn as placeholders. |
+| `C4Context` (and the other C4 types) | graph | New shapes; C4 uses icons, drawn as placeholders. |
+| `architecture-beta` | graph | Services with icons in groups, placed on a grid by their edge sides: `mermaid-architecture-diagrams.md`. |
 | `block-beta` | graph | Blocks in a grid of columns, drawn with the flowchart shapes: `mermaid-block-diagrams.md`. |
 | `mindmap` | tree | A two-sided tree out from the root; ASCII is an outline: `mermaid-mindmaps.md`. |
 | `pie` | chart | Slices with labels and a legend; ASCII is a table with percentage bars: `mermaid-pie-charts.md`. |

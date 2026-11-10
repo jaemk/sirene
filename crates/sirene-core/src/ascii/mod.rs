@@ -1,5 +1,6 @@
 //! Terminal text rendering of flowcharts (ASCIIR-*).
 
+mod architecture;
 mod block;
 mod canvas;
 mod gantt;
@@ -17,6 +18,7 @@ mod timeline;
 mod treemap;
 mod xychart;
 
+pub use architecture::render as architecture;
 pub use block::render as block;
 pub use gantt::render as gantt;
 pub use git::render as git_graph;
@@ -86,6 +88,11 @@ pub const CONFIG: Config = Config {
 pub fn render(chart: &Flowchart, options: &Options) -> String {
     let graph = chart.layout_graph(&Cells);
     let layout = layout::layout(&graph, &CONFIG);
+    draw(chart, &layout, options)
+}
+
+/// Draws `chart` placed by `layout`, in cells.
+fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String {
     let mut canvas = Canvas::new(layout.size.w, layout.size.h);
 
     for (s, r) in chart.subgraphs.iter().zip(&layout.clusters) {

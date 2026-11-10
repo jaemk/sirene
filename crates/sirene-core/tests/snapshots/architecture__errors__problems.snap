@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/architecture.rs
+expression: "architecture-beta\n    service a(server)[A] in missing\n    service a[Again]\n    group g[G]\n    service b[B] in g\n    a:R --> L:nope\n    a:R --> L:g\n    a{group}:R --> L:b\n    align row a nope\n    a:Q -- L:b\n"
+---
+2:29: error: no group `missing` declared above; drawing `a` outside any group
+3:13: error: `a` is already declared; ignoring this
+6:15: error: no service or junction `nope`; ignoring this edge
+7:15: error: `g` is a group; an edge ends at a service or junction, with `{group}` after it to end at its group
+8:5: warning: `a` is not in a group; drawing the edge from `a` itself
+9:5: warning: `align` needs at least two services or junctions; ignoring it
+9:17: warning: no service or junction `nope`; ignoring it
+10:7: error: expected a side: `L`, `R`, `T`, or `B`
+
+                    ┌ G ────┐
+                    │       │
+┌────────────┐      │ ┌───┐ │
+│ A (server) ├──────┼►│ B │ │
+└────────────┘      │ └───┘ │
+                    │       │
+                    └───────┘

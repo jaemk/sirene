@@ -894,8 +894,28 @@ fn other_diagram_types() {
             "<stdin>:1:1: error: `zenuml` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
              mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, \
-             treemap, and block diagrams\n",
+             treemap, block, and architecture diagrams\n",
         );
+}
+
+/// An architecture diagram draws in text and as an image (MARCH-4, LANGS-4).
+#[test]
+fn architecture_diagrams() {
+    let src = "architecture-beta\nservice a(server)[A]\nservice b[B]\na:R --> L:b\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(
+            "+------------+      +---+\n| A (server) +----->| B |\n+------------+      +---+\n",
+        );
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(">A</text>"));
 }
 
 /// A block diagram draws in text and as an image (MBLOCK-4, LANGS-4).

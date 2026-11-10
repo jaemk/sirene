@@ -1,0 +1,10 @@
+architecture-beta
+    service a(server)[A] in missing
+    service a[Again]
+    group g[G]
+    service b[B] in g
+    a:R --> L:nope
+    a:R --> L:g
+    a{group}:R --> L:b
+    align row a nope
+    a:Q -- L:b
