@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/gantt.rs
+expression: "---\nconfig:\n  gantt:\n    topAxis: true\n---\ngantt\n    dateFormat DD/MM/YYYY HH:mm\n    axisFormat %b %e\n    tickInterval 1week\n    weekday monday\n    todayMarker off\n    Kickoff        : vert, k, 06/01/2014 09:00, 0d\n    Design         : d, 06/01/2014 09:00, 1w\n    Build          : b, after d, 2w\n    Release        : milestone, after b, 0d\n"
+---
+
+                            Jan 13              Jan 20              Jan 27
+         ───────────────────┴───────────────────┴───────────────────┴─
+         Kickoff
+Design   ████████████████████
+Build    │                   ████████████████████████████████████████
+Release  │                                                          ◆
+         ───────────────────┬───────────────────┬───────────────────┬─
+                            Jan 13              Jan 20              Jan 27

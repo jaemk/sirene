@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/gantt.rs
+expression: "gantt\n    title A Gantt Diagram\n    dateFormat YYYY-MM-DD\n    section Section\n        A task          :a1, 2014-01-01, 30d\n        Another task    :after a1, 20d\n    section Another\n        Task in Another :2014-01-12, 12d\n        another task    :24d\n"
+---
+
+                                  A Gantt Diagram
+
+Section
+  A task           ████████████████████████████████████
+  Another task                                         ████████████████████████
+Another
+  Task in Another               ███████████████
+  another task                                 ████████████████████████████
+                   ─────┬───────┬────────┬───────┬───────┬────────┬───────┬─────
+                        2014-01-05       2014-01-19      2014-02-02       2014-02-16

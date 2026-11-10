@@ -33,7 +33,7 @@ const DARK: [u32; 8] = [
     0x748ffc, 0xff922b, 0x51cf66, 0xcc5de8, 0x22b8cf, 0xff6b6b, 0xfcc419, 0x94d82d,
 ];
 
-fn luminance(c: Color) -> f32 {
+pub(super) fn luminance(c: Color) -> f32 {
     (0.2126 * f32::from(c.r) + 0.7152 * f32::from(c.g) + 0.0722 * f32::from(c.b)) / 255.0
 }
 

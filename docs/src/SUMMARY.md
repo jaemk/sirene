@@ -30,6 +30,7 @@
 - [Git graphs](git.md)
 - [Timelines](timeline.md)
 - [Pie charts](pie.md)
+- [Gantt charts](gantt.md)
 
 # Project
 

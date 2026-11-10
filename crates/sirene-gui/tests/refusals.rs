@@ -225,6 +225,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for pie charts yet")
     );
     assert!(pie.chart.nodes.is_empty() && pie.other.is_some());
+    let gantt = Document::from_source(None, "gantt\n  a : 2014-01-01, 1d\n".to_owned());
+    assert_eq!(
+        gantt.read_only(),
+        Some("drawing edits are not supported for gantt charts yet")
+    );
+    assert!(gantt.chart.nodes.is_empty() && gantt.other.is_some());
 }
 
 #[gpui::test]

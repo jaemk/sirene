@@ -31,6 +31,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and `autonumber`, in images and text.
 - Mermaid pie charts (`pie`), read-only in the editor: slices with percentages, a legend,
   `showData`, and a title; in text, a table with a bar per slice.
+- Mermaid gantt charts (`gantt`), read-only in the editor: tasks with `after`, `until`,
+  durations, and tags (`active`, `done`, `crit`, `milestone`, `vert`), sections, `excludes`,
+  `includes`, `weekend`, `inclusiveEndDates`, `todayMarker`, `topAxis`, compact rows, and any
+  dayjs `dateFormat` and d3 `axisFormat`, also settable in frontmatter or a directive.
 
 ### Changed
 

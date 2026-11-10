@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/gantt.rs
+expression: "gantt\n    dateFormat YYYY-MM-DD\n    tickInterval 1year\n    weekday funday\n    weekend sunday\n    First  : 3d\n    A      : a, 2014-01-01, 2d\n    B      : a, 2014-01-03, 2d\n    C      : after nope, 2d\n    D      : 2014-13-01, 2d\n    E      : 2014-01-01, soon\n    F      : done\n    G      : x, y, z, w\n    H      : h, after i, 1d\n    I      : i, after h, 1d\n    click a href \"https://example.com\"\n    stray words\n"
+---
+3:5: error: `1year` is not an interval; expected a number and a unit, such as `1day` or `2week`
+4:5: error: `funday` is not a weekday; expected one such as `monday`
+5:5: error: `sunday` cannot start the weekend; expected `friday` or `saturday`
+6:5: error: `First` has no start and no task before it
+8:5: error: `a` is already a task id
+9:5: error: no task has the id `nope`
+10:5: error: `2014-13-01` is not a date in `YYYY-MM-DD`
+11:5: error: `soon` is not an end date in `YYYY-MM-DD`, a duration such as `3d`, or `until ID`
+12:5: error: expected the task's dates
+13:5: error: expected at most an id, a start, and an end
+14:5: error: `H` cannot be dated: its `after` and `until` tasks wait on each other
+15:5: error: `I` cannot be dated: its `after` and `until` tasks wait on each other
+16:5: warning: `click` is not supported in gantt charts; ignoring it
+17:5: error: expected a task (`name : dates`) or a setting
+
+A  ████████████████████████████████████████████████████████████
+   ┬───────┬──────┬───────┬──────┬───────┬──────┬───────┬──────┬
+   2014-01-01     2014-01-01     2014-01-02     2014-01-02     2014-01-03

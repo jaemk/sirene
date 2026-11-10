@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/gantt.rs
+expression: "gantt\n    dateFormat HH:mm\n    axisFormat %H:%M\n    todayMarker off\n    Setup  : s, 08:00, 30m\n    Talk   : after s, 1.5h\n    Lunch  : 12:00, 1h\n"
+---
+Setup  ######
+Talk         ##################
+Lunch                                                  ############
+       +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+       08:00 08:30 09:00 09:30 10:00 10:30 11:00 11:30 12:00 12:30 13:00

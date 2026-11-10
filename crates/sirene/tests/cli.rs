@@ -725,7 +725,7 @@ fn check() {
     let md = dir.join("doc.md");
     std::fs::write(
         &md,
-        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  gantt\n  ```\n",
+        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  mindmap\n  ```\n",
     )
     .unwrap();
     sirene()
@@ -736,7 +736,7 @@ fn check() {
         .stdout("")
         .stderr(
             predicate::str::contains("doc.md:5:8: error: expected a node after the edge").and(
-                predicate::str::contains("doc.md:11:3: warning: skipping a `gantt` diagram"),
+                predicate::str::contains("doc.md:11:3: warning: skipping a `mindmap` diagram"),
             ),
         );
     sirene()
@@ -756,7 +756,7 @@ fn markdown_images() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path();
     let md = dir.join("doc.md");
-    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\ngantt\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
+    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nmindmap\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
     std::fs::write(&md, text).unwrap();
     sirene()
         .arg("svg")
@@ -765,7 +765,7 @@ fn markdown_images() {
         .success()
         .stdout("")
         .stderr(
-            predicate::str::contains("doc.md:9:1: warning: skipping a `gantt` diagram")
+            predicate::str::contains("doc.md:9:1: warning: skipping a `mindmap` diagram")
                 .and(predicate::str::contains("doc-1.svg"))
                 .and(predicate::str::contains("doc-3.svg")),
         );
@@ -789,7 +789,7 @@ fn markdown_images() {
     let linked = std::fs::read_to_string(&md).unwrap();
     assert_eq!(
         linked,
-        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\ngantt\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
+        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\nmindmap\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
     );
     assert!(dir.join("img/doc-1.png").exists());
     // Every mermaid block is still there, unchanged.
@@ -887,13 +887,44 @@ fn suggests_a_misspelled_command() {
 fn other_diagram_types() {
     sirene()
         .arg("ascii")
-        .write_stdin("gantt\n  title x\n")
+        .write_stdin("mindmap\n  root\n")
         .assert()
         .failure()
         .stderr(
-            "<stdin>:1:1: error: `gantt` diagrams are not supported; \
-             sirene draws flowchart, sequence, state, class, ER, git graph, timeline, and pie diagrams\n",
+            "<stdin>:1:1: error: `mindmap` diagrams are not supported; \
+             sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, and gantt diagrams\n",
         );
+}
+
+/// A gantt chart draws in text and as an image (MGANTT-6, LANGS-4).
+#[test]
+fn gantt_charts() {
+    let src = "gantt\n  dateFormat YYYY-MM-DD\n  tickInterval 1day\n  axisFormat %d\n  todayMarker off\n  \
+               a : 2014-01-01, 2d\n  b : crit, 1d\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(
+            "a    ########################################\n\
+             ! b                                          ####################\n\
+             \x20    +-------------------+-------------------+-------------------+\n\
+             \x20    01                  02                  03                  04\n",
+        );
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicates::str::contains(">a</text>"));
+    sirene()
+        .arg("check")
+        .arg("-")
+        .write_stdin("gantt\n  a : after b, 1d\n")
+        .assert()
+        .failure()
+        .stderr("<stdin>:2:3: error: no task has the id `b`\n");
 }
 
 /// A pie chart draws in text and as an image (MPIE-4, LANGS-4).
