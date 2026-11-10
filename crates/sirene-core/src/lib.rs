@@ -14,6 +14,7 @@ pub mod layout;
 mod lines;
 pub mod markdown;
 pub mod mindmap;
+pub mod packet;
 pub mod pie;
 pub mod quadrant;
 pub mod requirement;

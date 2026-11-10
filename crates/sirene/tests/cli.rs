@@ -893,8 +893,27 @@ fn other_diagram_types() {
         .stderr(
             "<stdin>:1:1: error: `zenuml` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, journey, quadrant, XY, requirement, and kanban diagrams\n",
+             mindmap, journey, quadrant, XY, requirement, kanban, and packet diagrams\n",
         );
+}
+
+/// A packet diagram draws in text and as an image (MPKT-4, LANGS-4).
+#[test]
+fn packet_diagrams() {
+    let src =
+        "---\nconfig:\n  packet:\n    bitsPerRow: 4\n---\npacket\n  0-2: \"abc\"\n  +3: \"d\"\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout("   0\n   0 1 2 3\n  +-----+-+\n0 | abc |d|\n  +---+-+-+\n4 | d |\n  +---+\n");
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(">abc</text>"));
 }
 
 /// A kanban board draws in text and as an image (MKAN-4, LANGS-4).

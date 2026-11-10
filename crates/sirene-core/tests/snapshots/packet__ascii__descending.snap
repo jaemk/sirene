@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/packet.rs
+expression: "---\nconfig:\n  packet:\n    showBits: true\n    bitOrder: descending\n    bitsPerRow: 16\n---\npacket\n0-7: \"DATA\"\n8-11: \"TYPE\"\n12: \"EN\"\n13-15: \"RESERVED\"\n+20: \"Spans two rows\"\n"
+---
+              1                   0
+    5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+   +-----+-+-------+---------------+
+0  |RESER|E| TYPE  |     DATA      |
+   | VED |N|       |               |
+   +-----+-+-------+---------------+
+16 |        Spans two rows         |
+   +-----------------------+-------+
+                           | Spans |
+32                         |  two  |
+                           | rows  |
+                           +-------+

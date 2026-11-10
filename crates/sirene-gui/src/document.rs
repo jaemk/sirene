@@ -139,6 +139,7 @@ impl Document {
             Kind::Quadrant => Some("drawing edits are not supported for quadrant charts yet"),
             Kind::XyChart => Some("drawing edits are not supported for XY charts yet"),
             Kind::Kanban => Some("drawing edits are not supported for kanban boards yet"),
+            Kind::Packet => Some("drawing edits are not supported for packet diagrams yet"),
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")
             }

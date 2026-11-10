@@ -6,6 +6,7 @@ mod hit;
 mod journey;
 mod kanban;
 mod mindmap;
+mod packet;
 mod paint;
 mod pie;
 #[cfg(feature = "png")]
@@ -25,6 +26,7 @@ pub use git::git_graph;
 pub use journey::journey;
 pub use kanban::kanban;
 pub use mindmap::mindmap;
+pub use packet::packet;
 pub use paint::{CONFIG, flowchart};
 pub use pie::pie;
 pub use quadrant::quadrant;

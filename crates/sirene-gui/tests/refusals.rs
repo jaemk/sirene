@@ -270,6 +270,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for kanban boards yet")
     );
     assert!(board.chart.nodes.is_empty() && board.other.is_some());
+    let packet = Document::from_source(None, "packet\n  0-7: \"a\"\n".to_owned());
+    assert_eq!(
+        packet.read_only(),
+        Some("drawing edits are not supported for packet diagrams yet")
+    );
+    assert!(packet.chart.nodes.is_empty() && packet.other.is_some());
 }
 
 #[gpui::test]
