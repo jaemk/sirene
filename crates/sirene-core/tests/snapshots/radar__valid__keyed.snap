@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/radar.rs
+expression: "---\nconfig:\n  radar:\n    axisScaleFactor: 0.9\n    curveTension: 0.1\n---\nradar-beta\n  accTitle: Skills\n  %% Values by axis id, in any order, over several lines.\n  axis A, B, C, D, E\n  curve c1{ E: 5, D: 4, C: 3,\n    B: 2, A: 1 }\n  curve c2{5, 4, 3, 2, 1}\n  curve c3{3, 3, 3, 3, 3}\n  showLegend false\n  ticks 3\n"
+---
+
+A  c1  ████▊                    1
+   c2  ████████████████████████ 5
+   c3  ██████████████▍          3
+B  c1  █████████▋               2
+   c2  ███████████████████▎     4
+   c3  ██████████████▍          3
+C  c1  ██████████████▍          3
+   c2  ██████████████▍          3
+   c3  ██████████████▍          3
+D  c1  ███████████████████▎     4
+   c2  █████████▋               2
+   c3  ██████████████▍          3
+E  c1  ████████████████████████ 5
+   c2  ████▊                    1
+   c3  ██████████████▍          3
+
+0 to 5

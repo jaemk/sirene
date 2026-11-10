@@ -14,7 +14,7 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | `pie` | chart | Slices with labels and a legend; ASCII is a table with percentage bars: `mermaid-pie-charts.md`. |
 | `quadrantChart` | chart | Points in four labeled quadrants; ASCII plots them by name: `mermaid-quadrant-charts.md`. |
 | `xychart-beta` | chart | Bars and lines over category or numeric axes; ASCII is a row per position: `mermaid-xy-charts.md`. |
-| `radar-beta` | chart | Axes around a circle, and a polygon per series. |
+| `radar-beta` | chart | Axes around a circle, and a closed curve per series; ASCII is a bar per axis and series: `mermaid-radar-charts.md`. |
 | `sankey-beta` | chart | Flows between ranked nodes; the ranking could reuse LAYOUT-4. |
 | `packet` | chart | Rows of bit fields; ASCII is the RFC header layout: `mermaid-packet-diagrams.md`. |
 | `gantt` | chart | Dates, durations, dependencies (`after`), sections, and a time axis; ASCII is a bar per task: `mermaid-gantt-charts.md`. |

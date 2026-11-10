@@ -56,6 +56,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid packet diagrams (`packet`, `packet-beta`), read-only in the editor: bit ranges, single
   bits, and `+count` fields in rows of `bitsPerRow`, with bit numbers and `bitOrder: descending`;
   in text, the RFC header layout.
+- Mermaid radar charts (`radar-beta`), read-only in the editor: axes, curves with listed or
+  keyed values, `min`, `max`, `ticks`, circle or polygon `graticule`, a legend, and the
+  frontmatter `radar` config; in text, a bar per axis and curve.
 
 ### Changed
 

@@ -187,6 +187,9 @@ syntax_kinds! {
     SERIES_STMT,
     REQUIREMENT,
     FIELD,
+    // Radar charts: an axis or curve with its optional label, and one of a curve's values.
+    ENTRY,
+    VALUE,
     ERROR,
 }
 

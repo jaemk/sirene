@@ -1,0 +1,33 @@
+---
+source: crates/sirene-core/tests/radar.rs
+expression: "---\nconfig:\n  radar:\n    curveTension: round\n---\nradar-beta\n  axis a, b, c\n  axis a[\"Again\"]\n  curve short{1, 2}\n  curve long{1, 2, 3, 4}\n  curve keyed{a: 1, z: 2, a: 3}\n  curve mixed{a: 1, 2}\n  curve broken{1 2}\n  graticule square\n  ticks 0\n  showLegend maybe\n  max -1\n"
+---
+1:1: warning: ignoring `curveTension: round`: not a valid value
+8:8: error: axis `a` is already defined; ignoring this one
+9:9: error: `short` has 2 values for 3 axes; drawing the missing ones at the minimum
+10:9: error: `long` has 4 values for 3 axes; ignoring the extra ones
+11:9: error: `keyed` has no value for `b`, `c`; drawing it at the minimum
+11:21: error: `z` in `keyed` is not an axis; ignoring it
+11:27: error: `keyed` has two values for `a`; using the first
+12:9: error: `mixed` has no value for `b`, `c`; drawing it at the minimum
+12:21: error: expected `axis: value` in `mixed`, as its other values are
+13:18: error: expected `,` or `}`
+14:13: error: expected `circle` or `polygon` after `graticule`, not `square`
+15:9: error: expected a whole number from 1 to 100 after `ticks`, not `0`
+16:14: error: expected `true` or `false` after `showLegend`, not `maybe`
+17:3: error: `max -1` is not above the minimum, 0; using the largest value
+
+a  short  ████████                 1
+   long   ████████                 1
+   keyed  ████████                 1
+   mixed  ████████                 1
+b  short  ████████████████         2
+   long   ████████████████         2
+   keyed                           0
+   mixed                           0
+c  short                           0
+   long   ████████████████████████ 3
+   keyed                           0
+   mixed                           0
+
+0 to 3
