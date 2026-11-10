@@ -22,6 +22,7 @@ use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
 use crate::timeline::{self, Timeline};
 use crate::treemap::{self, Treemap};
+use crate::venn::{self, Venn};
 use crate::xychart::{self, XyChart};
 use crate::{class, er, requirement, state, zenuml};
 
@@ -53,6 +54,7 @@ pub enum Kind {
     ZenUml,
     Info,
     Ishikawa,
+    Venn,
 }
 
 impl Kind {
@@ -109,6 +111,8 @@ impl Kind {
             Kind::Info
         } else if ishikawa::HEADERS.contains(&word) {
             Kind::Ishikawa
+        } else if venn::HEADERS.contains(&word) {
+            Kind::Venn
         } else {
             Kind::Flowchart
         }
@@ -117,7 +121,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, and ishikawa diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, and venn diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -143,6 +147,7 @@ pub enum Diagram {
     C4(C4),
     Info(Info),
     Ishikawa(Ishikawa),
+    Venn(Venn),
 }
 
 impl Default for Diagram {
@@ -191,6 +196,7 @@ impl Diagram {
             Diagram::C4(c) => scene::c4(c, metrics, theme),
             Diagram::Info(i) => scene::info(i, metrics, theme),
             Diagram::Ishikawa(i) => scene::ishikawa(i, metrics, theme),
+            Diagram::Venn(v) => scene::venn(v, metrics, theme),
         }
     }
 
@@ -217,6 +223,7 @@ impl Diagram {
             Diagram::C4(c) => ascii::c4(c, options),
             Diagram::Info(i) => ascii::info(i, options),
             Diagram::Ishikawa(i) => ascii::ishikawa(i, options),
+            Diagram::Venn(v) => ascii::venn(v, options),
         }
     }
 }
@@ -417,6 +424,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Venn => {
+            let (chart, diagnostics) = venn::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Venn(chart),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -470,6 +484,7 @@ mod tests {
         assert_eq!(Kind::of("info showInfo\n"), Kind::Info);
         assert_eq!(Kind::of("ishikawa-beta\n"), Kind::Ishikawa);
         assert_eq!(Kind::of("ishikawa\n"), Kind::Ishikawa);
+        assert_eq!(Kind::of("venn-beta\n"), Kind::Venn);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -484,7 +499,11 @@ mod tests {
     fn other_diagrams() {
         assert_eq!(other_diagram("zenuml\n"), None);
         assert_eq!(other_diagram("info\n"), None);
-        assert_eq!(other_diagram("venn-beta\n"), Some("venn-beta".to_owned()));
+        assert_eq!(other_diagram("venn-beta\n"), None);
+        assert_eq!(
+            other_diagram("wardley-beta\n"),
+            Some("wardley-beta".to_owned())
+        );
         assert_eq!(other_diagram("xychart-beta\n"), None);
         assert_eq!(other_diagram("requirementDiagram\n"), None);
         assert_eq!(other_diagram("kanban\n"), None);

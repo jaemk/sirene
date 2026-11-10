@@ -725,7 +725,7 @@ fn check() {
     let md = dir.join("doc.md");
     std::fs::write(
         &md,
-        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  venn-beta\n  ```\n",
+        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  wardley-beta\n  ```\n",
     )
     .unwrap();
     sirene()
@@ -736,7 +736,7 @@ fn check() {
         .stdout("")
         .stderr(
             predicate::str::contains("doc.md:5:8: error: expected a node after the edge").and(
-                predicate::str::contains("doc.md:11:3: warning: skipping a `venn-beta` diagram"),
+                predicate::str::contains("doc.md:11:3: warning: skipping a `wardley-beta` diagram"),
             ),
         );
     sirene()
@@ -756,7 +756,7 @@ fn markdown_images() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path();
     let md = dir.join("doc.md");
-    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nvenn-beta\n  set A\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
+    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nwardley-beta\n  title A\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
     std::fs::write(&md, text).unwrap();
     sirene()
         .arg("svg")
@@ -765,7 +765,7 @@ fn markdown_images() {
         .success()
         .stdout("")
         .stderr(
-            predicate::str::contains("doc.md:9:1: warning: skipping a `venn-beta` diagram")
+            predicate::str::contains("doc.md:9:1: warning: skipping a `wardley-beta` diagram")
                 .and(predicate::str::contains("doc-1.svg"))
                 .and(predicate::str::contains("doc-3.svg")),
         );
@@ -789,7 +789,7 @@ fn markdown_images() {
     let linked = std::fs::read_to_string(&md).unwrap();
     assert_eq!(
         linked,
-        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\nvenn-beta\n  set A\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
+        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\nwardley-beta\n  title A\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
     );
     assert!(dir.join("img/doc-1.png").exists());
     // Every mermaid block is still there, unchanged.
@@ -887,14 +887,14 @@ fn suggests_a_misspelled_command() {
 fn other_diagram_types() {
     sirene()
         .arg("ascii")
-        .write_stdin("venn-beta\n  title T\n")
+        .write_stdin("wardley-beta\n  title T\n")
         .assert()
         .failure()
         .stderr(
-            "<stdin>:1:1: error: `venn-beta` diagrams are not supported; \
+            "<stdin>:1:1: error: `wardley-beta` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
              mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, \
-             treemap, block, architecture, C4, ZenUML, info, and ishikawa diagrams\n",
+             treemap, block, architecture, C4, ZenUML, info, ishikawa, and venn diagrams\n",
         );
 }
 
@@ -953,6 +953,24 @@ fn ishikawa_diagrams() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Short staffed</text>"));
+}
+
+/// A venn diagram draws in text and as an image (MVENN-4, MVENN-5).
+#[test]
+fn venn_diagrams() {
+    let src = "venn-beta\n  set A[\"Alpha\"]\n    text a1\n  set B\n  union A,B[\"Both\"]\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout("Alpha\n  - a1\nB\nAlpha & B: Both\n");
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Both</text>"));
 }
 
 /// A C4 diagram draws in text and as an image (MC4-4, LANGS-4).

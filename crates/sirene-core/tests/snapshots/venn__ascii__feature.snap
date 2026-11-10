@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/venn.rs
+expression: "venn-beta\n  title What makes a good feature\n  set Desirable\n  set Feasible\n  set Viable\n  union Desirable,Feasible[\"Buildable\"]\n  union Feasible,Viable[\"Sustainable\"]\n  union Desirable,Viable[\"Marketable\"]\n  union Desirable,Feasible,Viable[\"Ship it\"]\n"
+---
+      What makes a good feature
+
+Desirable
+Feasible
+Viable
+Desirable & Feasible: Buildable
+Feasible & Viable: Sustainable
+Desirable & Viable: Marketable
+Desirable & Feasible & Viable: Ship it

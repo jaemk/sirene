@@ -1,0 +1,12 @@
+---
+title: Innovation
+---
+%% the pairwise overlaps of a three-set union are implied
+venn-beta
+  set Desirable
+  set Feasible
+  set Viable
+  set "Out of scope":4
+  union Desirable,Feasible,Viable["Innovation"]
+  text Desirable,Feasible,Viable 42
+  style "Out of scope" fill:gray, fill-opacity:0.3, stroke-width:1px

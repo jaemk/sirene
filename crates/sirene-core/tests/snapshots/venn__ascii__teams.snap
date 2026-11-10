@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/venn.rs
+expression: "venn-beta\n  title \"Team overlap\"\n  set A[\"Frontend\"]:20\n    text A1[\"React\"]\n    text A2[\"Design Systems\"]\n  set B[\"Backend\"]:12\n    text B1[\"API\"]\n  union A,B[\"Shared\"]:3\n    text AB1[\"OpenAPI\"]\n  style A fill:#ff6b6b\n  style A,B color:#333\n  style A1 color:red\n"
+---
+       Team overlap
+
+Frontend
+  - React
+  - Design Systems
+Backend
+  - API
+Frontend & Backend: Shared
+  - OpenAPI

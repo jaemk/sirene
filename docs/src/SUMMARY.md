@@ -47,6 +47,7 @@
 - [ZenUML diagrams](zenuml.md)
 - [Info diagrams](info.md)
 - [Ishikawa diagrams](ishikawa.md)
+- [Venn diagrams](venn.md)
 
 # Project
 
