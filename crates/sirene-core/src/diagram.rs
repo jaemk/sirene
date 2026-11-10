@@ -9,6 +9,7 @@ use crate::flowchart::{self, Flowchart, scan};
 use crate::gantt::{self, Gantt};
 use crate::git::{self, GitGraph};
 use crate::info::{self, Info};
+use crate::ishikawa::{self, Ishikawa};
 use crate::journey::{self, Journey};
 use crate::kanban::{self, Kanban};
 use crate::mindmap::{self, Mindmap};
@@ -51,6 +52,7 @@ pub enum Kind {
     C4,
     ZenUml,
     Info,
+    Ishikawa,
 }
 
 impl Kind {
@@ -105,6 +107,8 @@ impl Kind {
             Kind::ZenUml
         } else if info::HEADERS.contains(&word) {
             Kind::Info
+        } else if ishikawa::HEADERS.contains(&word) {
+            Kind::Ishikawa
         } else {
             Kind::Flowchart
         }
@@ -113,7 +117,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, and info diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, and ishikawa diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -138,6 +142,7 @@ pub enum Diagram {
     Architecture(Architecture),
     C4(C4),
     Info(Info),
+    Ishikawa(Ishikawa),
 }
 
 impl Default for Diagram {
@@ -185,6 +190,7 @@ impl Diagram {
             Diagram::Architecture(a) => scene::architecture(a, metrics, theme),
             Diagram::C4(c) => scene::c4(c, metrics, theme),
             Diagram::Info(i) => scene::info(i, metrics, theme),
+            Diagram::Ishikawa(i) => scene::ishikawa(i, metrics, theme),
         }
     }
 
@@ -210,6 +216,7 @@ impl Diagram {
             Diagram::Architecture(a) => ascii::architecture(a, options),
             Diagram::C4(c) => ascii::c4(c, options),
             Diagram::Info(i) => ascii::info(i, options),
+            Diagram::Ishikawa(i) => ascii::ishikawa(i, options),
         }
     }
 }
@@ -403,6 +410,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Ishikawa => {
+            let (chart, diagnostics) = ishikawa::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Ishikawa(chart),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -454,6 +468,8 @@ mod tests {
         assert_eq!(Kind::of("C4Deployment\n"), Kind::C4);
         assert_eq!(Kind::of("zenuml\n"), Kind::ZenUml);
         assert_eq!(Kind::of("info showInfo\n"), Kind::Info);
+        assert_eq!(Kind::of("ishikawa-beta\n"), Kind::Ishikawa);
+        assert_eq!(Kind::of("ishikawa\n"), Kind::Ishikawa);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State

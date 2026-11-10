@@ -47,7 +47,6 @@ const OTHER_DIAGRAMS: &[&str] = &[
     "eventmodeling",
     "gantt",
     "gitGraph",
-    "ishikawa-beta",
     "journey",
     "kanban",
     "mindmap",

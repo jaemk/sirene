@@ -46,6 +46,7 @@
 - [C4 diagrams](c4.md)
 - [ZenUML diagrams](zenuml.md)
 - [Info diagrams](info.md)
+- [Ishikawa diagrams](ishikawa.md)
 
 # Project
 

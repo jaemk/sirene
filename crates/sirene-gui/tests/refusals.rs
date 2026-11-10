@@ -321,6 +321,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
     let info = Document::from_source(None, "info\n".to_owned());
     assert_eq!(info.read_only(), Some("info diagrams have nothing to edit"));
     assert!(info.chart.nodes.is_empty() && info.other.is_some());
+    let fish = Document::from_source(None, "ishikawa-beta\nE\n  A\n".to_owned());
+    assert_eq!(
+        fish.read_only(),
+        Some("drawing edits are not supported for ishikawa diagrams yet")
+    );
+    assert!(fish.chart.nodes.is_empty() && fish.other.is_some());
 }
 
 #[gpui::test]

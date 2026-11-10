@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/ishikawa.rs
+expression: "---\ntitle: Late delivery\n---\n%% the effect may share the header line, and be indented more than the causes\nishikawa Late<br>delivery\n  People\n    Short staffed\n      Holidays\n        Peak season\n  Methods\n  Machines &amp; tools\n    Broken scanner\n"
+---
+       Late delivery
+
+Late
+delivery
+├── People
+│   └── Short staffed
+│       └── Holidays
+│           └── Peak season
+├── Methods
+└── Machines & tools
+    └── Broken scanner
