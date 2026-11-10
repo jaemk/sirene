@@ -893,8 +893,30 @@ fn other_diagram_types() {
         .stderr(
             "<stdin>:1:1: error: `zenuml` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, journey, quadrant, XY, requirement, kanban, and packet diagrams\n",
+             mindmap, journey, quadrant, XY, requirement, kanban, packet, and radar diagrams\n",
         );
+}
+
+/// A radar chart draws in text and as an image (MRADAR-4, LANGS-4).
+#[test]
+fn radar_charts() {
+    let src = "radar-beta\n  axis a[\"Speed\"], b\n  curve c[\"Car\"]{4, 2}\n  max 4\n";
+    let full = "#".repeat(24);
+    let half = format!("{}{}", "#".repeat(12), " ".repeat(12));
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(format!(
+            "Speed  Car  {full} 4\nb      Car  {half} 2\n\n0 to 4\n"
+        ));
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(">Speed</text>"));
 }
 
 /// A packet diagram draws in text and as an image (MPKT-4, LANGS-4).

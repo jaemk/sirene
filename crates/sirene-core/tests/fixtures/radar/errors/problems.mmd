@@ -1,0 +1,17 @@
+---
+config:
+  radar:
+    curveTension: round
+---
+radar-beta
+  axis a, b, c
+  axis a["Again"]
+  curve short{1, 2}
+  curve long{1, 2, 3, 4}
+  curve keyed{a: 1, z: 2, a: 3}
+  curve mixed{a: 1, 2}
+  curve broken{1 2}
+  graticule square
+  ticks 0
+  showLegend maybe
+  max -1

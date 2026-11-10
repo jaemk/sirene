@@ -17,6 +17,7 @@ pub mod mindmap;
 pub mod packet;
 pub mod pie;
 pub mod quadrant;
+pub mod radar;
 pub mod requirement;
 pub mod scene;
 pub mod sequence;

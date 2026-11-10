@@ -1,0 +1,25 @@
+---
+source: crates/sirene-core/tests/radar.rs
+expression: "radar-beta\n  title Restaurant Comparison\n  axis food[\"Food Quality\"], service[\"Service\"], price[\"Price\"]\n  axis ambiance[\"Ambiance\"]\n\n  curve a[\"Restaurant A\"]{4, 3, 2, 4}\n  curve b[\"Restaurant B\"]{3, 4, 3, 3}\n  curve c[\"Restaurant C\"]{2, 3, 4, 2}\n  curve d[\"Restaurant D\"]{2, 2, 4, 3}\n\n  graticule polygon\n  max 5\n"
+---
+
+                Restaurant Comparison
+
+Food Quality  Restaurant A  ███████████████████▎     4
+              Restaurant B  ██████████████▍          3
+              Restaurant C  █████████▋               2
+              Restaurant D  █████████▋               2
+Service       Restaurant A  ██████████████▍          3
+              Restaurant B  ███████████████████▎     4
+              Restaurant C  ██████████████▍          3
+              Restaurant D  █████████▋               2
+Price         Restaurant A  █████████▋               2
+              Restaurant B  ██████████████▍          3
+              Restaurant C  ███████████████████▎     4
+              Restaurant D  ███████████████████▎     4
+Ambiance      Restaurant A  ███████████████████▎     4
+              Restaurant B  ██████████████▍          3
+              Restaurant C  █████████▋               2
+              Restaurant D  ██████████████▍          3
+
+0 to 5

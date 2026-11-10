@@ -276,6 +276,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for packet diagrams yet")
     );
     assert!(packet.chart.nodes.is_empty() && packet.other.is_some());
+    let radar = Document::from_source(None, "radar-beta\n  axis a, b, c\n".to_owned());
+    assert_eq!(
+        radar.read_only(),
+        Some("drawing edits are not supported for radar charts yet")
+    );
+    assert!(radar.chart.nodes.is_empty() && radar.other.is_some());
 }
 
 #[gpui::test]

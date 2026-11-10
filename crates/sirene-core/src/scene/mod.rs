@@ -12,6 +12,7 @@ mod pie;
 #[cfg(feature = "png")]
 pub mod png;
 mod quadrant;
+mod radar;
 mod sequence;
 mod shapes;
 mod style;
@@ -30,6 +31,7 @@ pub use packet::packet;
 pub use paint::{CONFIG, flowchart};
 pub use pie::pie;
 pub use quadrant::quadrant;
+pub use radar::radar;
 pub use sequence::sequence;
 pub use style::parse_color;
 pub use timeline::timeline;
