@@ -893,8 +893,31 @@ fn other_diagram_types() {
         .stderr(
             "<stdin>:1:1: error: `zenuml` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, journey, quadrant, and XY diagrams\n",
+             mindmap, journey, quadrant, XY, and requirement diagrams\n",
         );
+}
+
+/// A requirement diagram draws in text and as an image (MREQ-3, LANGS-4).
+#[test]
+fn requirement_diagrams() {
+    let src = "requirementDiagram\n  element e {\n    type: t\n  }\n  requirement r {\n    id: 1\n  }\n  e - satisfies -> r\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(
+            "  +-----------+\n  | «Element» |\n  |     e     |\n  +-----------+\n  | Type: t   |\n  \
+             +-----+-----+\n        :\n   «satisfies»\n        v\n+---------------+\n\
+             | «Requirement» |\n|       r       |\n+---------------+\n| Id: 1         |\n\
+             +---------------+\n",
+        );
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("«Element»"));
 }
 
 /// An XY chart draws in text and as an image (MXY-4, LANGS-4).

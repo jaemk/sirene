@@ -1,0 +1,25 @@
+---
+source: crates/sirene-core/tests/requirement.rs
+expression: "requirementDiagram\n    requirement r {\n    id: 1\n    risk: huge\n    verifymethod: guess\n    type: x\n    }\n    element e {\n    docref: d\n    id: 2\n    }\n    e - likes -> r\n    e - satisfies -> ghost\n    r:::nothing\n    class missing nothing\n    element unclosed {\n    type: t\n"
+---
+4:5: warning: ignoring risk `huge`: expected `Low`, `Medium`, or `High`
+5:5: warning: ignoring verify method `guess`: expected `Analysis`, `Inspection`, `Test`, or `Demonstration`
+6:5: warning: ignoring `type`: a requirement's fields are `id`, `text`, `risk`, and `verifymethod`
+10:5: warning: ignoring `id`: an element's fields are `type` and `docref`
+12:9: error: expected a relationship type: `contains`, `copies`, `derives`, `satisfies`, `verifies`, `refines`, or `traces`
+13:22: warning: `ghost` is not defined; drawing it as a plain box
+15:11: warning: unknown requirement or element `missing`
+18:1: error: unclosed block: expected `}`
+
+┌───────────────┐   ┌────────────┐   ┌───────────┐
+│ «Requirement» │   │ «Element»  │   │ «Element» │
+│       r       │   │     e      │   │ unclosed  │
+├───────────────┤   ├────────────┤   ├───────────┤
+│ Id: 1         │   │ Doc Ref: d │   │ Type: t   │
+└───────────────┘   └──────┬─────┘   └───────────┘
+                           ┆
+                      «satisfies»
+                           ▼
+                       ┌───────┐
+                       │ ghost │
+                       └───────┘

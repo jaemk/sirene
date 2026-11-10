@@ -4,7 +4,7 @@ How languages other than Mermaid flowcharts fit the pipeline. Each language has 
 Mermaid state (`mermaid-state-diagrams.md`), class (`mermaid-class-diagrams.md`), ER
 (`mermaid-er-diagrams.md`), sequence (`mermaid-sequence-diagrams.md`), pie
 (`mermaid-pie-charts.md`), gantt (`mermaid-gantt-charts.md`), mindmap
-(`mermaid-mindmaps.md`), journey (`mermaid-journeys.md`), quadrant chart (`mermaid-quadrant-charts.md`), XY chart (`mermaid-xy-charts.md`), and the remaining Mermaid types (`mermaid-charts.md`); Graphviz DOT (`graphviz-dot.md`); D2 (`d2.md`); PlantUML
+(`mermaid-mindmaps.md`), journey (`mermaid-journeys.md`), quadrant chart (`mermaid-quadrant-charts.md`), XY chart (`mermaid-xy-charts.md`), requirement (`mermaid-requirement-diagrams.md`), and the remaining Mermaid types (`mermaid-charts.md`); Graphviz DOT (`graphviz-dot.md`); D2 (`d2.md`); PlantUML
 (`plantuml.md`).
 
 ## LANGS-1 Detecting the language
@@ -26,7 +26,7 @@ Each language has a parser to a lossless syntax tree with diagnostics (the `synt
 `diagnostic` modules, as FLOWCH-1 to FLOWCH-3), and lowers to one of three models:
 
 - the graph model: the flowchart model (FLOWMO) with the additions in LANGS-3, for flowcharts,
-  state, class, ER, DOT, D2, and PlantUML's graph-shaped diagrams. It reuses the layered layout
+  state, class, ER, requirement, DOT, D2, and PlantUML's graph-shaped diagrams. It reuses the layered layout
   (LAYOUT), the scene builder (DISPLA), the ASCII renderer, and hit testing.
 - the sequence model (MSEQ-2), for Mermaid and PlantUML sequence diagrams, with its own layout,
   scene builder, and ASCII renderer.
@@ -85,11 +85,11 @@ as `flowchart::edit` does; a language without one has a read-only drawing, and t
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
-Sequence, state, class, and ER diagrams, git graphs, timelines, pie and gantt charts,
+Sequence, state, class, ER, and requirement diagrams, git graphs, timelines, pie and gantt charts,
 mindmaps, user journeys, and quadrant and XY charts are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
 disabled Add Node, Select All, and Fit Window, a press on a node pans instead of connecting, and
 every edit action says `Can't ...: drawing edits are not supported for state diagrams yet` (or
-class diagrams, ER diagrams, git graphs, timelines, sequence diagrams, pie charts, gantt
+class diagrams, ER diagrams, requirement diagrams, git graphs, timelines, sequence diagrams, pie charts, gantt
 charts, mindmaps, user journeys, quadrant charts, or XY charts). A sequence diagram, git graph,
 timeline, pie, gantt, quadrant, or XY chart, mindmap, or user journey is drawn from `Document::other` and has nothing to select. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 

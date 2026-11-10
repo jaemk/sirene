@@ -1,0 +1,18 @@
+---
+title: Styled requirements
+---
+requirementDiagram
+    direction LR
+    %% Classes by shorthand, `class`, and `style`.
+    requirement "Login works":::important {
+    id: R1
+    text: "Users can log in, with a password."
+    }
+    element portal {
+    type: service
+    }
+    portal - satisfies -> "Login works"
+    portal:::service
+    classDef important fill:#f8d7da, stroke:#c0392b
+    classDef service fill:#d6eaf8
+    style portal stroke-width:3px

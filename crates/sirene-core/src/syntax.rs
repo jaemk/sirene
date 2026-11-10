@@ -120,6 +120,8 @@ syntax_kinds! {
     // XY charts: `line` or `bar`, and `horizontal` or `vertical` after the header keyword.
     SERIES_KW,
     ORIENTATION,
+    // Requirement diagrams: a requirement type or `element`.
+    REQ_KW,
     ERROR_TOKEN,
 
     // Nodes.
@@ -180,6 +182,8 @@ syntax_kinds! {
     QUADRANT_STMT,
     POINT_STMT,
     SERIES_STMT,
+    REQUIREMENT,
+    FIELD,
     ERROR,
 }
 
