@@ -1,0 +1,38 @@
+---
+source: crates/sirene-core/tests/zenuml.rs
+expression: "zenuml\n    title Order service\n    // A sync call from the starter, with a body.\n    order = OrderService.create(item) {\n        Repo.save(item)\n        new Invoice(order)\n        Payment->Bank.charge(amount) {\n            return receipt\n        }\n    }\n    OrderService.notify()\n"
+---
+                                 Order service
+
+      +---------------+   +-------+                 +---------+      +-------+
+      | OrderService  |   | Repo  |                 | Payment |      | Bank  |
+      +-------+-------+   +---+---+                 +----+----+      +---+---+
+              |               |                          |               |
+ create(item) |               |                          |               |
+------------->|               |                          |               |
+              |               |                          |               |
+              |  save(item)   |                          |               |
+              +-------------->|                          |               |
+              |               |                          |               |
+              |               |       +---------+        |               |
+              |               |       | Invoice |        |               |
+              |               |       +----+----+        |               |
+              |               |            |             |               |
+              |         <<create>>         |             |               |
+              +---------------+----------->|             |               |
+              |               |            |             |               |
+              |               |            |             |charge(amount) |
+              |               |            |             +-------------->|
+              |               |            |             |               |
+              |               |            |             |    receipt    |
+              |               |            |             |<..............+
+              |               |            |             |               |
+     order    |               |            |             |               |
+ <............+               |            |             |               |
+              |               |            |             |               |
+   notify()   |               |            |             |               |
+------------->|               |            |             |               |
+              |               |            |             |               |
+      +-------+-------+   +---+---+   +----+----+   +----+----+      +---+---+
+      | OrderService  |   | Repo  |   | Invoice |   | Payment |      | Bank  |
+      +---------------+   +-------+   +---------+   +---------+      +-------+

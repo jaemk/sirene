@@ -77,6 +77,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `Db`, `Queue`, and `_Ext` variants, nested boundaries and deployment nodes, relations with
   technology, `UpdateElementStyle`, `UpdateRelStyle`, and `UpdateLayoutConfig`, in Mermaid's
   colors and row layout; in text, the boxes with the relations listed below.
+- Mermaid ZenUML diagrams (`zenuml`), drawn as sequence diagrams and read-only in the editor:
+  annotated and aliased participants, async messages, sync calls with bodies, replies from
+  assignments and `return`, creations with `new`, `@Starter`, and `if`/`else`, loops, `opt`,
+  `par`, and `try`/`catch`/`finally` fragments; calls with no caller come in from the left.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 
 ### Changed

@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/zenuml.rs
+expression: "zenuml\n    title Annotators and aliases\n    @Actor Alice\n    @Database Bob\n    J as John\n    Alice->J: Hello John, how are you?\n    J->Alice: Great!\n    Alice->Bob: Save it\n    @return\n    Bob->Alice: Saved\n"
+---
+      Annotators and aliases
+
+  o
+ /|\    +-----+         +-------+
+ / \    | Bob |         | John  |
+Alice   +--+--+         +---+---+
+  |        |                |
+  |Hello John, how are you? |
+  +--------+--------------->|
+  |        |                |
+  |        |Great!          |
+  |<-------+----------------+
+  |        |                |
+  |Save it |                |
+  +------->|                |
+  |        |                |
+  | Saved  |                |
+  |<.......+                |
+  |        |                |
+  o     +--+--+         +---+---+
+ /|\    | Bob |         | John  |
+ / \    +-----+         +-------+
+Alice

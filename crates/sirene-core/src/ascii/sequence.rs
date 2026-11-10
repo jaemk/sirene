@@ -73,6 +73,7 @@ fn divider(label: &str) -> String {
 /// A header's width (odd, so it centers on its lifeline) and height.
 fn header_size(kind: ParticipantKind, lines: &[String]) -> (i32, i32) {
     let (w, h) = match kind {
+        ParticipantKind::Hidden => (1, 0),
         ParticipantKind::Actor => (text_w(lines).max(3), lines.len() as i32 + 3),
         _ => (text_w(lines) + 4, lines.len() as i32 + 2),
     };
@@ -111,6 +112,9 @@ fn note_rect(note: &Note, cols: &[i32], w: i32, y: i32, h: i32) -> Rect {
 
 /// Draws a header with its top-left at `(x, y)`.
 fn header(canvas: &mut Canvas, kind: ParticipantKind, lines: &[String], x: i32, y: i32, w: i32) {
+    if kind == ParticipantKind::Hidden {
+        return;
+    }
     if kind == ParticipantKind::Actor {
         let mid = x + w / 2;
         canvas.clear(x, y, x + w - 1, y + 2 + lines.len() as i32);
@@ -186,6 +190,9 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
 
     // Lifelines, heavy where a participant is active.
     for (p, &x) in l.x.iter().enumerate() {
+        if seq.participants[p].kind == ParticipantKind::Hidden {
+            continue;
+        }
         let col = c(x);
         let y0 = c(l.head_y[p]) + header_h - 1;
         let y1 = c(l.life_end[p]);

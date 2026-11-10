@@ -312,6 +312,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for C4 diagrams yet")
     );
     assert!(c4.chart.nodes.is_empty() && c4.other.is_some());
+    let zen = Document::from_source(None, "zenuml\nA->B: hi\n".to_owned());
+    assert_eq!(
+        zen.read_only(),
+        Some("drawing edits are not supported for ZenUML diagrams yet")
+    );
+    assert!(zen.chart.nodes.is_empty() && zen.other.is_some());
 }
 
 #[gpui::test]

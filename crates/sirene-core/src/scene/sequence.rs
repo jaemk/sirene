@@ -159,6 +159,7 @@ impl<M: TextMetrics> Painter<'_, M> {
             ParticipantKind::Boundary | ParticipantKind::Control | ParticipantKind::Entity => {
                 (tw.max(2.0 * ICON_R + 24.0), ICON + BELOW + th)
             }
+            ParticipantKind::Hidden => (0.0, 0.0),
         }
     }
 
@@ -293,6 +294,7 @@ impl<M: TextMetrics> Painter<'_, M> {
                 }
                 self.lines(lines, cx, b.y + ICON + BELOW);
             }
+            ParticipantKind::Hidden => {}
         }
     }
 
@@ -469,6 +471,9 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
 
     // Lifelines and activation bars.
     for (i, &x) in l.x.iter().enumerate() {
+        if seq.participants[i].kind == ParticipantKind::Hidden {
+            continue;
+        }
         let y0 = l.head_y[i] + header_h;
         p.path(
             line(Pt::new(x, y0), Pt::new(x, l.life_end[i])),

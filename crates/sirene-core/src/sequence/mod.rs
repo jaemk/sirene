@@ -26,6 +26,8 @@ pub enum ParticipantKind {
     Database,
     Collections,
     Queue,
+    /// ZenUML's implicit starter: no header or lifeline, so its calls come in from the left.
+    Hidden,
 }
 
 impl ParticipantKind {
@@ -152,6 +154,8 @@ pub enum BlockKind {
     Break,
     /// A colored background; its label is the color.
     Rect,
+    /// ZenUML's `try`, with `catch` and `finally` dividers.
+    Try,
 }
 
 impl BlockKind {
@@ -164,6 +168,7 @@ impl BlockKind {
             BlockKind::Critical => "critical",
             BlockKind::Break => "break",
             BlockKind::Rect => "rect",
+            BlockKind::Try => "try",
         }
     }
 }

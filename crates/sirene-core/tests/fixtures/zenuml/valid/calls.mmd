@@ -1,0 +1,11 @@
+zenuml
+    title Order service
+    // A sync call from the starter, with a body.
+    order = OrderService.create(item) {
+        Repo.save(item)
+        new Invoice(order)
+        Payment->Bank.charge(amount) {
+            return receipt
+        }
+    }
+    OrderService.notify()

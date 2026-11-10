@@ -1,0 +1,27 @@
+zenuml
+    @Starter(Client)
+    API.book() {
+        try {
+            if(available) {
+                Booking.reserve()
+            } else if(waitlist) {
+                Booking.queue()
+            } else {
+                return none
+            }
+            while(retries < 3) {
+                Booking.confirm()
+            }
+            opt {
+                API->Mail: send receipt
+            }
+            par {
+                API->Log: booked
+                API->Metrics: booked
+            }
+        } catch(Timeout) {
+            API->Client: failed
+        } finally {
+            Booking.release()
+        }
+    }
