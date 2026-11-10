@@ -1,0 +1,14 @@
+block-beta
+  columns 1
+  top["Front end"]
+  block:back["Back end"]
+    columns 2
+    api auth
+    block:data
+      cache queue
+    end
+    worker
+  end
+  top --> api
+  api --> data
+  style top fill:#dbeafe

@@ -2,7 +2,7 @@
 
 pub mod edit;
 mod graph;
-mod lower;
+pub(crate) mod lower;
 mod model;
 mod parser;
 pub(crate) mod scan;

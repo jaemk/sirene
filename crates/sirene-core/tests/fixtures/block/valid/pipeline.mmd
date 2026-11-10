@@ -1,0 +1,10 @@
+---
+title: Pipeline
+---
+block-beta
+  columns 3
+  src(["Source"]) load<["&nbsp;load&nbsp;"]>(right) db[("Store")]
+  space:2 out{"Report"}
+  db -- "nightly" --> out
+  classDef warm fill:#fde68a,stroke:#b45309
+  class out warm

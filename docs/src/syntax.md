@@ -30,7 +30,7 @@ F:::important
 - A node is created where it is first mentioned, and a node without a label shows its id.
 - A later mention with a shape replaces the shape and label.
 - `"..."` labels may hold any character but `"`; use `#quot;` for it. Entity codes such as
-  `#amp;`, `#lt;`, and `#9829;` are decoded.
+  `#amp;`, `#lt;`, and `#9829;` are decoded, as are HTML entities such as `&nbsp;`.
 - `` "`...`" `` labels are markdown: `**bold**`, `__bold__`, `*italic*`, and `_italic_`.
 - `<br>` is a line break.
 - `:::name` adds a class.

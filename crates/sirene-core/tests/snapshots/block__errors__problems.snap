@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/block.rs
+expression: "block-beta\n  columns 0\n  a:0 b\n  block:g\n    columns 2\n    c:5\n  end\n  end\n  x<[\"go\"]>(sideways)\n  class nope k\n"
+---
+2:11: error: a group has at least 1 column; ignoring this
+3:5: error: `a` must be at least 1 column wide; drawing it 1 wide
+6:7: warning: 5 columns is wider than the 2 columns of its group; drawing it 2 wide
+8:3: error: `end` without a `block` to close
+9:13: error: expected `right`, `left`, `up`, `down`, `x`, or `y`
+10:9: warning: no block `nope`; ignoring it
+
+┌─────────┐  ┌─────────┐  ┌───────────┐
+│         │  │         │  │           │
+│    a    │  │    b    │  │ ┌───────┐ │
+│         │  │         │  │ │   c   │ │
+│         │  │         │  │ └───────┘ │
+└─────────┘  └─────────┘  └───────────┘

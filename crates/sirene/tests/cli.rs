@@ -893,9 +893,27 @@ fn other_diagram_types() {
         .stderr(
             "<stdin>:1:1: error: `zenuml` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, and \
-             treemap diagrams\n",
+             mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, \
+             treemap, and block diagrams\n",
         );
+}
+
+/// A block diagram draws in text and as an image (MBLOCK-4, LANGS-4).
+#[test]
+fn block_diagrams() {
+    let src = "block-beta\na b\na --> b\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout("+---+  +---+\n| a |  | b |\n+---+  +---+\n\na --> b\n");
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(">a</text>"));
 }
 
 /// A treemap draws in text and as an image (MTREE-4, LANGS-4).

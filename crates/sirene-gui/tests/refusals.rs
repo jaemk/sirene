@@ -294,6 +294,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for treemaps yet")
     );
     assert!(treemap.chart.nodes.is_empty() && treemap.other.is_some());
+    let block = Document::from_source(None, "block-beta\na b\n".to_owned());
+    assert_eq!(
+        block.read_only(),
+        Some("drawing edits are not supported for block diagrams yet")
+    );
+    assert!(block.chart.nodes.is_empty() && block.other.is_some());
 }
 
 #[gpui::test]

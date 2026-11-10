@@ -1,5 +1,6 @@
 //! Backend-independent drawing of diagrams as paths and text (DISPLA-*).
 
+mod block;
 mod gantt;
 mod git;
 mod hit;
@@ -24,6 +25,7 @@ mod xychart;
 
 use unicode_width::UnicodeWidthStr;
 
+pub use block::block;
 pub use gantt::gantt;
 pub use git::git_graph;
 pub use journey::journey;

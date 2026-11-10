@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/block.rs
+expression: "---\ntitle: Pipeline\n---\nblock-beta\n  columns 3\n  src([\"Source\"]) load<[\"&nbsp;load&nbsp;\"]>(right) db[(\"Store\")]\n  space:2 out{\"Report\"}\n  db -- \"nightly\" --> out\n  classDef warm fill:#fde68a,stroke:#b45309\n  class out warm\n"
+---
+
+             Pipeline
+
+╭────────╮  ┌────────┐  ╭────────╮
+( Source )  │  load  ►  ├────────┤
+(        )  │        │  │ Store  │
+╰────────╯  └────────┘  ╰────────╯
+
+                        ╱────────╲
+                        │ Report │
+                        │        │
+                        ╲────────╱
+
+db --> out: nightly

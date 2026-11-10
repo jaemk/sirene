@@ -143,6 +143,7 @@ impl Document {
             Kind::Radar => Some("drawing edits are not supported for radar charts yet"),
             Kind::Sankey => Some("drawing edits are not supported for sankey diagrams yet"),
             Kind::Treemap => Some("drawing edits are not supported for treemaps yet"),
+            Kind::Block => Some("drawing edits are not supported for block diagrams yet"),
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")
             }

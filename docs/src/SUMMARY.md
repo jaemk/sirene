@@ -41,6 +41,7 @@
 - [Radar charts](radar.md)
 - [Sankey diagrams](sankey.md)
 - [Treemaps](treemap.md)
+- [Block diagrams](block.md)
 
 # Project
 
