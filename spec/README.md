@@ -44,6 +44,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Kanban Boards | done | [mermaid-kanban-boards.md](mermaid-kanban-boards.md) |
 | Mermaid Packet Diagrams | done | [mermaid-packet-diagrams.md](mermaid-packet-diagrams.md) |
 | Mermaid Radar Charts | done | [mermaid-radar-charts.md](mermaid-radar-charts.md) |
+| Mermaid Sankey Diagrams | done | [mermaid-sankey-diagrams.md](mermaid-sankey-diagrams.md) |
 
 ## Conventions
 

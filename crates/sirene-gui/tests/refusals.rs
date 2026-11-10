@@ -282,6 +282,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for radar charts yet")
     );
     assert!(radar.chart.nodes.is_empty() && radar.other.is_some());
+    let sankey = Document::from_source(None, "sankey\nA,B,1\n".to_owned());
+    assert_eq!(
+        sankey.read_only(),
+        Some("drawing edits are not supported for sankey diagrams yet")
+    );
+    assert!(sankey.chart.nodes.is_empty() && sankey.other.is_some());
 }
 
 #[gpui::test]

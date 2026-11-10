@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/sankey.rs
+expression: "---\nconfig:\n  sankey:\n    showValues: false\n    linkColor: \"#a1a1a1\"\n    nodeAlignment: right\n---\nsankey-beta\nA,X,5\nB,X,3\nX,Y,8\nC,Y,2\n"
+---
+A  5
+`- X  5  ###############
+
+B  3
+`- X  3  #########
+
+X  8
+`- Y  8  ########################
+
+C  2
+`- Y  2  ######
+
+Y  10

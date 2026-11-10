@@ -12,6 +12,7 @@ use crate::packet::{self, Packet};
 use crate::pie::{self, Pie};
 use crate::quadrant::{self, QuadrantChart};
 use crate::radar::{self, Radar};
+use crate::sankey::{self, Sankey};
 use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
 use crate::timeline::{self, Timeline};
@@ -38,6 +39,7 @@ pub enum Kind {
     Kanban,
     Packet,
     Radar,
+    Sankey,
 }
 
 impl Kind {
@@ -78,6 +80,8 @@ impl Kind {
             Kind::Packet
         } else if radar::HEADERS.contains(&word) {
             Kind::Radar
+        } else if sankey::HEADERS.contains(&word) {
+            Kind::Sankey
         } else {
             Kind::Flowchart
         }
@@ -86,7 +90,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, and radar diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, and sankey diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -105,6 +109,7 @@ pub enum Diagram {
     Kanban(Kanban),
     Packet(Packet),
     Radar(Radar),
+    Sankey(Sankey),
 }
 
 impl Default for Diagram {
@@ -146,6 +151,7 @@ impl Diagram {
             Diagram::Kanban(k) => scene::kanban(k, metrics, theme),
             Diagram::Packet(p) => scene::packet(p, metrics, theme),
             Diagram::Radar(r) => scene::radar(r, metrics, theme),
+            Diagram::Sankey(s) => scene::sankey(s, metrics, theme),
         }
     }
 
@@ -165,6 +171,7 @@ impl Diagram {
             Diagram::Kanban(k) => ascii::kanban(k, options),
             Diagram::Packet(p) => ascii::packet(p, options),
             Diagram::Radar(r) => ascii::radar(r, options),
+            Diagram::Sankey(s) => ascii::sankey(s, options),
         }
     }
 }
@@ -309,6 +316,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Sankey => {
+            let (chart, diagnostics) = sankey::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Sankey(chart),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -348,6 +362,8 @@ mod tests {
         assert_eq!(Kind::of("packet\n"), Kind::Packet);
         assert_eq!(Kind::of("packet-beta\n"), Kind::Packet);
         assert_eq!(Kind::of("radar-beta\n"), Kind::Radar);
+        assert_eq!(Kind::of("sankey\n"), Kind::Sankey);
+        assert_eq!(Kind::of("sankey-beta\n"), Kind::Sankey);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -366,6 +382,7 @@ mod tests {
         assert_eq!(other_diagram("kanban\n"), None);
         assert_eq!(other_diagram("packet-beta\n"), None);
         assert_eq!(other_diagram("radar-beta\n"), None);
+        assert_eq!(other_diagram("sankey-beta\n"), None);
         assert_eq!(other_diagram("quadrantChart\n"), None);
         assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);

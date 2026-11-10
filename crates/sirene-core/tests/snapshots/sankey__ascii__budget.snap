@@ -1,0 +1,31 @@
+---
+source: crates/sirene-core/tests/sankey.rs
+expression: "---\ntitle: Household budget\nconfig:\n  sankey:\n    linkColor: source\n    nodeAlignment: left\n    prefix: \"$\"\n---\nsankey\n\"Salary, net\",Budget,4200\nSide work,Budget,600\nBudget,Rent,1800\nBudget,Food,700\nBudget,Savings,1200\nBudget,\"The \"\"other\"\" pile\",1100\nSavings,Index fund,900\nSavings,Cash,300\n"
+---
+                  Household budget
+
+Salary, net  $4200
+`- Budget            $4200  ########################
+
+Side work  $600
+`- Budget             $600  ###
+
+Budget  $4800
++- Rent              $1800  ##########
++- Savings           $1200  #######
++- Food               $700  ####
+`- The "other" pile  $1100  ######
+
+Rent  $1800
+
+Savings  $1200
++- Index fund         $900  #####
+`- Cash               $300  ##
+
+Food  $700
+
+The "other" pile  $1100
+
+Index fund  $900
+
+Cash  $300

@@ -59,6 +59,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid radar charts (`radar-beta`), read-only in the editor: axes, curves with listed or
   keyed values, `min`, `max`, `ticks`, circle or polygon `graticule`, a legend, and the
   frontmatter `radar` config; in text, a bar per axis and curve.
+- Mermaid sankey diagrams (`sankey-beta`, `sankey`), read-only in the editor: CSV rows of flows
+  laid out as d3-sankey does, with `linkColor`, `nodeAlignment`, `showValues`, `prefix`, and
+  `suffix`; in text, each node's outgoing flows with bars.
 
 ### Changed
 

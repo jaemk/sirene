@@ -1,0 +1,60 @@
+---
+source: crates/sirene-core/tests/sankey.rs
+expression: "---\nconfig:\n  sankey:\n    suffix: \" TWh\"\n---\nsankey-beta\n\n%% source,target,value\nAgricultural 'waste',Bio-conversion,124.729\nBio-conversion,Liquid,0.597\nBio-conversion,Losses,26.862\nBio-conversion,Solid,280.322\nBio-conversion,Gas,81.144\nBiofuel imports,Liquid,35\nBiomass imports,Solid,35\nCoal imports,Coal,11.606\nCoal reserves,Coal,63.965\nCoal,Solid,75.571\nGas,Industry,10.639\nGas,Losses,5.3\nGas reserves,Gas,82\nLiquid,Transport,121.066\nSolid,Industry,46.477\nSolid,Thermal generation,400.12\nThermal generation,Electricity grid,525.531\nThermal generation,Losses,787.129\nElectricity grid,Industry,342.165\nElectricity grid,\"Heating and cooling, homes\",113.726\nElectricity grid,Lighting,75.6\n"
+---
+Agricultural 'waste'  124.73 TWh
+`- Bio-conversion              124.73 TWh  ####
+
+Biomass imports  35 TWh
+`- Solid                           35 TWh  #
+
+Coal imports  11.61 TWh
+`- Coal                         11.61 TWh  #
+
+Coal reserves  63.97 TWh
+`- Coal                         63.97 TWh  ##
+
+Gas reserves  82 TWh
+`- Gas                             82 TWh  ###
+
+Biofuel imports  35 TWh
+`- Liquid                          35 TWh  #
+
+Bio-conversion  388.93 TWh
++- Losses                       26.86 TWh  #
++- Solid                       280.32 TWh  #########
++- Gas                          81.14 TWh  ##
+`- Liquid                         0.6 TWh  #
+
+Coal  75.57 TWh
+`- Solid                        75.57 TWh  ##
+
+Solid  446.6 TWh
++- Thermal generation          400.12 TWh  ############
+`- Industry                     46.48 TWh  #
+
+Gas  163.14 TWh
++- Losses                         5.3 TWh  #
+`- Industry                     10.64 TWh  #
+
+Liquid  121.07 TWh
+`- Transport                   121.07 TWh  ####
+
+Thermal generation  1312.66 TWh
++- Losses                      787.13 TWh  ########################
+`- Electricity grid            525.53 TWh  ################
+
+Electricity grid  531.49 TWh
++- Industry                    342.17 TWh  ##########
++- Heating and cooling, homes  113.73 TWh  ###
+`- Lighting                      75.6 TWh  ##
+
+Losses  819.29 TWh
+
+Industry  399.28 TWh
+
+Heating and cooling, homes  113.73 TWh
+
+Lighting  75.6 TWh
+
+Transport  121.07 TWh

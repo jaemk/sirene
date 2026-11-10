@@ -39,6 +39,7 @@
 - [Kanban boards](kanban.md)
 - [Packet diagrams](packet.md)
 - [Radar charts](radar.md)
+- [Sankey diagrams](sankey.md)
 
 # Project
 
