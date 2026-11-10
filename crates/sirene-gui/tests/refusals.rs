@@ -243,6 +243,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for user journeys yet")
     );
     assert!(journey.chart.nodes.is_empty() && journey.other.is_some());
+    let quadrant = Document::from_source(None, "quadrantChart\n  a: [0.5, 0.5]\n".to_owned());
+    assert_eq!(
+        quadrant.read_only(),
+        Some("drawing edits are not supported for quadrant charts yet")
+    );
+    assert!(quadrant.chart.nodes.is_empty() && quadrant.other.is_some());
 }
 
 #[gpui::test]

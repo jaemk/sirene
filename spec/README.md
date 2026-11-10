@@ -38,6 +38,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Gantt Charts | done | [mermaid-gantt-charts.md](mermaid-gantt-charts.md) |
 | Mermaid Mindmaps | done | [mermaid-mindmaps.md](mermaid-mindmaps.md) |
 | Mermaid Journeys | done | [mermaid-journeys.md](mermaid-journeys.md) |
+| Mermaid Quadrant Charts | done | [mermaid-quadrant-charts.md](mermaid-quadrant-charts.md) |
 
 ## Conventions
 

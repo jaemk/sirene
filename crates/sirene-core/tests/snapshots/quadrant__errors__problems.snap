@@ -1,0 +1,30 @@
+---
+source: crates/sirene-core/tests/quadrant.rs
+expression: "quadrantChart\n    title Problems\n    Missing coordinates\n    Bad: [x, 0.5]\n    Far: [1.5, -0.2]\n    Unclosed: [0.1, 0.2\n    Styled: [0.5, 0.5] size: 4, color: nope\n    Classy:::nothing: [0.2, 0.8]\n    Kept: [0.6, 0.4]\n"
+---
+3:24: error: expected `[x, y]` after the point's name
+4:11: error: `x` is not a number; expected a value from 0 to 1
+5:11: warning: `1.5` is outside 0 to 1; drawing it at 1
+5:16: warning: `-0.2` is outside 0 to 1; drawing it at 0
+6:24: error: expected `]`
+7:24: warning: ignoring `size`: a point's styles are `radius`, `color`, `stroke-color`, and `stroke-width`
+7:24: warning: ignoring `color: nope`: not a valid value
+8:5: warning: no `classDef nothing`; drawing `Classy` with the default style
+
+                 Problems
+
+┌────────────────────┬────────────────────┐
+│                    │                    │
+│                    │                    │
+│        ● Classy    │                    │
+│                    │                    │
+│                    │                    │
+├────────────────────1────────────────────┤
+│                    │   ● Kept           │
+│                    │                    │
+│                    │                    │
+│                    │                    │
+│                    │               Far ●│
+└────────────────────┴────────────────────┘
+
+1 Styled

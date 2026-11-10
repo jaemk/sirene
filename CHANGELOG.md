@@ -41,6 +41,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid user journeys (`journey`), read-only in the editor: tasks in sections with a score
   from 1 to 5 drawn as a face, and actors as colored dots with a legend; in text, a score bar per
   task.
+- Mermaid quadrant charts (`quadrantChart`), read-only in the editor: axis and quadrant labels,
+  and points styled directly or by `classDef` (`radius`, `color`, `stroke-color`,
+  `stroke-width`); in text, the points plotted by name in a box split in four.
 
 ### Changed
 

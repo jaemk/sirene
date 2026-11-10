@@ -9,6 +9,7 @@ mod paint;
 mod pie;
 #[cfg(feature = "png")]
 pub mod png;
+mod quadrant;
 mod sequence;
 mod shapes;
 mod style;
@@ -23,6 +24,7 @@ pub use journey::journey;
 pub use mindmap::mindmap;
 pub use paint::{CONFIG, flowchart};
 pub use pie::pie;
+pub use quadrant::quadrant;
 pub use sequence::sequence;
 pub use style::parse_color;
 pub use timeline::timeline;

@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/quadrant.rs
+expression: "quadrantChart\n    title Labels only\n    x-axis Urgent --> Not urgent\n    y-axis Not important --> Important\n    quadrant-1 Plan\n    quadrant-2 Do\n    quadrant-3 Delegate\n    quadrant-4 Delete\n"
+---
+                              Labels only
+
+              +--------------------+--------------------+
+              |                    |                    |
+              |                    |                    |
+    Important |         Do         |        Plan        |
+              |                    |                    |
+              |                    |                    |
+              +--------------------+--------------------+
+              |                    |                    |
+              |                    |                    |
+Not important |      Delegate      |       Delete       |
+              |                    |                    |
+              |                    |                    |
+              +--------------------+--------------------+
+                      Urgent             Not urgent

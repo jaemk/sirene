@@ -14,6 +14,7 @@ mod lines;
 pub mod markdown;
 pub mod mindmap;
 pub mod pie;
+pub mod quadrant;
 pub mod scene;
 pub mod sequence;
 pub mod state;

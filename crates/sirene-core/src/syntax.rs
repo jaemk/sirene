@@ -111,6 +111,12 @@ syntax_kinds! {
     TASK_DATA,
     // Mindmaps: `::icon` before a node's icon.
     ICON_KW,
+    // Quadrant charts: `x-axis` or `y-axis`, `quadrant-1` to `quadrant-4`, and the brackets
+    // around a point's coordinates.
+    AXIS_KW,
+    QUADRANT_KW,
+    L_BRACKET,
+    R_BRACKET,
     ERROR_TOKEN,
 
     // Nodes.
@@ -167,6 +173,9 @@ syntax_kinds! {
     SETTING_STMT,
     TASK_STMT,
     ICON_STMT,
+    AXIS_STMT,
+    QUADRANT_STMT,
+    POINT_STMT,
     ERROR,
 }
 
