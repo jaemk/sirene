@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/pie.rs
+expression: "pie\n    \"A\" : 10\n    \"A\" : 20\n    \"B\" : -5\n    \"C\" 5\n    \"D : 1\n    \"E\" : many\n    F : 3\n"
+---
+3:5: warning: `A` is already a slice; skipping this one
+4:11: error: `B` has a negative value; a slice must be 0 or more
+5:9: error: expected `:`
+6:5: error: unclosed string: expected `"`
+7:11: error: expected a number
+8:5: error: expected a slice (`"label" : value`) or `title`
+
+A  ████████████████████████████████████████  100%

@@ -10,6 +10,7 @@ pub mod git;
 pub mod layout;
 mod lines;
 pub mod markdown;
+pub mod pie;
 pub mod scene;
 pub mod sequence;
 pub mod state;

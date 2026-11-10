@@ -34,6 +34,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | PlantUML | research | [plantuml.md](plantuml.md) |
 | Mermaid Git Graphs | done | [mermaid-git-graphs.md](mermaid-git-graphs.md) |
 | Mermaid Timelines | done | [mermaid-timelines.md](mermaid-timelines.md) |
+| Mermaid Pie Charts | done | [mermaid-pie-charts.md](mermaid-pie-charts.md) |
 
 ## Conventions
 

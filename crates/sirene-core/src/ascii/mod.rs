@@ -2,10 +2,12 @@
 
 mod canvas;
 mod git;
+mod pie;
 mod sequence;
 mod timeline;
 
 pub use git::render as git_graph;
+pub use pie::render as pie;
 pub use sequence::render as sequence;
 pub use timeline::render as timeline;
 

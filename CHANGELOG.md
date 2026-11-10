@@ -29,6 +29,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the typed shapes, every message arrow, self-messages, activations, notes, `loop`, `alt`,
   `opt`, `par`, `critical`, `break`, and `rect` blocks, `box` groups, `create` and `destroy`,
   and `autonumber`, in images and text.
+- Mermaid pie charts (`pie`), read-only in the editor: slices with percentages, a legend,
+  `showData`, and a title; in text, a table with a bar per slice.
 
 ### Changed
 

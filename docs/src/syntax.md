@@ -1,8 +1,8 @@
 # Supported syntax
 
 sirene reads Mermaid's flowchart syntax (`flowchart`, `graph`, and `flowchart-elk`). This page
-lists what is read and where sirene differs from Mermaid. Other diagram types (`sequenceDiagram`,
-`pie`, ...) are one error, and nothing is drawn.
+lists what is read and where sirene differs from Mermaid. The other types sirene draws have pages
+of their own; the rest (`gantt`, `mindmap`, ...) are one error, and nothing is drawn.
 
 ## Header and direction
 

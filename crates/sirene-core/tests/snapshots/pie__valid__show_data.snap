@@ -1,0 +1,11 @@
+---
+source: crates/sirene-core/tests/pie.rs
+expression: "%% Values beside each label, and slices sorted largest first.\npie showData\n    title Key elements in Product X\n    \"Calcium\" : 42.96\n    \"Potassium\" : 50.05\n    \"Magnesium\" : 10.01\n    'Iron' : 5\n"
+---
+
+                   Key elements in Product X
+
+Potassium  ██████████████████▌                        46%  50.05
+Calcium    ███████████████▉                           40%  42.96
+Magnesium  ███▊                                        9%  10.01
+Iron       █▉                                          5%      5

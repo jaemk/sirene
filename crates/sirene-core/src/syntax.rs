@@ -103,6 +103,8 @@ syntax_kinds! {
     SEQ_KW,
     ARROW,
     ACTIVATION,
+    // Pie charts: `showData` after the header keyword.
+    SHOW_DATA_KW,
     ERROR_TOKEN,
 
     // Nodes.
@@ -155,6 +157,7 @@ syntax_kinds! {
     PARTICIPANT_STMT,
     MESSAGE_STMT,
     SEQ_STMT,
+    SLICE_STMT,
     ERROR,
 }
 
