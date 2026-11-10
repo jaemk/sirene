@@ -62,6 +62,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid sankey diagrams (`sankey-beta`, `sankey`), read-only in the editor: CSV rows of flows
   laid out as d3-sankey does, with `linkColor`, `nodeAlignment`, `showValues`, `prefix`, and
   `suffix`; in text, each node's outgoing flows with bars.
+- Mermaid treemaps (`treemap-beta`, `treemap`), read-only in the editor: sections and leaves
+  nested by indentation, laid out as d3's squarified treemap, with `classDef` styles and d3
+  `valueFormat`; in text, an outline with a bar per item.
 
 ### Changed
 

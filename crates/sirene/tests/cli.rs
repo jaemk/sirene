@@ -893,9 +893,32 @@ fn other_diagram_types() {
         .stderr(
             "<stdin>:1:1: error: `zenuml` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, and sankey \
-             diagrams\n",
+             mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, and \
+             treemap diagrams\n",
         );
+}
+
+/// A treemap draws in text and as an image (MTREE-4, LANGS-4).
+#[test]
+fn treemaps() {
+    let src = "treemap-beta\n\"S\"\n  \"a\": 3\n  \"b\": 1\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(format!(
+            "S     4  {}\n+- a  3  {}\n`- b  1  {}\n",
+            "#".repeat(24),
+            "#".repeat(18),
+            "#".repeat(6)
+        ));
+    sirene()
+        .arg("svg")
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(">S</text>"));
 }
 
 /// A sankey diagram draws in text and as an image (MSANKEY-4, LANGS-4).

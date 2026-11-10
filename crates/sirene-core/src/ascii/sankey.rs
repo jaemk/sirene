@@ -5,13 +5,13 @@ use super::{Charset, Options, width};
 use crate::sankey::Sankey;
 
 /// Cells across a bar.
-const FIELD: usize = 24;
+pub(super) const FIELD: usize = 24;
 
 /// Eighth blocks, from one eighth to seven.
 const EIGHTHS: [char; 7] = ['▏', '▎', '▍', '▌', '▋', '▊', '▉'];
 
 /// A bar for `share` (0 to 1) of `FIELD` cells, at least a sliver when above 0.
-fn bar(share: f64, charset: Charset) -> String {
+pub(super) fn bar(share: f64, charset: Charset) -> String {
     let cells = share.clamp(0.0, 1.0) * FIELD as f64;
     let mut out = String::new();
     match charset {

@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/treemap.rs
+expression: "treemap-beta\ntitle Product Lines\n\"Hardware\"\n    \"Laptops\": 4200\n    \"Phones\": 3100\n    \"Accessories\"\n        \"Cables\": 300\n        \"Chargers\": 450\n\"Software\"\n    \"Licenses\": 2600\n    \"Subscriptions\": 1900\n\"Services\"\n    \"Support\": 1200\n    \"Training\": 500\n"
+---
+             Product Lines
+
+Hardware          8,050  ##############
++- Laptops        4,200  #######
++- Phones         3,100  #####
+`- Accessories      750  #
+   +- Chargers      450  #
+   `- Cables        300  #
+
+Software          4,500  ########
++- Licenses       2,600  ####
+`- Subscriptions  1,900  ###
+
+Services          1,700  ###
++- Support        1,200  ##
+`- Training         500  #

@@ -13,6 +13,7 @@ mod radar;
 mod sankey;
 mod sequence;
 mod timeline;
+mod treemap;
 mod xychart;
 
 pub use gantt::render as gantt;
@@ -27,6 +28,7 @@ pub use radar::render as radar;
 pub use sankey::render as sankey;
 pub use sequence::render as sequence;
 pub use timeline::render as timeline;
+pub use treemap::render as treemap;
 pub use xychart::render as xychart;
 
 use unicode_width::UnicodeWidthStr;
