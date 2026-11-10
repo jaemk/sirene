@@ -213,6 +213,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for timelines yet")
     );
     assert!(timeline.chart.nodes.is_empty() && timeline.other.is_some());
+    let seq = Document::from_source(None, "sequenceDiagram\n  A->>B: hi\n".to_owned());
+    assert_eq!(
+        seq.read_only(),
+        Some("drawing edits are not supported for sequence diagrams yet")
+    );
+    assert!(seq.chart.nodes.is_empty() && seq.other.is_some());
 }
 
 #[gpui::test]

@@ -17,7 +17,8 @@ $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
 - The parser keeps every byte of the source, so the editor never reformats a file. Diagnostics
   point at a line and column, and a diagram with errors is still drawn.
 
-Flowcharts (`flowchart` and `graph`), [state diagrams](state.md) (`stateDiagram-v2`),
+Flowcharts (`flowchart` and `graph`), [sequence diagrams](sequence.md) (`sequenceDiagram`),
+[state diagrams](state.md) (`stateDiagram-v2`),
 [class diagrams](class.md) (`classDiagram`), [ER diagrams](er.md) (`erDiagram`),
 [git graphs](git.md) (`gitGraph`), and [timelines](timeline.md) (`timeline`) are drawn; other Mermaid diagram types are reported
 as unsupported. See [Supported

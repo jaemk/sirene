@@ -1,0 +1,45 @@
+---
+source: crates/sirene-core/tests/sequence.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    A->B: solid line\n    A-->B: dotted line\n    A->>B: solid arrow\n    A-->>B: dotted arrow\n    B-xA: solid cross\n    B--xA: dotted cross\n    A-)B: async\n    A--)B: async dotted\n    A<<->>B: both ways\n    A<<-->>B: both ways dotted\n    B->>B: self\n"
+---
++---+             +---+
+| A |             | B |
++-+-+             +-+-+
+  |                 |
+  |   solid line    |
+  +-----------------|
+  |                 |
+  |   dotted line   |
+  +.................|
+  |                 |
+  |   solid arrow   |
+  +---------------->|
+  |                 |
+  |  dotted arrow   |
+  +................>|
+  |                 |
+  |   solid cross   |
+  |x----------------+
+  |                 |
+  |  dotted cross   |
+  |x................+
+  |                 |
+  |      async      |
+  +---------------->|
+  |                 |
+  |  async dotted   |
+  +................>|
+  |                 |
+  |    both ways    |
+  |<--------------->|
+  |                 |
+  |both ways dotted |
+  |<...............>|
+  |                 |
+  |                 | self
+  |                 +--+
+  |                 +<-+
+  |                 |
++-+-+             +-+-+
+| A |             | B |
++---+             +---+

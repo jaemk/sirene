@@ -98,6 +98,11 @@ syntax_kinds! {
     SECTION_KW,
     PERIOD,
     EVENT,
+    // Sequence diagrams: a statement keyword such as `participant` or `loop`, a message arrow
+    // such as `->>`, and the `+` or `-` after it.
+    SEQ_KW,
+    ARROW,
+    ACTIVATION,
     ERROR_TOKEN,
 
     // Nodes.
@@ -147,6 +152,9 @@ syntax_kinds! {
     SECTION_STMT,
     PERIOD_STMT,
     EVENTS_STMT,
+    PARTICIPANT_STMT,
+    MESSAGE_STMT,
+    SEQ_STMT,
     ERROR,
 }
 

@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/sequence.rs
+expression: "---\ntitle: Participants\n---\nsequenceDiagram\n    actor U as User\n    participant W as Web<br>app\n    participant Q@{ \"type\": \"queue\" } as Jobs\n    participant D@{ \"type\": \"database\" }\n    participant C@{ \"type\": \"control\" }\n    U->>W: click\n    W->>Q: enqueue\n    Q->>D: write\n    D-->>C: done\n"
+---
+                Participants
+
+  o     +-----+
+ /|\    | Web |   +-------+   +---+   +---+
+ / \    | app |   | Jobs  |   | D |   | C |
+User    +--+--+   +---+---+   +-+-+   +-+-+
+  |        |          |         |       |
+  | click  |          |         |       |
+  +------->|          |         |       |
+  |        |          |         |       |
+  |        | enqueue  |         |       |
+  |        +--------->|         |       |
+  |        |          |         |       |
+  |        |          |  write  |       |
+  |        |          +-------->|       |
+  |        |          |         |       |
+  |        |          |         | done  |
+  |        |          |         +......>|
+  |        |          |         |       |
+  o     +--+--+   +---+---+   +-+-+   +-+-+
+ /|\    | Web |   | Jobs  |   | D |   | C |
+ / \    | app |   +-------+   +---+   +---+
+User    +-----+

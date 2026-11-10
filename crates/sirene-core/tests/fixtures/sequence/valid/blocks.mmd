@@ -1,0 +1,34 @@
+sequenceDiagram
+    participant Client
+    participant Server
+    participant Cache
+    loop Every minute
+        Client->>Server: poll
+    end
+    alt hit
+        Server->>Cache: get
+        Cache-->>Server: value
+    else miss
+        Server->>Server: compute
+    end
+    opt verbose
+        Server-->>Client: log
+    end
+    par fan out
+        Server->>Cache: a
+    and
+        Server->>Client: b
+    end
+    critical connect
+        Client->>Server: open
+    option timeout
+        Client->>Client: retry
+    end
+    break failed
+        Server-->>Client: error
+    end
+    rect rgb(200, 220, 255)
+        loop inner
+            Client->>Server: nested
+        end
+    end

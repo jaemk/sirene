@@ -5,6 +5,7 @@ mod hit;
 mod paint;
 #[cfg(feature = "png")]
 pub mod png;
+mod sequence;
 mod shapes;
 mod style;
 pub mod svg;
@@ -14,6 +15,7 @@ use unicode_width::UnicodeWidthStr;
 
 pub use git::git_graph;
 pub use paint::{CONFIG, flowchart};
+pub use sequence::sequence;
 pub use style::parse_color;
 pub use timeline::timeline;
 

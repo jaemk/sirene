@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/sequence.rs
+expression: "sequenceDiagram\n    Alice->>+John: Hello John, how are you?\n    Alice->>+John: John, can you hear me?\n    John-->>-Alice: Hi Alice, I can hear you!\n    John-->>-Alice: I feel great!\n    activate Alice\n    Alice->>Alice: think\n    deactivate Alice\n"
+---
++-------+                  +-------+
+| Alice |                  | John  |
++---+---+                  +---+---+
+    |                          |
+    | Hello John, how are you? |
+    +------------------------->|
+    |                          |
+    |  John, can you hear me?  |
+    +------------------------->|
+    |                          |
+    |Hi Alice, I can hear you! |
+    |<.........................+
+    |                          |
+    |      I feel great!       |
+    |<.........................+
+    |                          |
+    | think                    |
+    +--+                       |
+    +<-+                       |
+    |                          |
++---+---+                  +---+---+
+| Alice |                  | John  |
++-------+                  +-------+

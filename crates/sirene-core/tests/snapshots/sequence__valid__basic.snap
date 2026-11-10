@@ -1,0 +1,21 @@
+---
+source: crates/sirene-core/tests/sequence.rs
+expression: "sequenceDiagram\n    Alice->>John: Hello John, how are you?\n    John-->>Alice: Great!\n    Alice-)John: See you later!\n"
+---
+
+┌───────┐                 ┌───────┐
+│ Alice │                 │ John  │
+└───┬───┘                 └───┬───┘
+    │                         │
+    │Hello John, how are you? │
+    ├────────────────────────►│
+    │                         │
+    │         Great!          │
+    │◄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤
+    │                         │
+    │     See you later!      │
+    ├────────────────────────>│
+    │                         │
+┌───┴───┐                 ┌───┴───┐
+│ Alice │                 │ John  │
+└───────┘                 └───────┘

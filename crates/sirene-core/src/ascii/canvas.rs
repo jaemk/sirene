@@ -89,6 +89,18 @@ impl Canvas {
         }
     }
 
+    /// Empties the cells from `(x0, y0)` to `(x1, y1)` inclusive, so what is drawn there next
+    /// covers what was under it.
+    pub fn clear(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) {
+        for y in y0..=y1 {
+            for x in x0..=x1 {
+                if let Some(c) = self.cell(x, y) {
+                    *c = Cell::default();
+                }
+            }
+        }
+    }
+
     /// Shows `g` at a cell until more lines join it.
     pub fn glyph(&mut self, x: i32, y: i32, g: Glyph) {
         if let Some(c) = self.cell(x, y) {

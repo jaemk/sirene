@@ -11,6 +11,7 @@ pub mod layout;
 mod lines;
 pub mod markdown;
 pub mod scene;
+pub mod sequence;
 pub mod state;
 pub mod syntax;
 pub mod timeline;

@@ -23,6 +23,7 @@
 
 # Other diagrams
 
+- [Sequence diagrams](sequence.md)
 - [State diagrams](state.md)
 - [Class diagrams](class.md)
 - [ER diagrams](er.md)

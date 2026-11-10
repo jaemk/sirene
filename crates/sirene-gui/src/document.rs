@@ -126,6 +126,7 @@ impl Document {
     pub fn read_only(&self) -> Option<&'static str> {
         match Kind::of(&self.source) {
             Kind::Flowchart => None,
+            Kind::Sequence => Some("drawing edits are not supported for sequence diagrams yet"),
             Kind::State => Some("drawing edits are not supported for state diagrams yet"),
             Kind::Class => Some("drawing edits are not supported for class diagrams yet"),
             Kind::Er => Some("drawing edits are not supported for ER diagrams yet"),
