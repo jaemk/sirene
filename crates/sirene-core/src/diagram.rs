@@ -1,6 +1,7 @@
 //! The entry point for every Mermaid diagram type sirene draws (LANGS-2).
 
 use crate::ascii::{self, Options};
+use crate::block::{self, Block};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::{self, Flowchart, scan};
 use crate::gantt::{self, Gantt};
@@ -42,6 +43,7 @@ pub enum Kind {
     Radar,
     Sankey,
     Treemap,
+    Block,
 }
 
 impl Kind {
@@ -86,6 +88,8 @@ impl Kind {
             Kind::Sankey
         } else if treemap::HEADERS.contains(&word) {
             Kind::Treemap
+        } else if block::HEADERS.contains(&word) {
+            Kind::Block
         } else {
             Kind::Flowchart
         }
@@ -94,7 +98,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, and treemap diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, and block diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -115,6 +119,7 @@ pub enum Diagram {
     Radar(Radar),
     Sankey(Sankey),
     Treemap(Treemap),
+    Block(Block),
 }
 
 impl Default for Diagram {
@@ -158,6 +163,7 @@ impl Diagram {
             Diagram::Radar(r) => scene::radar(r, metrics, theme),
             Diagram::Sankey(s) => scene::sankey(s, metrics, theme),
             Diagram::Treemap(t) => scene::treemap(t, metrics, theme),
+            Diagram::Block(b) => scene::block(b, metrics, theme),
         }
     }
 
@@ -179,6 +185,7 @@ impl Diagram {
             Diagram::Radar(r) => ascii::radar(r, options),
             Diagram::Sankey(s) => ascii::sankey(s, options),
             Diagram::Treemap(t) => ascii::treemap(t, options),
+            Diagram::Block(b) => ascii::block(b, options),
         }
     }
 }
@@ -337,6 +344,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Block => {
+            let (block, diagnostics) = block::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Block(block),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -380,6 +394,8 @@ mod tests {
         assert_eq!(Kind::of("sankey-beta\n"), Kind::Sankey);
         assert_eq!(Kind::of("treemap-beta\n"), Kind::Treemap);
         assert_eq!(Kind::of("treemap\n"), Kind::Treemap);
+        assert_eq!(Kind::of("block-beta\n"), Kind::Block);
+        assert_eq!(Kind::of("block\n"), Kind::Block);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -400,6 +416,7 @@ mod tests {
         assert_eq!(other_diagram("radar-beta\n"), None);
         assert_eq!(other_diagram("sankey-beta\n"), None);
         assert_eq!(other_diagram("treemap-beta\n"), None);
+        assert_eq!(other_diagram("block-beta\n"), None);
         assert_eq!(other_diagram("quadrantChart\n"), None);
         assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);

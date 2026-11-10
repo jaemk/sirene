@@ -70,6 +70,7 @@ pub fn label_source(text: &str, markdown: bool) -> String {
                 '`' if !markdown => body.push_str("#96;"),
                 '"' => body.push_str("#quot;"),
                 '#' => body.push_str("#35;"),
+                '&' => body.push_str("#amp;"),
                 '<' => body.push_str("#lt;"),
                 _ => body.push(c),
             }

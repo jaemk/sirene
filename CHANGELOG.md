@@ -65,6 +65,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid treemaps (`treemap-beta`, `treemap`), read-only in the editor: sections and leaves
   nested by indentation, laid out as d3's squarified treemap, with `classDef` styles and d3
   `valueFormat`; in text, an outline with a bar per item.
+- Mermaid block diagrams (`block-beta`, `block`), read-only in the editor: blocks in a grid of
+  `columns` with widths and `space`, nested `block` groups, block arrows, edges, and styles,
+  placed as Mermaid places them; in text, the grid with the edges listed below.
+- Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 
 ### Changed
 

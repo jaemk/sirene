@@ -96,7 +96,7 @@ it touches, including comments and formatting, is kept byte for byte. Tests:
   statement. Edges that share a stroke (`A & B --> C`), and edges with an id in a chain, are not
   reversed.
 - Labels are written bare when they are one line of letters, digits, spaces, and `_.,!?'`;
-  otherwise quoted, with `"`, `#`, `<`, and (outside markdown) `` ` `` as entity codes and line
+  otherwise quoted, with `"`, `#`, `&`, `<`, and (outside markdown) `` ` `` as entity codes and line
   breaks as `<br>`. Markdown labels stay markdown strings. Parsing the written label gives back
   the text with control characters as spaces and each line trimmed. Setting a label to the text
   it already has makes no edit.

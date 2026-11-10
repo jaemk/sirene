@@ -1,5 +1,6 @@
 //! Terminal text rendering of flowcharts (ASCIIR-*).
 
+mod block;
 mod canvas;
 mod gantt;
 mod git;
@@ -16,6 +17,7 @@ mod timeline;
 mod treemap;
 mod xychart;
 
+pub use block::render as block;
 pub use gantt::render as gantt;
 pub use git::render as git_graph;
 pub use journey::render as journey;

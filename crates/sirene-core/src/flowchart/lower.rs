@@ -57,7 +57,7 @@ fn merge_metadata(into: &mut Metadata, entries: Metadata) {
 }
 
 /// The label of a `LABEL` node (FLOWMO-6).
-fn label_of(node: &SyntaxNode) -> Label {
+pub(crate) fn label_of(node: &SyntaxNode) -> Label {
     tokens(node)
         .find_map(|t| match t.kind() {
             STRING => Some(text::label(text::unquote(t.text()), false)),
@@ -70,7 +70,7 @@ fn label_of(node: &SyntaxNode) -> Label {
 
 /// Stroke, arrowheads, and length of an edge (FLOWMO-8), or `None` when the parser could not
 /// complete it.
-fn edge_style(edge: &SyntaxNode) -> Option<(Stroke, Option<Arrow>, Option<Arrow>, u8)> {
+pub(crate) fn edge_style(edge: &SyntaxNode) -> Option<(Stroke, Option<Arrow>, Option<Arrow>, u8)> {
     let open = token(edge, STROKE_OPEN);
     let stroke = token(edge, STROKE)?;
     let marker_text = open.as_ref().unwrap_or(&stroke).text().to_owned();

@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod ascii;
+pub mod block;
 pub mod class;
 pub mod diagnostic;
 pub mod diagram;

@@ -8,7 +8,7 @@ use super::{
 use crate::flowchart::{
     Arrow, Edge, Flowchart, Label, Measure, Node, Row, Shape, Span, Stroke as Line, Subgraph,
 };
-use crate::layout::{self, Config, Rect, Size, Spacing};
+use crate::layout::{self, Config, Layout, Rect, Size, Spacing};
 
 /// Spacing in pixels.
 pub const CONFIG: Config = Config {
@@ -285,6 +285,19 @@ fn subgraph_title(s: &Subgraph) -> String {
 pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
     let px = Px { metrics, theme };
     let layout = layout::layout(&chart.layout_graph(&px), &CONFIG);
+    draw(chart, &layout, metrics, theme).0
+}
+
+/// Draws `chart` where `layout` placed it: node `i` at `layout.nodes[i]`, and so on, as
+/// `Flowchart::layout_graph` numbers them. Also returns where the layout's origin is in the
+/// scene.
+pub(super) fn draw(
+    chart: &Flowchart,
+    layout: &Layout,
+    metrics: &impl TextMetrics,
+    theme: &Theme,
+) -> (Scene, Pt) {
+    let px = Px { metrics, theme };
     let title = chart
         .title
         .as_deref()
@@ -497,12 +510,15 @@ pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -
         "drew a {width}x{height} scene of {} elements",
         p.elements.len()
     );
-    Scene {
-        width,
-        height,
-        background: theme.background,
-        elements: p.elements,
-    }
+    (
+        Scene {
+            width,
+            height,
+            background: theme.background,
+            elements: p.elements,
+        },
+        off,
+    )
 }
 
 fn rect(b: BoxF) -> Vec<Segment> {

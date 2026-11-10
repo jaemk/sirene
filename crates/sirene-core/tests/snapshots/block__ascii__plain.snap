@@ -1,0 +1,11 @@
+---
+source: crates/sirene-core/tests/block.rs
+expression: "block-beta\n  columns 3\n  a b c\n  d:2 e\n"
+---
++---+  +---+  +---+
+| a |  | b |  | c |
++---+  +---+  +---+
+
++----------+  +---+
+|    d     |  | e |
++----------+  +---+

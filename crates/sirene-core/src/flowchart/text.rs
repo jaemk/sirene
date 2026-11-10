@@ -65,15 +65,21 @@ fn br_len(s: &str) -> Option<usize> {
     (b.get(i) == Some(&b'>')).then_some(i + 1)
 }
 
-/// Decodes `#name;` and `#NNN;` entity codes; unknown codes are kept verbatim.
+/// Decodes Mermaid's `#name;` and `#NNN;` entity codes, and HTML's `&name;` and `&#NNN;`;
+/// unknown codes are kept verbatim.
 pub(crate) fn decode_entities(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut rest = s;
-    while let Some(i) = rest.find('#') {
+    while let Some(i) = rest.find(['#', '&']) {
         out.push_str(&rest[..i]);
+        let mark = &rest[i..i + 1];
         let tail = &rest[i + 1..];
         let decoded = tail.find(';').and_then(|end| {
             let code = &tail[..end];
+            let code = match mark {
+                "&" => code.strip_prefix('#').unwrap_or(code),
+                _ => code,
+            };
             let c = match code {
                 "quot" => Some('"'),
                 "amp" => Some('&'),
@@ -94,7 +100,7 @@ pub(crate) fn decode_entities(s: &str) -> String {
                 rest = &tail[end + 1..];
             }
             None => {
-                out.push('#');
+                out.push_str(mark);
                 rest = tail;
             }
         }
@@ -383,6 +389,8 @@ mod tests {
         assert_eq!(decode_entities("#nope; #; # #12"), "#nope; #; # #12");
         assert_eq!(decode_entities("#99999999999;"), "#99999999999;");
         assert_eq!(decode_entities("#lt;br#gt;"), "<br>");
+        assert_eq!(decode_entities("&nbsp;&amp;&#9829;"), "\u{a0}&\u{2665}");
+        assert_eq!(decode_entities("a & b; &nope; &"), "a & b; &nope; &");
     }
 
     #[test]

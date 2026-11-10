@@ -72,7 +72,7 @@ A label is text plus a markdown flag.
 - `` "`...`" `` strings are markdown; other labels are plain.
 - `<br>`, `<br/>`, and `<br />` (any case) become line breaks.
 - Entity codes are decoded: `#quot;`, `#amp;`, `#lt;`, `#gt;`, `#apos;`, `#nbsp;`, and decimal
-  `#NNN;`. Unknown codes are kept verbatim.
+  `#NNN;`, and the same as HTML entities (`&nbsp;`, `&#9829;`). Unknown codes are kept verbatim.
 - `Label::spans` gives each line as styled spans. In markdown, `**bold**` and `__bold__` are bold
   and `*italic*` and `_italic_` italic; a marker without a partner on its line stays as text, and
   `_` marks only at a word edge (`snake_case` is text). `Label::lines` is the spans' text.
