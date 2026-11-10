@@ -33,6 +33,7 @@
 - [Gantt charts](gantt.md)
 - [Mindmaps](mindmap.md)
 - [User journeys](journey.md)
+- [Quadrant charts](quadrant.md)
 
 # Project
 

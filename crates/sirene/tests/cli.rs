@@ -725,7 +725,7 @@ fn check() {
     let md = dir.join("doc.md");
     std::fs::write(
         &md,
-        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  quadrantChart\n  ```\n",
+        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  xychart-beta\n  ```\n",
     )
     .unwrap();
     sirene()
@@ -736,9 +736,7 @@ fn check() {
         .stdout("")
         .stderr(
             predicate::str::contains("doc.md:5:8: error: expected a node after the edge").and(
-                predicate::str::contains(
-                    "doc.md:11:3: warning: skipping a `quadrantChart` diagram",
-                ),
+                predicate::str::contains("doc.md:11:3: warning: skipping a `xychart-beta` diagram"),
             ),
         );
     sirene()
@@ -758,7 +756,7 @@ fn markdown_images() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path();
     let md = dir.join("doc.md");
-    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nquadrantChart\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
+    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nxychart-beta\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
     std::fs::write(&md, text).unwrap();
     sirene()
         .arg("svg")
@@ -767,7 +765,7 @@ fn markdown_images() {
         .success()
         .stdout("")
         .stderr(
-            predicate::str::contains("doc.md:9:1: warning: skipping a `quadrantChart` diagram")
+            predicate::str::contains("doc.md:9:1: warning: skipping a `xychart-beta` diagram")
                 .and(predicate::str::contains("doc-1.svg"))
                 .and(predicate::str::contains("doc-3.svg")),
         );
@@ -791,7 +789,7 @@ fn markdown_images() {
     let linked = std::fs::read_to_string(&md).unwrap();
     assert_eq!(
         linked,
-        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\nquadrantChart\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
+        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\nxychart-beta\n  \"a\": 1\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
     );
     assert!(dir.join("img/doc-1.png").exists());
     // Every mermaid block is still there, unchanged.
@@ -889,14 +887,33 @@ fn suggests_a_misspelled_command() {
 fn other_diagram_types() {
     sirene()
         .arg("ascii")
-        .write_stdin("quadrantChart\n  title T\n")
+        .write_stdin("xychart-beta\n  title T\n")
         .assert()
         .failure()
         .stderr(
-            "<stdin>:1:1: error: `quadrantChart` diagrams are not supported; \
+            "<stdin>:1:1: error: `xychart-beta` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, and journey diagrams\n",
+             mindmap, journey, and quadrant diagrams\n",
         );
+}
+
+/// A quadrant chart draws in text and as an image (MQUAD-4, LANGS-4).
+#[test]
+fn quadrant_charts() {
+    sirene()
+        .arg("ascii")
+        .write_stdin("quadrantChart\n  quadrant-1 Do\n  A: [0.75, 0.75]\n")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("│         Do         │").and(predicate::str::contains("● A")),
+        );
+    sirene()
+        .arg("svg")
+        .write_stdin("quadrantChart\n  A: [0.75, 0.75]\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(">A</text>"));
 }
 
 /// A user journey draws in text and as an image (MJOUR-4, LANGS-4).

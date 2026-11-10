@@ -6,6 +6,7 @@ mod git;
 mod journey;
 mod mindmap;
 mod pie;
+mod quadrant;
 mod sequence;
 mod timeline;
 
@@ -14,6 +15,7 @@ pub use git::render as git_graph;
 pub use journey::render as journey;
 pub use mindmap::render as mindmap;
 pub use pie::render as pie;
+pub use quadrant::render as quadrant;
 pub use sequence::render as sequence;
 pub use timeline::render as timeline;
 
