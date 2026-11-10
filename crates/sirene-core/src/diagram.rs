@@ -16,6 +16,7 @@ use crate::sankey::{self, Sankey};
 use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
 use crate::timeline::{self, Timeline};
+use crate::treemap::{self, Treemap};
 use crate::xychart::{self, XyChart};
 use crate::{class, er, requirement, state};
 
@@ -40,6 +41,7 @@ pub enum Kind {
     Packet,
     Radar,
     Sankey,
+    Treemap,
 }
 
 impl Kind {
@@ -82,6 +84,8 @@ impl Kind {
             Kind::Radar
         } else if sankey::HEADERS.contains(&word) {
             Kind::Sankey
+        } else if treemap::HEADERS.contains(&word) {
+            Kind::Treemap
         } else {
             Kind::Flowchart
         }
@@ -90,7 +94,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, and sankey diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, and treemap diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -110,6 +114,7 @@ pub enum Diagram {
     Packet(Packet),
     Radar(Radar),
     Sankey(Sankey),
+    Treemap(Treemap),
 }
 
 impl Default for Diagram {
@@ -152,6 +157,7 @@ impl Diagram {
             Diagram::Packet(p) => scene::packet(p, metrics, theme),
             Diagram::Radar(r) => scene::radar(r, metrics, theme),
             Diagram::Sankey(s) => scene::sankey(s, metrics, theme),
+            Diagram::Treemap(t) => scene::treemap(t, metrics, theme),
         }
     }
 
@@ -172,6 +178,7 @@ impl Diagram {
             Diagram::Packet(p) => ascii::packet(p, options),
             Diagram::Radar(r) => ascii::radar(r, options),
             Diagram::Sankey(s) => ascii::sankey(s, options),
+            Diagram::Treemap(t) => ascii::treemap(t, options),
         }
     }
 }
@@ -323,6 +330,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Treemap => {
+            let (treemap, diagnostics) = treemap::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Treemap(treemap),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -364,6 +378,8 @@ mod tests {
         assert_eq!(Kind::of("radar-beta\n"), Kind::Radar);
         assert_eq!(Kind::of("sankey\n"), Kind::Sankey);
         assert_eq!(Kind::of("sankey-beta\n"), Kind::Sankey);
+        assert_eq!(Kind::of("treemap-beta\n"), Kind::Treemap);
+        assert_eq!(Kind::of("treemap\n"), Kind::Treemap);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -383,6 +399,7 @@ mod tests {
         assert_eq!(other_diagram("packet-beta\n"), None);
         assert_eq!(other_diagram("radar-beta\n"), None);
         assert_eq!(other_diagram("sankey-beta\n"), None);
+        assert_eq!(other_diagram("treemap-beta\n"), None);
         assert_eq!(other_diagram("quadrantChart\n"), None);
         assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);

@@ -19,6 +19,7 @@ mod shapes;
 mod style;
 pub mod svg;
 mod timeline;
+mod treemap;
 mod xychart;
 
 use unicode_width::UnicodeWidthStr;
@@ -37,6 +38,7 @@ pub use sankey::sankey;
 pub use sequence::sequence;
 pub use style::parse_color;
 pub use timeline::timeline;
+pub use treemap::treemap;
 pub use xychart::xychart;
 
 /// A point in scene coordinates (pixels, y down).

@@ -288,6 +288,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for sankey diagrams yet")
     );
     assert!(sankey.chart.nodes.is_empty() && sankey.other.is_some());
+    let treemap = Document::from_source(None, "treemap-beta\n\"A\": 1\n".to_owned());
+    assert_eq!(
+        treemap.read_only(),
+        Some("drawing edits are not supported for treemaps yet")
+    );
+    assert!(treemap.chart.nodes.is_empty() && treemap.other.is_some());
 }
 
 #[gpui::test]

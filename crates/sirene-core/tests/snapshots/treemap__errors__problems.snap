@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/treemap.rs
+expression: "---\nconfig:\n  treemap:\n    valueFormat: \"abc\"\n    padding: -1\n---\ntreemap-beta\n\"Empty\"\n\"Full\"\n  \"A\": 1.2.3\n  \"B\": 4:::nope\n  \"C\":\n  \"D\n  E: 1\n"
+---
+1:1: warning: ignoring `valueFormat: abc`: not a valid value
+1:1: warning: ignoring `padding: -1`: not a valid value
+8:1: warning: section `Empty` holds no items, so it is not drawn; give it a value such as `"Empty": 1`, or indent items under it
+10:8: error: `1.2.3` is not a number; ignoring `A`
+11:3: warning: class `nope` has no `classDef`; ignoring it
+12:3: warning: section `C` holds no items, so it is not drawn; give it a value such as `"C": 1`, or indent items under it
+12:7: error: expected a value such as `12`
+13:3: error: unclosed `"`: expected a closing `"` on the same line
+14:3: error: expected an item such as `"Section"` or `"Leaf": 10`, `classDef`, or `title`
+
+Full   4  ████████████████████████
+├─ B   4  ████████████████████████
+└─ C   0
+
+Empty  0

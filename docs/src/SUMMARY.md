@@ -40,6 +40,7 @@
 - [Packet diagrams](packet.md)
 - [Radar charts](radar.md)
 - [Sankey diagrams](sankey.md)
+- [Treemaps](treemap.md)
 
 # Project
 

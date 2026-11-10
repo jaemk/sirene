@@ -60,6 +60,7 @@ const OTHER_DIAGRAMS: &[&str] = &[
     "stateDiagram",
     "stateDiagram-v2",
     "timeline",
+    "treemap",
     "treemap-beta",
     "xychart",
     "xychart-beta",

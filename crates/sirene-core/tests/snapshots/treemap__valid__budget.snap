@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/treemap.rs
+expression: "---\nconfig:\n  treemap:\n    valueFormat: \"$,.2f\"\n    padding: 6\n---\ntreemap-beta\n%% Spending with styled items\n\"Housing\"\n  \"Rent\": 1800.5\n  \"Utilities\": 210\n\"Food\"\n  \"Groceries\": 640:::big\n  \"Dining\", 1,180\n\"Savings\": 900:::calm\nclassDef big fill:#f96,stroke:#333,stroke-width:2px\nclassDef calm fill:#9cf,color:#036\n"
+---
+
+Housing       $2,010.50  ██████████▎
+├─ Rent       $1,800.50  █████████▏
+└─ Utilities    $210.00  █▏
+
+Food          $1,820.00  █████████▎
+├─ Dining     $1,180.00  ██████
+└─ Groceries    $640.00  ███▎
+
+Savings         $900.00  ████▋

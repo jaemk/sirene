@@ -25,6 +25,7 @@ pub mod sequence;
 pub mod state;
 pub mod syntax;
 pub mod timeline;
+pub mod treemap;
 pub mod xychart;
 
 pub use diagnostic::{Diagnostic, Severity};
