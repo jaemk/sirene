@@ -3,6 +3,7 @@
 mod gantt;
 mod git;
 mod hit;
+mod mindmap;
 mod paint;
 mod pie;
 #[cfg(feature = "png")]
@@ -17,6 +18,7 @@ use unicode_width::UnicodeWidthStr;
 
 pub use gantt::gantt;
 pub use git::git_graph;
+pub use mindmap::mindmap;
 pub use paint::{CONFIG, flowchart};
 pub use pie::pie;
 pub use sequence::sequence;

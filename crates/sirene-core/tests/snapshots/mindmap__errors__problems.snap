@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/mindmap.rs
+expression: "mindmap\n  ::icon(fa fa-star)\n  root\n    a[unclosed\n    b(ok) trailing\n    c\n  second root\n    child of the second root\n    :::lost\n  ::icon(fa fa-book)\n"
+---
+2:3: error: `::icon(...)` must follow the node it applies to
+4:15: error: unclosed `[`: expected `]`
+5:11: error: expected the end of the line
+7:3: error: `second root` has no parent: a mindmap has one root, so indent this line under a node above it
+10:3: warning: icons are not drawn; ignoring `fa fa-book`
+
+root
+├── [unclosed]
+├── (ok)
+├── c
+└── child of the second root

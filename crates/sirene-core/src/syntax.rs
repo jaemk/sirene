@@ -109,6 +109,8 @@ syntax_kinds! {
     SETTING_KW,
     TASK_NAME,
     TASK_DATA,
+    // Mindmaps: `::icon` before a node's icon.
+    ICON_KW,
     ERROR_TOKEN,
 
     // Nodes.
@@ -164,6 +166,7 @@ syntax_kinds! {
     SLICE_STMT,
     SETTING_STMT,
     TASK_STMT,
+    ICON_STMT,
     ERROR,
 }
 

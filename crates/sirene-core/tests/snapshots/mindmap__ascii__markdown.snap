@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/mindmap.rs
+expression: "mindmap\n    id1[\"`**Root** with\na second line\nUnicode works too: 🤓`\"]\n      id2[\"`The dog in **the** hog... a *very long text* that wraps to a new line`\"]\n      id3[Regular labels still wrap if they are long enough to pass the width]\n      id4[\"quoted (with parens)\"]\n"
+---
+[Root with
+ a second line
+ Unicode works too: 🤓]
++-- [The dog in the hog... a very long text that wraps to a new line]
++-- [Regular labels still wrap if they are long enough to pass the width]
+`-- [quoted (with parens)]

@@ -31,6 +31,7 @@
 - [Timelines](timeline.md)
 - [Pie charts](pie.md)
 - [Gantt charts](gantt.md)
+- [Mindmaps](mindmap.md)
 
 # Project
 

@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/mindmap.rs
+expression: "---\ntitle: Shapes\n---\nmindmap\n  %% Every shape, with and without an id\n  root{{Hexagon root}}\n    sq[Square]\n    :::urgent large\n    rd(Rounded)\n    ci((Circle))\n    cl)Cloud(\n    bg))Bang((\n    Default shape\n    [No id]\n"
+---
+
+     Shapes
+
+{{Hexagon root}}
+├── [Square]
+├── (Rounded)
+├── ((Circle))
+├── )Cloud(
+├── ))Bang((
+├── Default shape
+└── [No id]
