@@ -358,6 +358,6 @@ fn other_types() {
     let d = &diagram::lower("zenuml\n").diagnostics[0];
     assert_eq!(
         d.message,
-        "`zenuml` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, and kanban diagrams"
+        "`zenuml` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, and packet diagrams"
     );
 }

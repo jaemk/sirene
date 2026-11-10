@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/packet.rs
+expression: "---\nconfig:\n  packet:\n    bitsPerRow: lots\n---\npacket\n0-7: \"ok\"\n10-11: \"gap\"\n11-12: \"overlap\"\n20-15: \"backwards\"\n+0: \"empty\"\n12: unquoted\n+4: \"after\"\n"
+---
+1:1: warning: ignoring `bitsPerRow: lots`: not a valid value
+8:1: error: `10-11` does not follow the field before it; expected it to start at bit 8
+9:1: error: `11-12` does not follow the field before it; expected it to start at bit 12
+10:1: error: `20-15` ends before it starts
+11:1: error: `+0` has no bits; a field holds at least one
+12:5: error: expected a quoted label such as `"Source Port"`
+
+   0                   1                   2                   3
+   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+  ┌───────────────┐   ┌───┬───────┐
+0 │      ok       │   │gap│ after │
+  └───────────────┘   └───┴───────┘

@@ -4,7 +4,7 @@ A local WYSIWYG editor and viewer for Mermaid flowcharts, with SVG, PNG, and ter
 output. Flowcharts (`flowchart` and `graph`), sequence diagrams (`sequenceDiagram`), state
 diagrams (`stateDiagram-v2`), class
 diagrams (`classDiagram`), ER diagrams (`erDiagram`), git graphs (`gitGraph`), timelines
-(`timeline`), pie charts (`pie`), gantt charts (`gantt`), mindmaps (`mindmap`), user journeys (`journey`), quadrant charts (`quadrantChart`), XY charts (`xychart-beta`), requirement diagrams (`requirementDiagram`), and kanban boards (`kanban`) are drawn; all but flowcharts are read-only in the editor's drawing. Other Mermaid diagram types are reported as unsupported.
+(`timeline`), pie charts (`pie`), gantt charts (`gantt`), mindmaps (`mindmap`), user journeys (`journey`), quadrant charts (`quadrantChart`), XY charts (`xychart-beta`), requirement diagrams (`requirementDiagram`), kanban boards (`kanban`), and packet diagrams (`packet`) are drawn; all but flowcharts are read-only in the editor's drawing. Other Mermaid diagram types are reported as unsupported.
 
 Docs: <https://jaemk.github.io/sirene/>. See `spec/README.md` for the feature status table.
 

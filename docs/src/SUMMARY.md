@@ -37,6 +37,7 @@
 - [XY charts](xychart.md)
 - [Requirement diagrams](requirement.md)
 - [Kanban boards](kanban.md)
+- [Packet diagrams](packet.md)
 
 # Project
 

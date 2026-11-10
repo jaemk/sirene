@@ -122,6 +122,9 @@ syntax_kinds! {
     ORIENTATION,
     // Requirement diagrams: a requirement type or `element`.
     REQ_KW,
+    // Packet diagrams: `+` before a bit count and `-` in a bit range.
+    PLUS,
+    DASH,
     ERROR_TOKEN,
 
     // Nodes.

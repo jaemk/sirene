@@ -8,6 +8,7 @@ use crate::git::{self, GitGraph};
 use crate::journey::{self, Journey};
 use crate::kanban::{self, Kanban};
 use crate::mindmap::{self, Mindmap};
+use crate::packet::{self, Packet};
 use crate::pie::{self, Pie};
 use crate::quadrant::{self, QuadrantChart};
 use crate::scene::{self, Scene, TextMetrics, Theme};
@@ -34,6 +35,7 @@ pub enum Kind {
     XyChart,
     Requirement,
     Kanban,
+    Packet,
 }
 
 impl Kind {
@@ -70,6 +72,8 @@ impl Kind {
             Kind::Requirement
         } else if kanban::HEADERS.contains(&word) {
             Kind::Kanban
+        } else if packet::HEADERS.contains(&word) {
+            Kind::Packet
         } else {
             Kind::Flowchart
         }
@@ -78,7 +82,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, and kanban diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, and packet diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -95,6 +99,7 @@ pub enum Diagram {
     Quadrant(QuadrantChart),
     XyChart(XyChart),
     Kanban(Kanban),
+    Packet(Packet),
 }
 
 impl Default for Diagram {
@@ -134,6 +139,7 @@ impl Diagram {
             Diagram::Quadrant(q) => scene::quadrant(q, metrics, theme),
             Diagram::XyChart(c) => scene::xychart(c, metrics, theme),
             Diagram::Kanban(k) => scene::kanban(k, metrics, theme),
+            Diagram::Packet(p) => scene::packet(p, metrics, theme),
         }
     }
 
@@ -151,6 +157,7 @@ impl Diagram {
             Diagram::Quadrant(q) => ascii::quadrant(q, options),
             Diagram::XyChart(c) => ascii::xychart(c, options),
             Diagram::Kanban(k) => ascii::kanban(k, options),
+            Diagram::Packet(p) => ascii::packet(p, options),
         }
     }
 }
@@ -281,6 +288,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Packet => {
+            let (packet, diagnostics) = packet::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Packet(packet),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -317,6 +331,8 @@ mod tests {
         assert_eq!(Kind::of("xychart horizontal\n"), Kind::XyChart);
         assert_eq!(Kind::of("requirementDiagram\n"), Kind::Requirement);
         assert_eq!(Kind::of("kanban\n"), Kind::Kanban);
+        assert_eq!(Kind::of("packet\n"), Kind::Packet);
+        assert_eq!(Kind::of("packet-beta\n"), Kind::Packet);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -333,6 +349,7 @@ mod tests {
         assert_eq!(other_diagram("xychart-beta\n"), None);
         assert_eq!(other_diagram("requirementDiagram\n"), None);
         assert_eq!(other_diagram("kanban\n"), None);
+        assert_eq!(other_diagram("packet-beta\n"), None);
         assert_eq!(other_diagram("quadrantChart\n"), None);
         assert_eq!(other_diagram("journey\n"), None);
         assert_eq!(other_diagram("mindmap\n"), None);

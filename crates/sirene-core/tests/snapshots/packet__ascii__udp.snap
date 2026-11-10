@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/packet.rs
+expression: "packet-beta\ntitle UDP Packet\n+16: \"Source Port\"\n+16: \"Destination Port\"\n32-47: \"Length\"\n48-63: \"Checksum\"\n64-95: \"Data (variable length)\"\n"
+---
+                              UDP Packet
+
+    0                   1                   2                   3
+    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+   +-------------------------------+-------------------------------+
+0  |          Source Port          |       Destination Port        |
+   +-------------------------------+-------------------------------+
+32 |            Length             |           Checksum            |
+   +-------------------------------+-------------------------------+
+64 |                    Data (variable length)                     |
+   +---------------------------------------------------------------+
