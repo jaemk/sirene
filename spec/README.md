@@ -39,6 +39,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Mindmaps | done | [mermaid-mindmaps.md](mermaid-mindmaps.md) |
 | Mermaid Journeys | done | [mermaid-journeys.md](mermaid-journeys.md) |
 | Mermaid Quadrant Charts | done | [mermaid-quadrant-charts.md](mermaid-quadrant-charts.md) |
+| Mermaid XY Charts | done | [mermaid-xy-charts.md](mermaid-xy-charts.md) |
 
 ## Conventions
 

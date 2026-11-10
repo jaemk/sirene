@@ -20,6 +20,7 @@ pub mod sequence;
 pub mod state;
 pub mod syntax;
 pub mod timeline;
+pub mod xychart;
 
 pub use diagnostic::{Diagnostic, Severity};
 pub use rowan::{TextRange, TextSize};

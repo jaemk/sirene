@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/xychart.rs
+expression: "xychart-beta\n    title Problems\n    x-axis [a, b, c]\n    y-axis \"Down\" 10 --> 0\n    y-axis [x, y]\n    bar [1, 2, 3, 4]\n    line [1, two, 3]\n    line \"unclosed\" [1, 2\n    pie [1]\n    line [3, 1, 2]\n"
+---
+4:5: warning: the range runs down from 10 to 0; drawing it from 0 to 10
+5:5: error: the y-axis takes a range (`min --> max`), not categories
+6:5: warning: this `bar` has 4 values for 3 categories; the last 1 are not drawn
+7:14: error: expected a number
+8:26: error: expected `,` or `]`
+9:5: error: expected `line`, `bar`, `x-axis`, `y-axis`, or `title`
+
+                        Problems
+
+   bar 1                       line 1
+a  ██▍                      1         ●                 3
+b  ████▊                    2    ●                      1
+c  ███████▎                 3       ●                   2
+
+0 to 10
