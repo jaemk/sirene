@@ -1,11 +1,13 @@
 //! Terminal text rendering of flowcharts (ASCIIR-*).
 
 mod canvas;
+mod gantt;
 mod git;
 mod pie;
 mod sequence;
 mod timeline;
 
+pub use gantt::render as gantt;
 pub use git::render as git_graph;
 pub use pie::render as pie;
 pub use sequence::render as sequence;

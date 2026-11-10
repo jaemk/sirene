@@ -105,6 +105,10 @@ syntax_kinds! {
     ACTIVATION,
     // Pie charts: `showData` after the header keyword.
     SHOW_DATA_KW,
+    // Gantt charts: a setting keyword such as `dateFormat`, and a task's name and data.
+    SETTING_KW,
+    TASK_NAME,
+    TASK_DATA,
     ERROR_TOKEN,
 
     // Nodes.
@@ -158,6 +162,8 @@ syntax_kinds! {
     MESSAGE_STMT,
     SEQ_STMT,
     SLICE_STMT,
+    SETTING_STMT,
+    TASK_STMT,
     ERROR,
 }
 

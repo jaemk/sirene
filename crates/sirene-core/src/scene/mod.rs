@@ -1,5 +1,6 @@
 //! Backend-independent drawing of diagrams as paths and text (DISPLA-*).
 
+mod gantt;
 mod git;
 mod hit;
 mod paint;
@@ -14,6 +15,7 @@ mod timeline;
 
 use unicode_width::UnicodeWidthStr;
 
+pub use gantt::gantt;
 pub use git::git_graph;
 pub use paint::{CONFIG, flowchart};
 pub use pie::pie;

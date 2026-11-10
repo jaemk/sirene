@@ -351,10 +351,13 @@ fn syntax_errors() {
 /// Mermaid's other types still say which ones sirene draws (LANGS-4).
 #[test]
 fn other_types() {
-    assert_eq!(diagram::other_diagram("gantt\n").as_deref(), Some("gantt"));
-    let d = &diagram::lower("gantt\n").diagnostics[0];
+    assert_eq!(
+        diagram::other_diagram("mindmap\n").as_deref(),
+        Some("mindmap")
+    );
+    let d = &diagram::lower("mindmap\n").diagnostics[0];
     assert_eq!(
         d.message,
-        "`gantt` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, and pie diagrams"
+        "`mindmap` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, and gantt diagrams"
     );
 }

@@ -1,0 +1,15 @@
+---
+config:
+  gantt:
+    topAxis: true
+---
+gantt
+    dateFormat DD/MM/YYYY HH:mm
+    axisFormat %b %e
+    tickInterval 1week
+    weekday monday
+    todayMarker off
+    Kickoff        : vert, k, 06/01/2014 09:00, 0d
+    Design         : d, 06/01/2014 09:00, 1w
+    Build          : b, after d, 2w
+    Release        : milestone, after b, 0d

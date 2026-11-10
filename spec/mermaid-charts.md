@@ -14,7 +14,7 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | `xychart-beta`, `quadrantChart`, `radar-beta` | chart | Axes, scales, and points or bars. |
 | `sankey-beta` | chart | Flows between ranked nodes; the ranking could reuse LAYOUT-4. |
 | `packet-beta` | chart | Rows of bit fields. |
-| `gantt` | timeline | Dates, durations, dependencies (`after`), sections, and a time axis; ASCII is a bar per task. |
+| `gantt` | chart | Dates, durations, dependencies (`after`), sections, and a time axis; ASCII is a bar per task: `mermaid-gantt-charts.md`. |
 | `timeline`, `journey` | timeline | Sections along a line (`timeline`: `mermaid-timelines.md`); journey adds scores and actors. |
 | `gitGraph` | timeline | Commits on branch lanes, merges, and cherry-picks: `mermaid-git-graphs.md`. |
 | `kanban` | board | Columns of cards. |

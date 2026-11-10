@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/gantt.rs
+expression: "%%{init: {\"gantt\": {\"displayMode\": \"compact\"}}}%%\ngantt\n    title Compact rows\n    excludes weekends, 2014-01-15\n    includes 2014-01-11\n    weekend friday\n    inclusiveEndDates\n    section Team A\n    One   : 2014-01-06, 2014-01-08\n    Two   : 2014-01-09, 3d\n    Three : 2014-01-07, 4d\n    section Team B\n    Four  : crit, 2014-01-08, 5d\n"
+---
+
+                                 Compact rows
+
+Team A  One████████████████████Two███████████████████████████
+                Three████████████████████████████████
+Team B                 Four█████████████████████████████████████████
+        ┬───────┬──────┬───────┬──────┬───────┬──────┬───────┬──────┬
+        2014-01-06     2014-01-08     2014-01-10     2014-01-12     2014-01-14
