@@ -50,6 +50,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Architecture Diagrams | done | [mermaid-architecture-diagrams.md](mermaid-architecture-diagrams.md) |
 | Mermaid C4 Diagrams | done | [mermaid-c4-diagrams.md](mermaid-c4-diagrams.md) |
 | Mermaid ZenUML Diagrams | done | [mermaid-zenuml-diagrams.md](mermaid-zenuml-diagrams.md) |
+| Mermaid Info Diagrams | done | [mermaid-info-diagrams.md](mermaid-info-diagrams.md) |
 
 ## Conventions
 

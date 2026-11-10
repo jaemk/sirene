@@ -351,10 +351,13 @@ fn syntax_errors() {
 /// Mermaid's other types still say which ones sirene draws (LANGS-4).
 #[test]
 fn other_types() {
-    assert_eq!(diagram::other_diagram("info\n").as_deref(), Some("info"));
-    let d = &diagram::lower("info\n").diagnostics[0];
+    assert_eq!(
+        diagram::other_diagram("venn-beta\n").as_deref(),
+        Some("venn-beta")
+    );
+    let d = &diagram::lower("venn-beta\n").diagnostics[0];
     assert_eq!(
         d.message,
-        "`info` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, and ZenUML diagrams"
+        "`venn-beta` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, and info diagrams"
     );
 }

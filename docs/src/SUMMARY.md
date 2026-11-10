@@ -45,6 +45,7 @@
 - [Architecture diagrams](architecture.md)
 - [C4 diagrams](c4.md)
 - [ZenUML diagrams](zenuml.md)
+- [Info diagrams](info.md)
 
 # Project
 

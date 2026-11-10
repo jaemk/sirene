@@ -130,6 +130,8 @@ syntax_kinds! {
     EQ,
     DOT,
     ZEN_KW,
+    // Info diagrams: `showInfo`.
+    SHOW_INFO_KW,
     ERROR_TOKEN,
 
     // Nodes.
@@ -202,6 +204,8 @@ syntax_kinds! {
     CALL,
     FRAGMENT,
     BRANCH,
+    // Info diagrams: `showInfo` on its own line.
+    SHOW_INFO_STMT,
     ERROR,
 }
 
