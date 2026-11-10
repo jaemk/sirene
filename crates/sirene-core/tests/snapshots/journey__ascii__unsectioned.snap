@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/journey.rs
+expression: "---\ntitle: Checkout\n---\njourney\n  %% Tasks before any section, a half score, and a long name that wraps\n  accTitle: Checkout journey\n  accDescr: How a shopper pays\n  Find the product page after searching for a while: 2.5: Shopper\n  Pay: 4: Shopper, Bank, Store\n  Wait for the parcel: 3\n"
+---
+                                     Checkout
+
+Find the product page after searching for a while  ***.. 2.5  Shopper
+Pay                                                ****. 4    Shopper, Bank, Store
+Wait for the parcel                                ***.. 3

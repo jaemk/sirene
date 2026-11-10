@@ -237,6 +237,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for mindmaps yet")
     );
     assert!(mindmap.chart.nodes.is_empty() && mindmap.other.is_some());
+    let journey = Document::from_source(None, "journey\n  a: 5: Me\n".to_owned());
+    assert_eq!(
+        journey.read_only(),
+        Some("drawing edits are not supported for user journeys yet")
+    );
+    assert!(journey.chart.nodes.is_empty() && journey.other.is_some());
 }
 
 #[gpui::test]

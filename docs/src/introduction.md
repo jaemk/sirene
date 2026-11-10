@@ -21,8 +21,8 @@ Flowcharts (`flowchart` and `graph`), [sequence diagrams](sequence.md) (`sequenc
 [state diagrams](state.md) (`stateDiagram-v2`),
 [class diagrams](class.md) (`classDiagram`), [ER diagrams](er.md) (`erDiagram`),
 [git graphs](git.md) (`gitGraph`), [timelines](timeline.md) (`timeline`), [pie
-charts](pie.md) (`pie`), [gantt charts](gantt.md) (`gantt`), and [mindmaps](mindmap.md)
-(`mindmap`) are drawn; other Mermaid diagram types are reported
+charts](pie.md) (`pie`), [gantt charts](gantt.md) (`gantt`), [mindmaps](mindmap.md)
+(`mindmap`), and [user journeys](journey.md) (`journey`) are drawn; other Mermaid diagram types are reported
 as unsupported. See [Supported
 syntax](syntax.md) for what is read and how it differs from Mermaid.
 

@@ -352,12 +352,12 @@ fn syntax_errors() {
 #[test]
 fn other_types() {
     assert_eq!(
-        diagram::other_diagram("journey\n").as_deref(),
-        Some("journey")
+        diagram::other_diagram("quadrantChart\n").as_deref(),
+        Some("quadrantChart")
     );
-    let d = &diagram::lower("journey\n").diagnostics[0];
+    let d = &diagram::lower("quadrantChart\n").diagnostics[0];
     assert_eq!(
         d.message,
-        "`journey` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, and mindmap diagrams"
+        "`quadrantChart` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, and journey diagrams"
     );
 }
