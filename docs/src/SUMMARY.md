@@ -42,6 +42,7 @@
 - [Sankey diagrams](sankey.md)
 - [Treemaps](treemap.md)
 - [Block diagrams](block.md)
+- [Architecture diagrams](architecture.md)
 
 # Project
 

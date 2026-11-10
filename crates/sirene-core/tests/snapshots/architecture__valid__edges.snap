@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/architecture.rs
+expression: "architecture-beta\n    title Edges and junctions\n    group public(internet)[Public]\n    group private(cloud)[Private]\n\n    service gateway(internet)[Gateway] in public\n    service web(server)[Web] in private\n    service jobs(server)[Jobs] in private\n    service store(database)[Store]\n    junction hub\n\n    gateway{group}:R --> L:web{group}\n    web:R -[queue]- L:jobs\n    jobs:B <--> T:hub\n    hub:R --> L:store\n"
+---
+
+                                         Edges and junctions
+
+┌ Public (internet) ─────┐      ┌ Private (cloud) ────────────────────────┐
+│                        │      │                                         │
+│ ┌────────────────────┐ │      │ ┌──────────────┐      ┌───────────────┐ │
+│ │ Gateway (internet) │ ├─────►│ │ Web (server) ├─queue┤ Jobs (server) │ │
+│ └────────────────────┘ │      │ └──────────────┘      └───────────────┘ │
+│                        │      │                               ▲         │
+└────────────────────────┘      └───────────────────────────────┼─────────┘
+                                                                │
+                                                     ┌──────────┘
+                                                     │
+                                                     ▼                           ┌──────────────────┐
+                                                     ●──────────────────────────►│ Store (database) │
+                                                                                 └──────────────────┘
