@@ -125,6 +125,11 @@ syntax_kinds! {
     // Packet diagrams: `+` before a bit count and `-` in a bit range.
     PLUS,
     DASH,
+    // ZenUML: `=` before a call, `.` before a method, and a keyword such as `new`, `if`, or
+    // `return`.
+    EQ,
+    DOT,
+    ZEN_KW,
     ERROR_TOKEN,
 
     // Nodes.
@@ -192,6 +197,11 @@ syntax_kinds! {
     VALUE,
     // Sankey diagrams: a `source,target,value` row.
     FLOW,
+    // ZenUML: a sync call or creation, a fragment such as `if` ... `else`, and one of its
+    // branches.
+    CALL,
+    FRAGMENT,
+    BRANCH,
     ERROR,
 }
 

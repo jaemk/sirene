@@ -148,6 +148,7 @@ impl Document {
                 Some("drawing edits are not supported for architecture diagrams yet")
             }
             Kind::C4 => Some("drawing edits are not supported for C4 diagrams yet"),
+            Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")
             }

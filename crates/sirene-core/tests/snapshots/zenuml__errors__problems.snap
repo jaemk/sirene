@@ -1,0 +1,24 @@
+---
+source: crates/sirene-core/tests/zenuml.rs
+expression: "zenuml\n    @EC2 Server\n    A B\n    A.call(x\n    return early\n    @return\n    A.next()\n    if(x)\n    A->B: fine\n"
+---
+2:6: warning: `@EC2` is not drawn; drawing a participant
+3:5: error: expected a participant, a message such as `A->B: text` or `A.method()`, a fragment such as `if(x) {`, or `title`
+4:11: error: expected `)` to close the arguments
+5:5: warning: `return` outside a call; ignoring it
+6:5: warning: `@return` is for the next message such as `A->B: x`; ignoring it
+8:10: error: expected `{`
+
+    ┌─────────┐   ┌───┐   ┌───┐
+    │ Server  │   │ A │   │ B │
+    └────┬────┘   └─┬─┘   └─┬─┘
+         │          │       │
+       next()       │       │
+─────────┼─────────►┃       │
+         │          │       │
+         │          │ fine  │
+         │          ├──────>│
+         │          │       │
+    ┌────┴────┐   ┌─┴─┐   ┌─┴─┐
+    │ Server  │   │ A │   │ B │
+    └─────────┘   └───┘   └───┘

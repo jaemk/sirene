@@ -44,6 +44,7 @@
 - [Block diagrams](block.md)
 - [Architecture diagrams](architecture.md)
 - [C4 diagrams](c4.md)
+- [ZenUML diagrams](zenuml.md)
 
 # Project
 

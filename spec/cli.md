@@ -107,7 +107,7 @@ DIR`), or a Markdown file (`.md` or `.markdown`), whose mermaid blocks (MARKDO-1
 positions in the Markdown file; a block of another Mermaid diagram type (MARKDO-2) is skipped with
 `NAME:LINE:COL: warning: skipping a `KIND` diagram; sirene draws flowchart, sequence, state, class,
 ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban,
-packet, radar, sankey, treemap, block, architecture, and C4 diagrams` (the list is
+packet, radar, sankey, treemap, block, architecture, C4, and ZenUML diagrams` (the list is
 `diagram::DRAWN`).
 Every FILE is
 checked. The exit status is 1 when any FILE cannot be read or has an error, else 0. A mistyped

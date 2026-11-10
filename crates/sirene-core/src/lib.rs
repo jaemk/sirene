@@ -30,6 +30,7 @@ pub mod syntax;
 pub mod timeline;
 pub mod treemap;
 pub mod xychart;
+pub mod zenuml;
 
 pub use diagnostic::{Diagnostic, Severity};
 pub use rowan::{TextRange, TextSize};
