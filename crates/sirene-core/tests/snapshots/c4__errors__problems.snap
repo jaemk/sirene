@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/c4.rs
+expression: "C4Context\n    Person(a, \"A\")\n    Person(a, \"Again\")\n    System()\n    Rel(a, nope, \"Uses\")\n    Person(p, \"P\") {\n        System(s, \"S\")\n    }\n    AddElementTag(\"v1\", $bgColor=\"red\")\n    UpdateLayoutConfig($c4ShapeInRow=\"0\")\n    Person(b, \"B\n"
+---
+3:5: error: `a` is already declared; ignoring this
+4:5: error: `System` needs an alias first
+5:5: error: no element or boundary `nope`; ignoring this
+6:5: warning: `Person` is not a boundary; drawing what is inside it outside
+9:5: warning: `AddElementTag` is not supported; ignoring it
+10:5: warning: `c4ShapeInRow` must be a whole number of at least 1; ignoring `0`
+11:15: error: unclosed string: expected `"`
+
+╭────────────╮  ╭────────────╮  ╭────────────╮  ╭────────────╮
+│ <<person>> │  │ <<person>> │  │ <<system>> │  │ <<person>> │
+│     A      │  │     P      │  │     S      │  │     b      │
+╰────────────╯  ╰────────────╯  ╰────────────╯  ╰────────────╯

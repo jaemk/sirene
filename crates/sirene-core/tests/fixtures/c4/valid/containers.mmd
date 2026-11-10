@@ -1,0 +1,19 @@
+C4Container
+    title Container diagram for Internet Banking System
+
+    System_Ext(email_system, "E-Mail System", "The internal Microsoft Exchange system")
+    Person(customer, Customer, "A customer of the bank")
+
+    Container_Boundary(c1, "Internet Banking") {
+        Container(spa, "Single-Page App", "JavaScript, Angular", "Provides banking functionality via the browser")
+        Container_Ext(mobile_app, "Mobile App", "C#, Xamarin")
+        Container(web_app, "Web Application", "Java, Spring MVC")
+        ContainerDb(database, "Database", "SQL Database", "Stores user registration information")
+        ContainerQueue(queue, "Events", "Kafka")
+        Component(auth, "Auth", "Spring Bean")
+    }
+
+    Rel(customer, web_app, "Uses", "HTTPS")
+    Rel_Back(database, web_app, "Reads from and writes to", "JDBC")
+    Rel(email_system, customer, "Sends e-mails to")
+    Rel(web_app, queue, "Publishes")

@@ -169,7 +169,7 @@ A document whose first statement starts with another Mermaid diagram keyword (`s
 `classDiagram`, `stateDiagram`, `erDiagram`, `gantt`, `pie`, `gitGraph`, `mindmap`, `timeline`,
 and the rest of mermaid's types, with their `-v2` and `-beta` forms) is one `ERROR` node from that
 keyword to the end, with one diagnostic on the keyword, e.g.
-`` `zenuml` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, and architecture diagrams `` (the list
+`` `zenuml` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, and C4 diagrams `` (the list
 is `diagram::DRAWN`). Nothing of it is drawn. A type sirene draws never reaches this parser:
 `diagram::lower` sends it to its own (MSTATE-1, MCLASS-1, MER-1, MGIT-1, TIMELI-1, MPIE-1,
 MGANTT-1, MMIND-1, MJOUR-1, MQUAD-1, MXY-1, MREQ-1, MKAN-1, MPKT-1, MRADAR-1, MSANKEY-1, MTREE-1). Tests: `other_diagram_types_are_one_error` in

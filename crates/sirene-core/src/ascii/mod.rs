@@ -2,6 +2,7 @@
 
 mod architecture;
 mod block;
+mod c4;
 mod canvas;
 mod gantt;
 mod git;
@@ -20,6 +21,7 @@ mod xychart;
 
 pub use architecture::render as architecture;
 pub use block::render as block;
+pub use c4::render as c4;
 pub use gantt::render as gantt;
 pub use git::render as git_graph;
 pub use journey::render as journey;

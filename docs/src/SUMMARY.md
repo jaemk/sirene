@@ -43,6 +43,7 @@
 - [Treemaps](treemap.md)
 - [Block diagrams](block.md)
 - [Architecture diagrams](architecture.md)
+- [C4 diagrams](c4.md)
 
 # Project
 

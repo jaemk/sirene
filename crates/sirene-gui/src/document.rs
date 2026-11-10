@@ -147,6 +147,7 @@ impl Document {
             Kind::Architecture => {
                 Some("drawing edits are not supported for architecture diagrams yet")
             }
+            Kind::C4 => Some("drawing edits are not supported for C4 diagrams yet"),
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")
             }

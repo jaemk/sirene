@@ -72,6 +72,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   their icons (`cloud`, `database`, `disk`, `internet`, `server`), junctions, nested groups,
   edges by side with arrows, labels, and `{group}` ends, and `align`, placed on a grid from
   the edge sides; in text, boxes with the icon name.
+- Mermaid C4 diagrams (`C4Context`, `C4Container`, `C4Component`, `C4Dynamic`,
+  `C4Deployment`), read-only in the editor: people, systems, containers, and components with
+  `Db`, `Queue`, and `_Ext` variants, nested boundaries and deployment nodes, relations with
+  technology, `UpdateElementStyle`, `UpdateRelStyle`, and `UpdateLayoutConfig`, in Mermaid's
+  colors and row layout; in text, the boxes with the relations listed below.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 
 ### Changed

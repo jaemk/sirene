@@ -306,6 +306,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for architecture diagrams yet")
     );
     assert!(arch.chart.nodes.is_empty() && arch.other.is_some());
+    let c4 = Document::from_source(None, "C4Context\nPerson(a, A)\n".to_owned());
+    assert_eq!(
+        c4.read_only(),
+        Some("drawing edits are not supported for C4 diagrams yet")
+    );
+    assert!(c4.chart.nodes.is_empty() && c4.other.is_some());
 }
 
 #[gpui::test]
