@@ -8,6 +8,7 @@ use crate::diagnostic::Diagnostic;
 use crate::flowchart::{self, Flowchart, scan};
 use crate::gantt::{self, Gantt};
 use crate::git::{self, GitGraph};
+use crate::info::{self, Info};
 use crate::journey::{self, Journey};
 use crate::kanban::{self, Kanban};
 use crate::mindmap::{self, Mindmap};
@@ -49,6 +50,7 @@ pub enum Kind {
     Architecture,
     C4,
     ZenUml,
+    Info,
 }
 
 impl Kind {
@@ -101,6 +103,8 @@ impl Kind {
             Kind::C4
         } else if zenuml::HEADERS.contains(&word) {
             Kind::ZenUml
+        } else if info::HEADERS.contains(&word) {
+            Kind::Info
         } else {
             Kind::Flowchart
         }
@@ -109,7 +113,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, and ZenUML diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, and info diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -133,6 +137,7 @@ pub enum Diagram {
     Block(Block),
     Architecture(Architecture),
     C4(C4),
+    Info(Info),
 }
 
 impl Default for Diagram {
@@ -179,6 +184,7 @@ impl Diagram {
             Diagram::Block(b) => scene::block(b, metrics, theme),
             Diagram::Architecture(a) => scene::architecture(a, metrics, theme),
             Diagram::C4(c) => scene::c4(c, metrics, theme),
+            Diagram::Info(i) => scene::info(i, metrics, theme),
         }
     }
 
@@ -203,6 +209,7 @@ impl Diagram {
             Diagram::Block(b) => ascii::block(b, options),
             Diagram::Architecture(a) => ascii::architecture(a, options),
             Diagram::C4(c) => ascii::c4(c, options),
+            Diagram::Info(i) => ascii::info(i, options),
         }
     }
 }
@@ -389,6 +396,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Info => {
+            let (info, diagnostics) = info::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Info(info),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -439,6 +453,7 @@ mod tests {
         assert_eq!(Kind::of("C4Context\n"), Kind::C4);
         assert_eq!(Kind::of("C4Deployment\n"), Kind::C4);
         assert_eq!(Kind::of("zenuml\n"), Kind::ZenUml);
+        assert_eq!(Kind::of("info showInfo\n"), Kind::Info);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -452,7 +467,8 @@ mod tests {
     #[test]
     fn other_diagrams() {
         assert_eq!(other_diagram("zenuml\n"), None);
-        assert_eq!(other_diagram("info\n"), Some("info".to_owned()));
+        assert_eq!(other_diagram("info\n"), None);
+        assert_eq!(other_diagram("venn-beta\n"), Some("venn-beta".to_owned()));
         assert_eq!(other_diagram("xychart-beta\n"), None);
         assert_eq!(other_diagram("requirementDiagram\n"), None);
         assert_eq!(other_diagram("kanban\n"), None);

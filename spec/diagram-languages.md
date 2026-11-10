@@ -36,7 +36,7 @@ SVG, PNG, themes, and text metrics (DISPLA-4 to DISPLA-12) are shared by all of 
 diagnostic's position is in the source the user wrote, as now.
 
 `diagram::lower` returns a `diagram::Diagram`: `Graph` (a `Flowchart`) or one of the other models
-(`Sequence`, MSEQ-2; `Git`, MGIT-2; `Timeline`, TIMELI-2; `Pie`, MPIE-2; `Gantt`, MGANTT-3; `Mindmap`, MMIND-2; `Journey`, MJOUR-2; `Quadrant`, MQUAD-2; `XyChart`, MXY-2; `Kanban`, MKAN-2; `Packet`, MPKT-2; `Radar`, MRADAR-2; `Sankey`, MSANKEY-2; `Treemap`, MTREE-2; `Block`, MBLOCK-2; `Architecture`, MARCH-2; `C4`, MC4-2; ZenUML lowers to `Sequence`, MZEN-2). `Diagram::scene` and `Diagram::ascii`
+(`Sequence`, MSEQ-2; `Git`, MGIT-2; `Timeline`, TIMELI-2; `Pie`, MPIE-2; `Gantt`, MGANTT-3; `Mindmap`, MMIND-2; `Journey`, MJOUR-2; `Quadrant`, MQUAD-2; `XyChart`, MXY-2; `Kanban`, MKAN-2; `Packet`, MPKT-2; `Radar`, MRADAR-2; `Sankey`, MSANKEY-2; `Treemap`, MTREE-2; `Block`, MBLOCK-2; `Architecture`, MARCH-2; `C4`, MC4-2; `Info`, MINFO-2; ZenUML lowers to `Sequence`, MZEN-2). `Diagram::scene` and `Diagram::ascii`
 draw any of them, and the CLI, Markdown rendering, and the editor's drawing and export go through
 them. Only a graph is hit-tested and edited; the others draw read-only (LANGS-5) with every
 element owned by the diagram.
@@ -86,14 +86,15 @@ are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not 
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
 Sequence, state, class, ER, and requirement diagrams, git graphs, timelines, pie and gantt charts,
-mindmaps, user journeys, quadrant, XY, and radar charts, kanban boards, packet, sankey, block, architecture, C4, and ZenUML diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
+mindmaps, user journeys, quadrant, XY, and radar charts, kanban boards, packet, sankey, block, architecture, C4, ZenUML, and info diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
 disabled Add Node, Select All, and Fit Window, a press on a node pans instead of connecting, and
 every edit action says `Can't ...: drawing edits are not supported for state diagrams yet` (or
 class diagrams, ER diagrams, requirement diagrams, git graphs, timelines, sequence diagrams, pie charts, gantt
 charts, mindmaps, user journeys, quadrant charts, XY charts, kanban boards, packet diagrams,
-radar charts, sankey diagrams, treemaps, block diagrams, architecture diagrams, C4 diagrams, or ZenUML diagrams).
+radar charts, sankey diagrams, treemaps, block diagrams, architecture diagrams, C4 diagrams, or ZenUML diagrams; an info diagram says it has
+nothing to edit).
 A sequence diagram, git graph, timeline, pie, gantt, quadrant, XY, or radar chart, mindmap, user
-journey, kanban board, packet, sankey, block, architecture, C4, or ZenUML diagram, or treemap is drawn from `Document::other` and has nothing to select. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
+journey, kanban board, packet, sankey, block, architecture, C4, ZenUML, or info diagram, or treemap is drawn from `Document::other` and has nothing to select. Tests: `state_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 
