@@ -176,6 +176,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   frontmatter was not found.
 - Long flowcharts and large subgraphs read, lay out, and draw in time near linear in their
   size; a 2,000-node chain took several seconds.
+- Long state diagrams, mindmaps, pie charts, and sankey diagrams read and draw in time near
+  linear in their size; 10,000 sankey flows took tens of seconds.
 
 ## [0.2.0] - 2026-11-08
 

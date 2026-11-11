@@ -1,5 +1,7 @@
 //! Collects a pie chart's title and slices (MPIE-2).
 
+use std::collections::HashSet;
+
 use super::{Pie, Slice};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
@@ -10,6 +12,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Pie, Vec<Diagnostic>) {
     let mut pie = Pie::default();
     let mut diagnostics = Vec::new();
     let mut title = None;
+    let mut labels = HashSet::new();
     for el in root.children_with_tokens() {
         if el.kind() == FRONTMATTER
             && let Some(tok) = el.as_token()
@@ -34,7 +37,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Pie, Vec<Diagnostic>) {
                         number.text_range(),
                         format!("`{label}` has a negative value; a slice must be 0 or more"),
                     ));
-                } else if pie.slices.iter().any(|s| s.label == label) {
+                } else if !labels.insert(label.clone()) {
                     diagnostics.push(Diagnostic::warning(
                         stmt.text_range(),
                         format!("`{label}` is already a slice; skipping this one"),

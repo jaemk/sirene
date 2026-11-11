@@ -50,26 +50,26 @@ struct State<'a> {
     height: f32,
 }
 
-/// Steps from each node along `next` until none are left: a node's depth, or its height when
-/// walking backward. Gives up past the node count, which only a cycle reaches.
-fn levels(n: usize, starts: impl Fn(usize) -> Vec<usize>) -> Vec<usize> {
+/// The most steps along `next` that end at each node: its depth, or its height when walking
+/// backward. d3-sankey steps from every node at once until none are left, which gives the same
+/// levels; this visits each link once. A node on a cycle, which lowering never leaves, is
+/// stepped to only from outside the cycle.
+fn levels(n: usize, next: impl Fn(usize) -> Vec<usize>) -> Vec<usize> {
+    let next: Vec<Vec<usize>> = (0..n).map(next).collect();
+    let mut waiting = vec![0usize; n];
+    for &j in next.iter().flatten() {
+        waiting[j] += 1;
+    }
+    let mut ready: Vec<usize> = (0..n).filter(|&i| waiting[i] == 0).collect();
     let mut level = vec![0; n];
-    let mut current: Vec<usize> = (0..n).collect();
-    let mut x = 0;
-    while !current.is_empty() && x <= n {
-        let mut next = Vec::new();
-        let mut seen = vec![false; n];
-        for &i in &current {
-            level[i] = x;
-            for j in starts(i) {
-                if !seen[j] {
-                    seen[j] = true;
-                    next.push(j);
-                }
+    while let Some(i) = ready.pop() {
+        for &j in &next[i] {
+            level[j] = level[j].max(level[i] + 1);
+            waiting[j] -= 1;
+            if waiting[j] == 0 {
+                ready.push(j);
             }
         }
-        x += 1;
-        current = next;
     }
     level
 }
@@ -468,6 +468,54 @@ mod tests {
         }
         assert!((l.links[0].width + l.links[1].width - h(0)).abs() < 0.01);
         assert!(l.links[0].y0 < l.links[1].y0 || l.nodes[1].y0 > l.nodes[2].y0);
+    }
+
+    /// d3-sankey's levels: step from every node at once until none are left.
+    fn stepped(n: usize, next: &[Vec<usize>]) -> Vec<usize> {
+        let mut level = vec![0; n];
+        let mut current: Vec<usize> = (0..n).collect();
+        let mut x = 0;
+        while !current.is_empty() {
+            let mut seen = vec![false; n];
+            let mut after = Vec::new();
+            for &i in &current {
+                level[i] = x;
+                for &j in &next[i] {
+                    if !std::mem::replace(&mut seen[j], true) {
+                        after.push(j);
+                    }
+                }
+            }
+            x += 1;
+            current = after;
+        }
+        level
+    }
+
+    #[test]
+    fn levels_match_stepping() {
+        let mut seed = 7u64;
+        let mut rand = |m: usize| {
+            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            (seed >> 33) as usize % m
+        };
+        for _ in 0..200 {
+            let n = 1 + rand(12);
+            // Links only go to higher indices, so there is no cycle; some repeat.
+            let mut next = vec![Vec::new(); n];
+            for _ in 0..rand(3 * n) {
+                let a = rand(n);
+                let b = rand(n);
+                if a != b {
+                    next[a.min(b)].push(a.max(b));
+                }
+            }
+            assert_eq!(
+                levels(n, |i| next[i].clone()),
+                stepped(n, &next),
+                "{next:?}"
+            );
+        }
     }
 
     #[test]

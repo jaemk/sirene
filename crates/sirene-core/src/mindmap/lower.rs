@@ -11,8 +11,9 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
     let src = root.to_string();
     let mut map = Mindmap::default();
     let mut diagnostics = Vec::new();
-    // Each node's indentation.
-    let mut levels: Vec<usize> = Vec::new();
+    // The last node and its ancestors, as (indentation, index) with indentation rising: the
+    // nearest earlier node indented less than a line is on it.
+    let mut open: Vec<(usize, usize)> = Vec::new();
     // The node `::icon` and `:::` lines apply to; `None` after a node that was left out.
     let mut last: Option<usize> = None;
     let mut too_deep = false;
@@ -36,9 +37,11 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
                         "`@{...}` is not used in mindmaps; ignoring it",
                     ));
                 }
+                // Entries indented less than this line; the stack is cut there only once the
+                // node is kept, as a later line may still sit under the rest.
+                let under = open.partition_point(|&(l, _)| l < level);
                 if !map.nodes.is_empty() {
-                    let Some(parent) = (0..map.nodes.len()).rev().find(|&j| levels[j] < level)
-                    else {
+                    let Some(&(_, parent)) = under.checked_sub(1).map(|k| &open[k]) else {
                         diagnostics.push(Diagnostic::new(
                             stmt.text_range(),
                             format!(
@@ -72,7 +75,8 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
                     map.nodes[p].children.push(i);
                 }
                 map.nodes.push(node);
-                levels.push(level);
+                open.truncate(under);
+                open.push((level, i));
                 last = Some(i);
             }
             ICON_STMT | CLASS_SHORTHAND => {

@@ -1,6 +1,8 @@
 //! Collects a sankey diagram's nodes and links, leaving out any link that would close a cycle
 //! (MSANKEY-2).
 
+use std::collections::{HashMap, VecDeque};
+
 use super::{Align, Link, LinkColor, Sankey};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
@@ -26,6 +28,11 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sankey, Vec<Diagnostic>) {
             }
         }
     }
+    let mut index = HashMap::new();
+    // Kept links out of each node, for the cycle check.
+    let mut out: Vec<Vec<usize>> = Vec::new();
+    // Whether each node is the target of a kept link: one that is not cannot be reached.
+    let mut reached: Vec<bool> = Vec::new();
     for row in root.children().filter(|r| r.kind() == FLOW) {
         let names: Vec<String> = tokens(&row)
             .filter(|t| matches!(t.kind(), TEXT | STRING))
@@ -45,9 +52,16 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sankey, Vec<Diagnostic>) {
             ));
             continue;
         }
-        let a = node(&mut s, source);
-        let b = node(&mut s, target);
-        if let Some(path) = path(&s, b, a) {
+        let a = node(&mut s, &mut index, source);
+        let b = node(&mut s, &mut index, target);
+        out.resize(s.nodes.len(), Vec::new());
+        reached.resize(s.nodes.len(), false);
+        let closes = if a == b || reached[a] {
+            path(&out, b, a)
+        } else {
+            None
+        };
+        if let Some(path) = closes {
             let names: Vec<String> = std::iter::once(&a)
                 .chain(&path)
                 .map(|&i| format!("`{}`", s.nodes[i]))
@@ -63,6 +77,8 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sankey, Vec<Diagnostic>) {
             ));
             continue;
         }
+        out[a].push(b);
+        reached[b] = true;
         s.links.push(Link {
             source: a,
             target: b,
@@ -70,9 +86,11 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sankey, Vec<Diagnostic>) {
         });
     }
     // A node only named by links that were left out has nothing to draw.
-    let used: Vec<bool> = (0..s.nodes.len())
-        .map(|i| s.links.iter().any(|l| l.source == i || l.target == i))
-        .collect();
+    let mut used = vec![false; s.nodes.len()];
+    for l in &s.links {
+        used[l.source] = true;
+        used[l.target] = true;
+    }
     if used.iter().any(|u| !u) {
         let mut map = vec![0; s.nodes.len()];
         let mut kept = Vec::new();
@@ -140,46 +158,45 @@ fn name(t: &SyntaxToken) -> String {
 }
 
 /// The index of node `name`, added when new.
-fn node(s: &mut Sankey, name: &str) -> usize {
-    match s.nodes.iter().position(|n| n == name) {
-        Some(i) => i,
-        None => {
-            s.nodes.push(name.to_owned());
-            s.nodes.len() - 1
-        }
+fn node(s: &mut Sankey, index: &mut HashMap<String, usize>, name: &str) -> usize {
+    if let Some(&i) = index.get(name) {
+        return i;
     }
+    s.nodes.push(name.to_owned());
+    index.insert(name.to_owned(), s.nodes.len() - 1);
+    s.nodes.len() - 1
 }
 
-/// The nodes on a path of links from `from` to `to`, both included, if there is one; a node
-/// always reaches itself.
-fn path(s: &Sankey, from: usize, to: usize) -> Option<Vec<usize>> {
+/// The nodes on a path of links (`out`, the targets per source) from `from` to `to`, both
+/// included, if there is one; a node always reaches itself.
+fn path(out: &[Vec<usize>], from: usize, to: usize) -> Option<Vec<usize>> {
     if from == to {
         return Some(vec![from]);
     }
+    if out[from].is_empty() {
+        return None;
+    }
     // Breadth first, remembering how each node was reached.
-    let mut came = vec![None; s.nodes.len()];
-    let mut queue = std::collections::VecDeque::from([from]);
-    let mut seen = vec![false; s.nodes.len()];
-    seen[from] = true;
+    let mut came: HashMap<usize, usize> = HashMap::new();
+    let mut queue = VecDeque::from([from]);
     while let Some(i) = queue.pop_front() {
-        for l in s.links.iter().filter(|l| l.source == i) {
-            if seen[l.target] {
+        for &target in &out[i] {
+            if target == from || came.contains_key(&target) {
                 continue;
             }
-            seen[l.target] = true;
-            came[l.target] = Some(i);
-            if l.target == to {
-                let mut out = Vec::new();
+            came.insert(target, i);
+            if target == to {
+                let mut path = Vec::new();
                 let mut at = to;
-                while let Some(prev) = came[at] {
-                    out.push(prev);
+                while let Some(&prev) = came.get(&at) {
+                    path.push(prev);
                     at = prev;
                 }
-                out.reverse();
-                out.push(to);
-                return Some(out);
+                path.reverse();
+                path.push(to);
+                return Some(path);
             }
-            queue.push_back(l.target);
+            queue.push_back(target);
         }
     }
     None
