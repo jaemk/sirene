@@ -1,0 +1,10 @@
+digraph u {
+  splines=ortho
+  fontname="Helvetica"
+  { rank=same; a; b }
+  a:e -> b:w
+  c [label=<<b>bold</b> text>, width=2, shape=egg2]
+  d [color=nosuchcolor, style=wedged]
+  c -> d [arrowhead=bogus, constraint=false]
+}
+digraph second { x }

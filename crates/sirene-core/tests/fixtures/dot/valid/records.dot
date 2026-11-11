@@ -1,0 +1,8 @@
+digraph classes {
+  node [shape=record]
+  Animal [label="{Animal|+ name : string\l+ age : int\l|+ die() : void\l}"]
+  Dog [label="{Dog|+ bark() : void\l}"]
+  Cat [shape=Mrecord, label="{Cat|+ meow() : void}"]
+  Dog -> Animal [arrowhead=empty]
+  Cat -> Animal [arrowhead=empty]
+}

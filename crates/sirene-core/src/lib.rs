@@ -8,6 +8,7 @@ pub mod class;
 pub mod cynefin;
 pub mod diagnostic;
 pub mod diagram;
+pub mod dot;
 pub mod er;
 pub mod eventmodel;
 pub mod flowchart;

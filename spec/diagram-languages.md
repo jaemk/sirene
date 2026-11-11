@@ -67,9 +67,12 @@ end markers (`Arrow::Triangle`, `Diamond`, `HollowDiamond`, and the crow's feet 
 diagrams. End labels take no room in the layout. In ASCII the crow's feet are `?` (zero or one),
 `1`, `*` (zero or more), and `+` (one or more).
 
-Within Mermaid, `diagram::Kind::of` reads the header keyword after frontmatter, comments, and
-directives, and `diagram::lower` sends the source to its parser; the CLI and the editor go through
-it. Languages other than Mermaid, and `--lang`, come with DOT.
+`diagram::Kind::of` is `Kind::Dot` for a source that starts with a DOT graph header (DOT-1), and
+otherwise reads the Mermaid header keyword after frontmatter, comments, and directives;
+`diagram::lower` sends the source to its parser, and the CLI and the editor go through it.
+Directories are scanned for `.dot` and `.gv` files, and `dot` and `graphviz` Markdown blocks are
+drawn, both detected from their source. Forcing the language by extension or info string, and
+`--lang`, are not done yet (DOT-5).
 
 ## LANGS-4 Commands
 

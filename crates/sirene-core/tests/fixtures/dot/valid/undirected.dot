@@ -1,0 +1,6 @@
+strict graph net {
+  a -- b -- c
+  a -- {d e}
+  b -- a
+  c -- c
+}

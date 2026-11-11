@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/dot.rs
+expression: "// A pipeline, left to right.\ndigraph pipeline {\n  rankdir=LR\n  label=\"Build \\G\"\n  node [shape=box]\n  fetch -> compile -> test -> ship\n  compile -> lint [label=\"also\"]\n  test -> compile [label=\"retry\", style=dashed]\n}\n"
+---
+                    Build pipeline
+
+                                   +------+
+             +---------+ +-------->| test |    +------+
++-------+    |         +-+       +.+      +--->| ship |
+| fetch +--->| compile |<..retry.+ +------+    +------+
++-------+    |         +-+
+             +---------+ +-also--+ +------+
+                                 +>| lint |
+                                   +------+

@@ -1,0 +1,6 @@
+graph g {
+  a -> b
+  c [color]
+  d --
+  = e
+}

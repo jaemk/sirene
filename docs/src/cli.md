@@ -63,8 +63,8 @@ sirene refuses to write a PNG to a terminal, or to overwrite the input file.
 
 ## Directories
 
-`sirene svg DIR` and `sirene png DIR` render every `.mmd` and `.mermaid` file under DIR, skipping
-hidden entries and symlinked directories. Each output is written beside its diagram, or with
+`sirene svg DIR` and `sirene png DIR` render every `.mmd`, `.mermaid`, `.dot`, and `.gv` file
+under DIR, skipping hidden entries and symlinked directories. Each output is written beside its diagram, or with
 `-o OUTDIR` at the same relative path under OUTDIR:
 
 ```
@@ -77,7 +77,7 @@ same output (`a.mmd` beside `a.mermaid`), the first in path order wins and the o
 
 ## Markdown files
 
-`sirene svg FILE.md` and `sirene png FILE.md` (also `.markdown`) render each `mermaid` code block
+`sirene svg FILE.md` and `sirene png FILE.md` (also `.markdown`) render each `mermaid`, `dot`, or `graphviz` code block
 to `STEM-N.svg` or `STEM-N.png` beside the file, N counting blocks from 1; `-o OUTDIR` writes
 them there instead.
 
@@ -106,8 +106,8 @@ Diagnostic positions are lines and columns in the Markdown file.
 
 ## `sirene check`
 
-Prints diagnostics without rendering, for diagram files, directories (every `.mmd` and
-`.mermaid` file under them), Markdown files (each mermaid block), or stdin. It checks every
+Prints diagnostics without rendering, for diagram files, directories (every diagram file under
+them), Markdown files (each diagram block), or stdin. It checks every
 FILE and exits 1 if any has an error, so it fits a pre-commit hook or a CI step:
 
 ```

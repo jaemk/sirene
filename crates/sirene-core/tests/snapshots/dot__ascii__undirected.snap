@@ -1,0 +1,21 @@
+---
+source: crates/sirene-core/tests/dot.rs
+expression: "strict graph net {\n  a -- b -- c\n  a -- {d e}\n  b -- a\n  c -- c\n}\n"
+---
+        .---.
+        ( a )
+        '+++'
+         |||
+     +---+|+---+
+     |    |    |
+     |    |    |
+  +--+    |    +--+
+  |       |       |
+.-+-.   .-+-.   .-+-.
+( b )   ( d )   ( e )
+'-+-'   '---'   '---'
+  |
+  |
+.-+-+-+
+( c ) |
+'---+-+

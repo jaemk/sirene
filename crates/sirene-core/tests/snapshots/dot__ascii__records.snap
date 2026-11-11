@@ -1,0 +1,23 @@
+---
+source: crates/sirene-core/tests/dot.rs
+expression: "digraph classes {\n  node [shape=record]\n  Animal [label=\"{Animal|+ name : string\\l+ age : int\\l|+ die() : void\\l}\"]\n  Dog [label=\"{Dog|+ bark() : void\\l}\"]\n  Cat [shape=Mrecord, label=\"{Cat|+ meow() : void}\"]\n  Dog -> Animal [arrowhead=empty]\n  Cat -> Animal [arrowhead=empty]\n}\n"
+---
++-----------------+   .-----------------.
+|       Dog       |   |       Cat       |
++-----------------+   +-----------------+
+| + bark() : void |   | + meow() : void |
++--------+--------+   '--------+--------'
+         |                     |
+         +---+              +--+
+             |              |
+             |              |
+             +--+       +---+
+                v       v
+           +-----------------+
+           |     Animal      |
+           +-----------------+
+           | + name : string |
+           | + age : int     |
+           +-----------------+
+           | + die() : void  |
+           +-----------------+

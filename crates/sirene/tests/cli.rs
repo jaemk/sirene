@@ -501,7 +501,7 @@ fn directories() {
         .assert()
         .failure()
         .stderr(format!(
-            "error: no .mmd or .mermaid files in {}\n",
+            "error: no .mmd, .mermaid, .dot, or .gv files in {}\n",
             empty.display()
         ));
     sirene()
@@ -746,7 +746,7 @@ fn check() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "error: no .mmd or .mermaid files in",
+            "error: no .mmd, .mermaid, .dot, or .gv files in",
         ));
     // Stdin.
     sirene()
@@ -914,6 +914,50 @@ fn suggests_a_misspelled_command() {
             "error: no file or command named 'asci'; did you mean 'sirene ascii'? \
              (to open a new file with that name, use './asci')\n",
         );
+}
+
+/// DOT draws from stdin, from `.dot` and `.gv` files in a directory, and from `dot` blocks in
+/// Markdown (LANGS-1, LANGS-4).
+#[test]
+fn dot_graphs() {
+    sirene()
+        .arg("ascii")
+        .write_stdin("digraph { rankdir=LR; fetch -> build }\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fetch").and(predicate::str::contains("build")))
+        .stderr("");
+    sirene()
+        .args(["svg", "-"])
+        .write_stdin("digraph { bgcolor=navy; a [style=filled, fillcolor=gold] }\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fill=\"#ffd700\""))
+        .stdout(predicate::str::contains("fill=\"#000080\""));
+    sirene()
+        .args(["check", "-"])
+        .write_stdin("graph { a -> b }\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("`->` in a `graph`: expected `--`"));
+
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("a.dot"), "digraph { a -> b }\n").unwrap();
+    std::fs::write(tmp.path().join("b.gv"), "graph { c -- d }\n").unwrap();
+    let out = tmp.path().join("out");
+    sirene()
+        .arg("svg")
+        .arg(tmp.path())
+        .arg("-o")
+        .arg(&out)
+        .assert()
+        .success();
+    assert!(out.join("a.svg").is_file());
+    assert!(out.join("b.svg").is_file());
+
+    let md = tmp.path().join("doc.md");
+    std::fs::write(&md, "# Doc\n\n```dot\ndigraph { x -> y }\n```\n").unwrap();
+    sirene().arg("check").arg(&md).assert().success().stderr("");
 }
 
 /// An agentflow diagram draws in text (MAGF-1).

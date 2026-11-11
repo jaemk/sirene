@@ -198,6 +198,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for requirement diagrams yet")
     );
     assert_eq!(req.chart.edges.len(), 1);
+    let dot = Document::from_source(None, "digraph { a -> b }\n".to_owned());
+    assert_eq!(
+        dot.read_only(),
+        Some("drawing edits are not supported for DOT yet")
+    );
+    assert_eq!(dot.chart.edges.len(), 1);
     let uc = Document::from_source(None, "usecase-beta\n  actor A\n  A --> B\n".to_owned());
     assert_eq!(
         uc.read_only(),

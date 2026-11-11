@@ -1,0 +1,35 @@
+---
+source: crates/sirene-core/tests/dot.rs
+expression: "digraph styles {\n  bgcolor=\"#fafafa\"\n  node [fontcolor=navy]\n  db [shape=cylinder, style=filled, fillcolor=\"#ffe4b5\"]\n  q [shape=diamond, color=red, penwidth=2]\n  note [shape=note, label=\"read\\nonly\"]\n  dot [shape=point]\n  hidden [style=invis]\n  \"a b\" [shape=circle, style=\"dashed,bold\"]\n  q -> db [arrowhead=odiamond, color=\"0.6 0.8 0.9\"]\n  db -> note [dir=both, arrowtail=dot, arrowhead=tee]\n  note -> dot [dir=none]\n  \"a b\" -> q [headlabel=\"1\", taillabel=\"*\", minlen=2]\n  dot -> hidden [style=invis]\n}\n"
+---
+
+  ╭─────╮
+  ( a b )
+  ╰──┬──╯
+     │*
+     │
+     │
+     ▼1
+   ╱───╲
+   │ q │
+   ╲─┬─╱
+     │
+     ◇
+  ╭────╮
+  ├────┤
+  │ db │
+  ╰────╯
+     o
+     1
+ ┌──────╮
+ │ read │
+ │ only │
+ └───┬──┘
+     │
+     │
+     ●
+
+
+╭────────╮
+( hidden )
+╰────────╯
