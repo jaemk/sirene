@@ -153,6 +153,8 @@ syntax_kinds! {
     RR_REPEAT,
     RR_NUMVAL,
     RR_SPECIAL,
+    // Cynefin diagrams: a domain name such as `complex`.
+    CYNEFIN_KW,
     ERROR_TOKEN,
 
     // Nodes.
@@ -249,6 +251,9 @@ syntax_kinds! {
     RR_TERM,
     RR_GROUP,
     RR_CALL,
+    // Cynefin diagrams: a domain block's opening line, and a line of quoted items.
+    DOMAIN_STMT,
+    ITEM_STMT,
     ERROR,
 }
 

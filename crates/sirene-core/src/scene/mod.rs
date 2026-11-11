@@ -3,6 +3,7 @@
 mod architecture;
 mod block;
 mod c4;
+mod cynefin;
 mod gantt;
 mod git;
 mod hit;
@@ -36,6 +37,7 @@ use unicode_width::UnicodeWidthStr;
 pub use architecture::architecture;
 pub use block::block;
 pub use c4::c4;
+pub use cynefin::cynefin;
 pub use gantt::gantt;
 pub use git::git_graph;
 pub use info::info;

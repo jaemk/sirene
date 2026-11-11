@@ -40,7 +40,6 @@ const OTHER_DIAGRAMS: &[&str] = &[
     "C4Context",
     "C4Deployment",
     "C4Dynamic",
-    "cynefin-beta",
     "classDiagram",
     "classDiagram-v2",
     "erDiagram",

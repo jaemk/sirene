@@ -4,6 +4,7 @@ use crate::architecture::{self, Architecture};
 use crate::ascii::{self, Options};
 use crate::block::{self, Block};
 use crate::c4::{self, C4};
+use crate::cynefin::{self, Cynefin};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::{self, Flowchart, scan};
 use crate::gantt::{self, Gantt};
@@ -64,6 +65,7 @@ pub enum Kind {
     Railroad,
     /// A flowchart whose top-level subgraphs are lanes (`swimlane-beta`).
     Swimlane,
+    Cynefin,
 }
 
 impl Kind {
@@ -132,6 +134,8 @@ impl Kind {
             Kind::Railroad
         } else if word == flowchart::SWIMLANE {
             Kind::Swimlane
+        } else if cynefin::HEADERS.contains(&word) {
+            Kind::Cynefin
         } else {
             Kind::Flowchart
         }
@@ -140,7 +144,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, and swimlane diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, and Cynefin diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -170,6 +174,7 @@ pub enum Diagram {
     Wardley(Wardley),
     TreeView(TreeView),
     Railroad(Railroad),
+    Cynefin(Cynefin),
 }
 
 impl Default for Diagram {
@@ -222,6 +227,7 @@ impl Diagram {
             Diagram::Wardley(w) => scene::wardley(w, metrics, theme),
             Diagram::TreeView(t) => scene::treeview(t, metrics, theme),
             Diagram::Railroad(r) => scene::railroad(r, metrics, theme),
+            Diagram::Cynefin(c) => scene::cynefin(c, metrics, theme),
         }
     }
 
@@ -252,6 +258,7 @@ impl Diagram {
             Diagram::Wardley(w) => ascii::wardley(w, options),
             Diagram::TreeView(t) => ascii::treeview(t, options),
             Diagram::Railroad(r) => ascii::railroad(r, options),
+            Diagram::Cynefin(c) => ascii::cynefin(c, options),
         }
     }
 }
@@ -481,6 +488,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Cynefin => {
+            let (chart, diagnostics) = cynefin::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Cynefin(chart),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -543,6 +557,8 @@ mod tests {
         assert_eq!(Kind::of("railroad-abnf-beta\n"), Kind::Railroad);
         assert_eq!(Kind::of("railroad-peg-beta\n"), Kind::Railroad);
         assert_eq!(Kind::of("swimlane-beta LR\n"), Kind::Swimlane);
+        assert_eq!(Kind::of("cynefin-beta\n"), Kind::Cynefin);
+        assert_eq!(Kind::of("cynefin-beta:\n"), Kind::Cynefin);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -563,6 +579,7 @@ mod tests {
         assert_eq!(other_diagram("usecase-beta\n"), None);
         assert_eq!(other_diagram("railroad-ebnf-beta\n"), None);
         assert_eq!(other_diagram("swimlane-beta\n"), None);
+        assert_eq!(other_diagram("cynefin-beta\n"), None);
         assert_eq!(
             other_diagram("eventmodeling\n"),
             Some("eventmodeling".to_owned())

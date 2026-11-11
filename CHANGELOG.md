@@ -109,6 +109,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid swimlane diagrams (`swimlane-beta`), read-only in the editor: flowcharts whose
   top-level subgraphs are lanes side by side across the flow, with an untitled lane for
   nodes outside every lane.
+- Mermaid Cynefin diagrams (`cynefin-beta`), read-only in the editor: items in the five
+  domains, transitions between them, and `showDomainDescriptions`; in text, the quadrants in a
+  box with confusion in the middle and the transitions listed below.
 - Mermaid 12's other new types (`eventmodeling` and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.

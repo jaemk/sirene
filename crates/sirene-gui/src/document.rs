@@ -156,6 +156,7 @@ impl Document {
             Kind::UseCase => Some("drawing edits are not supported for use case diagrams yet"),
             Kind::Railroad => Some("drawing edits are not supported for railroad diagrams yet"),
             Kind::Swimlane => Some("drawing edits are not supported for swimlane diagrams yet"),
+            Kind::Cynefin => Some("drawing edits are not supported for Cynefin diagrams yet"),
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")
