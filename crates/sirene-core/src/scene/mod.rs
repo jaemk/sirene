@@ -26,6 +26,7 @@ pub mod svg;
 mod timeline;
 mod treemap;
 mod venn;
+mod wardley;
 mod xychart;
 
 use unicode_width::UnicodeWidthStr;
@@ -51,6 +52,7 @@ pub use style::parse_color;
 pub use timeline::timeline;
 pub use treemap::treemap;
 pub use venn::venn;
+pub use wardley::wardley;
 pub use xychart::xychart;
 
 /// A point in scene coordinates (pixels, y down).

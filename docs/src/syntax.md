@@ -2,7 +2,7 @@
 
 sirene reads Mermaid's flowchart syntax (`flowchart`, `graph`, and `flowchart-elk`). This page
 lists what is read and where sirene differs from Mermaid. The other types sirene draws have pages
-of their own; the rest (the types added in Mermaid 12, such as `wardley-beta`) are one error, and nothing is drawn.
+of their own; the rest (the types added in Mermaid 12, such as `treeView-beta`) are one error, and nothing is drawn.
 
 ## Header and direction
 

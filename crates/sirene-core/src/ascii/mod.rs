@@ -20,6 +20,7 @@ mod sequence;
 mod timeline;
 mod treemap;
 mod venn;
+mod wardley;
 mod xychart;
 
 pub use architecture::render as architecture;
@@ -41,6 +42,7 @@ pub use sequence::render as sequence;
 pub use timeline::render as timeline;
 pub use treemap::render as treemap;
 pub use venn::render as venn;
+pub use wardley::render as wardley;
 pub use xychart::render as xychart;
 
 use unicode_width::UnicodeWidthStr;

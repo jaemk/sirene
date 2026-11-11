@@ -333,6 +333,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for venn diagrams yet")
     );
     assert!(venn.chart.nodes.is_empty() && venn.other.is_some());
+    let map = Document::from_source(None, "wardley-beta\ncomponent A [0.5, 0.5]\n".to_owned());
+    assert_eq!(
+        map.read_only(),
+        Some("drawing edits are not supported for Wardley maps yet")
+    );
+    assert!(map.chart.nodes.is_empty() && map.other.is_some());
 }
 
 #[gpui::test]

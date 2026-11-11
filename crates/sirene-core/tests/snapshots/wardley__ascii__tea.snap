@@ -1,0 +1,42 @@
+---
+source: crates/sirene-core/tests/wardley.rs
+expression: "wardley-beta\ntitle Tea Shop %% the classic example\nevolution Unmodelled / Genesis -> Divergent / Custom -> Convergent / Product -> Modelled / Commodity\n\nanchor Business [0.95, 0.63]\nanchor Public [0.95, 0.78]\ncomponent Cup of Tea [0.79, 0.61] label [19, -4]\ncomponent Cup [0.73, 0.78]\ncomponent Tea [0.63, 0.81]\ncomponent Hot Water [0.52, 0.80]\ncomponent Water [0.38, 0.82]\ncomponent Kettle [0.43, 0.35] label [-57, 4]\ncomponent Power [0.10, 0.70] label [-27, 20]\n\nBusiness -> Cup of Tea\nPublic -> Cup of Tea\nCup of Tea -> Cup\nCup of Tea -> Tea\nCup of Tea -> Hot Water\nHot Water -> Water\nHot Water -> Kettle; limited by\nKettle -> Power\nKettle +> Power\nPower +<> Water\nTea -.-> Water\n\nevolve Kettle 0.62\nevolve Power 0.89\n"
+---
+                                         Tea Shop
+
+Visibility
+|                      :                     :                    :
+|                      :                     :          @ Business:  @ Public
+|                      :                     :                    :
+|                      :                     :        * Cup of Tea:
+|                      :                     :                    :  * Cup
+|                      :                     :                    :    * Tea
+|                      :                     :                    :
+|                      :                     :                    :    * Hot Water
+|                      :       * Kettle      :                    :
+|                      :                     :                    :     * Water
+|                      :                     :                    :
+|                      :                     :                    :
+|                      :                     :                    :
+|                      :                     :                * Power
+|                      :                     :                    :
++-----------------------------------------------------------------------------------------
+  Unmodelled / Genesis   Divergent / Custom  Convergent / Product  Modelled / Commodity
+                                        Evolution
+
+Links:
+  Business -- Cup of Tea
+  Public -- Cup of Tea
+  Cup of Tea -- Cup
+  Cup of Tea -- Tea
+  Cup of Tea -- Hot Water
+  Hot Water -- Water
+  Hot Water -- Kettle (limited by)
+  Kettle -- Power
+  Kettle --> Power
+  Power <--> Water
+  Tea -.- Water
+
+Evolve:
+  Kettle -> 0.62
+  Power -> 0.89

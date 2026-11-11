@@ -151,6 +151,7 @@ impl Document {
             Kind::Info => Some("info diagrams have nothing to edit"),
             Kind::Ishikawa => Some("drawing edits are not supported for ishikawa diagrams yet"),
             Kind::Venn => Some("drawing edits are not supported for venn diagrams yet"),
+            Kind::Wardley => Some("drawing edits are not supported for Wardley maps yet"),
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")
