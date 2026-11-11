@@ -88,6 +88,10 @@ api --> db
 A subgraph's members are the nodes mentioned in its body. A node already in an earlier subgraph
 stays there. Edges may start or end at a subgraph.
 
+`api@{ view: collapsed }` after a subgraph's `end` draws it as one node: its title over a dashed
+rule and three dots. Edges to anything inside it end at that node, and edges wholly inside it are
+not drawn.
+
 ## Styling
 
 ```

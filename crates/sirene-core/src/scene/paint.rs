@@ -6,7 +6,8 @@ use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
 };
 use crate::flowchart::{
-    Arrow, Edge, Flowchart, Label, Measure, Node, Row, Shape, Span, Stroke as Line, Subgraph,
+    Arrow, Edge, Flowchart, Label, Measure, Node, Origin, Row, Shape, Span, Stroke as Line,
+    Subgraph,
 };
 use crate::layout::{self, Config, Layout, Rect, Size, Spacing};
 
@@ -284,8 +285,25 @@ fn subgraph_title(s: &Subgraph) -> String {
 /// Draws `chart`, measuring text with `metrics` (DISPLA-1).
 pub fn flowchart(chart: &Flowchart, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
     let px = Px { metrics, theme };
-    let layout = layout::layout(&chart.layout_graph(&px), &CONFIG);
-    draw(chart, &layout, metrics, theme).0
+    let Some(c) = chart.collapsed() else {
+        let layout = layout::layout(&chart.layout_graph(&px), &CONFIG);
+        return draw(chart, &layout, metrics, theme).0;
+    };
+    // Collapsed subgraphs (FLOWMO-15): draw the folded chart, owned by the original's elements.
+    let layout = layout::layout(&c.chart.layout_graph(&px), &CONFIG);
+    let mut scene = draw(&c.chart, &layout, metrics, theme).0;
+    for e in &mut scene.elements {
+        e.owner = match e.owner {
+            Owner::Node(i) => match c.nodes[i] {
+                Origin::Node(n) => Owner::Node(n),
+                Origin::Subgraph(s) => Owner::Cluster(s),
+            },
+            Owner::Edge(i) => Owner::Edge(c.edges[i]),
+            Owner::Cluster(i) => Owner::Cluster(c.subgraphs[i]),
+            Owner::Diagram => Owner::Diagram,
+        };
+    }
+    scene
 }
 
 /// Draws `chart` where `layout` placed it: node `i` at `layout.nodes[i]`, and so on, as
@@ -685,18 +703,23 @@ impl Painter<'_> {
     ) {
         let owner = Owner::Node(i);
         let theme = self.theme;
-        let line = stroke(s, theme.node_stroke, 1.0, None);
-        let ink = Some(s.stroke.unwrap_or(theme.edge));
+        // A collapsed subgraph keeps its cluster colors (FLOWMO-15).
+        let (fill, border, ink) = if node.shape == Shape::Collapsed {
+            (
+                theme.cluster_fill,
+                theme.cluster_stroke,
+                theme.cluster_stroke,
+            )
+        } else {
+            (theme.node_fill, theme.node_stroke, theme.edge)
+        };
+        let line = stroke(s, border, 1.0, None);
+        let ink = Some(s.stroke.unwrap_or(ink));
         if !o.body.is_empty() {
             if o.solid {
                 self.path(owner, o.body, Some(s.fill.unwrap_or(theme.edge)), None);
             } else {
-                self.path(
-                    owner,
-                    o.body,
-                    Some(s.fill.unwrap_or(theme.node_fill)),
-                    Some(line),
-                );
+                self.path(owner, o.body, Some(s.fill.unwrap_or(fill)), Some(line));
             }
         }
         for l in o.lines {

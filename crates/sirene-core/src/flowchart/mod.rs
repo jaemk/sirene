@@ -1,5 +1,6 @@
 //! Mermaid flowchart parsing and lowering.
 
+mod collapse;
 pub mod edit;
 mod graph;
 pub(crate) mod lower;
@@ -11,6 +12,7 @@ pub(crate) mod text;
 
 use rowan::GreenNode;
 
+pub use collapse::{Collapsed, Origin};
 pub use graph::Measure;
 pub use model::{
     Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Metadata, Node, Note, NoteSide, Row,

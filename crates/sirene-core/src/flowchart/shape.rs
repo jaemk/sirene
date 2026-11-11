@@ -17,6 +17,8 @@ macro_rules! shapes {
             AwesomeActor,
             /// A use case diagram's ellipse, roomier than `Ellipse`.
             UseCase,
+            /// A collapsed subgraph (FLOWMO-15): its title over a dashed rule and three dots.
+            Collapsed,
         }
 
         const NAMES: &[(&str, Shape)] = &[
@@ -38,6 +40,7 @@ macro_rules! shapes {
                     Shape::HollowActor => "usecaseActorHollow",
                     Shape::AwesomeActor => "usecaseActorAwesome",
                     Shape::UseCase => "usecaseEllipse",
+                    Shape::Collapsed => "collapsedGroup",
                 }
             }
 
