@@ -33,10 +33,10 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | `railroad-beta`, `railroad-ebnf-beta`, `railroad-abnf-beta`, `railroad-peg-beta` | grammar | Rules as syntax diagrams; ASCII draws boxed elements on a track: `mermaid-railroad-diagrams.md`. |
 | `swimlane-beta` | graph | A flowchart whose top-level subgraphs are lanes across the flow: `mermaid-swimlane-diagrams.md`. |
 | `cynefin-beta` | quadrants | Items in the five Cynefin domains, with transitions; ASCII is the quadrants in a box: `mermaid-cynefin-diagrams.md`. |
+| `eventmodeling` | timeline | Frames on a timeline in swimlanes by type and namespace, with relations; ASCII is the lanes as rows of boxes: `mermaid-event-modeling-diagrams.md`. |
 | `kanban` | board | Columns of cards, with the mindmap grammar; ASCII is a box per column: `mermaid-kanban-boards.md`. |
 
-Mermaid 12 also adds `eventmodeling`
-and `agentflow-beta`. Until each is built it is FLOWCH-16's "not supported"
+Mermaid 12 also adds `agentflow-beta`. Until it is built it is FLOWCH-16's "not supported"
 error.
 
 ## MCHART-2 Open questions

@@ -43,7 +43,6 @@ const OTHER_DIAGRAMS: &[&str] = &[
     "classDiagram",
     "classDiagram-v2",
     "erDiagram",
-    "eventmodeling",
     "gantt",
     "gitGraph",
     "journey",

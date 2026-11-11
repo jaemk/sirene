@@ -1,0 +1,35 @@
+---
+source: crates/sirene-core/tests/eventmodel.rs
+expression: "eventmodeling\n  title Shopping Cart\n\n  tf 01 ui CartUI\n  tf 02 cmd AddItem [[AddItem01]]\n  tf 03 evt ItemAdded [[ItemAdded]]\n  tf 04 rmo CartItems\n  tf 05 ui CartUI\n  tf 06 cmd AddItem [[AddItem02]]\n  tf 07 evt ItemAdded [[ItemAdded]]\n\n  data AddItem01 {\n    description: 'john'\n    image: 'avatar_john'\n    price: 20.4\n  }\n\n  data AddItem02 {\n    description: 'jack'\n    image: 'avatar_jack'\n    price: 12.5\n  }\n\n  data ItemAdded {\n    description: string\n    image: string\n    price: number\n  }\n"
+---
+                                               Shopping Cart
+
++---------------------------------------------------------------------------------------------------------+
+|                                                                                                         |
+| UI/Automation        + 01 ui -+                           + 05 ui -+                                    |
+|                      | CartUI |                           | CartUI |                                    |
+|                      +------+-+                           +--------+                                    |
+|                             |                                 ^                                         |
++.............................+.................................+.........................................+
+|                             v                                 |                                         |
+| Command/Read Model        + 02 cmd --------------+  + 04 rmo -+-+  + 06 cmd --------------+             |
+|                           |       AddItem        |  | CartItems |  |       AddItem        |             |
+|                           +----------------------+  +-----------+  +----------------------+             |
+|                           | description: 'john'  |      ^          | description: 'jack'  |             |
+|                           | image: 'avatar_john' |      |          | image: 'avatar_jack' |             |
+|                           | price: 20.4          |      |          | price: 12.5          |             |
+|                           +----------------+-----+      |          +----------------+-----+             |
+|                                            |            |                           |                   |
++............................................+............+...........................+...................+
+|                                            v            |                           v                   |
+| Events                                + 03 evt ---------+---+                  + 07 evt -------------+  |
+|                                       |      ItemAdded      |                  |      ItemAdded      |  |
+|                                       +---------------------+                  +---------------------+  |
+|                                       | description: string |                  | description: string |  |
+|                                       | image: string       |                  | image: string       |  |
+|                                       | price: number       |                  | price: number       |  |
+|                                       +---------------------+                  +---------------------+  |
+|                                                                                                         |
++---------------------------------------------------------------------------------------------------------+
+
+05 CartUI -> 06 AddItem

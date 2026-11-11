@@ -1,0 +1,31 @@
+---
+source: crates/sirene-core/tests/eventmodel.rs
+expression: "---\ntitle: Cart read model\n---\neventmodeling\n  rf 02 evt CartCreated\n  rf 03 evt ItemAdded `json`{ \"id\": 1 }\n  rf 04 evt ItemRemoved\n  rf 05 evt CartCleared\n  tf 01 rmo CartItems ->> 02 ->> 03 ->> 04 ->> 05\n  tf 06 ui CartUI\n\n  entity ItemAdded\n  note 03 `md` {\n    Raised once per item.\n  }\n  gwt 03\n    given\n      evt ItemAdded\n    then\n      evt ItemAdded\n"
+---
+                                         Cart read model
+
+┌────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                │
+│ UI/Automation                                                                      ┌ 06 ui ─┐  │
+│                                                                                    │ CartUI │  │
+│                                                                                    └────────┘  │
+│                                                                                        ▲       │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┤
+│                                                                                        │       │
+│ Command/Read Model                                                           ┌ 01 rmo ─┴─┐     │
+│                                                                              │ CartItems │     │
+│                                                                              └───────────┘     │
+│                                                                                  ▲             │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┤
+│                                                                                  │             │
+│ Events               ┌ 02 evt ─────┐  ┌ 03 evt ───┐  ┌ 04 evt ─────┐  ┌ 05 evt ──┴──┐          │
+│                      │ CartCreated │  │ ItemAdded │  │ ItemRemoved │  │ CartCleared │          │
+│                      └─────────────┘  ├───────────┤  └─────────────┘  └─────────────┘          │
+│                                       │ "id": 1   │                                            │
+│                                       └───────────┘                                            │
+│                                                                                                │
+└────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+02 CartCreated → 01 CartItems
+03 ItemAdded → 01 CartItems
+04 ItemRemoved → 01 CartItems

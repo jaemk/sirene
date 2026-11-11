@@ -214,6 +214,11 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         cy.read_only(),
         Some("drawing edits are not supported for Cynefin diagrams yet")
     );
+    let em = Document::from_source(None, "eventmodeling\ntf 01 ui A\n".to_owned());
+    assert_eq!(
+        em.read_only(),
+        Some("drawing edits are not supported for event modeling diagrams yet")
+    );
     let rr = Document::from_source(None, "railroad-ebnf-beta\na = b ;\n".to_owned());
     assert_eq!(
         rr.read_only(),
