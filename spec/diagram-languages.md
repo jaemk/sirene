@@ -147,3 +147,10 @@ an error and is ignored (MGANTT-3). An ASCII drawing is cut off at 2^22 cells (A
 
 Tests: `crates/sirene-core/tests/limits.rs` draws a source at each limit and 2,000-statement
 chains, and checks the diagnostics; `skipped_blocks_keep_their_text` checks the trees.
+
+## LANGS-9 Source text
+
+A source draws the same with `\n` or `\r\n` line endings, with or without a final newline, and
+after a byte order mark (U+FEFF), which reads as whitespace and may come before frontmatter or a
+Markdown fence. The tree keeps it. Tests: `crates/sirene-core/tests/text.rs` draws every
+fixture each way.

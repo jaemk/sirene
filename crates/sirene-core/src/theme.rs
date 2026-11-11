@@ -639,14 +639,15 @@ fn from_hsl(h: f32, s: f32, l: f32) -> (u8, u8, u8) {
 
 /// The frontmatter's `config:` `theme` and `themeVariables`; returns where the body starts.
 fn frontmatter(src: &str, out: &mut ThemeConfig) -> usize {
-    let mut lines = src.split_inclusive('\n');
+    let bom = crate::flowchart::scan::bom_len(src);
+    let mut lines = src[bom..].split_inclusive('\n');
     let Some(first) = lines.next() else {
         return 0;
     };
     if first.trim_end() != "---" {
         return 0;
     }
-    let mut at = first.len();
+    let mut at = bom + first.len();
     let indent = |line: &str| line.len() - line.trim_start().len();
     let mut in_config = false;
     let mut vars_at: Option<usize> = None;

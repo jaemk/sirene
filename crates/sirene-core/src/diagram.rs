@@ -346,7 +346,7 @@ impl From<flowchart::Lowered> for Lowered {
 
 /// The first word of `src` after frontmatter, comments, and directives.
 pub(crate) fn header(src: &str) -> &str {
-    let mut r = src;
+    let mut r = &src[scan::bom_len(src)..];
     let first = scan::line_len(r);
     if r[..first].trim_end() == "---" {
         let mut at = first + scan::newline_len(&r[first..]);

@@ -158,7 +158,7 @@ impl<'a> Parser<'a> {
     fn at_line_start(&self) -> bool {
         let before = &self.src[..self.pos];
         let line = before.rfind('\n').map_or(before, |i| &before[i + 1..]);
-        line.chars().all(char::is_whitespace)
+        line.chars().all(scan::is_space)
     }
 
     /// Wraps the rest of the statement in an `ERROR` node and reports `message`.
@@ -230,15 +230,21 @@ impl<'a> Parser<'a> {
         self.finish();
     }
 
-    /// FLOWCH-3: frontmatter block at byte 0.
+    /// FLOWCH-3: frontmatter block at the start of the source, after a byte order mark
+    /// (LANGS-9).
     fn frontmatter(&mut self) {
-        let first = scan::line_len(self.src);
-        if self.src[..first].trim_end() != "---" {
+        let bom = scan::bom_len(self.src);
+        if bom > 0 {
+            self.token(WHITESPACE, bom);
+        }
+        let (start, src) = (self.pos, self.rest());
+        let first = scan::line_len(src);
+        if src[..first].trim_end() != "---" {
             return;
         }
-        let mut line_start = first + scan::newline_len(&self.src[first..]);
-        while line_start < self.src.len() {
-            let rest = &self.src[line_start..];
+        let mut line_start = first + scan::newline_len(&src[first..]);
+        while line_start < src.len() {
+            let rest = &src[line_start..];
             let len = scan::line_len(rest);
             if rest[..len].trim() == "---" {
                 self.token(FRONTMATTER, line_start + len);
@@ -250,8 +256,8 @@ impl<'a> Parser<'a> {
         self.token(ERROR_TOKEN, first);
         self.finish();
         self.error(
-            0,
-            first,
+            start,
+            start + first,
             "unclosed frontmatter: expected a closing `---` line",
         );
     }

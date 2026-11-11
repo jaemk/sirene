@@ -227,7 +227,7 @@ impl<'a> Base<'a> {
     fn at_line_start(&self) -> bool {
         let before = &self.src[..self.pos];
         let line = before.rfind('\n').map_or(before, |i| &before[i + 1..]);
-        line.chars().all(char::is_whitespace)
+        line.chars().all(scan::is_space)
     }
 
     /// Frontmatter, trivia, and a `HEADER` holding one of `headers` (each a whole word, per
@@ -250,15 +250,18 @@ impl<'a> Base<'a> {
         }
     }
 
-    /// A frontmatter block at the start of the source, if any.
+    /// A frontmatter block at the start of the source, if any, after a byte order mark
+    /// (LANGS-9).
     pub fn frontmatter(&mut self) {
-        let first = scan::line_len(self.src);
-        if self.src[..first].trim_end() != "---" {
+        self.token(WHITESPACE, scan::bom_len(self.src));
+        let (start, src) = (self.pos, self.rest());
+        let first = scan::line_len(src);
+        if src[..first].trim_end() != "---" {
             return;
         }
-        let mut line_start = first + scan::newline_len(&self.src[first..]);
-        while line_start < self.src.len() {
-            let rest = &self.src[line_start..];
+        let mut line_start = first + scan::newline_len(&src[first..]);
+        while line_start < src.len() {
+            let rest = &src[line_start..];
             let len = scan::line_len(rest);
             if rest[..len].trim() == "---" {
                 self.token(FRONTMATTER, line_start + len);
@@ -270,8 +273,8 @@ impl<'a> Base<'a> {
         self.token(ERROR_TOKEN, first);
         self.finish();
         self.error(
-            0,
-            first,
+            start,
+            start + first,
             "unclosed frontmatter: expected a closing `---` line",
         );
     }

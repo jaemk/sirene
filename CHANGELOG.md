@@ -169,6 +169,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Text output of a very large drawing is cut off at 2^22 cells with a line saying so, in place
   of an overflow or an allocation failure.
 - Architecture diagrams with many groups lay out in time proportional to their size.
+- A file starting with a byte order mark draws as it does without one; before, its header or
+  frontmatter was not found.
 
 ## [0.2.0] - 2026-11-08
 
