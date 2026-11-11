@@ -115,6 +115,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid event modeling diagrams (`eventmodeling`), read-only in the editor: time and reset
   frames in swimlanes by type and namespace, inferred and `->>` relations, inline data and
   data blocks; in text, the lanes as rows of boxes with vertical arrows between them.
+- Collapsed flowchart subgraphs (`id@{ view: collapsed }`) are drawn as one node with the
+  subgraph's title, a dashed rule, and three dots; edges into the subgraph end at that node.
 - Mermaid 12's other new types (`eventmodeling` and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.

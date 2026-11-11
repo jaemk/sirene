@@ -65,12 +65,15 @@ enum Geo {
     /// A figure with its label below.
     Actor,
     UseCase,
+    /// A collapsed subgraph: its title over a dashed rule and three dots.
+    Collapsed,
 }
 
 fn geo(shape: Shape) -> Geo {
     match shape {
         Shape::Actor | Shape::HollowActor | Shape::AwesomeActor => Geo::Actor,
         Shape::UseCase => Geo::UseCase,
+        Shape::Collapsed => Geo::Collapsed,
         Shape::Rounded => Geo::Rounded,
         Shape::Stadium => Geo::Stadium,
         Shape::FramedRect => Geo::Framed,
@@ -114,6 +117,12 @@ const FIGURE_GAP: f32 = 8.0;
 const ACTOR_PAD: f32 = 10.0;
 /// The room between a use case's label and its ellipse on every side.
 const USECASE_PAD: f32 = 20.0;
+/// A collapsed subgraph's padding, minimum width, and the gap and row under its title, as
+/// Mermaid's `collapsedGroup` draws them.
+const COLLAPSED_PAD: f32 = 8.0;
+const COLLAPSED_MIN_W: f32 = 80.0;
+const COLLAPSED_GAP: f32 = 8.0;
+const COLLAPSED_ROW: f32 = 20.0;
 
 /// Radius of a cylinder's end ellipses.
 fn cylinder_ry(w: f32) -> f32 {
@@ -151,6 +160,10 @@ pub(super) fn size(shape: Shape, tw: f32, th: f32) -> (f32, f32) {
             FIGURE_H + FIGURE_GAP + th + 2.0 * ACTOR_PAD,
         ),
         Geo::UseCase => (tw + 2.0 * USECASE_PAD, th + 2.0 * USECASE_PAD),
+        Geo::Collapsed => (
+            (tw + 2.0 * COLLAPSED_PAD).max(COLLAPSED_MIN_W),
+            th + COLLAPSED_GAP + COLLAPSED_ROW + 2.0 * COLLAPSED_PAD,
+        ),
     }
 }
 
@@ -171,6 +184,10 @@ pub(super) fn text_box(shape: Shape, b: BoxF) -> BoxF {
             ..b
         },
         Geo::Flipped => BoxF { h: b.h / 2.0, ..b },
+        Geo::Collapsed => BoxF {
+            h: (b.h - COLLAPSED_GAP - COLLAPSED_ROW).max(0.0),
+            ..b
+        },
         Geo::Sloped => BoxF {
             y: b.y + SLOPE,
             h: b.h - SLOPE,
@@ -456,6 +473,24 @@ pub(super) fn outline(shape: Shape, b: BoxF) -> Outline {
             (x, y + NOTCH),
         ]),
         Geo::Sloped => polygon(&[(x, y + SLOPE), (r, y), (r, bottom), (x, bottom)]),
+        Geo::Collapsed => {
+            // A dashed rule above the indicator row, then three dots centered in it.
+            let rule = bottom - COLLAPSED_PAD - COLLAPSED_ROW;
+            let mut at = x + 8.0;
+            while at < r - 8.0 {
+                out.lines
+                    .push(line((at, rule), ((at + 3.0).min(r - 8.0), rule)));
+                at += 6.0;
+            }
+            for k in [-1.0, 0.0, 1.0] {
+                out.dots.push(ellipse(
+                    Pt::new(cx + 10.0 * k, rule + COLLAPSED_ROW / 2.0),
+                    2.5,
+                    2.5,
+                ));
+            }
+            rounded(b, 8.0)
+        }
     };
     out.boundary = if geo(shape) == Geo::Actor {
         // Edges meet the figure, not the label below it.

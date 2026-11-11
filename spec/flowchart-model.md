@@ -170,3 +170,19 @@ name. An index with no edge yet is an error.
 `click id ...` attaches to an existing node either a callback (name and arguments) or a link
 (URL and optional target), plus an optional tooltip. Callback arguments are split at commas
 outside double quotes, trimmed, and unquoted. A `click` on an unknown node is a warning.
+
+## FLOWMO-15 Collapsed subgraphs
+
+A subgraph whose metadata has `view: collapsed` (e.g. `one@{ view: collapsed }` after its `end`)
+is drawn as one node in place of its contents, as Mermaid 12.3 does. The model keeps every node
+and subgraph; `Flowchart::collapsed` returns the folded chart that the scene and text renderers
+draw, with each element mapped back to the original:
+
+- every member of a collapsed subgraph, at any depth, is hidden and stands for the outermost
+  collapsed subgraph that contains it;
+- each visible collapsed subgraph becomes a `Shape::Collapsed` node with its title (its id when
+  untitled), classes, and styles, placed where its first hidden node was in node order;
+- an edge to or from a hidden element goes to the collapsed node instead, and an edge that
+  becomes a loop on a collapsed node only by folding is dropped;
+- a collapsed node is drawn with the cluster colors: a rounded box, its title, a dashed rule,
+  and three dots (in text: a rounded box with a dotted rule and `···`).

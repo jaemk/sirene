@@ -104,6 +104,9 @@ pub const CONFIG: Config = Config {
 
 /// Renders `chart` as text (ASCIIR-1).
 pub fn render(chart: &Flowchart, options: &Options) -> String {
+    // Collapsed subgraphs (FLOWMO-15) are drawn folded into nodes.
+    let folded = chart.collapsed();
+    let chart = folded.as_ref().map_or(chart, |c| &c.chart);
     let graph = chart.layout_graph(&Cells);
     let layout = layout::layout(&graph, &CONFIG);
     draw(chart, &layout, options)
@@ -210,6 +213,7 @@ impl Measure for Cells {
             Frame::Text => Size::new(w.max(1), h),
             Frame::Framed => Size::new(w + 6, h + 2),
             Frame::Cylinder => Size::new(w + 4, h + 3),
+            Frame::Collapsed => Size::new((w + 4).max(7), h + 4),
             _ => Size::new(w + 4, h + 2),
         }
     }
@@ -303,6 +307,8 @@ enum Frame {
     TrapTop,
     Framed,
     Cylinder,
+    /// A collapsed subgraph: rounded, with a dotted rule and three dots under the label.
+    Collapsed,
     Text,
     /// One character and no label.
     Glyph(Glyph),
@@ -340,6 +346,7 @@ fn frame(shape: Shape) -> Frame {
         Shape::FramedRect => Frame::Framed,
         Shape::Cylinder | Shape::HorizontalCylinder | Shape::LinedCylinder => Frame::Cylinder,
         Shape::Text => Frame::Text,
+        Shape::Collapsed => Frame::Collapsed,
         _ => Frame::Plain,
     }
 }
@@ -395,7 +402,7 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
         },
     );
     let corners = match f {
-        Frame::Rounded | Frame::Round | Frame::Cylinder => Some(ROUND),
+        Frame::Rounded | Frame::Round | Frame::Cylinder | Frame::Collapsed => Some(ROUND),
         Frame::Diamond | Frame::Hexagon => Some(SLANT),
         _ => None,
     };
@@ -427,6 +434,13 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
             canvas.vline(r.right() - 1, r.y, r.bottom(), Line::Light);
         }
         Frame::Cylinder => canvas.hline(r.x, r.right(), r.y + 1, Line::Light),
+        Frame::Collapsed => {
+            canvas.hline(r.x + 1, r.right() - 1, r.bottom() - 2, Line::Dotted);
+            let dots = glyph('·', '.');
+            for dx in -1..=1 {
+                canvas.glyph(r.x + r.w / 2 + dx, r.bottom() - 1, dots);
+            }
+        }
         _ => {}
     }
     // A rule above each compartment, joining the sides.
@@ -457,6 +471,7 @@ fn draw_node_text(canvas: &mut Canvas, node: &Node, r: Rect) {
         Frame::Text => (r.x, r.w, r.y, r.h),
         Frame::Framed => (r.x + 2, r.w - 4, r.y + 1, r.h - 2),
         Frame::Cylinder => (r.x + 1, r.w - 2, r.y + 2, r.h - 3),
+        Frame::Collapsed => (r.x + 1, r.w - 2, r.y + 1, r.h - 4),
         _ => (r.x + 1, r.w - 2, r.y + 1, r.h - 2),
     };
     draw_lines(canvas, &lines, x, w, y + (h - lines.len() as i32) / 2);
