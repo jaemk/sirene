@@ -1,0 +1,21 @@
+swimlane-beta TB
+  accTitle: Request intake
+  accDescr: A request is collected, reviewed, and scheduled.
+  subgraph Intake
+    collect[Collect request]
+    validate[Validate details]
+  end
+
+  subgraph Review
+    review[Review request]
+    decide{Ready?}
+  end
+
+  subgraph Delivery
+    schedule[Schedule work]
+    complete[Complete work]
+  end
+
+  collect --> validate --> review --> decide
+  decide -->|Yes| schedule --> complete
+  decide -->|No| collect

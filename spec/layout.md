@@ -80,3 +80,15 @@ top-bottom or bottom-top cluster the title sits in the top border row with the b
 kept clear of them and pulled toward the middle. In a left-right or right-left cluster it starts
 at the main-axis padding from the left border, and the cluster is at least wide enough for it.
 No route passes through a title.
+
+## LAYOUT-12 Lanes
+
+A top-level cluster marked as a lane is not a block: its items join the diagram's ranks with
+everyone else's. In each rank the items are ordered lane by lane, in input order, and each lane
+is positioned on its own, so the lanes are bands side by side along the cross axis, sharing
+their borders, each as wide as its content and title need and centering its content. Every lane
+spans the diagram along the main axis, and the diagram gets border rows as a cluster does. Edge
+dummies keep the upper end's lane above the edge's middle rank and the lower end's from it on.
+A lane's title sits on its real top border, at the padding from its left border. An edge to or
+from a lane itself has no route. Tests: `placement` and `edges_to_lanes` in
+`crates/sirene-core/tests/swimlane.rs`.

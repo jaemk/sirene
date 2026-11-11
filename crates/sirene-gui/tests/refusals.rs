@@ -204,6 +204,11 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for use case diagrams yet")
     );
     assert_eq!(uc.chart.edges.len(), 1);
+    let sl = Document::from_source(None, "swimlane-beta\nsubgraph L\n  a\nend\n".to_owned());
+    assert_eq!(
+        sl.read_only(),
+        Some("drawing edits are not supported for swimlane diagrams yet")
+    );
     let rr = Document::from_source(None, "railroad-ebnf-beta\na = b ;\n".to_owned());
     assert_eq!(
         rr.read_only(),

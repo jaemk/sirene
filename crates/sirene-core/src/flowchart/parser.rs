@@ -61,7 +61,6 @@ const OTHER_DIAGRAMS: &[&str] = &[
     "sequenceDiagram",
     "stateDiagram",
     "stateDiagram-v2",
-    "swimlane-beta",
     "timeline",
     "treemap",
     "treemap-beta",
@@ -179,7 +178,7 @@ impl<'a> Parser<'a> {
         self.frontmatter();
         self.trivia();
         let r = self.rest();
-        if ["flowchart-elk", "flowchart", "graph"]
+        if ["flowchart-elk", "flowchart", "graph", super::SWIMLANE]
             .iter()
             .any(|kw| scan::keyword(r, kw))
         {

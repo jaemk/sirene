@@ -1,0 +1,47 @@
+---
+source: crates/sirene-core/tests/swimlane.rs
+expression: "swimlane-beta TB\n  subgraph applicant [Applicant]\n    apply[Submit application]\n    sign[Sign agreement]\n  end\n\n  subgraph reviewer [Reviewer]\n    subgraph checks [Checks]\n      screen[Screen application]\n    end\n    decide{Approved?}\n  end\n\n  apply -->|Application received| screen\n  screen --> decide\n  decide -->|Approved| sign\n  decide -->|Needs changes| apply\n"
+---
+8:5: warning: subgraph `checks` is nested in a lane; only top-level subgraphs are lanes, so it is drawn as a plain box
+
+┌─ Applicant ────────────┬─ Reviewer ─────────────────────────────────┐
+│                        │                                            │
+│ ┌────────────────────┐ │                                            │
+│ │ Submit application │ │                                            │
+│ └───────────────┬────┘ │                                            │
+│       ▲         │      │                                            │
+│       │         └──────┼───────────┐                                │
+│       │                │           │                                │
+│       │                │ Application received                       │
+│       │                │           │                                │
+│       │                │           └─┐                              │
+│       └────────────────┼─────────────┼──────────────────────┐       │
+│                        │             │                      │       │
+│                        │ ┌───────────┼─── Checks ─┐         │       │
+│                        │ │           │            │         │       │
+│                        │ │           └┐           │         │       │
+│                        │ │            ▼           │         │       │
+│                        │ │ ┌────────────────────┐ │   Needs changes │
+│                        │ │ │ Screen application │ │         │       │
+│                        │ │ └──────────┬─────────┘ │         │       │
+│                        │ │            │           │         │       │
+│                        │ └────────────┼───────────┘         │       │
+│                        │              │                     │       │
+│                        │              └──┐             ┌────┘       │
+│                        │                 │             │            │
+│                        │                 │             │            │
+│                        │                 └───┐     ┌───┘            │
+│                        │                     ▼     │                │
+│                        │                  ╱────────┴──╲             │
+│                        │                  │ Approved? │             │
+│                        │                  ╲─────┬─────╱             │
+│                        │                        │                   │
+│            ┌───────────┼────────────────────────┘                   │
+│            │           │                                            │
+│        Approved        │                                            │
+│            ▼           │                                            │
+│   ┌────────────────┐   │                                            │
+│   │ Sign agreement │   │                                            │
+│   └────────────────┘   │                                            │
+│                        │                                            │
+└────────────────────────┴────────────────────────────────────────────┘

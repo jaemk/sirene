@@ -82,6 +82,7 @@ fn bad_cluster_parents_are_top_level() {
         parent: Some(parent),
         direction: None,
         title: Size::default(),
+        lane: false,
     };
     // Cluster 0 and 1 name each other, 2 names itself, and 3 names a missing cluster.
     let g = Graph {

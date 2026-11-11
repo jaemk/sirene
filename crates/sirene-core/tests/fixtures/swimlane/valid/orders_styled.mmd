@@ -1,0 +1,18 @@
+swimlane-beta LR
+  subgraph buyer [Buyer]
+    choose([Choose product])
+    pay[Pay invoice]
+  end
+
+  subgraph store [Store]
+    reserve[Reserve stock]
+    ship((Ship))
+  end
+
+  choose --> reserve
+  reserve -.->|Invoice ready| pay
+  pay ==> ship
+  ship --> audit[Audit]
+
+  classDef attention fill:#fff2cc,stroke:#d6a500,color:#111;
+  class reserve attention;
