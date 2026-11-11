@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Graphviz DOT: `graph`, `digraph`, and `strict` sources, `.dot` and `.gv` files in
+  directories, and `dot` or `graphviz` Markdown blocks draw with sirene's layout, including
+  clusters, `node` and `edge` defaults, record labels as compartments, shapes, colors, arrows,
+  and end labels. Attributes that are not drawn are warnings.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

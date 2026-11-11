@@ -6,7 +6,8 @@ Tests: the unit tests in `crates/sirene-core/src/markdown.rs`.
 ## MARKDO-1 Mermaid blocks
 
 `sirene_core::markdown::mermaid_blocks` finds the fenced code blocks whose info string's first
-word is `mermaid`, as CommonMark fences them: an opening line of at least three backticks or
+word is `mermaid`, or `dot` or `graphviz` (DOT-1, detected from the code as LANGS-1), as
+CommonMark fences them: an opening line of at least three backticks or
 tildes, indented at most three spaces (a backtick fence's info string has no backticks), closed
 by a line of the same character at least as long with nothing else on it, indented at most
 three spaces; an unclosed block runs to the end of the text. Other fenced blocks are skipped

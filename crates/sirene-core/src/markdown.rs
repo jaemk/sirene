@@ -55,8 +55,8 @@ impl Block {
     }
 }
 
-/// An opening fence on `line`: its indent, character, and length, when the info string's first
-/// word is `mermaid`.
+/// An opening fence on `line`: its indent, character, and length, and whether the info
+/// string's first word names a diagram language: `mermaid`, or `dot` or `graphviz` (LANGS-1).
 fn opening(line: &str) -> Option<(usize, char, usize, bool)> {
     let indent = line.len() - line.trim_start_matches(' ').len();
     if indent > 3 {
@@ -74,7 +74,12 @@ fn opening(line: &str) -> Option<(usize, char, usize, bool)> {
         return None;
     }
     let word = info.split_whitespace().next().unwrap_or("");
-    Some((indent, c, len, word == "mermaid"))
+    Some((
+        indent,
+        c,
+        len,
+        matches!(word, "mermaid" | "dot" | "graphviz"),
+    ))
 }
 
 /// Whether `line` closes a fence of `c` at least `len` long.
@@ -88,8 +93,8 @@ fn closes(line: &str, c: char, len: usize) -> bool {
     run >= len && rest[run..].trim().is_empty()
 }
 
-/// The mermaid blocks in `src`, in order. Other fenced blocks are skipped whole, so a mermaid
-/// fence inside one is not a block.
+/// The diagram blocks in `src` (`mermaid`, `dot`, and `graphviz`), in order. Other fenced
+/// blocks are skipped whole, so a mermaid fence inside one is not a block.
 pub fn mermaid_blocks(src: &str) -> Vec<Block> {
     let mut blocks = Vec::new();
     // (byte offset, line text without its newline) for each line.
@@ -221,6 +226,9 @@ mod tests {
     #[test]
     fn fences() {
         assert_eq!(opening("```mermaid"), Some((0, '`', 3, true)));
+        assert_eq!(opening("```dot"), Some((0, '`', 3, true)));
+        assert_eq!(opening("~~~ graphviz {.x}"), Some((0, '~', 3, true)));
+        assert_eq!(opening("```dotnet"), Some((0, '`', 3, false)));
         assert_eq!(opening("   ~~~ js"), Some((3, '~', 3, false)));
         assert_eq!(opening("    ```mermaid"), None);
         assert_eq!(opening("``mermaid"), None);

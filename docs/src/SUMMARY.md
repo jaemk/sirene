@@ -58,6 +58,10 @@
 - [Event modeling diagrams](eventmodel.md)
 - [Agentflow diagrams](agentflow.md)
 
+# Other languages
+
+- [Graphviz DOT](dot.md)
+
 # Project
 
 - [Development](development.md)

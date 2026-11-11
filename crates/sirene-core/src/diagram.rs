@@ -30,7 +30,7 @@ use crate::treeview::{self, TreeView};
 use crate::venn::{self, Venn};
 use crate::wardley::{self, Wardley};
 use crate::xychart::{self, XyChart};
-use crate::{class, er, requirement, state, usecase, zenuml};
+use crate::{class, dot, er, requirement, state, usecase, zenuml};
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,11 +71,17 @@ pub enum Kind {
     EventModel,
     /// A flowchart of `flow` containers with agentflow's shapes and edges (`agentflow-beta`).
     Agentflow,
+    /// A Graphviz DOT graph (DOT-1), detected by its `graph` or `digraph` header (LANGS-1).
+    Dot,
 }
 
 impl Kind {
-    /// The type of the diagram `src` starts with; a flowchart unless the header says otherwise.
+    /// The type of the diagram `src` starts with: DOT when it starts with a DOT graph header,
+    /// otherwise the Mermaid type its header names, and a flowchart when it names none.
     pub fn of(src: &str) -> Kind {
+        if dot::is_dot(src) {
+            return Kind::Dot;
+        }
         let word = header(src);
         // `gitGraph:` and `gitGraph TB:` name the direction in the same word or the next.
         let word = word.strip_suffix(':').unwrap_or(word);
@@ -329,14 +335,33 @@ pub(crate) fn header(src: &str) -> &str {
 /// Parses and lowers `src` with the parser its header picks (LANGS-2), and reads its theme
 /// settings (MTHEME-1).
 pub fn lower(src: &str) -> Lowered {
+    if Kind::of(src) == Kind::Dot {
+        return lower_dot(src);
+    }
     let mut lowered = lower_diagram(src);
     lowered.theme = ThemeConfig::read(src);
     lowered.diagnostics.extend(lowered.theme.diagnostics());
     lowered
 }
 
+/// A DOT graph (DOT-2), its `bgcolor` as the theme's background.
+fn lower_dot(src: &str) -> Lowered {
+    let l = dot::parse(src).lower();
+    let mut theme = ThemeConfig::default();
+    if let Some(c) = l.background {
+        let hex = format!("#{:02x}{:02x}{:02x}{:02x}", c.r, c.g, c.b, c.a);
+        theme.variables.push(("background".into(), hex));
+    }
+    Lowered {
+        diagram: Diagram::Graph(l.flowchart),
+        diagnostics: l.diagnostics,
+        theme,
+    }
+}
+
 fn lower_diagram(src: &str) -> Lowered {
     match Kind::of(src) {
+        Kind::Dot => lower_dot(src),
         Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => flowchart::parse(src).lower().into(),
         Kind::Sequence => {
             let (seq, diagnostics) = sequence::parse(src).lower();

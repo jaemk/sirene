@@ -44,7 +44,7 @@ pub fn check(path: &Path) -> bool {
         }
         let found = crate::scan(path, path, "mmd");
         if found.is_empty() {
-            eprintln!("error: no .mmd or .mermaid files in {}", path.display());
+            eprintln!("{}", crate::no_diagrams(path));
             return false;
         }
         let failed = found

@@ -1,0 +1,1238 @@
+//! Lowers a DOT syntax tree to the graph model (DOT-2, DOT-3).
+
+use std::collections::{HashMap, HashSet};
+
+use rowan::TextRange;
+
+use super::x11::X11;
+use crate::diagnostic::Diagnostic;
+use crate::flowchart::{
+    Arrow, Direction, Edge, Flowchart, Label, Node, Row, Shape, Stroke, Style, Subgraph,
+};
+use crate::scene::{Color, parse_color};
+use crate::syntax::SyntaxKind::*;
+use crate::syntax::{SyntaxNode, SyntaxToken};
+
+/// A lowered DOT graph: the graph model, the problems found, and the graph's `bgcolor`.
+pub(crate) struct Output {
+    pub flowchart: Flowchart,
+    pub diagnostics: Vec<Diagnostic>,
+    pub background: Option<Color>,
+}
+
+pub(crate) fn lower(root: &SyntaxNode) -> Output {
+    let mut l = Lowerer::default();
+    let mut graphs = root.children().filter(|n| n.kind() == DOT_GRAPH);
+    if let Some(g) = graphs.next() {
+        l.graph(&g);
+    }
+    for extra in graphs {
+        l.warning(
+            extra.text_range(),
+            "only the first graph in a file is drawn",
+        );
+    }
+    l.finish()
+}
+
+/// An attribute value: the text of a quoted string, name, or numeral, or of an HTML string
+/// without its outer `<` and `>`.
+#[derive(Debug, Clone)]
+struct Value {
+    text: String,
+    html: bool,
+}
+
+#[derive(Debug, Clone)]
+struct Attr {
+    key: String,
+    value: Value,
+    range: TextRange,
+}
+
+/// The last value of `key` among `attrs`.
+fn get<'a>(attrs: &'a [Attr], key: &str) -> Option<&'a Attr> {
+    attrs.iter().rev().find(|a| a.key == key)
+}
+
+fn get_text<'a>(attrs: &'a [Attr], key: &str) -> Option<&'a str> {
+    get(attrs, key).map(|a| a.value.text.as_str())
+}
+
+/// What a statement's attributes apply to, for knowing which are drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Target {
+    Graph,
+    Node,
+    Edge,
+}
+
+const GRAPH_ATTRS: &[&str] = &[
+    "rankdir",
+    "label",
+    "bgcolor",
+    "color",
+    "fillcolor",
+    "pencolor",
+    "fontcolor",
+    "style",
+];
+const NODE_ATTRS: &[&str] = &[
+    "label",
+    "shape",
+    "style",
+    "color",
+    "fillcolor",
+    "fontcolor",
+    "penwidth",
+];
+const EDGE_ATTRS: &[&str] = &[
+    "label",
+    "headlabel",
+    "taillabel",
+    "style",
+    "color",
+    "fontcolor",
+    "penwidth",
+    "arrowhead",
+    "arrowtail",
+    "dir",
+    "minlen",
+];
+
+/// The defaults in effect in a graph or subgraph (DOT-2).
+#[derive(Debug, Clone, Default)]
+struct Scope {
+    node: Vec<Attr>,
+    edge: Vec<Attr>,
+    /// The innermost cluster, whose members the nodes mentioned here become.
+    cluster: Option<usize>,
+    /// Whether this scope is the root graph or a cluster, whose graph attributes are drawn.
+    drawn: bool,
+}
+
+struct Cluster {
+    id: String,
+    parent: Option<usize>,
+    attrs: Vec<Attr>,
+    range: TextRange,
+}
+
+struct PendingEdge {
+    from: usize,
+    to: usize,
+    attrs: Vec<Attr>,
+    range: TextRange,
+}
+
+#[derive(Default)]
+struct Lowerer {
+    diagnostics: Vec<Diagnostic>,
+    directed: bool,
+    strict: bool,
+    name: String,
+    root_attrs: Vec<Attr>,
+    ids: Vec<String>,
+    node_index: HashMap<String, usize>,
+    node_attrs: Vec<Vec<Attr>>,
+    node_cluster: Vec<Option<usize>>,
+    mentions: Vec<Vec<TextRange>>,
+    edges: Vec<PendingEdge>,
+    clusters: Vec<Cluster>,
+    /// Names already warned about, so each is reported once per file.
+    warned: HashSet<String>,
+}
+
+fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
+    node.children_with_tokens().filter_map(|e| e.into_token())
+}
+
+fn keyword(node: &SyntaxNode) -> Option<String> {
+    tokens(node)
+        .find(|t| t.kind() == DOT_KW)
+        .map(|t| t.text().to_ascii_lowercase())
+}
+
+fn ids(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> {
+    node.children().filter(|n| n.kind() == DOT_ID)
+}
+
+/// The text of a quoted string: without its quotes, `\"` as `"`, and a backslash before a
+/// line break joining the lines. Other escapes stay for the label (DOT-2).
+fn unquote(s: &str) -> String {
+    let inner = s
+        .strip_prefix('"')
+        .map(|s| s.strip_suffix('"').unwrap_or(s))
+        .unwrap_or(s);
+    inner
+        .replace("\\\r\n", "")
+        .replace("\\\n", "")
+        .replace("\\\"", "\"")
+}
+
+fn value(id: &SyntaxNode) -> Value {
+    let mut text = String::new();
+    let mut html = false;
+    for t in tokens(id) {
+        match t.kind() {
+            STRING => text.push_str(&unquote(t.text())),
+            HTML_STRING => {
+                html = true;
+                let s = t.text();
+                text.push_str(s.get(1..s.len().saturating_sub(1)).unwrap_or(""));
+            }
+            IDENT | NUMBER => text.push_str(t.text()),
+            _ => {}
+        }
+    }
+    Value { text, html }
+}
+
+/// A label's escapes: `\n`, `\l`, and `\r` break lines, `\N` is the node's name, `\G` the
+/// graph's, `\E` the edge's, `\T` and `\H` its tail and head, and `\x` is `x`.
+fn escape(text: &str, names: &Names) -> String {
+    let mut out = String::new();
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n' | 'l' | 'r') => out.push('\n'),
+            Some('N') => out.push_str(names.node),
+            Some('G') => out.push_str(names.graph),
+            Some('E') => out.push_str(&names.edge()),
+            Some('T') => out.push_str(names.tail),
+            Some('H') => out.push_str(names.head),
+            Some(c) => out.push(c),
+            None => out.push('\\'),
+        }
+    }
+    // A final `\l` or `\n` ends the last line rather than starting another.
+    if out.ends_with('\n') {
+        out.pop();
+    }
+    out
+}
+
+/// The names a label's escapes refer to.
+struct Names<'a> {
+    graph: &'a str,
+    node: &'a str,
+    tail: &'a str,
+    head: &'a str,
+    directed: bool,
+}
+
+impl Names<'_> {
+    fn edge(&self) -> String {
+        let op = if self.directed { "->" } else { "--" };
+        format!("{}{op}{}", self.tail, self.head)
+    }
+}
+
+/// An HTML label's text: tags dropped, `<br/>` as a line break, and the common entities
+/// decoded.
+fn html_text(s: &str) -> String {
+    let mut out = String::new();
+    let mut rest = s;
+    while let Some(i) = rest.find('<') {
+        out.push_str(&rest[..i]);
+        let end = rest[i..].find('>').map_or(rest.len(), |j| i + j + 1);
+        let tag = rest[i + 1..end.saturating_sub(1).max(i + 1)].trim();
+        if tag.get(..2).is_some_and(|t| t.eq_ignore_ascii_case("br")) {
+            out.push('\n');
+        }
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    let out = out
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&");
+    out.lines()
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_owned()
+}
+
+/// A field of a record label: text, or a group of fields in braces (DOT-3).
+#[derive(Debug, Clone, PartialEq)]
+enum Field {
+    Text(String),
+    Group(Vec<Field>),
+}
+
+/// The fields of a record label: `|` separates them, braces group them, and a `<port>` names
+/// one. `\{`, `\}`, `\|`, `\<`, `\>`, and `\ ` are literal.
+fn record_fields(s: &str) -> Vec<Field> {
+    fn group(chars: &mut std::iter::Peekable<std::str::Chars>) -> Vec<Field> {
+        let mut fields = Vec::new();
+        let mut text = String::new();
+        let mut nested: Option<Vec<Field>> = None;
+        let push = |fields: &mut Vec<Field>, text: &mut String, nested: &mut Option<Vec<Field>>| {
+            match nested.take() {
+                Some(g) => fields.push(Field::Group(g)),
+                None => fields.push(Field::Text(std::mem::take(text).trim().to_owned())),
+            }
+            text.clear();
+        };
+        while let Some(c) = chars.next() {
+            match c {
+                '\\' => match chars.next() {
+                    Some(e @ ('{' | '}' | '|' | '<' | '>' | ' ')) => text.push(e),
+                    Some(e) => {
+                        text.push('\\');
+                        text.push(e);
+                    }
+                    None => {}
+                },
+                '{' => nested = Some(group(chars)),
+                '}' => break,
+                '|' => push(&mut fields, &mut text, &mut nested),
+                '<' => {
+                    for p in chars.by_ref() {
+                        if p == '>' {
+                            break;
+                        }
+                    }
+                }
+                _ => text.push(c),
+            }
+        }
+        push(&mut fields, &mut text, &mut nested);
+        fields
+    }
+    let mut fields = group(&mut s.chars().peekable());
+    // `{a|b|c}` stacks its fields, as compartments do.
+    if let [Field::Group(g)] = fields.as_slice() {
+        fields = g.clone();
+    }
+    fields
+}
+
+/// The texts in a field, in order.
+fn leaves(field: &Field, out: &mut Vec<String>) {
+    match field {
+        Field::Text(t) => out.push(t.clone()),
+        Field::Group(g) => g.iter().for_each(|f| leaves(f, out)),
+    }
+}
+
+/// A Graphviz color: an X11 name, `#rrggbb`, `#rrggbbaa`, an `H,S,V` triple of fractions, or
+/// the first color of a list such as `red:blue` (DOT-3).
+fn color(value: &str) -> Option<Color> {
+    let first = value.split(':').next().unwrap_or("");
+    let first = first.split(';').next().unwrap_or("").trim();
+    let v = first.to_ascii_lowercase();
+    let v = match v.strip_prefix('/') {
+        Some(scheme) => {
+            let (scheme, name) = scheme.split_once('/')?;
+            if !matches!(scheme, "" | "x11" | "svg") {
+                return None;
+            }
+            name.to_owned()
+        }
+        None => v,
+    };
+    if v.starts_with('#') {
+        return parse_color(&v);
+    }
+    let hsv: Vec<f32> = v
+        .split([',', ' '])
+        .filter(|s| !s.is_empty())
+        .map_while(|s| s.parse().ok())
+        .collect();
+    if let [h, s, b] = hsv[..] {
+        return Some(hsv_color(h, s, b));
+    }
+    if let Ok(i) = X11.binary_search_by(|(n, _)| (*n).cmp(v.as_str())) {
+        return Some(Color::rgb(X11[i].1));
+    }
+    parse_color(&v).filter(|_| !v.starts_with("rgb"))
+}
+
+fn hsv_color(h: f32, s: f32, v: f32) -> Color {
+    let (h, s, v) = (
+        h.clamp(0.0, 1.0) * 6.0,
+        s.clamp(0.0, 1.0),
+        v.clamp(0.0, 1.0),
+    );
+    let i = h.floor().min(5.0);
+    let f = h - i;
+    let (p, q, t) = (v * (1.0 - s), v * (1.0 - s * f), v * (1.0 - s * (1.0 - f)));
+    let (r, g, b) = match i as u8 {
+        0 => (v, t, p),
+        1 => (q, v, p),
+        2 => (p, v, t),
+        3 => (p, q, v),
+        4 => (t, p, v),
+        _ => (v, p, q),
+    };
+    let c = |x: f32| (x * 255.0).round() as u8;
+    Color {
+        r: c(r),
+        g: c(g),
+        b: c(b),
+        a: 255,
+    }
+}
+
+fn hex(c: Color) -> String {
+    if c.a == 255 {
+        format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b)
+    } else {
+        format!("#{:02x}{:02x}{:02x}{:02x}", c.r, c.g, c.b, c.a)
+    }
+}
+
+fn style(property: &str, value: impl Into<String>) -> Style {
+    Style {
+        property: property.into(),
+        value: value.into(),
+    }
+}
+
+/// A node shape, or `None` for one sirene does not draw (DOT-3).
+fn shape(name: &str) -> Option<Shape> {
+    Some(match name {
+        "box" | "rect" | "rectangle" | "square" | "msquare" | "record" => Shape::Rect,
+        "mrecord" => Shape::Rounded,
+        "ellipse" | "oval" | "egg" => Shape::Ellipse,
+        "circle" | "mcircle" => Shape::Circle,
+        "doublecircle" => Shape::DoubleCircle,
+        "point" => Shape::FilledCircle,
+        "diamond" | "mdiamond" => Shape::Diamond,
+        "plaintext" | "plain" | "none" | "underline" => Shape::Text,
+        "cylinder" => Shape::Cylinder,
+        "hexagon" | "octagon" | "doubleoctagon" | "tripleoctagon" | "septagon" | "pentagon" => {
+            Shape::Hexagon
+        }
+        "parallelogram" => Shape::LeanRight,
+        "trapezium" | "trapezoid" => Shape::TrapezoidBottom,
+        "invtrapezium" | "invtrapezoid" => Shape::TrapezoidTop,
+        "triangle" => Shape::Triangle,
+        "invtriangle" => Shape::FlippedTriangle,
+        "note" => Shape::Note,
+        "tab" | "folder" => Shape::Folder,
+        "box3d" => Shape::StackedRect,
+        "component" => Shape::LinedRect,
+        "cds" => Shape::Flag,
+        "star" => Shape::Bang,
+        _ => return None,
+    })
+}
+
+/// The marker an arrow name draws, `Some(None)` for `none`, or `None` for an unknown name.
+/// A name may stack several shapes (`invdot`); the first is drawn.
+fn arrow(name: &str) -> Option<Option<Arrow>> {
+    let name = match name {
+        "empty" => "onormal",
+        "invempty" => "oinv",
+        "ediamond" => "odiamond",
+        "open" => "vee",
+        "halfopen" => "lvee",
+        n => n,
+    };
+    // Modifiers: `o` for an open shape, then `l` or `r` for half of one.
+    let mut s = name;
+    let open = s.starts_with('o');
+    if open {
+        s = &s[1..];
+    }
+    if s.starts_with(['l', 'r']) {
+        s = &s[1..];
+    }
+    const SHAPES: &[&str] = &[
+        "normal", "inv", "vee", "curve", "icurve", "diamond", "dot", "box", "tee", "crow", "none",
+    ];
+    let first = SHAPES.iter().find(|sh| s.starts_with(**sh))?;
+    Some(match *first {
+        "none" => None,
+        "normal" | "inv" if open => Some(Arrow::Triangle),
+        "normal" | "inv" | "vee" | "curve" | "icurve" => Some(Arrow::Point),
+        "diamond" if open => Some(Arrow::HollowDiamond),
+        "diamond" => Some(Arrow::Diamond),
+        "dot" => Some(Arrow::Circle),
+        "box" | "tee" => Some(Arrow::One),
+        "crow" if open => Some(Arrow::ZeroMany),
+        "crow" => Some(Arrow::OneMany),
+        _ => unreachable!("listed above"),
+    })
+}
+
+impl Lowerer {
+    fn warning(&mut self, range: TextRange, message: impl Into<String>) {
+        self.diagnostics.push(Diagnostic::warning(range, message));
+    }
+
+    /// Warns once per file under `key`.
+    fn warn_once(&mut self, key: &str, range: TextRange, message: impl Into<String>) {
+        if self.warned.insert(key.to_owned()) {
+            self.warning(range, message);
+        }
+    }
+
+    fn graph(&mut self, g: &SyntaxNode) {
+        for t in tokens(g).filter(|t| t.kind() == DOT_KW) {
+            match t.text().to_ascii_lowercase().as_str() {
+                "strict" => self.strict = true,
+                "digraph" => self.directed = true,
+                _ => {}
+            }
+        }
+        if let Some(id) = ids(g).next() {
+            self.name = value(&id).text;
+        }
+        let mut scope = Scope {
+            drawn: true,
+            ..Scope::default()
+        };
+        self.stmts(g, &mut scope);
+    }
+
+    /// The attributes in a statement's `[...]` lists, each checked against what `target`
+    /// draws.
+    fn attr_lists(&mut self, stmt: &SyntaxNode, target: Target) -> Vec<Attr> {
+        let mut out = Vec::new();
+        for list in stmt.children().filter(|n| n.kind() == DOT_ATTR_LIST) {
+            for a in list.children().filter(|n| n.kind() == ATTR) {
+                let mut it = ids(&a);
+                let (Some(k), Some(v)) = (it.next(), it.next()) else {
+                    continue;
+                };
+                let attr = Attr {
+                    key: value(&k).text,
+                    value: value(&v),
+                    range: a.text_range(),
+                };
+                self.check(&attr, target);
+                out.push(attr);
+            }
+        }
+        out
+    }
+
+    /// Warns, once per name, about an attribute `target` does not draw (DOT-3, DOT-4).
+    fn check(&mut self, attr: &Attr, target: Target) {
+        let known = match target {
+            Target::Graph => GRAPH_ATTRS,
+            Target::Node => NODE_ATTRS,
+            Target::Edge => EDGE_ATTRS,
+        };
+        if known.contains(&attr.key.as_str()) {
+            if attr.value.html && attr.key.ends_with("label") {
+                self.warn_once("<html>", attr.range, "HTML labels are drawn as their text");
+            }
+            return;
+        }
+        let what = match target {
+            Target::Graph => "graph",
+            Target::Node => "node",
+            Target::Edge => "edge",
+        };
+        let key = attr.key.clone();
+        self.warn_once(
+            &format!("{what}:{key}"),
+            attr.range,
+            format!("the {what} attribute `{key}` is not supported; ignored"),
+        );
+    }
+
+    /// The statements in a graph or subgraph body. Returns the nodes they mention.
+    fn stmts(&mut self, body: &SyntaxNode, scope: &mut Scope) -> Vec<usize> {
+        let mut mentioned = Vec::new();
+        for stmt in body.children() {
+            match stmt.kind() {
+                DOT_ASSIGN => {
+                    let mut it = ids(&stmt);
+                    if let (Some(k), Some(v)) = (it.next(), it.next()) {
+                        let attr = Attr {
+                            key: value(&k).text,
+                            value: value(&v),
+                            range: stmt.text_range(),
+                        };
+                        self.graph_attr(attr, scope);
+                    }
+                }
+                DOT_ATTR_STMT => match keyword(&stmt).as_deref() {
+                    Some("node") => {
+                        let attrs = self.attr_lists(&stmt, Target::Node);
+                        scope.node.extend(attrs);
+                    }
+                    Some("edge") => {
+                        let attrs = self.attr_lists(&stmt, Target::Edge);
+                        scope.edge.extend(attrs);
+                    }
+                    _ => {
+                        for attr in self.attr_lists_unchecked(&stmt) {
+                            self.graph_attr(attr, scope);
+                        }
+                    }
+                },
+                DOT_NODE_STMT => {
+                    let Some(n) = stmt.children().find(|n| n.kind() == NODE) else {
+                        continue;
+                    };
+                    let i = self.node_ref(&n, scope);
+                    let attrs = self.attr_lists(&stmt, Target::Node);
+                    self.node_attrs[i].extend(attrs);
+                    mentioned.push(i);
+                }
+                DOT_EDGE_STMT => mentioned.extend(self.edge_stmt(&stmt, scope)),
+                SUBGRAPH => mentioned.extend(self.subgraph(&stmt, scope)),
+                _ => {}
+            }
+        }
+        mentioned
+    }
+
+    fn attr_lists_unchecked(&mut self, stmt: &SyntaxNode) -> Vec<Attr> {
+        stmt.children()
+            .filter(|n| n.kind() == DOT_ATTR_LIST)
+            .flat_map(|list| list.children().filter(|n| n.kind() == ATTR))
+            .filter_map(|a| {
+                let mut it = ids(&a);
+                let (k, v) = (it.next()?, it.next()?);
+                Some(Attr {
+                    key: value(&k).text,
+                    value: value(&v),
+                    range: a.text_range(),
+                })
+            })
+            .collect()
+    }
+
+    /// A graph attribute: the root graph's or a cluster's; a plain subgraph's draw nothing.
+    fn graph_attr(&mut self, attr: Attr, scope: &Scope) {
+        if attr.key == "rank" {
+            self.warn_once(
+                "graph:rank",
+                attr.range,
+                "`rank` is not supported yet; the nodes are ranked as usual",
+            );
+            return;
+        }
+        self.check(&attr, Target::Graph);
+        if !scope.drawn {
+            return;
+        }
+        match scope.cluster {
+            Some(c) => self.clusters[c].attrs.push(attr),
+            None => self.root_attrs.push(attr),
+        }
+    }
+
+    /// The node a `NODE` names, created with the scope's defaults if new.
+    fn node_ref(&mut self, n: &SyntaxNode, scope: &Scope) -> usize {
+        let mut it = ids(n);
+        let Some(id) = it.next() else {
+            return self.node("", n.text_range(), scope);
+        };
+        if it.next().is_some() {
+            self.warn_once(
+                "<port>",
+                n.text_range(),
+                "ports are not supported yet; the edge joins the node",
+            );
+        }
+        let name = value(&id).text;
+        self.node(&name, id.text_range(), scope)
+    }
+
+    fn node(&mut self, id: &str, range: TextRange, scope: &Scope) -> usize {
+        let i = match self.node_index.get(id) {
+            Some(&i) => {
+                if self.node_cluster[i].is_none() {
+                    self.node_cluster[i] = scope.cluster;
+                }
+                i
+            }
+            None => {
+                let i = self.ids.len();
+                self.ids.push(id.to_owned());
+                self.node_index.insert(id.to_owned(), i);
+                self.node_attrs.push(scope.node.clone());
+                self.node_cluster.push(scope.cluster);
+                self.mentions.push(Vec::new());
+                i
+            }
+        };
+        self.mentions[i].push(range);
+        i
+    }
+
+    /// `a -> b -> {c d} [attrs]`: an edge from every node of each operand to every node of
+    /// the next. Returns the nodes mentioned.
+    fn edge_stmt(&mut self, stmt: &SyntaxNode, scope: &mut Scope) -> Vec<usize> {
+        let mut operands: Vec<(Vec<usize>, TextRange)> = Vec::new();
+        for n in stmt.children() {
+            match n.kind() {
+                NODE => {
+                    let i = self.node_ref(&n, scope);
+                    operands.push((vec![i], n.text_range()));
+                }
+                SUBGRAPH => {
+                    let nodes = self.subgraph(&n, scope);
+                    operands.push((nodes, n.text_range()));
+                }
+                _ => {}
+            }
+        }
+        let mut attrs = scope.edge.clone();
+        attrs.extend(self.attr_lists(stmt, Target::Edge));
+        for pair in operands.windows(2) {
+            let ((from, a), (to, b)) = (&pair[0], &pair[1]);
+            let range = a.cover(*b);
+            for &f in from {
+                for &t in to {
+                    self.edges.push(PendingEdge {
+                        from: f,
+                        to: t,
+                        attrs: attrs.clone(),
+                        range,
+                    });
+                }
+            }
+        }
+        operands.into_iter().flat_map(|(n, _)| n).collect()
+    }
+
+    /// A subgraph: a cluster when its name starts with `cluster`; its defaults are scoped to
+    /// it. Returns the nodes mentioned in it.
+    fn subgraph(&mut self, sub: &SyntaxNode, parent: &Scope) -> Vec<usize> {
+        let name = ids(sub).next().map(|id| value(&id).text);
+        let cluster = name.as_ref().is_some_and(|n| {
+            n.get(..7)
+                .is_some_and(|p| p.eq_ignore_ascii_case("cluster"))
+        });
+        let mut scope = Scope {
+            node: parent.node.clone(),
+            edge: parent.edge.clone(),
+            cluster: parent.cluster,
+            drawn: cluster,
+        };
+        if cluster {
+            let id = name.unwrap_or_default();
+            let existing = self.clusters.iter().position(|c| c.id == id);
+            scope.cluster = Some(existing.unwrap_or_else(|| {
+                self.clusters.push(Cluster {
+                    id,
+                    parent: parent.cluster,
+                    attrs: Vec::new(),
+                    range: sub.text_range(),
+                });
+                self.clusters.len() - 1
+            }));
+        }
+        self.stmts(sub, &mut scope)
+    }
+
+    fn finish(mut self) -> Output {
+        let mut chart = Flowchart::default();
+        let graph = self.name.clone();
+        let root = std::mem::take(&mut self.root_attrs);
+        if let Some(a) = get(&root, "rankdir") {
+            match a.value.text.to_ascii_uppercase().as_str() {
+                "TB" => chart.direction = Direction::TopBottom,
+                "LR" => chart.direction = Direction::LeftRight,
+                "BT" => chart.direction = Direction::BottomTop,
+                "RL" => chart.direction = Direction::RightLeft,
+                v => {
+                    let range = a.range;
+                    self.warning(
+                        range,
+                        format!("unknown `rankdir` `{v}`: expected TB, LR, BT, or RL"),
+                    );
+                }
+            }
+        }
+        if let Some(a) = get(&root, "label") {
+            chart.title = Some(self.label_text(&a.value.clone(), &graph, ""));
+        }
+        let background = get(&root, "bgcolor")
+            .cloned()
+            .and_then(|a| self.color_of(&a));
+
+        for i in 0..self.ids.len() {
+            let node = self.lower_node(i, &graph);
+            chart.nodes.push(node);
+        }
+        let edges = self.merge_edges();
+        for e in edges {
+            let edge = self.lower_edge(&e, &graph);
+            chart.edges.push(edge);
+        }
+        for c in 0..self.clusters.len() {
+            let sub = self.lower_cluster(c, &graph);
+            chart.subgraphs.push(sub);
+        }
+        Output {
+            flowchart: chart,
+            diagnostics: self.diagnostics,
+            background,
+        }
+    }
+
+    /// A strict graph's repeated edges as one, with their attributes combined (DOT-2).
+    fn merge_edges(&mut self) -> Vec<PendingEdge> {
+        let edges = std::mem::take(&mut self.edges);
+        if !self.strict {
+            return edges;
+        }
+        let mut out: Vec<PendingEdge> = Vec::new();
+        let mut seen: HashMap<(usize, usize), usize> = HashMap::new();
+        for e in edges {
+            let key = if self.directed || e.from <= e.to {
+                (e.from, e.to)
+            } else {
+                (e.to, e.from)
+            };
+            match seen.get(&key) {
+                Some(&k) => out[k].attrs.extend(e.attrs),
+                None => {
+                    seen.insert(key, out.len());
+                    out.push(e);
+                }
+            }
+        }
+        out
+    }
+
+    fn label_text(&mut self, v: &Value, graph: &str, node: &str) -> String {
+        if v.html {
+            return html_text(&v.text);
+        }
+        let names = Names {
+            graph,
+            node,
+            tail: "",
+            head: "",
+            directed: self.directed,
+        };
+        escape(&v.text, &names)
+    }
+
+    fn color_of(&mut self, a: &Attr) -> Option<Color> {
+        let c = color(&a.value.text);
+        if c.is_none() {
+            let v = a.value.text.clone();
+            self.warning(a.range, format!("unknown color `{v}`; ignored"));
+        }
+        c
+    }
+
+    /// The `style` attribute's words, lowercase.
+    fn styles_of(attrs: &[Attr]) -> Vec<String> {
+        get_text(attrs, "style")
+            .map(|s| {
+                s.split(',')
+                    .map(|w| {
+                        // `setlinewidth(2)` and the like take an argument.
+                        let w = w.split('(').next().unwrap_or("");
+                        w.trim().to_ascii_lowercase()
+                    })
+                    .filter(|w| !w.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Warns about each style word not in `known`.
+    fn check_styles(&mut self, attrs: &[Attr], words: &[String], known: &[&str]) {
+        let Some(a) = get(attrs, "style") else {
+            return;
+        };
+        let range = a.range;
+        for w in words {
+            if !known.contains(&w.as_str()) {
+                self.warn_once(
+                    &format!("style:{w}"),
+                    range,
+                    format!("the style `{w}` is not supported; ignored"),
+                );
+            }
+        }
+    }
+
+    fn lower_node(&mut self, i: usize, graph: &str) -> Node {
+        let attrs = std::mem::take(&mut self.node_attrs[i]);
+        let id = self.ids[i].clone();
+        let shape_name = get_text(&attrs, "shape").map(str::to_ascii_lowercase);
+        let mut shape = match shape_name.as_deref() {
+            None => Shape::Ellipse,
+            Some(name) => match shape(name) {
+                Some(s) => s,
+                None => {
+                    let range = get(&attrs, "shape").map_or_else(TextRange::default, |a| a.range);
+                    self.warn_once(
+                        &format!("shape:{name}"),
+                        range,
+                        format!("the shape `{name}` is not supported; drawn as an ellipse"),
+                    );
+                    Shape::Ellipse
+                }
+            },
+        };
+        let record = matches!(shape_name.as_deref(), Some("record" | "mrecord"));
+        let raw = get(&attrs, "label")
+            .map(|a| a.value.clone())
+            .unwrap_or(Value {
+                text: "\\N".into(),
+                html: false,
+            });
+        let mut sections = Vec::new();
+        let label = if shape == Shape::FilledCircle {
+            String::new()
+        } else if record && !raw.html {
+            let fields = record_fields(&raw.text);
+            let mut texts = |f: &Field| {
+                let mut out = Vec::new();
+                leaves(f, &mut out);
+                out.iter()
+                    .map(|t| {
+                        self.label_text(
+                            &Value {
+                                text: t.clone(),
+                                html: false,
+                            },
+                            graph,
+                            &id,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let title = fields.first().map(&mut texts).unwrap_or_default();
+            for f in fields.iter().skip(1) {
+                let rows: Vec<Row> = texts(f)
+                    .iter()
+                    .flat_map(|t| t.split('\n').map(Row::plain).collect::<Vec<_>>())
+                    .collect();
+                sections.push(rows);
+            }
+            title.join("\n")
+        } else {
+            self.label_text(&raw, graph, &id)
+        };
+
+        let words = Self::styles_of(&attrs);
+        self.check_styles(
+            &attrs,
+            &words,
+            &[
+                "filled", "rounded", "dashed", "dotted", "bold", "solid", "invis",
+            ],
+        );
+        if words.iter().any(|w| w == "rounded") && shape == Shape::Rect {
+            shape = Shape::Rounded;
+        }
+        let styles = self.shape_styles(&attrs, &words, "fillcolor");
+        Node {
+            id,
+            label: Label::plain(label),
+            shape,
+            sections,
+            classes: Vec::new(),
+            styles,
+            click: None,
+            tooltip: None,
+            metadata: Vec::new(),
+            mentions: std::mem::take(&mut self.mentions[i]),
+        }
+    }
+
+    /// The fill, stroke, text color, width, and dashes of a node or cluster.
+    fn shape_styles(&mut self, attrs: &[Attr], words: &[String], fill_key: &str) -> Vec<Style> {
+        let has = |w: &str| words.iter().any(|x| x == w);
+        let mut out = Vec::new();
+        let stroke = get(attrs, "pencolor")
+            .or_else(|| get(attrs, "color"))
+            .cloned()
+            .and_then(|a| self.color_of(&a));
+        let fill = get(attrs, fill_key)
+            .cloned()
+            .and_then(|a| self.color_of(&a));
+        let bg = get(attrs, "bgcolor")
+            .cloned()
+            .and_then(|a| self.color_of(&a));
+        let line = get(attrs, "color").and_then(|a| color(&a.value.text));
+        if has("filled") {
+            let c = fill.or(line).unwrap_or(Color::rgb(0xd3d3d3));
+            out.push(style("fill", hex(c)));
+        } else if let Some(c) = bg {
+            out.push(style("fill", hex(c)));
+        }
+        if let Some(c) = stroke {
+            out.push(style("stroke", hex(c)));
+        }
+        if let Some(c) = get(attrs, "fontcolor")
+            .cloned()
+            .and_then(|a| self.color_of(&a))
+        {
+            out.push(style("color", hex(c)));
+        }
+        let width = get_text(attrs, "penwidth").and_then(|w| w.trim().parse::<f32>().ok());
+        if let Some(w) = width.filter(|w| w.is_finite() && *w >= 0.0) {
+            out.push(style("stroke-width", format!("{w}px")));
+        } else if has("bold") {
+            out.push(style("stroke-width", "2px"));
+        }
+        if has("dashed") {
+            out.push(style("stroke-dasharray", "5 5"));
+        } else if has("dotted") {
+            out.push(style("stroke-dasharray", "2 3"));
+        }
+        if has("invis") {
+            out.push(style("fill", "none"));
+            out.push(style("stroke", "none"));
+            out.push(style("color", "none"));
+        }
+        out
+    }
+
+    fn arrow_attr(&mut self, attrs: &[Attr], key: &str) -> Option<Arrow> {
+        let Some(a) = get(attrs, key) else {
+            return Some(Arrow::Point);
+        };
+        let name = a.value.text.trim().to_ascii_lowercase();
+        match arrow(&name) {
+            Some(m) => m,
+            None => {
+                let range = a.range;
+                self.warn_once(
+                    &format!("arrow:{name}"),
+                    range,
+                    format!("unknown arrow `{name}`; drawn as `normal`"),
+                );
+                Some(Arrow::Point)
+            }
+        }
+    }
+
+    fn lower_edge(&mut self, e: &PendingEdge, graph: &str) -> Edge {
+        let attrs = &e.attrs;
+        let (tail, head) = (self.ids[e.from].clone(), self.ids[e.to].clone());
+        let dir = match get(attrs, "dir") {
+            None => (if self.directed { "forward" } else { "none" }).to_owned(),
+            Some(a) => {
+                let d = a.value.text.trim().to_ascii_lowercase();
+                if matches!(d.as_str(), "forward" | "back" | "both" | "none") {
+                    d
+                } else {
+                    let range = a.range;
+                    self.warning(
+                        range,
+                        format!("unknown `dir` `{d}`: expected forward, back, both, or none"),
+                    );
+                    (if self.directed { "forward" } else { "none" }).to_owned()
+                }
+            }
+        };
+        let end = matches!(dir.as_str(), "forward" | "both")
+            .then(|| self.arrow_attr(attrs, "arrowhead"))
+            .flatten();
+        let start = matches!(dir.as_str(), "back" | "both")
+            .then(|| self.arrow_attr(attrs, "arrowtail"))
+            .flatten();
+
+        let names = Names {
+            graph,
+            node: "",
+            tail: &tail,
+            head: &head,
+            directed: self.directed,
+        };
+        let label = |key: &str| {
+            get(attrs, key).map(|a| {
+                Label::plain(if a.value.html {
+                    html_text(&a.value.text)
+                } else {
+                    escape(&a.value.text, &names)
+                })
+            })
+        };
+        let (label, start_label, end_label) =
+            (label("label"), label("taillabel"), label("headlabel"));
+
+        let words = Self::styles_of(attrs);
+        self.check_styles(
+            attrs,
+            &words,
+            &["dashed", "dotted", "bold", "solid", "invis"],
+        );
+        let has = |w: &str| words.iter().any(|x| x == w);
+        let stroke = if has("invis") {
+            Stroke::Invisible
+        } else if has("dashed") || has("dotted") {
+            Stroke::Dotted
+        } else if has("bold") {
+            Stroke::Thick
+        } else {
+            Stroke::Normal
+        };
+        let mut styles = Vec::new();
+        if let Some(c) = get(attrs, "color").cloned().and_then(|a| self.color_of(&a)) {
+            styles.push(style("stroke", hex(c)));
+        }
+        if let Some(c) = get(attrs, "fontcolor")
+            .cloned()
+            .and_then(|a| self.color_of(&a))
+        {
+            styles.push(style("color", hex(c)));
+        }
+        let width = get_text(attrs, "penwidth").and_then(|w| w.trim().parse::<f32>().ok());
+        if let Some(w) = width.filter(|w| w.is_finite() && *w >= 0.0) {
+            styles.push(style("stroke-width", format!("{w}px")));
+        }
+        let length = get_text(attrs, "minlen")
+            .and_then(|m| m.trim().parse::<f32>().ok())
+            .map_or(1, |m| m.round().clamp(1.0, 10.0) as u8);
+        Edge {
+            id: None,
+            from: tail,
+            to: head,
+            stroke,
+            start,
+            end,
+            length,
+            label,
+            start_label,
+            end_label,
+            classes: Vec::new(),
+            styles,
+            curve: None,
+            animate: false,
+            animation: None,
+            metadata: Vec::new(),
+            range: e.range,
+        }
+    }
+
+    fn lower_cluster(&mut self, c: usize, graph: &str) -> Subgraph {
+        let attrs = std::mem::take(&mut self.clusters[c].attrs);
+        let title = get(&attrs, "label")
+            .map(|a| a.value.clone())
+            .map(|v| self.label_text(&v, graph, ""))
+            .unwrap_or_default();
+        let words = Self::styles_of(&attrs);
+        self.check_styles(
+            &attrs,
+            &words,
+            &[
+                "filled", "rounded", "dashed", "dotted", "bold", "solid", "invis",
+            ],
+        );
+        let styles = self.shape_styles(&attrs, &words, "fillcolor");
+        let mut members: Vec<String> = (0..self.ids.len())
+            .filter(|&i| self.node_cluster[i] == Some(c))
+            .map(|i| self.ids[i].clone())
+            .collect();
+        members.extend(
+            self.clusters
+                .iter()
+                .filter(|k| k.parent == Some(c))
+                .map(|k| k.id.clone()),
+        );
+        Subgraph {
+            id: self.clusters[c].id.clone(),
+            title: Label::plain(title),
+            direction: None,
+            members,
+            classes: Vec::new(),
+            styles,
+            metadata: Vec::new(),
+            range: self.clusters[c].range,
+            region: false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn names() -> Names<'static> {
+        Names {
+            graph: "G",
+            node: "n",
+            tail: "a",
+            head: "b",
+            directed: true,
+        }
+    }
+
+    #[test]
+    fn escapes() {
+        let e = |s: &str| escape(s, &names());
+        assert_eq!(e("\\N in \\G"), "n in G");
+        assert_eq!(e("one\\ltwo\\l"), "one\ntwo");
+        assert_eq!(e("\\E: \\T to \\H"), "a->b: a to b");
+        assert_eq!(e("a\\nb\\rc"), "a\nb\nc");
+        assert_eq!(e("x\\\\y\\q"), "x\\yq");
+        assert_eq!(unquote("\"say \\\"hi\\\"\""), "say \"hi\"");
+        assert_eq!(unquote("\"a\\\nb\""), "ab");
+    }
+
+    #[test]
+    fn html() {
+        assert_eq!(html_text("<b>bold</b> &amp; plain"), "bold & plain");
+        assert_eq!(html_text("one<BR/>two<br align=\"left\"/>"), "one\ntwo");
+        assert_eq!(html_text("<table><tr><td>a</td></tr></table>"), "a");
+    }
+
+    #[test]
+    fn records() {
+        let t = |s: &str| Field::Text(s.into());
+        assert_eq!(record_fields("a|b|c"), [t("a"), t("b"), t("c")]);
+        assert_eq!(record_fields("{a|b}"), [t("a"), t("b")]);
+        assert_eq!(
+            record_fields("<f0> left|{<f1> mid\\|dle|x}|right"),
+            [
+                t("left"),
+                Field::Group(vec![t("mid|dle"), t("x")]),
+                t("right")
+            ]
+        );
+    }
+
+    #[test]
+    fn colors() {
+        assert_eq!(color("red"), Some(Color::rgb(0xff0000)));
+        assert_eq!(color("LightGrey"), Some(Color::rgb(0xd3d3d3)));
+        assert_eq!(color("gray50"), Some(Color::rgb(0x7f7f7f)));
+        assert_eq!(color("/x11/navy"), Some(Color::rgb(0x000080)));
+        assert_eq!(
+            color("#ff000080"),
+            Some(Color::rgb(0xff0000).with_alpha(0x80))
+        );
+        assert_eq!(color("red:blue"), Some(Color::rgb(0xff0000)));
+        assert_eq!(color("0.0 1.0 1.0"), Some(Color::rgb(0xff0000)));
+        assert_eq!(color("0.6667,1,1"), Some(Color::rgb(0x0000ff)));
+        assert_eq!(color("teal"), Some(Color::rgb(0x008080)));
+        assert_eq!(color("/blues9/3"), None);
+        assert_eq!(color("nope"), None);
+        // The X11 table is sorted for binary search.
+        assert!(X11.windows(2).all(|w| w[0].0 < w[1].0));
+    }
+
+    #[test]
+    fn arrows() {
+        assert_eq!(arrow("normal"), Some(Some(Arrow::Point)));
+        assert_eq!(arrow("empty"), Some(Some(Arrow::Triangle)));
+        assert_eq!(arrow("odiamond"), Some(Some(Arrow::HollowDiamond)));
+        assert_eq!(arrow("invodot"), Some(Some(Arrow::Point)));
+        assert_eq!(arrow("odot"), Some(Some(Arrow::Circle)));
+        assert_eq!(arrow("crow"), Some(Some(Arrow::OneMany)));
+        assert_eq!(arrow("tee"), Some(Some(Arrow::One)));
+        assert_eq!(arrow("lvee"), Some(Some(Arrow::Point)));
+        assert_eq!(arrow("none"), Some(None));
+        assert_eq!(arrow("open"), Some(Some(Arrow::Point)));
+        assert_eq!(arrow("bogus"), None);
+    }
+}

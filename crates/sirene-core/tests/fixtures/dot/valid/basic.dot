@@ -1,0 +1,9 @@
+// A pipeline, left to right.
+digraph pipeline {
+  rankdir=LR
+  label="Build \G"
+  node [shape=box]
+  fetch -> compile -> test -> ship
+  compile -> lint [label="also"]
+  test -> compile [label="retry", style=dashed]
+}

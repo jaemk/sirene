@@ -164,6 +164,9 @@ syntax_kinds! {
     // Agentflow diagrams: the `global` and `connector` keywords (`flow` is a `SUBGRAPH_KW`).
     GLOBAL_KW,
     CONNECTOR_KW,
+    // DOT: a keyword such as `digraph` or `node` (any case), and an HTML string `<...>`.
+    DOT_KW,
+    HTML_STRING,
     ERROR_TOKEN,
 
     // Nodes.
@@ -271,6 +274,16 @@ syntax_kinds! {
     // Agentflow: a `global ... end` block and a `connector` declaration.
     GLOBAL,
     CONNECTOR_STMT,
+    // DOT: a graph, a node, edge, or attribute statement, an `a = b` assignment, an attribute
+    // list `[...]`, and an ID (with its `+` concatenations). Subgraphs are `SUBGRAPH`, an
+    // attribute `ATTR`, and a node ID with its port `NODE`.
+    DOT_GRAPH,
+    DOT_NODE_STMT,
+    DOT_EDGE_STMT,
+    DOT_ATTR_STMT,
+    DOT_ASSIGN,
+    DOT_ATTR_LIST,
+    DOT_ID,
     ERROR,
 }
 

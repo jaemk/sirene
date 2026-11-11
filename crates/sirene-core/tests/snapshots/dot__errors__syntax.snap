@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/dot.rs
+expression: "graph g {\n  a -> b\n  c [color]\n  d --\n  = e\n}\n"
+---
+2:5: error: `->` in a `graph`: expected `--`
+3:11: error: expected `=` and a value
+5:3: error: expected a node or subgraph after the edge operator
+5:3: error: expected a node, edge, attribute, or subgraph statement
+
+╭───╮   ╭───╮   ╭───╮
+( a )   ( c )   ( d )
+╰─┬─╯   ╰───╯   ╰───╯
+  │
+  │
+╭─┴─╮
+( b )
+╰───╯

@@ -39,5 +39,5 @@ and statement order are kept. See [The editor](editor.md).
 sirene png --watch docs/
 ```
 
-writes a `.png` beside each `.mmd` and `.mermaid` file under `docs/`, then writes it again each
-time one changes. See [Command line](cli.md).
+writes a `.png` beside each diagram file (`.mmd`, `.mermaid`, `.dot`, `.gv`) under `docs/`, then writes it
+again each time one changes. See [Command line](cli.md).

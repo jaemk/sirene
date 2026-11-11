@@ -468,7 +468,7 @@ fn convert(
         if let Some(d) = &dir
             && jobs.is_empty()
         {
-            eprintln!("error: no .mmd or .mermaid files in {}", d.display());
+            eprintln!("{}", no_diagrams(d));
             return ExitCode::FAILURE;
         }
         for line in &skipped {
@@ -548,8 +548,19 @@ fn stamp(path: &Path) -> Option<Stamp> {
     Some((meta.modified().ok()?, meta.len()))
 }
 
-/// The `.mmd` and `.mermaid` files under `dir`, sorted, each with its output: the same path
-/// relative to `out`, with extension `ext`. Hidden entries and symlinked directories are skipped.
+/// The diagram files under `dir` (`.mmd`, `.mermaid`, `.dot`, and `.gv`; LANGS-1), sorted,
+/// each with its output: the same path relative to `out`, with extension `ext`. Hidden entries
+/// and symlinked directories are skipped.
+pub(crate) const DIAGRAM_EXTENSIONS: &[&str] = &["mmd", "mermaid", "dot", "gv"];
+
+/// The message for a directory with no diagram files.
+pub(crate) fn no_diagrams(dir: &Path) -> String {
+    format!(
+        "error: no .mmd, .mermaid, .dot, or .gv files in {}",
+        dir.display()
+    )
+}
+
 fn scan(dir: &Path, out: &Path, ext: &str) -> Vec<(PathBuf, PathBuf)> {
     let mut found = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
@@ -571,7 +582,7 @@ fn scan(dir: &Path, out: &Path, ext: &str) -> Vec<(PathBuf, PathBuf)> {
             } else if path.is_file()
                 && path
                     .extension()
-                    .is_some_and(|x| x == "mmd" || x == "mermaid")
+                    .is_some_and(|x| DIAGRAM_EXTENSIONS.iter().any(|e| x == *e))
             {
                 let rel = path.strip_prefix(dir).expect("found under dir");
                 let target = out.join(rel).with_extension(ext);

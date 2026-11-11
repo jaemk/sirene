@@ -1,0 +1,15 @@
+digraph styles {
+  bgcolor="#fafafa"
+  node [fontcolor=navy]
+  db [shape=cylinder, style=filled, fillcolor="#ffe4b5"]
+  q [shape=diamond, color=red, penwidth=2]
+  note [shape=note, label="read\nonly"]
+  dot [shape=point]
+  hidden [style=invis]
+  "a b" [shape=circle, style="dashed,bold"]
+  q -> db [arrowhead=odiamond, color="0.6 0.8 0.9"]
+  db -> note [dir=both, arrowtail=dot, arrowhead=tee]
+  note -> dot [dir=none]
+  "a b" -> q [headlabel="1", taillabel="*", minlen=2]
+  dot -> hidden [style=invis]
+}
