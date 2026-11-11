@@ -1,5 +1,8 @@
 //! Dates on a calendar with no time zone, read and written in dayjs and d3 formats (MGANTT-2),
 //! and the axis ticks d3 would choose (MGANTT-4).
+//!
+//! Follows Day.js (Copyright (c) 2018-present, iamkun; MIT) and d3-array, d3-time,
+//! d3-time-format, and d3-scale (Copyright 2010-2023 Mike Bostock; ISC). See THIRD-PARTY-NOTICES.
 
 /// Milliseconds since 1970-01-01 00:00, with no time zone.
 pub type Time = i64;

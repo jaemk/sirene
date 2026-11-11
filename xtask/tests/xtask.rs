@@ -51,6 +51,11 @@ fn bundle_layout() {
     }
     assert_eq!(fs::read(contents.join("PkgInfo")).unwrap(), b"APPL????");
     check_icns(&fs::read(contents.join("Resources/sirene.icns")).unwrap());
+    let notices = fs::read_to_string(contents.join("Resources/THIRD-PARTY-NOTICES")).unwrap();
+    assert!(notices.contains("venn.js"), "{notices}");
+    for name in ["LICENSE-MIT", "LICENSE-APACHE"] {
+        assert!(contents.join("Resources").join(name).is_file(), "{name}");
+    }
 
     let plist = Value::from_file(contents.join("Info.plist")).unwrap();
     assert_eq!(plist, xtask::info_plist());

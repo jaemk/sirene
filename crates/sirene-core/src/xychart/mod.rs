@@ -129,7 +129,8 @@ pub fn format_number(v: f64) -> String {
 }
 
 /// Round steps of about `count` ticks covering `lo..=hi`: 1, 2, or 5 times a power of ten, as
-/// d3's `ticks` picks them.
+/// d3's `ticks` picks them. Ported from d3-array (Copyright 2010-2023 Mike Bostock; ISC); see
+/// THIRD-PARTY-NOTICES.
 pub fn ticks(lo: f64, hi: f64, count: usize) -> Vec<f64> {
     let span = hi - lo;
     if span.is_nan() || span <= 0.0 || !span.is_finite() {

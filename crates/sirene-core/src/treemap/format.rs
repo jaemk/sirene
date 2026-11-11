@@ -1,5 +1,7 @@
 //! d3-format number specifiers, for `valueFormat` (MTREE-2): `[[fill]align][sign][symbol][0]
 //! [width][,][.precision][~][type]`, in the en-US locale.
+//!
+//! Ported from d3-format (Copyright 2010-2021 Mike Bostock; ISC). See THIRD-PARTY-NOTICES.
 
 /// A parsed d3-format specifier.
 #[derive(Debug, Clone, PartialEq)]

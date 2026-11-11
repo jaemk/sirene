@@ -203,6 +203,16 @@ pub fn write_icon(dir: &Path) -> Result<(), String> {
     write(&dir.join("sirene.png"), &icon_png(1024)?)
 }
 
+/// sirene's licenses and the third-party notices, copied into the bundle's `Resources`.
+pub const LICENSES: [(&str, &str); 3] = [
+    ("LICENSE-MIT", include_str!("../../LICENSE-MIT")),
+    ("LICENSE-APACHE", include_str!("../../LICENSE-APACHE")),
+    (
+        "THIRD-PARTY-NOTICES",
+        include_str!("../../THIRD-PARTY-NOTICES"),
+    ),
+];
+
 /// Writes `dir/Sirene.app` around `binary` (MACOSP-1) and returns its path.
 pub fn bundle(binary: &Path, dir: &Path) -> Result<PathBuf, String> {
     // Read the binary before removing the old bundle, which may hold it.
@@ -232,6 +242,9 @@ pub fn bundle(binary: &Path, dir: &Path) -> Result<PathBuf, String> {
     write(&contents.join("Info.plist"), &plist)?;
     write(&contents.join("PkgInfo"), b"APPL????")?;
     write(&resources.join("sirene.icns"), &icns()?)?;
+    for (name, text) in LICENSES {
+        write(&resources.join(name), text.as_bytes())?;
+    }
     Ok(app)
 }
 
