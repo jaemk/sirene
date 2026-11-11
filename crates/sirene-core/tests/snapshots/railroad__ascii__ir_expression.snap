@@ -1,0 +1,29 @@
+---
+source: crates/sirene-core/tests/railroad.rs
+expression: "railroad-beta\ntitle Expression Grammar\naccTitle: Expressions\naccDescr { Terms joined by plus or minus }\n\nexpression = sequence(\n    nonterminal(\"term\"),\n    zeroOrMore(sequence(\n        choice(terminal(\"+\"), terminal(\"-\")),\n        nonterminal(\"term\")\n    ))\n) ;\nfactor = choice(\n    nonterminal(\"number\"),\n    sequence(terminal(\"(\"), nonterminal(\"expression\"), terminal(\")\"))\n) ;\nnumber = oneOrMore(nonterminal(\"digit\")) ;\nsign = optional(special(\"plus or minus\")) ;\n"
+---
+                         +---------------------+
+               +------+  |   .---.    +------+ |
+expression = *-+ term +--+-+-+ + +-+--+ term +-+-*
+               +------+  | | '---' |  +------+ |
+                         | | .---. |           |
+                         | +-+ - +-+           |
+                         |   '---'             |
+                         +----------<----------+
+
+             +--------+
+factor = *-+-+ number +-------------------+-*
+           | +--------+                   |
+           | .---.  +------------+  .---. |
+           +-+ ( +--+ expression +--+ ) +-+
+             '---'  +------------+  '---'
+
+             +-------+
+number = *-+-+ digit +-+-*
+           | +-------+ |
+           +-----<-----+
+
+         +-----------------------+
+         | +...................+ |
+sign = *-+-+ ? plus or minus ? +-+-*
+           +...................+

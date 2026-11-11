@@ -30,10 +30,10 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | `venn-beta` | circles | Sets as circles sized and overlapped by their sizes; ASCII lists each set and overlap: `mermaid-venn-diagrams.md`. |
 | `wardley-beta` | map | Components placed by visibility and evolution, with links and trends; ASCII plots them by name over the stages: `mermaid-wardley-maps.md`. |
 | `treeView-beta` | tree | Files and directories nested by indentation or box-drawing characters; ASCII prints the tree as `tree` does: `mermaid-tree-views.md`. |
+| `railroad-beta`, `railroad-ebnf-beta`, `railroad-abnf-beta`, `railroad-peg-beta` | grammar | Rules as syntax diagrams; ASCII draws boxed elements on a track: `mermaid-railroad-diagrams.md`. |
 | `kanban` | board | Columns of cards, with the mindmap grammar; ASCII is a box per column: `mermaid-kanban-boards.md`. |
 
-Mermaid 12 also adds
-`railroad-beta` (and its `-ebnf`, `-abnf`, and `-peg` forms), `swimlane-beta`, `eventmodeling`,
+Mermaid 12 also adds `swimlane-beta`, `eventmodeling`,
 `cynefin-beta`, and `agentflow-beta`. Until each is built it is FLOWCH-16's "not supported"
 error.
 

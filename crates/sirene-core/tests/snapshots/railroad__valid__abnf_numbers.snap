@@ -1,0 +1,21 @@
+---
+source: crates/sirene-core/tests/railroad.rs
+expression: "railroad-abnf-beta\nphone = [ \"+\" country-code ] subscriber ;\ncountry-code = 1*3DIGIT ;\nsubscriber = 2*4( %x30-39 / \"-\" ) 3%d32 ;\n"
+---
+          ┌─────────────────────────┐
+          │ ╭───╮  ┌──────────────┐ │  ┌────────────┐
+phone = ●─┴─┤ + ├──┤ country-code ├─┴──┤ subscriber ├─●
+            ╰───╯  └──────────────┘    └────────────┘
+
+                   ┌───────┐
+country-code = ●─┬─┤ DIGIT ├─┬─●
+                 │ └───────┘ │
+                 └─────◄─────┘
+
+                   ╭─────────╮        ╭──────╮
+subscriber = ●─┬─┬─┤ %x30-39 ├─┬─┬──┬─┤ %d32 ├─┬─●
+               │ │ ╰─────────╯ │ │  │ ╰──────╯ │
+               │ │ ╭───╮       │ │  └─────◄────┘
+               │ └─┤ - ├───────┘ │
+               │   ╰───╯         │
+               └────────◄────────┘

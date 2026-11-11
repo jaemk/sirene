@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/railroad.rs
+expression: "railroad-ebnf-beta\n(* ISO 14977 style *)\nletter ::= \"a\" | \"b\" ;\nword = letter , { letter } , ? end of word ? ;\nother = character - letter ; /* W3C comment */\n"
+---
+             .---.
+letter = *-+-+ a +-+-*
+           | '---' |
+           | .---. |
+           +-+ b +-+
+             '---'
+
+                     +------------+
+         +--------+  | +--------+ |  +.................+
+word = *-+ letter +--+-+ letter +-+--+ ? end of word ? +-*
+         +--------+  | +--------+ |  +.................+
+                     +------<-----+
+
+          +-----------+  .---.  +--------+
+other = *-+ character +--+ - +--+ letter +-*
+          +-----------+  '---'  +--------+

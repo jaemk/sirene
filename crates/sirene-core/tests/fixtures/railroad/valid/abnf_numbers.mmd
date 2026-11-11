@@ -1,0 +1,4 @@
+railroad-abnf-beta
+phone = [ "+" country-code ] subscriber ;
+country-code = 1*3DIGIT ;
+subscriber = 2*4( %x30-39 / "-" ) 3%d32 ;

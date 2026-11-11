@@ -1,0 +1,18 @@
+railroad-beta
+title Expression Grammar
+accTitle: Expressions
+accDescr { Terms joined by plus or minus }
+
+expression = sequence(
+    nonterminal("term"),
+    zeroOrMore(sequence(
+        choice(terminal("+"), terminal("-")),
+        nonterminal("term")
+    ))
+) ;
+factor = choice(
+    nonterminal("number"),
+    sequence(terminal("("), nonterminal("expression"), terminal(")"))
+) ;
+number = oneOrMore(nonterminal("digit")) ;
+sign = optional(special("plus or minus")) ;
