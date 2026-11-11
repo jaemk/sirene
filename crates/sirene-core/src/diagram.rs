@@ -68,6 +68,8 @@ pub enum Kind {
     Swimlane,
     Cynefin,
     EventModel,
+    /// A flowchart of `flow` containers with agentflow's shapes and edges (`agentflow-beta`).
+    Agentflow,
 }
 
 impl Kind {
@@ -136,6 +138,8 @@ impl Kind {
             Kind::Railroad
         } else if word == flowchart::SWIMLANE {
             Kind::Swimlane
+        } else if word == flowchart::AGENTFLOW {
+            Kind::Agentflow
         } else if cynefin::HEADERS.contains(&word) {
             Kind::Cynefin
         } else if eventmodel::HEADERS.contains(&word) {
@@ -148,7 +152,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, and event modeling diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, event modeling, and agentflow diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -321,7 +325,7 @@ pub(crate) fn header(src: &str) -> &str {
 /// Parses and lowers `src` with the parser its header picks (LANGS-2).
 pub fn lower(src: &str) -> Lowered {
     match Kind::of(src) {
-        Kind::Flowchart | Kind::Swimlane => flowchart::parse(src).lower().into(),
+        Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => flowchart::parse(src).lower().into(),
         Kind::Sequence => {
             let (seq, diagnostics) = sequence::parse(src).lower();
             Lowered {
@@ -512,14 +516,6 @@ pub fn lower(src: &str) -> Lowered {
     }
 }
 
-/// The keyword of a Mermaid diagram type sirene does not draw, e.g. `pie` (FLOWCH-16).
-pub fn other_diagram(src: &str) -> Option<String> {
-    match Kind::of(src) {
-        Kind::Flowchart => flowchart::parse(src).other_diagram(),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -574,6 +570,7 @@ mod tests {
         assert_eq!(Kind::of("cynefin-beta\n"), Kind::Cynefin);
         assert_eq!(Kind::of("cynefin-beta:\n"), Kind::Cynefin);
         assert_eq!(Kind::of("eventmodeling\n"), Kind::EventModel);
+        assert_eq!(Kind::of("agentflow-beta LR\n"), Kind::Agentflow);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -584,40 +581,49 @@ mod tests {
         assert_eq!(Kind::of("---\nunclosed\n"), Kind::Flowchart);
     }
 
+    /// Every Mermaid 12.3 type has a parser: none is refused by its header.
     #[test]
-    fn other_diagrams() {
-        assert_eq!(other_diagram("zenuml\n"), None);
-        assert_eq!(other_diagram("info\n"), None);
-        assert_eq!(other_diagram("venn-beta\n"), None);
-        assert_eq!(other_diagram("wardley-beta\n"), None);
-        assert_eq!(other_diagram("treeView-beta\n"), None);
-        assert_eq!(other_diagram("usecase-beta\n"), None);
-        assert_eq!(other_diagram("railroad-ebnf-beta\n"), None);
-        assert_eq!(other_diagram("swimlane-beta\n"), None);
-        assert_eq!(other_diagram("cynefin-beta\n"), None);
-        assert_eq!(other_diagram("eventmodeling\n"), None);
-        assert_eq!(
-            other_diagram("agentflow-beta\n"),
-            Some("agentflow-beta".to_owned())
-        );
-        assert_eq!(other_diagram("xychart-beta\n"), None);
-        assert_eq!(other_diagram("requirementDiagram\n"), None);
-        assert_eq!(other_diagram("kanban\n"), None);
-        assert_eq!(other_diagram("packet-beta\n"), None);
-        assert_eq!(other_diagram("radar-beta\n"), None);
-        assert_eq!(other_diagram("sankey-beta\n"), None);
-        assert_eq!(other_diagram("treemap-beta\n"), None);
-        assert_eq!(other_diagram("block-beta\n"), None);
-        assert_eq!(other_diagram("architecture-beta\n"), None);
-        assert_eq!(other_diagram("C4Container\n"), None);
-        assert_eq!(other_diagram("quadrantChart\n"), None);
-        assert_eq!(other_diagram("journey\n"), None);
-        assert_eq!(other_diagram("mindmap\n"), None);
-        assert_eq!(other_diagram("gantt\n"), None);
-        assert_eq!(other_diagram("pie\n"), None);
-        assert_eq!(other_diagram("stateDiagram-v2\n"), None);
-        assert_eq!(other_diagram("gitGraph\n"), None);
-        assert_eq!(other_diagram("sequenceDiagram\n"), None);
-        assert_eq!(other_diagram("flowchart\n"), None);
+    fn every_type_is_drawn() {
+        for header in [
+            "zenuml",
+            "info",
+            "venn-beta",
+            "wardley-beta",
+            "treeView-beta",
+            "usecase-beta",
+            "railroad-ebnf-beta",
+            "swimlane-beta",
+            "cynefin-beta",
+            "eventmodeling",
+            "agentflow-beta",
+            "xychart-beta",
+            "requirementDiagram",
+            "kanban",
+            "packet-beta",
+            "radar-beta",
+            "sankey-beta",
+            "treemap-beta",
+            "block-beta",
+            "architecture-beta",
+            "C4Container",
+            "quadrantChart",
+            "journey",
+            "mindmap",
+            "gantt",
+            "pie",
+            "stateDiagram-v2",
+            "gitGraph",
+            "sequenceDiagram",
+            "flowchart",
+        ] {
+            let lowered = lower(&format!("{header}\n"));
+            assert!(
+                lowered
+                    .diagnostics
+                    .iter()
+                    .all(|d| !d.message.contains("not supported")),
+                "{header}"
+            );
+        }
     }
 }

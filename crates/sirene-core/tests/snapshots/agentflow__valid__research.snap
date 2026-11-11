@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/agentflow.rs
+expression: "agentflow-beta LR\n  global\n    user[\"User\"]\n  end\n\n  flow plan[\"Planner\"]\n    goal@{ shape: input, label: \"Read the goal\" }\n    split{\"Split into tasks?\"}\n  end\n\n  flow work[\"Workers\"]\n    search@{ shape: tool, label: \"Web search\" }\n    notes@{ shape: refdoc, label: \"Notes\" }\n    act@{ shape: action, label: \"Draft answer\" }\n  end\n\n  connector bus[\"Message bus\"]\n\n  user --> goal\n  goal --> split\n  split -- yes --> search\n  split -->|no| act\n  search --> notes\n  notes -.- bus\n  bus --> act\n  act --x user\n"
+---
+
+              ┌─ Planner ────────────────────────────────────┐         ┌─ Workers ───────────────────────┐
+              │                       ╱───────────────────╲  │         │  ┌┬────────────┬┐    ┌───────┐  │
+              │  ┌───────────────┐    │ Split into tasks? ├──┼───yes───┼─►││ Web search │├───►│ Notes ├┄┄┼┄┐
+╭──────╮    ┌─┼─►╱ Read the goal ├───►│                   ├──┼─┐       │  └┴────────────┴┘    └───────┘  │ └┄┄┐ ╭─────────────╮
+│ User ├────┘ │  └───────────────┘    ╲───────────────────╱  │ └─no──┐ │                                 │    └┄┤ Message bus │
+│      │x┐    └──────────────────────────────────────────────┘       │ │  ╱──────────────╲               │    ┌─┤             │
+╰──────╯ │                                                           └─┼─►< Draft answer >               │ ┌──┘ ╰─────────────╯
+         └─────────────────────────────────────────────────────────────┼──┤              >◄──────────────┼─┘
+                                                                       │  ╲──────────────╱               │
+                                                                       └─────────────────────────────────┘

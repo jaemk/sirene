@@ -30,7 +30,8 @@ Statements after the error parse normally.
 
 ## FLOWCH-4 Header
 
-The first statement is `flowchart`, `graph`, `flowchart-elk`, or `swimlane-beta` (MSWIM-1),
+The first statement is `flowchart`, `graph`, `flowchart-elk`, `swimlane-beta` (MSWIM-1), or
+`agentflow-beta` (MAGF-1),
 optionally followed by
 whitespace and a direction: `TB`, `TD`, `BT`, `RL`, `LR`, or the aliases `>` (LR), `<` (RL),
 `^` (BT), `v` (TB). The header ends at a newline or `;`. Any other first statement is an error
@@ -170,8 +171,8 @@ A document whose first statement starts with another Mermaid diagram keyword (`s
 `classDiagram`, `stateDiagram`, `erDiagram`, `gantt`, `pie`, `gitGraph`, `mindmap`, `timeline`,
 and the rest of mermaid's types, with their `-v2` and `-beta` forms) is one `ERROR` node from that
 keyword to the end, with one diagnostic on the keyword, e.g.
-`` `wardley-beta` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, and event modeling diagrams `` (the list
-is `diagram::DRAWN`). Nothing of it is drawn. A type sirene draws never reaches this parser:
-`diagram::lower` sends it to its own (MSTATE-1, MCLASS-1, MER-1, MGIT-1, TIMELI-1, MPIE-1,
+`` `wardley-beta` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, event modeling, and agentflow diagrams `` (the list
+is `diagram::DRAWN`). Nothing of it is drawn. Every Mermaid 12.3 type has a parser, so only a
+direct `flowchart::parse` sees this: `diagram::lower` sends each type to its own (MSTATE-1, MCLASS-1, MER-1, MGIT-1, TIMELI-1, MPIE-1,
 MGANTT-1, MMIND-1, MJOUR-1, MQUAD-1, MXY-1, MREQ-1, MKAN-1, MPKT-1, MRADAR-1, MSANKEY-1, MTREE-1, MINFO-1, MISH-1). Tests: `other_diagram_types_are_one_error` in
 `crates/sirene-core/tests/flowchart_model.rs`.

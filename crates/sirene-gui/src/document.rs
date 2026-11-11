@@ -160,6 +160,7 @@ impl Document {
             Kind::EventModel => {
                 Some("drawing edits are not supported for event modeling diagrams yet")
             }
+            Kind::Agentflow => Some("drawing edits are not supported for agentflow diagrams yet"),
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")

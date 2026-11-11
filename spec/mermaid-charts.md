@@ -34,10 +34,10 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | `swimlane-beta` | graph | A flowchart whose top-level subgraphs are lanes across the flow: `mermaid-swimlane-diagrams.md`. |
 | `cynefin-beta` | quadrants | Items in the five Cynefin domains, with transitions; ASCII is the quadrants in a box: `mermaid-cynefin-diagrams.md`. |
 | `eventmodeling` | timeline | Frames on a timeline in swimlanes by type and namespace, with relations; ASCII is the lanes as rows of boxes: `mermaid-event-modeling-diagrams.md`. |
+| `agentflow-beta` | graph | A flowchart of `flow` containers with a reduced set of shapes and edges: `mermaid-agentflow-diagrams.md`. |
 | `kanban` | board | Columns of cards, with the mindmap grammar; ASCII is a box per column: `mermaid-kanban-boards.md`. |
 
-Mermaid 12 also adds `agentflow-beta`. Until it is built it is FLOWCH-16's "not supported"
-error.
+Every Mermaid 12.3 diagram type is drawn.
 
 ## MCHART-2 Open questions
 

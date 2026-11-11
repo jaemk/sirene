@@ -1,0 +1,24 @@
+---
+source: crates/sirene-core/tests/agentflow.rs
+expression: "agentflow-beta TB\n  start[[Start]]\n  flow review[\"Review loop\"]@{ view: collapsed }\n    check{{Check}}\n    fix[/Fix/]\n    check --> fix\n    fix --> check\n  end\n  flow\n    ship[\"Ship it\"]\n  end\n  start --> check\n  fix --> ship\n"
+---
+
+  ++-------++
+  || Start ||
+  ++---+---++
+       |
+       v
+.-------------.
+| Review loop |
+|.............|
+|     ...     |
+'------+------'
+       |
+       |
++------+------+
+|      v      |
+| .---------. |
+| | Ship it | |
+| '---------' |
+|             |
++-------------+

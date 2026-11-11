@@ -347,17 +347,3 @@ fn syntax_errors() {
     );
     assert_eq!(errors("stateDiagram-v2\n  }\n"), ["unexpected `}`"]);
 }
-
-/// Mermaid's other types still say which ones sirene draws (LANGS-4).
-#[test]
-fn other_types() {
-    assert_eq!(
-        diagram::other_diagram("agentflow-beta\n").as_deref(),
-        Some("agentflow-beta")
-    );
-    let d = &diagram::lower("agentflow-beta\n").diagnostics[0];
-    assert_eq!(
-        d.message,
-        "`agentflow-beta` diagrams are not supported; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, and event modeling diagrams"
-    );
-}

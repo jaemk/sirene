@@ -17,8 +17,8 @@ closed. `Block::position` maps a line and column in the code back to the Markdow
 
 ## MARKDO-2 Other diagram types
 
-`Parse::other_diagram` gives the keyword of the other Mermaid diagram type a source is (FLOWCH-16),
-e.g. `pie`, so callers can skip such blocks.
+`Parse::other_diagram` gives the keyword of the other Mermaid diagram type a flowchart source
+is (FLOWCH-16), e.g. `pie`. Every Mermaid 12.3 type is drawn, so the CLI skips no blocks.
 
 ## MARKDO-3 Replacing a block's code
 

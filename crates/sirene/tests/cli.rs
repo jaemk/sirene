@@ -721,11 +721,11 @@ fn check() {
         .assert()
         .success()
         .stderr("");
-    // Markdown: positions are in the Markdown file; other diagram types are skipped.
+    // Markdown: positions are in the Markdown file.
     let md = dir.join("doc.md");
     std::fs::write(
         &md,
-        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  agentflow-beta\n  ```\n",
+        "# Doc\n\n```mermaid\nflowchart TD\n  A -->\n```\n\n- item\n\n  ```mermaid\n  agentflow-beta\n  a ==> b\n  ```\n",
     )
     .unwrap();
     sirene()
@@ -736,9 +736,7 @@ fn check() {
         .stdout("")
         .stderr(
             predicate::str::contains("doc.md:5:8: error: expected a node after the edge").and(
-                predicate::str::contains(
-                    "doc.md:11:3: warning: skipping a `agentflow-beta` diagram",
-                ),
+                predicate::str::contains("doc.md:12:5: error: `==>` is not an agentflow edge"),
             ),
         );
     sirene()
@@ -751,14 +749,14 @@ fn check() {
     sirene().arg("check").assert().failure();
 }
 
-/// `svg` and `png` on a Markdown file write one image per flowchart block and never change the
+/// `svg` and `png` on a Markdown file write one image per mermaid block and never change the
 /// blocks; `--link` adds a link after each, once.
 #[test]
 fn markdown_images() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path();
     let md = dir.join("doc.md");
-    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nagentflow-beta\n  title A\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
+    let text = "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n```mermaid\nagentflow-beta\n  flow f\n    X\n  end\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n";
     std::fs::write(&md, text).unwrap();
     sirene()
         .arg("svg")
@@ -767,13 +765,13 @@ fn markdown_images() {
         .success()
         .stdout("")
         .stderr(
-            predicate::str::contains("doc.md:9:1: warning: skipping a `agentflow-beta` diagram")
-                .and(predicate::str::contains("doc-1.svg"))
+            predicate::str::contains("doc-1.svg")
+                .and(predicate::str::contains("doc-2.svg"))
                 .and(predicate::str::contains("doc-3.svg")),
         );
     let svg = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap_or_default();
     assert!(svg("doc-1.svg").contains(">A</text>"));
-    assert!(!dir.join("doc-2.svg").exists());
+    assert!(svg("doc-2.svg").contains(">X</text>"));
     assert!(svg("doc-3.svg").contains(">C</text>"));
     // Without --link, the Markdown is left alone.
     assert_eq!(std::fs::read_to_string(&md).unwrap(), text);
@@ -791,7 +789,7 @@ fn markdown_images() {
     let linked = std::fs::read_to_string(&md).unwrap();
     assert_eq!(
         linked,
-        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\nagentflow-beta\n  title A\n```\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
+        "# Doc\n\n```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](img/doc-1.png)\n\n```mermaid\nagentflow-beta\n  flow f\n    X\n  end\n```\n![diagram 2](img/doc-2.png)\n\n~~~mermaid\ngraph TD\n  C\n~~~\n![diagram 3](img/doc-3.png)\n"
     );
     assert!(dir.join("img/doc-1.png").exists());
     // Every mermaid block is still there, unchanged.
@@ -884,20 +882,16 @@ fn suggests_a_misspelled_command() {
         );
 }
 
-/// Another Mermaid diagram type gets one clear error and no drawing (FLOWCH-16).
+/// An agentflow diagram draws in text (MAGF-1).
 #[test]
-fn other_diagram_types() {
+fn agentflow_draws() {
     sirene()
         .arg("ascii")
-        .write_stdin("agentflow-beta\n  title T\n")
+        .write_stdin("agentflow-beta\n  flow f[\"Plan\"]\n    a --> b\n  end\n")
         .assert()
-        .failure()
-        .stderr(
-            "<stdin>:1:1: error: `agentflow-beta` diagrams are not supported; \
-             sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-             mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, \
-             treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, and event modeling diagrams\n",
-        );
+        .success()
+        .stdout(predicate::str::contains("Plan"))
+        .stderr("");
 }
 
 /// A ZenUML diagram draws in text and as an image (MZEN-3, LANGS-4).

@@ -16,6 +16,7 @@ pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
         pos: 0,
         builder: GreenNodeBuilder::new(),
         diagnostics: Vec::new(),
+        agentflow: false,
     };
     p.root();
     (p.builder.finish(), p.diagnostics)
@@ -26,11 +27,13 @@ struct Parser<'a> {
     pos: usize,
     builder: GreenNodeBuilder<'static>,
     diagnostics: Vec<Diagnostic>,
+    /// An `agentflow-beta` diagram (MAGF-1): `flow` containers, `global` blocks,
+    /// `connector` declarations, and only `-->`, `--x`, and `-.-` edges.
+    agentflow: bool,
 }
 
 /// Mermaid's other diagram types, by the keyword that starts them.
 const OTHER_DIAGRAMS: &[&str] = &[
-    "agentflow-beta",
     "architecture",
     "architecture-beta",
     "block",
@@ -74,6 +77,24 @@ pub(super) fn other_diagram(r: &str) -> Option<&str> {
         .unwrap_or(r.len());
     let word = &r[..end];
     OTHER_DIAGRAMS.contains(&word).then_some(word)
+}
+
+/// Whether `s` is an agentflow edge without a label: `-->` or `--x` (any length), or `-.-`
+/// with any number of dots (MAGF-3).
+fn agentflow_stroke(s: &str) -> bool {
+    agentflow_arrow(s)
+        || (s.len() >= 3
+            && s.starts_with('-')
+            && s.ends_with('-')
+            && s[1..s.len() - 1].bytes().all(|b| b == b'.'))
+}
+
+/// Whether `s` is `-->` or `--x` with any number of dashes.
+fn agentflow_arrow(s: &str) -> bool {
+    let s = s.trim();
+    s.len() >= 3
+        && matches!(s.as_bytes()[s.len() - 1], b'>' | b'x')
+        && s[..s.len() - 1].bytes().all(|b| b == b'-')
 }
 
 fn offset(n: usize) -> TextSize {
@@ -180,6 +201,9 @@ impl<'a> Parser<'a> {
             .iter()
             .any(|kw| scan::keyword(r, kw))
         {
+            self.header();
+        } else if scan::keyword(r, super::AGENTFLOW) {
+            self.agentflow = true;
             self.header();
         } else if let Some(kind) = other_diagram(r) {
             // FLOWCH-16: the whole document is another diagram type; draw nothing of it.
@@ -303,14 +327,27 @@ impl<'a> Parser<'a> {
             let tail = &r[kw.len()..];
             tail[scan::ws_len(tail)..].chars().next()
         };
-        if scan::keyword(r, "subgraph") {
-            self.subgraph(depth);
+        let container = if self.agentflow { "flow" } else { "subgraph" };
+        if scan::keyword(r, container) {
+            self.subgraph(depth, container);
+        } else if self.agentflow && scan::keyword(r, "global") {
+            self.global(depth);
+        } else if self.agentflow && scan::keyword(r, "connector") {
+            self.connector();
+        } else if self.agentflow && scan::keyword(r, "subgraph") {
+            self.error_rest("agentflow has no `subgraph`; use `flow`");
+            return;
         } else if scan::keyword(r, "end") {
             let start = self.pos;
             self.start(ERROR);
             self.token(END_KW, 3);
             self.finish();
-            self.error(start, start + 3, "`end` without a matching `subgraph`");
+            let message = if self.agentflow {
+                "`end` without a matching `flow` or `global`"
+            } else {
+                "`end` without a matching `subgraph`"
+            };
+            self.error(start, start + 3, message);
         } else if scan::keyword(r, "direction") {
             self.direction_stmt();
         } else if scan::keyword(r, "classDef") {
@@ -492,9 +529,13 @@ impl<'a> Parser<'a> {
             self.token(AT, 1);
             self.finish();
         }
+        let start = self.pos;
         match scan::stroke(self.rest()) {
             Some(Stroke::Full(n)) => {
                 self.token(STROKE, n);
+                if self.agentflow && !agentflow_stroke(&self.src[start..self.pos]) {
+                    self.agentflow_edge_error(start, self.pos);
+                }
                 if self.ws_then(|r| r.starts_with('|')) {
                     self.start(EDGE_LABEL);
                     let open = self.pos;
@@ -518,7 +559,16 @@ impl<'a> Parser<'a> {
                 );
                 self.finish();
                 match scan::closing_stroke(self.rest(), kind) {
-                    Some(m) => self.token(STROKE, m),
+                    Some(m) => {
+                        let close = self.pos;
+                        self.token(STROKE, m);
+                        let opened = self.src[open..open + n].trim_end();
+                        if self.agentflow
+                            && (opened != "--" || !agentflow_arrow(&self.src[close..self.pos]))
+                        {
+                            self.agentflow_edge_error(open, self.pos);
+                        }
+                    }
                     None => self.error(
                         open,
                         open + n,
@@ -531,14 +581,27 @@ impl<'a> Parser<'a> {
         self.finish();
     }
 
+    /// MAGF-3: agentflow has only `-->`, `--x`, and `-.-` edges.
+    fn agentflow_edge_error(&mut self, start: usize, end: usize) {
+        let text: String = self.src[start..end]
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        self.error(
+            start,
+            end,
+            format!("`{text}` is not an agentflow edge; use `-->`, `--x`, or `-.-`"),
+        );
+    }
+
     // ---- other statements ----
 
     /// FLOWCH-10.
-    fn subgraph(&mut self, depth: usize) {
+    fn subgraph(&mut self, depth: usize, keyword: &str) {
         let kw_start = self.pos;
         self.start(SUBGRAPH);
         self.start(SUBGRAPH_HEADER);
-        self.token(SUBGRAPH_KW, "subgraph".len());
+        self.token(SUBGRAPH_KW, keyword.len());
         if self.ws_then(|r| !scan::is_stmt_end(r)) {
             let r = self.rest();
             let n = scan::id_len(r);
@@ -552,8 +615,15 @@ impl<'a> Parser<'a> {
                 self.token(IDENT, n);
                 self.ws();
                 self.shape(1, Opener::Rect);
+                if self.agentflow && self.rest().starts_with("@{") {
+                    self.metadata();
+                }
             } else if n > 0 && scan::is_stmt_end(after) {
                 self.token(IDENT, n);
+            } else if self.agentflow && n > 0 && r[n..].starts_with("@{") {
+                // MAGF-2: `flow id@{ ... }`.
+                self.token(IDENT, n);
+                self.metadata();
             } else {
                 let len = scan::trim_end_len(r, scan::stmt_len(r));
                 self.start(LABEL);
@@ -568,9 +638,39 @@ impl<'a> Parser<'a> {
         } else {
             self.error(
                 kw_start,
-                kw_start + "subgraph".len(),
-                "unclosed `subgraph`: expected `end`",
+                kw_start + keyword.len(),
+                format!("unclosed `{keyword}`: expected `end`"),
             );
+        }
+        self.finish();
+    }
+
+    /// MAGF-2: `global` ... `end`; its nodes belong to no `flow`.
+    fn global(&mut self, depth: usize) {
+        let kw_start = self.pos;
+        self.start(GLOBAL);
+        self.token(GLOBAL_KW, "global".len());
+        self.end_of_statement();
+        if self.statements(depth + 1) {
+            self.token(END_KW, "end".len());
+        } else {
+            self.error(
+                kw_start,
+                kw_start + "global".len(),
+                "unclosed `global`: expected `end`",
+            );
+        }
+        self.finish();
+    }
+
+    /// MAGF-2: `connector id["Title"]`, with optional metadata.
+    fn connector(&mut self) {
+        self.start(CONNECTOR_STMT);
+        self.token(CONNECTOR_KW, "connector".len());
+        if self.ws_then(|r| scan::id_len(r) > 0) {
+            self.node();
+        } else {
+            self.fail("expected a connector id after `connector`");
         }
         self.finish();
     }

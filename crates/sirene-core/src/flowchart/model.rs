@@ -367,6 +367,8 @@ pub struct Flowchart {
     pub default_curve: Option<String>,
     /// A swimlane diagram: top-level subgraphs are lanes side by side across the flow.
     pub lanes: bool,
+    /// An agentflow diagram (MAGF-1): subgraphs are `flow` containers, drawn unfilled.
+    pub agentflow: bool,
 }
 
 impl Flowchart {

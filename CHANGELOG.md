@@ -117,8 +117,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   data blocks; in text, the lanes as rows of boxes with vertical arrows between them.
 - Collapsed flowchart subgraphs (`id@{ view: collapsed }`) are drawn as one node with the
   subgraph's title, a dashed rule, and three dots; edges into the subgraph end at that node.
-- Mermaid 12's other new types (`eventmodeling` and the rest) are
-  reported as not supported instead of read as flowcharts.
+- Mermaid agentflow diagrams (`agentflow-beta`), read-only in the editor: `flow` containers
+  (collapsible with `@{ view: collapsed }`), `global` blocks, `connector` nodes, agentflow's
+  shape aliases (`task`, `tool`, `input`, `decision`, `refdoc`, `action`), and `-->`, `--x`, and
+  `-.-` edges; removed shapes are errors and other Mermaid shapes warnings, both drawn rounded.
+- Markdown blocks are no longer skipped as another diagram type: every Mermaid 12.3 type is
+  drawn.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 - `THIRD-PARTY-NOTICES` with the licenses of the code sirene ports (venn.js, fmin, d3-sankey,
   and other d3 modules, Day.js, Mermaid) and the Noto Sans fonts. Release tarballs, the macOS

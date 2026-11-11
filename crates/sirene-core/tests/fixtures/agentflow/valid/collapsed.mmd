@@ -1,0 +1,13 @@
+agentflow-beta TB
+  start[[Start]]
+  flow review["Review loop"]@{ view: collapsed }
+    check{{Check}}
+    fix[/Fix/]
+    check --> fix
+    fix --> check
+  end
+  flow
+    ship["Ship it"]
+  end
+  start --> check
+  fix --> ship

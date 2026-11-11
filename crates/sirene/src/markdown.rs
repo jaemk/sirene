@@ -30,22 +30,6 @@ pub fn report(
     errors
 }
 
-/// A block of another Mermaid diagram type: reported as skipped. Returns whether it was one.
-fn skipped(name: &str, block: &Block) -> bool {
-    match diagram::other_diagram(&block.code) {
-        Some(kind) => {
-            eprintln!(
-                "{name}:{}:{}: warning: skipping a `{kind}` diagram; sirene draws {}",
-                block.line,
-                block.indent + 1,
-                diagram::DRAWN
-            );
-            true
-        }
-        None => false,
-    }
-}
-
 /// Checks `path`'s diagrams, printing their diagnostics: a Markdown file's mermaid blocks, every
 /// diagram under a directory, or one diagram (stdin for `-`). Returns whether all were read
 /// and had no errors.
@@ -82,9 +66,6 @@ pub fn check(path: &Path) -> bool {
         log::debug!("{name}: {} mermaid block(s)", blocks.len());
         let mut ok = true;
         for block in &blocks {
-            if skipped(&name, block) {
-                continue;
-            }
             let lowered = diagram::lower(&block.code);
             ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
         }
@@ -201,10 +182,6 @@ pub fn render(
     let mut links = Vec::new();
     for (i, block) in blocks.into_iter().enumerate() {
         let n = i + 1;
-        if skipped(&name, &block) {
-            links.push((block, None));
-            continue;
-        }
         let lowered = diagram::lower(&block.code);
         ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
         let image = image_path(md, out, n, ext);

@@ -15,7 +15,7 @@ is detected from its first statement: `@startuml` (or another `@start...`) is Pl
 `digraph`, or `strict` followed by an optional ID and `{` is DOT; anything else is Mermaid. D2 has
 no header, so it needs its extension or `--lang d2`. Every command takes `--lang
 mermaid|dot|d2|plantuml` to override detection. Within Mermaid, the header keyword picks the
-diagram type, as today (FLOWCH-4, FLOWCH-16).
+diagram type (FLOWCH-4).
 
 In Markdown (MARKDO-1), a block's info string picks the language: `mermaid`; `dot` or
 `graphviz`; `d2`; `plantuml` or `puml`. Blocks of other languages are left alone.
@@ -74,8 +74,8 @@ it. Languages other than Mermaid, and `--lang`, come with DOT.
 ## LANGS-4 Commands
 
 `check`, `ascii`, `svg`, `png`, `--watch`, directories, and Markdown files work for every
-language. A directory is scanned for every extension in LANGS-1. FLOWCH-16's "not supported"
-error narrows to the Mermaid types not yet built, and says which are.
+language. A directory is scanned for every extension in LANGS-1. Every Mermaid 12.3 type is
+drawn.
 
 ## LANGS-5 Editor
 
@@ -86,7 +86,7 @@ are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not 
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
 Sequence, state, class, ER, requirement, and use case diagrams, git graphs, timelines, pie and gantt charts,
-mindmaps, user journeys, quadrant, XY, and radar charts, kanban boards, packet, sankey, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, and event modeling diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
+mindmaps, user journeys, quadrant, XY, and radar charts, kanban boards, packet, sankey, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, event modeling, and agentflow diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
 disabled Add Node, Select All, and Fit Window, a press on a node pans instead of connecting, and
 every edit action says `Can't ...: drawing edits are not supported for state diagrams yet` (or
 class diagrams, ER diagrams, requirement diagrams, use case diagrams, git graphs, timelines, sequence diagrams, pie charts, gantt

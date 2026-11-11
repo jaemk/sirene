@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/agentflow.rs
+expression: "agentflow-beta\n  flow f[\"Shapes\"]\n    a@{ shape: cloud, label: \"Cloud\" }\n    b@{ shape: task, label: \"Task\" }\n  end\n  a --> b\n"
+---
+3:6: warning: agentflow does not support the `cloud` shape; drawing a rounded rectangle
+
+┌─ Shapes ──┐
+│           │
+│ ╭───────╮ │
+│ │ Cloud │ │
+│ ╰───┬───╯ │
+│     │     │
+│     ▼     │
+│ ╭──────╮  │
+│ │ Task │  │
+│ ╰──────╯  │
+│           │
+└───────────┘
