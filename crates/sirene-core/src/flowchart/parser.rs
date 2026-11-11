@@ -8,6 +8,7 @@ use rowan::{GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::scan::{self, Opener, Stroke};
 use crate::diagnostic::Diagnostic;
+use crate::lines::{MAX_DEPTH, end_block_len, too_deep};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -633,15 +634,7 @@ impl<'a> Parser<'a> {
         }
         self.finish();
         self.end_of_statement();
-        if self.statements(depth + 1) {
-            self.token(END_KW, "end".len());
-        } else {
-            self.error(
-                kw_start,
-                kw_start + keyword.len(),
-                format!("unclosed `{keyword}`: expected `end`"),
-            );
-        }
+        self.body(depth, kw_start, keyword);
         self.finish();
     }
 
@@ -651,16 +644,44 @@ impl<'a> Parser<'a> {
         self.start(GLOBAL);
         self.token(GLOBAL_KW, "global".len());
         self.end_of_statement();
-        if self.statements(depth + 1) {
+        self.body(depth, kw_start, "global");
+        self.finish();
+    }
+
+    /// The statements of a container opened by `keyword` at `kw_start`, and its `end`. A
+    /// container nested more than `MAX_DEPTH` deep is not read: its content is one `ERROR` node
+    /// (LANGS-8).
+    fn body(&mut self, depth: usize, kw_start: usize, keyword: &str) {
+        let closed = if depth < MAX_DEPTH {
+            self.statements(depth + 1)
+        } else {
+            self.trivia();
+            let (openers, what): (&[&str], _) = if self.agentflow {
+                (&["flow", "global"], "flows")
+            } else {
+                (&["subgraph"], "subgraphs")
+            };
+            let end = end_block_len(self.rest(), openers);
+            let start = self.pos;
+            let len = end.unwrap_or(self.rest().len());
+            let line = scan::line_len(self.rest()).min(len);
+            self.error(start, start + line, too_deep(what, MAX_DEPTH));
+            if len > 0 {
+                self.start(ERROR);
+                self.token(ERROR_TOKEN, len);
+                self.finish();
+            }
+            end.is_some()
+        };
+        if closed {
             self.token(END_KW, "end".len());
         } else {
             self.error(
                 kw_start,
-                kw_start + "global".len(),
-                "unclosed `global`: expected `end`",
+                kw_start + keyword.len(),
+                format!("unclosed `{keyword}`: expected `end`"),
             );
         }
-        self.finish();
     }
 
     /// MAGF-2: `connector id["Title"]`, with optional metadata.

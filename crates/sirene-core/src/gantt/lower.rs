@@ -1,6 +1,6 @@
 //! Collects a gantt chart's settings and sections, and dates its tasks (MGANTT-2, MGANTT-3).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use rowan::TextRange;
 
@@ -336,46 +336,46 @@ fn date_tasks(g: &Gantt, raws: &[Raw], diagnostics: &mut Vec<Diagnostic>) -> Vec
             failed[i] = true;
         }
     }
-    loop {
-        let mut progress = false;
-        for (i, r) in raws.iter().enumerate() {
-            if failed[i] || out[i].is_some() {
-                continue;
+    // The tasks each task waits for. A task is dated once those are settled, so a chain of any
+    // length takes one visit per task.
+    let untils: Vec<Option<Vec<String>>> = raws.iter().map(|r| until(&r.end)).collect();
+    let mut waiting = vec![0usize; raws.len()];
+    let mut dependents: Vec<Vec<usize>> = vec![Vec::new(); raws.len()];
+    for (i, r) in raws.iter().enumerate() {
+        if failed[i] {
+            continue;
+        }
+        let (after, previous): (&[String], _) = match &r.start {
+            Start::After(names) => (names, None),
+            Start::Previous => (&[], r.previous),
+            Start::Date(_) => (&[], None),
+        };
+        let named = after.iter().chain(untils[i].iter().flatten());
+        for j in named.map(|n| ids[n.as_str()]).chain(previous) {
+            waiting[i] += 1;
+            dependents[j].push(i);
+        }
+    }
+    let mut ready: VecDeque<usize> = (0..raws.len()).filter(|&i| waiting[i] == 0).collect();
+    let mut endless = false;
+    while let Some(i) = ready.pop_front() {
+        let r = &raws[i];
+        // `None` when the task cannot be dated, as when a task it waits for cannot be.
+        let dates = 'task: {
+            if failed[i] {
+                break 'task None;
             }
-            // Ok(Some) when known, Ok(None) when waiting on another task, Err when it cannot be.
-            let lookup = |names: &[String]| -> Result<Option<Vec<Dates>>, ()> {
-                let mut v = Vec::new();
-                for n in names {
-                    let j = ids[n.as_str()];
-                    if failed[j] {
-                        return Err(());
-                    }
-                    match out[j] {
-                        Some(d) => v.push(d),
-                        None => return Ok(None),
-                    }
-                }
-                Ok(Some(v))
+            let lookup = |names: &[String]| -> Option<Vec<Dates>> {
+                names.iter().map(|n| out[ids[n.as_str()]]).collect()
             };
             let start = match &r.start {
-                Start::Previous => {
-                    let j = r.previous.expect("checked when read");
-                    if failed[j] {
-                        failed[i] = true;
-                        continue;
-                    }
-                    match out[j] {
-                        Some(d) => d.1,
-                        None => continue,
-                    }
-                }
+                Start::Previous => match out[r.previous.expect("checked when read")] {
+                    Some(d) => d.1,
+                    None => break 'task None,
+                },
                 Start::After(names) => match lookup(names) {
-                    Ok(Some(v)) => v.iter().map(|d| d.1).max().expect("ids given"),
-                    Ok(None) => continue,
-                    Err(()) => {
-                        failed[i] = true;
-                        continue;
-                    }
+                    Some(v) => v.iter().map(|d| d.1).max().expect("ids given"),
+                    None => break 'task None,
                 },
                 Start::Date(s) => match date(s) {
                     Some(t) => t,
@@ -384,19 +384,14 @@ fn date_tasks(g: &Gantt, raws: &[Raw], diagnostics: &mut Vec<Diagnostic>) -> Vec
                             r.range,
                             format!("`{s}` is not a date in `{}`", g.date_format),
                         ));
-                        failed[i] = true;
-                        continue;
+                        break 'task None;
                     }
                 },
             };
-            let (end, manual) = if let Some(names) = until(&r.end) {
-                match lookup(&names) {
-                    Ok(Some(v)) => (v.iter().map(|d| d.0).min().expect("ids given"), false),
-                    Ok(None) => continue,
-                    Err(()) => {
-                        failed[i] = true;
-                        continue;
-                    }
+            let (end, manual) = if let Some(names) = &untils[i] {
+                match lookup(names) {
+                    Some(v) => (v.iter().map(|d| d.0).min().expect("ids given"), false),
+                    None => break 'task None,
                 }
             } else if let Some(t) = time::parse_dayjs(&r.end, &g.date_format, g.now) {
                 let t = if g.inclusive_end_dates {
@@ -415,19 +410,31 @@ fn date_tasks(g: &Gantt, raws: &[Raw], diagnostics: &mut Vec<Diagnostic>) -> Vec
                         r.end, g.date_format
                     ),
                 ));
-                failed[i] = true;
-                continue;
+                break 'task None;
             };
-            out[i] = Some(if manual || g.excludes.is_empty() {
-                (start, end, end)
+            let moved = if manual || g.excludes.is_empty() || endless {
+                None
             } else {
-                let (end, drawn) = skip_excluded(g, start, end);
-                (start, end, drawn)
-            });
-            progress = true;
-        }
-        if !progress {
-            break;
+                let moved = skip_excluded(g, start, end);
+                if moved.is_none() {
+                    endless = true;
+                    diagnostics.push(Diagnostic::new(
+                        r.range,
+                        "`excludes` leaves no day to work on; ignoring it",
+                    ));
+                }
+                moved
+            };
+            let (end, drawn) = moved.unwrap_or((end, end));
+            Some((start, end, drawn))
+        };
+        failed[i] = dates.is_none();
+        out[i] = dates;
+        for &d in &dependents[i] {
+            waiting[d] -= 1;
+            if waiting[d] == 0 {
+                ready.push_back(d);
+            }
         }
     }
     for (i, r) in raws.iter().enumerate() {
@@ -452,10 +459,14 @@ fn until(end: &str) -> Option<Vec<String>> {
 }
 
 /// Mermaid's `fixTaskDates`: each excluded day after the start moves the end a day later; the
-/// bar ends at the last end that was not moved. Returns the end and the drawn end.
-fn skip_excluded(g: &Gantt, start: Time, mut end: Time) -> (Time, Time) {
+/// bar ends at the last end that was not moved. Returns the end and the drawn end, or `None`
+/// when the end never stops moving: more days in a row are excluded than dates and weekdays
+/// can exclude unless every weekday is.
+fn skip_excluded(g: &Gantt, start: Time, mut end: Time) -> Option<(Time, Time)> {
+    let longest = 7 * (g.excludes.len() + 1);
     let mut day = start + time::DAY;
     let mut excluded = false;
+    let mut run = 0;
     let mut drawn = end;
     while day <= end {
         if !excluded {
@@ -464,10 +475,16 @@ fn skip_excluded(g: &Gantt, start: Time, mut end: Time) -> (Time, Time) {
         excluded = g.is_excluded(day);
         if excluded {
             end += time::DAY;
+            run += 1;
+            if run > longest {
+                return None;
+            }
+        } else {
+            run = 0;
         }
         day += time::DAY;
     }
-    (end, drawn)
+    Some((end, drawn))
 }
 
 #[cfg(test)]

@@ -161,6 +161,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A `stroke-width` over 32px is drawn 32px wide; a wider line and its arrowheads ran off the
   image.
 - A blank diagram title no longer prints an empty line in text output.
+- Deeply nested sources no longer overflow the stack: blocks, indented levels, and JSON values
+  are read 64 deep (block diagrams 12), and a deeper one is one error.
+- A gantt chart whose `excludes` names every day no longer hangs; it is an error and the
+  `excludes` is ignored. Long `after` chains are dated in one visit per task, and a task waiting
+  on a task with a bad date is left out without a second error.
+- Text output of a very large drawing is cut off at 2^22 cells with a line saying so, in place
+  of an overflow or an allocation failure.
+- Architecture diagrams with many groups lay out in time proportional to their size.
 
 ## [0.2.0] - 2026-11-08
 

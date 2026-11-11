@@ -50,7 +50,11 @@ start plus the duration (days and weeks rounded to whole days, months and years 
 dayjs adds them), or the earliest start of the `until` tasks. `after` and `until` may name tasks
 declared later. When the end is a duration or `until` and `excludes` is set, each excluded day
 from the day after the start through the end moves the end a day later, and the bar is drawn to
-the last end that was not moved (Mermaid's `fixTaskDates`).
+the last end that was not moved (Mermaid's `fixTaskDates`). When `excludes` names every weekday,
+so that an end would move forever, it is an error on the first such task and `excludes` is
+ignored. A task that waits for one that cannot be dated is not drawn, and tasks that wait on each
+other are an error each. Dating visits each task once, whatever the order of the source. Tests:
+`endless_excludes`, `waits`.
 
 `excludes` holds `weekends`, weekday names, and dates in `dateFormat`, separated by commas or
 spaces, matched in any case; `includes` holds dates that are never excluded. `weekend` sets which

@@ -104,12 +104,70 @@ struct Local {
     items: Vec<(Cell, Rect)>,
 }
 
+/// What is directly in each container (a group, or `None` for the diagram), in source order.
+type Within = HashMap<Option<usize>, Vec<usize>>;
+
+fn within(m: &Within, container: Option<usize>) -> &[usize] {
+    m.get(&container).map_or(&[], Vec::as_slice)
+}
+
 struct Ctx<'a> {
     arch: &'a Architecture,
     s: &'a Sizes<'a>,
+    nodes_in: Within,
+    groups_in: Within,
+    /// Each edge is in the innermost container that holds both of its ends.
+    ports_in: Within,
+    /// Each `align` is in every container that holds one of its members.
+    aligns_in: Within,
 }
 
-impl Ctx<'_> {
+impl<'a> Ctx<'a> {
+    fn new(arch: &'a Architecture, s: &'a Sizes<'a>) -> Self {
+        let mut ctx = Ctx {
+            arch,
+            s,
+            nodes_in: Within::new(),
+            groups_in: Within::new(),
+            ports_in: Within::new(),
+            aligns_in: Within::new(),
+        };
+        for (n, &parent) in arch.node_parent.iter().enumerate() {
+            ctx.nodes_in.entry(parent).or_default().push(n);
+        }
+        for (g, &parent) in arch.group_parent.iter().enumerate() {
+            if parent != Some(g) {
+                ctx.groups_in.entry(parent).or_default().push(g);
+            }
+        }
+        // The containers around a node, innermost first, ending at the diagram.
+        let around = |n: usize| {
+            let mut chain = vec![arch.node_parent[n]];
+            while let Some(g) = chain[chain.len() - 1] {
+                if chain.len() > arch.group_parent.len() {
+                    break;
+                }
+                chain.push(arch.group_parent[g]);
+            }
+            chain
+        };
+        for (i, p) in arch.ports.iter().enumerate() {
+            let to = around(p.to);
+            if let Some(&shared) = around(p.from).iter().find(|c| to.contains(c)) {
+                ctx.ports_in.entry(shared).or_default().push(i);
+            }
+        }
+        for (i, al) in arch.aligns.iter().enumerate() {
+            for &n in &al.nodes {
+                let list = ctx.aligns_in.entry(arch.node_parent[n]).or_default();
+                if list.last() != Some(&i) {
+                    list.push(i);
+                }
+            }
+        }
+        ctx
+    }
+
     /// The item directly in `container` that holds node `n`, if any.
     fn item_in(&self, container: Option<usize>, n: usize) -> Option<Cell> {
         let mut cell = Cell::Node(n);
@@ -131,14 +189,14 @@ impl Ctx<'_> {
         let a = self.arch;
         let mut cells: Vec<Cell> = Vec::new();
         cells.extend(
-            (0..a.chart.nodes.len())
-                .filter(|&n| a.node_parent[n] == container)
-                .map(Cell::Node),
+            within(&self.nodes_in, container)
+                .iter()
+                .map(|&n| Cell::Node(n)),
         );
         cells.extend(
-            (0..a.chart.subgraphs.len())
-                .filter(|&g| a.group_parent[g] == container && Some(g) != container)
-                .map(Cell::Group),
+            within(&self.groups_in, container)
+                .iter()
+                .map(|&g| Cell::Group(g)),
         );
         // Each item's own size; a cell's label room below.
         let mut sizes: HashMap<Cell, NodeSize> = HashMap::new();
@@ -157,7 +215,8 @@ impl Ctx<'_> {
         // Neighbors by edges inside this container.
         type Step = (i32, i32);
         let mut next: HashMap<Cell, Vec<(Cell, Step)>> = HashMap::new();
-        for p in &a.ports {
+        for &i in within(&self.ports_in, container) {
+            let p = &a.ports[i];
             let (Some(x), Some(y)) = (
                 self.item_in(container, p.from),
                 self.item_in(container, p.to),
@@ -179,14 +238,16 @@ impl Ctx<'_> {
             }
             p
         };
+        // The column right of every one taken so far.
+        let mut col = 0;
         for &start in &cells {
             if at.contains_key(&start) {
                 continue;
             }
-            let col = taken.keys().map(|p| p.0 + 1).max().unwrap_or(0);
             let p = free(&taken, (col, 0), (1, 0));
             at.insert(start, p);
             taken.insert(p, start);
+            col = col.max(p.0 + 1);
             let mut queue = VecDeque::from([start]);
             while let Some(c) = queue.pop_front() {
                 let here = at[&c];
@@ -197,12 +258,14 @@ impl Ctx<'_> {
                     let p = free(&taken, (here.0 + d.0, here.1 + d.1), d);
                     at.insert(n, p);
                     taken.insert(p, n);
+                    col = col.max(p.0 + 1);
                     queue.push_back(n);
                 }
             }
         }
         // `align`: a row shares the first member's row, a column its column, in order.
-        for al in &a.aligns {
+        for &i in within(&self.aligns_in, container) {
+            let al = &a.aligns[i];
             let members: Vec<Cell> = al
                 .nodes
                 .iter()
@@ -322,7 +385,7 @@ fn assign(local: &Local, origin: (f64, f64), done: &HashMap<usize, Local>, place
 
 /// Places every node and group of `arch`, and routes its edges.
 pub fn layout(arch: &Architecture, s: &Sizes) -> Placed {
-    let ctx = Ctx { arch, s };
+    let ctx = Ctx::new(arch, s);
     let mut done = HashMap::new();
     let root = ctx.layout(None, &mut done);
     let mut placed = Placed {

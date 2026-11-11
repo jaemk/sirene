@@ -3,6 +3,7 @@
 use rowan::{GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use crate::diagnostic::Diagnostic;
+use crate::lines::{MAX_DEPTH, too_deep};
 use crate::syntax::SyntaxKind::{self, *};
 
 /// One token: its kind and its byte range in the source.
@@ -286,10 +287,6 @@ struct Parser<'a> {
     /// How many subgraphs enclose the statement being parsed.
     depth: usize,
 }
-
-/// The deepest subgraph nesting parsed. A deeper subgraph is an error, so no source can
-/// overflow the stack here or in what reads the tree.
-const MAX_DEPTH: usize = 64;
 
 impl Parser<'_> {
     fn at_end(&self) -> bool {
@@ -646,7 +643,7 @@ impl Parser<'_> {
             &mut self.diagnostics,
             start,
             end.max(start),
-            format!("subgraphs nested more than {MAX_DEPTH} deep"),
+            too_deep("subgraphs", MAX_DEPTH),
         );
     }
 

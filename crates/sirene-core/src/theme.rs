@@ -9,6 +9,7 @@ use std::ops::Range;
 use rowan::{TextRange, TextSize};
 
 use crate::diagnostic::Diagnostic;
+use crate::lines::MAX_DEPTH;
 use crate::scene::{Color, Theme, parse_color};
 
 /// Mermaid's theme names.
@@ -708,6 +709,7 @@ fn directives(src: &str, from: usize, out: &mut ThemeConfig) {
             src,
             at: open,
             end: close,
+            depth: 0,
         };
         let mut entries = Vec::new();
         if p.object_body("", &mut entries).is_some() {
@@ -745,6 +747,8 @@ struct Parser<'a> {
     src: &'a str,
     at: usize,
     end: usize,
+    /// How many objects are open around the cursor.
+    depth: usize,
 }
 
 type Entry = (String, String, Range<usize>);
@@ -802,8 +806,15 @@ impl Parser<'_> {
         self.skip_space();
         match self.peek()? {
             '{' => {
+                // LANGS-8: a directive nested deeper than any setting is not read.
+                if self.depth >= MAX_DEPTH {
+                    return None;
+                }
                 self.at += 1;
-                self.object_body(path, out)?;
+                self.depth += 1;
+                let body = self.object_body(path, out);
+                self.depth -= 1;
+                body?;
                 self.eat('}').then_some(())
             }
             '[' => {

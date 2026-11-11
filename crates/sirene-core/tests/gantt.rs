@@ -239,6 +239,50 @@ fn excludes() {
     assert_eq!(g.excluded_days(), [date(2014, 1, 11), date(2014, 1, 12)]);
 }
 
+/// MGANTT-3: with every weekday excluded no end would settle; `excludes` is ignored, once.
+#[test]
+fn endless_excludes() {
+    for days in [
+        "monday tuesday wednesday thursday friday saturday sunday",
+        "weekends, monday, tuesday, wednesday, thursday, friday, 2014-01-10",
+    ] {
+        let src = format!("gantt\n  excludes {days}\n  x : 2014-01-09, 3d\n  y : 2014-01-09, 2d\n");
+        let (g, d) = gantt::parse(&src).lower_at(NOW);
+        let messages: Vec<&str> = d.iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(
+            messages,
+            ["`excludes` leaves no day to work on; ignoring it"],
+            "{days}"
+        );
+        assert_eq!(task(&g, "x").end, date(2014, 1, 12));
+        assert_eq!(task(&g, "y").drawn_end, date(2014, 1, 11));
+    }
+    // Six weekdays and a run of dates still leave a day.
+    let g = chart(
+        "gantt\n  excludes monday tuesday wednesday thursday friday saturday 2014-01-12 2014-01-19\n  \
+         x : 2014-01-09, 1d\n",
+    );
+    assert_eq!(task(&g, "x").end, date(2014, 1, 26));
+}
+
+/// MGANTT-3: a task waiting for one that cannot be dated is left out without a second error,
+/// in any source order.
+#[test]
+fn waits() {
+    let (g, d) = gantt::parse(
+        "gantt\n  a : a, after b, 1d\n  b : b, after c, 1d\n  c : c, 2014-02-30, 1d\n  \
+         d : d, after e f, 1d\n  e : e, 2014-01-01, until f\n  f : f, 2014-01-03, 1d\n  g : 2d\n",
+    )
+    .lower_at(NOW);
+    let messages: Vec<&str> = d.iter().map(|d| d.message.as_str()).collect();
+    assert_eq!(messages, ["`2014-02-30` is not a date in `YYYY-MM-DD`"]);
+    let names: Vec<&str> = g.tasks().map(|t| t.name.as_str()).collect();
+    assert_eq!(names, ["d", "e", "f", "g"]);
+    assert_eq!(task(&g, "e").end, date(2014, 1, 3));
+    assert_eq!(task(&g, "d").start, date(2014, 1, 4));
+    assert_eq!(task(&g, "g").end, date(2014, 1, 6));
+}
+
 /// MGANTT-3: what cannot be read or dated is an error, and the task is skipped.
 #[test]
 fn errors() {

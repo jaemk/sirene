@@ -17,8 +17,8 @@ separators, repeated lists), edge chains `a -> b -> c`, subgraphs as edge endpoi
 `+` concatenation and `\` line continuation, HTML strings `<...>`), `//` and `/* */` comments, and
 lines starting with `#`. Keywords are case-insensitive. `->` in a `graph` and `--` in a `digraph`
 are errors. Only the first graph in a file is drawn; each later one is a warning. Subgraphs nest
-64 deep; a deeper one is an error and is skipped up to its closing brace, so no source overflows
-the stack. An unclosed block is one error, however many blocks are open.
+64 deep (LANGS-8); a deeper one is an error and is skipped up to its closing brace, so no source
+overflows the stack. An unclosed block is one error, however many blocks are open.
 
 ## DOT-2 Model
 

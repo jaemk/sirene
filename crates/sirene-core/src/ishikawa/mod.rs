@@ -9,7 +9,7 @@ pub(crate) use parser::HEADERS;
 
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
-use crate::lines::split_br;
+use crate::lines::{MAX_DEPTH, split_br, too_deep};
 use crate::syntax::SyntaxKind::*;
 use crate::syntax::SyntaxNode;
 
@@ -62,6 +62,7 @@ impl Parse {
         let mut chart = Ishikawa::default();
         // Each line's label and indentation, in order.
         let mut lines: Vec<(Vec<String>, usize)> = Vec::new();
+        let mut ranges = Vec::new();
         for el in root.children_with_tokens() {
             if el.kind() == FRONTMATTER
                 && let Some(tok) = el.as_token()
@@ -75,28 +76,42 @@ impl Parse {
             let level = src[line_start..start].chars().count();
             let label = split_br(&text::decode_entities(node.text().to_string().trim()));
             lines.push((label, level));
+            ranges.push(node.text_range());
         }
-        chart.effect = tree(lines);
+        let mut diagnostics = self.diagnostics.clone();
+        let (effect, left_out) = tree(lines);
+        chart.effect = effect;
+        if let Some(i) = left_out {
+            diagnostics.push(Diagnostic::new(ranges[i], too_deep("causes", MAX_DEPTH)));
+        }
         log::debug!("lowered an ishikawa diagram");
-        (chart, self.diagnostics.clone())
+        (chart, diagnostics)
     }
 }
 
 /// The tree of `lines` as Mermaid builds it: the first line is the root; the first cause's
 /// indentation is level 1, and each line is a child of the nearest line above it with a lower
-/// level (MISH-2).
-fn tree(lines: Vec<(Vec<String>, usize)>) -> Option<Cause> {
-    let mut it = lines.into_iter();
-    let (root, _) = it.next()?;
+/// level (MISH-2). A cause more than `MAX_DEPTH` deep is left out, and the index of the first
+/// such line is returned (LANGS-8).
+fn tree(lines: Vec<(Vec<String>, usize)>) -> (Option<Cause>, Option<usize>) {
+    let mut it = lines.into_iter().enumerate();
+    let Some((_, (root, _))) = it.next() else {
+        return (None, None);
+    };
+    let mut left_out = None;
     // An arena: each node's label, children, and level.
     let mut nodes: Vec<(Vec<String>, Vec<usize>)> = vec![(root, Vec::new())];
     let mut stack: Vec<(usize, usize)> = vec![(0, 0)];
     let mut base = None;
-    for (label, raw) in it {
+    for (n, (label, raw)) in it {
         let base = *base.get_or_insert(raw);
         let level = (raw as isize - base as isize + 1).max(1) as usize;
         while stack.len() > 1 && stack.last().is_some_and(|&(l, _)| l >= level) {
             stack.pop();
+        }
+        if stack.len() > MAX_DEPTH {
+            left_out.get_or_insert(n);
+            continue;
         }
         let parent = stack.last().expect("the root stays on the stack").1;
         let i = nodes.len();
@@ -110,7 +125,7 @@ fn tree(lines: Vec<(Vec<String>, usize)>) -> Option<Cause> {
             children: nodes[i].1.iter().map(|&c| build(nodes, c)).collect(),
         }
     }
-    Some(build(&nodes, 0))
+    (Some(build(&nodes, 0)), left_out)
 }
 
 /// Parses ishikawa source. Never fails; problems are reported as diagnostics.
@@ -138,8 +153,8 @@ mod tests {
 
     #[test]
     fn trees() {
-        assert_eq!(tree(Vec::new()), None);
-        let t = tree(vec![
+        assert_eq!(tree(Vec::new()), (None, None));
+        let (t, left_out) = tree(vec![
             line("E", 4),
             line("a", 2),
             line("b", 4),
@@ -147,8 +162,9 @@ mod tests {
             line("d", 4),
             line("e", 2),
             line("f", 0),
-        ])
-        .unwrap();
+        ]);
+        let t = t.unwrap();
+        assert_eq!(left_out, None);
         // The effect may be indented more than the causes; a line left of the first cause is a
         // cause too.
         assert_eq!(shape(&t), "E(a(b(c),d),e,f)");

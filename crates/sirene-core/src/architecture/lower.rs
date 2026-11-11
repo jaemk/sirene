@@ -6,6 +6,7 @@ use super::{Align, Architecture, Item, Port, Side};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::lower::label_of;
 use crate::flowchart::{Arrow, Edge, Label, Node, Shape, Stroke, Subgraph, text};
+use crate::lines::{MAX_DEPTH, too_deep};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -48,6 +49,8 @@ struct Lowerer {
     nodes: HashMap<String, usize>,
     /// Group ids to subgraph indexes.
     groups: HashMap<String, usize>,
+    /// Whether the nesting limit has been reported (LANGS-8).
+    too_deep: bool,
 }
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
@@ -117,6 +120,28 @@ impl Lowerer {
             .filter(|t| !t.is_empty());
         let label = child(stmt, LABEL).map(|l| label_of(&l)).unwrap_or_default();
         if kw.text() == "group" {
+            // LANGS-8: the groups around `parent`, itself included; never more than the limit.
+            let around = |mut g: usize| {
+                let mut n = 1;
+                while let Some(p) = self.arch.group_parent[g] {
+                    g = p;
+                    n += 1;
+                }
+                n
+            };
+            let parent = parent.filter(|&g| {
+                let fits = around(g) < MAX_DEPTH;
+                if !fits && !std::mem::replace(&mut self.too_deep, true) {
+                    self.diagnostics.push(Diagnostic::new(
+                        id.text_range(),
+                        format!(
+                            "{}; drawing a deeper group outside any group",
+                            too_deep("groups", MAX_DEPTH)
+                        ),
+                    ));
+                }
+                fits
+            });
             let s = self.arch.chart.subgraphs.len();
             self.groups.insert(name.clone(), s);
             self.arch.chart.subgraphs.push(Subgraph {

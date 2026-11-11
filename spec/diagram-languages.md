@@ -120,3 +120,30 @@ Every Mermaid type comes first, so that any Mermaid file draws:
 7. PlantUML sequence and activity, on the sequence and graph models.
 8. Edit modules for state and class.
 9. D2 and the rest of PlantUML, after their research.
+
+## LANGS-8 Limits
+
+No source overflows the stack or hangs. Nesting is read `lines::MAX_DEPTH` (64) deep; `lines::too_deep` words the error, `<things> nested
+more than 64 deep`, which is reported once per diagram (once per rule in a railroad diagram):
+
+- Blocks with a closer (flowchart subgraphs, composite states, class namespaces, C4 boundaries,
+  ZenUML blocks, DOT subgraphs): a deeper block is not read. Its
+  text through the matching closer is one `ERROR` node, so the tree still holds every byte.
+  Blocks left open at the end of the source are one `unclosed` error per kind of block in the
+  shared line parser (`lines::Base`).
+- Block diagrams nest 12 deep, since sizing a block visits its children twice per level.
+- Indented levels (mindmap nodes, treemap sections, tree view entries, ishikawa causes): deeper
+  lines are left out.
+- Sequence diagrams: a deeper block is left out with the statements inside it, up to its `end`.
+  A participant draws 64 activations at once; deeper ones are tracked but not drawn.
+- Architecture diagrams: a deeper group is drawn outside any group.
+- Railroad diagrams: a rule with a deeper group or expression fails at that point, as any other
+  syntax error in a rule does.
+- JSON (use case sources, `%%{init}%%` directives): a deeper value is invalid JSON. A directive
+  that is not valid JSON is ignored, as Mermaid ignores it.
+
+A gantt chart dates each task once, in dependency order; `excludes` that leaves no working day is
+an error and is ignored (MGANTT-3). An ASCII drawing is cut off at 2^22 cells (ASCIIR-1).
+
+Tests: `crates/sirene-core/tests/limits.rs` draws a source at each limit and 2,000-statement
+chains, and checks the diagnostics; `skipped_blocks_keep_their_text` checks the trees.

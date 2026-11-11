@@ -9,6 +9,7 @@ pub(crate) use parser::HEADERS;
 
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
+use crate::lines::{MAX_DEPTH, too_deep};
 use crate::syntax::SyntaxKind::*;
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -146,6 +147,7 @@ impl Parse {
             .find(|&c| c > 0)
             .unwrap_or(4);
         let mut flat: Vec<(isize, Entry)> = Vec::new();
+        let mut ranges = Vec::new();
         for n in &nodes {
             let Some(entry) = entry(n) else { continue };
             let start = usize::from(n.text_range().start());
@@ -169,8 +171,13 @@ impl Parse {
                 lead.chars().count() as isize
             };
             flat.push((level, entry));
+            ranges.push(n.text_range());
         }
-        view.entries = build(flat);
+        let (entries, left_out) = build(flat);
+        view.entries = entries;
+        if let Some(i) = left_out {
+            diagnostics.push(Diagnostic::new(ranges[i], too_deep("entries", MAX_DEPTH)));
+        }
         log::debug!("lowered a tree view");
         (view, diagnostics)
     }
@@ -236,14 +243,20 @@ fn config(c: &mut Config, block: &str) {
 }
 
 /// The tree of `(level, entry)` lines as Mermaid builds it: each line is a child of the nearest
-/// line above it with a lower level, under a root at level -1 (MTREEV-2).
-fn build(lines: Vec<(isize, Entry)>) -> Vec<Entry> {
+/// line above it with a lower level, under a root at level -1 (MTREEV-2). An entry more than
+/// `MAX_DEPTH` deep is left out, and the index of the first such line is returned (LANGS-8).
+fn build(lines: Vec<(isize, Entry)>) -> (Vec<Entry>, Option<usize>) {
     // An arena of entries with their children's indexes; index 0 is the root.
     let mut nodes: Vec<(Entry, Vec<usize>)> = vec![(Entry::default(), Vec::new())];
     let mut stack: Vec<(isize, usize)> = vec![(-1, 0)];
-    for (level, e) in lines {
+    let mut left_out = None;
+    for (n, (level, e)) in lines.into_iter().enumerate() {
         while stack.last().is_some_and(|&(l, _)| level <= l) {
             stack.pop();
+        }
+        if stack.len() > MAX_DEPTH {
+            left_out.get_or_insert(n);
+            continue;
         }
         let parent = stack.last().map_or(0, |&(_, i)| i);
         let i = nodes.len();
@@ -257,7 +270,7 @@ fn build(lines: Vec<(isize, Entry)>) -> Vec<Entry> {
         e.children = kids.into_iter().map(|k| take(nodes, k)).collect();
         e
     }
-    take(&mut nodes, 0).children
+    (take(&mut nodes, 0).children, left_out)
 }
 
 /// Parses tree view source. Never fails; problems are reported as diagnostics.
@@ -301,7 +314,7 @@ mod tests {
             name: name.to_owned(),
             ..Entry::default()
         };
-        let t = build(vec![
+        let (t, _) = build(vec![
             (4, e("a")),
             (8, e("b")),
             (2, e("c")),

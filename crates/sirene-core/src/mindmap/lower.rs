@@ -3,6 +3,7 @@
 use super::{Mindmap, Node, Shape};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
+use crate::lines::{self, MAX_DEPTH};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -14,6 +15,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
     let mut levels: Vec<usize> = Vec::new();
     // The node `::icon` and `:::` lines apply to; `None` after a node that was left out.
     let mut last: Option<usize> = None;
+    let mut too_deep = false;
     for el in root.children_with_tokens() {
         if el.kind() == FRONTMATTER
             && let Some(tok) = el.as_token()
@@ -49,6 +51,18 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
                         continue;
                     };
                     let p = &map.nodes[parent];
+                    if p.depth >= MAX_DEPTH {
+                        // LANGS-8: left out, and reported at the first one.
+                        if !too_deep {
+                            too_deep = true;
+                            diagnostics.push(Diagnostic::new(
+                                stmt.text_range(),
+                                lines::too_deep("nodes", MAX_DEPTH),
+                            ));
+                        }
+                        last = None;
+                        continue;
+                    }
                     node.parent = Some(parent);
                     node.depth = p.depth + 1;
                     node.section = p.section.or(Some(p.children.len()));

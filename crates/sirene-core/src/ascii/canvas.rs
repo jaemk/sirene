@@ -40,18 +40,31 @@ struct Cell {
     tail: bool,
 }
 
+/// The most cells a canvas holds (ASCIIR-4). A larger drawing keeps its top rows.
+const MAX_CELLS: usize = 1 << 22;
+
 pub(super) struct Canvas {
     width: i32,
     height: i32,
     cells: Vec<Cell>,
+    /// The size asked for, when it was more than `MAX_CELLS` and the canvas is cut off.
+    cut: Option<(i32, i32)>,
 }
 
 impl Canvas {
     pub fn new(width: i32, height: i32) -> Self {
+        Self::with_limit(width, height, MAX_CELLS)
+    }
+
+    fn with_limit(width: i32, height: i32, limit: usize) -> Self {
+        let (w, h) = (width.max(0) as usize, height.max(0) as usize);
+        let columns = w.min(limit);
+        let rows = h.min(limit / columns.max(1));
         Canvas {
-            width,
-            height,
-            cells: vec![Cell::default(); (width.max(0) * height.max(0)) as usize],
+            width: columns as i32,
+            height: rows as i32,
+            cells: vec![Cell::default(); columns * rows],
+            cut: (columns < w || rows < h).then_some((width, height)),
         }
     }
 
@@ -75,7 +88,7 @@ impl Canvas {
 
     /// A horizontal line from `x0` to `x1` inclusive.
     pub fn hline(&mut self, x0: i32, x1: i32, y: i32, line: Line) {
-        for x in x0..=x1 {
+        for x in x0.max(0)..=x1.min(self.width - 1) {
             let bits = if x > x0 { LEFT } else { 0 } | if x < x1 { RIGHT } else { 0 };
             self.add(x, y, bits, line);
         }
@@ -83,7 +96,7 @@ impl Canvas {
 
     /// A vertical line from `y0` to `y1` inclusive.
     pub fn vline(&mut self, x: i32, y0: i32, y1: i32, line: Line) {
-        for y in y0..=y1 {
+        for y in y0.max(0)..=y1.min(self.height - 1) {
             let bits = if y > y0 { UP } else { 0 } | if y < y1 { DOWN } else { 0 };
             self.add(x, y, bits, line);
         }
@@ -92,8 +105,8 @@ impl Canvas {
     /// Empties the cells from `(x0, y0)` to `(x1, y1)` inclusive, so what is drawn there next
     /// covers what was under it.
     pub fn clear(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) {
-        for y in y0..=y1 {
-            for x in x0..=x1 {
+        for y in y0.max(0)..=y1.min(self.height - 1) {
+            for x in x0.max(0)..=x1.min(self.width - 1) {
                 if let Some(c) = self.cell(x, y) {
                     *c = Cell::default();
                 }
@@ -149,6 +162,11 @@ impl Canvas {
             }
             out.push_str(line.trim_end());
             out.push('\n');
+        }
+        if let Some((width, height)) = self.cut {
+            out.push_str(&format!(
+                "... cut off: the drawing is {width} columns by {height} rows\n"
+            ));
         }
         out
     }
@@ -337,5 +355,32 @@ mod tests {
     #[test]
     fn empty_canvas() {
         assert_eq!(Canvas::new(0, 0).render(Charset::Unicode), "");
+        assert_eq!(Canvas::new(-1, 3).render(Charset::Unicode), "");
+    }
+
+    #[test]
+    fn cuts_off_past_the_limit() {
+        // Three rows of four cells fit in 12; the fourth row is cut, and drawing there is ignored.
+        let mut c = Canvas::with_limit(4, 5, 12);
+        c.vline(0, -2, i32::MAX - 1, Line::Light);
+        c.hline(i32::MIN + 1, i32::MAX - 1, 1, Line::Light);
+        c.clear(2, 2, i32::MAX - 1, i32::MAX - 1);
+        c.text(0, 4, "x");
+        assert_eq!(
+            c.render(Charset::Unicode),
+            "│\n┼───\n│\n... cut off: the drawing is 4 columns by 5 rows\n"
+        );
+        // Wider than the limit: one row of `limit` cells.
+        let mut c = Canvas::with_limit(9, 2, 4);
+        c.hline(0, 8, 0, Line::Light);
+        assert_eq!(
+            c.render(Charset::Ascii),
+            "----\n... cut off: the drawing is 9 columns by 2 rows\n"
+        );
+        // A size whose product does not fit in an `i32`.
+        let c = Canvas::new(70_000, 70_000);
+        assert_eq!(c.cells.len(), 59 * 70_000);
+        assert!(c.cut.is_some());
+        assert!(Canvas::new(2_048, 2_048).cut.is_none());
     }
 }

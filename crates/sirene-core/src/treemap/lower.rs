@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use super::{Format, Item, Treemap};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::{Style, text};
+use crate::lines::{self, MAX_DEPTH};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -49,6 +50,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
     let mut stack: Vec<(usize, usize)> = Vec::new();
     // Each item's line.
     let mut ranges = Vec::new();
+    let mut too_deep = false;
     for stmt in root.children() {
         match stmt.kind() {
             TITLE_STMT => title = text_of(&stmt, TEXT).filter(|s| !s.is_empty()),
@@ -96,6 +98,17 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
                 let level = src[line_start..start].chars().count();
                 while stack.last().is_some_and(|&(_, l)| l >= level) {
                     stack.pop();
+                }
+                if stack.len() >= MAX_DEPTH {
+                    // LANGS-8: left out, and reported at the first one.
+                    if !too_deep {
+                        too_deep = true;
+                        diagnostics.push(Diagnostic::new(
+                            stmt.text_range(),
+                            lines::too_deep("sections", MAX_DEPTH),
+                        ));
+                    }
+                    continue;
                 }
                 let i = t.items.len();
                 let parent = stack.last().map(|&(p, _)| p);
