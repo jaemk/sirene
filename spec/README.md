@@ -55,6 +55,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Venn Diagrams | done | [mermaid-venn-diagrams.md](mermaid-venn-diagrams.md) |
 | Mermaid Wardley Maps | done | [mermaid-wardley-maps.md](mermaid-wardley-maps.md) |
 | Mermaid Tree Views | done | [mermaid-tree-views.md](mermaid-tree-views.md) |
+| Mermaid Use Case Diagrams | done | [mermaid-use-case-diagrams.md](mermaid-use-case-diagrams.md) |
 
 ## Conventions
 

@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nactor A\nA --> B:::c\nnote for ghost \"x\"\nclass nobody c\nsystemBoundary S\n  C\nend\nnote for S \"x\"\n"
+---
+3:11: warning: ignoring `:::` on `B`: declare it (with a shape, metadata, or a stereotype) to give it classes
+4:10: warning: ignoring note for unknown `ghost`
+5:7: warning: unknown actor, use case, system boundary, or edge `nobody`
+9:10: warning: ignoring note for `S`: a note is for an actor or use case, not a system boundary
+
+   ┌───┐       ╭───╮
+   │ A ├──────►( B )
+   └───┘       ╰───╯
+
+┌─ S ─────┐
+│  ╭───╮  │
+│  ( C )  │
+│  ╰───╯  │
+└─────────┘

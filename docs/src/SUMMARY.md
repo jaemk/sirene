@@ -50,6 +50,7 @@
 - [Venn diagrams](venn.md)
 - [Wardley maps](wardley.md)
 - [Tree views](treeview.md)
+- [Use case diagrams](usecase.md)
 
 # Project
 

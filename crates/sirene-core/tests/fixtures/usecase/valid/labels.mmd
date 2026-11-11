@@ -1,0 +1,11 @@
+usecase-beta
+actor Reviewer("`*Reviewer*`")
+Literal("**Literal markers**")
+Formatted("`**Formatted label**
+with a physical line break`")
+Quoted("Show #quot;quoted#quot; text")
+Priced[Costs 19.95 EUR - VAT included!]
+Reviewer -- "`opens **form**`" --> Formatted
+Reviewer --> Literal
+Reviewer --> Quoted
+Reviewer -- files R&D report --> Priced

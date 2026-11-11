@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nCustomer --> Login\nactor Customer\nactor Admin(\"Main administrator\")\nLogin(\"Sign in\")\nReport[Generate report]\n\"Reset password\"\nAdmin --> Report\n"
+---
+     +----------+             .---------.
+     | Customer +------------>( Sign in )
+     +----------+             '---------'
+
++--------------------+    +-----------------+
+| Main administrator +--->| Generate report |
++--------------------+    +-----------------+
+
+  .----------------.
+  ( Reset password )
+  '----------------'

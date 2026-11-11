@@ -1,0 +1,11 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nsystemBoundary s\n  A --> B\nend\n"
+---
+3:5: error: relationships go after the system boundary's `end`
+
+┌─ s ─────┐
+│  ╭───╮  │
+│  ( A )  │
+│  ╰───╯  │
+└─────────┘

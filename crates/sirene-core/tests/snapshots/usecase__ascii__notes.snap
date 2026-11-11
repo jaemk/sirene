@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nnote for Login \"`Requires an **active session**`\"\nnote for User \"Starts the workflow\"\nactor User\nLogin(\"Sign in\")\nUser --> Login\n"
+---
+       +------+                     .---------.
+       | User +-------------------->( Sign in )
+       +------+                     '---------'
+           :                             :
+           :                             :
++---------------------.    +----------------------------.
+| Starts the workflow |    | Requires an active session |
++---------------------+    +----------------------------+

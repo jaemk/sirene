@@ -62,10 +62,15 @@ enum Geo {
     Fork,
     Notched,
     Sloped,
+    /// A figure with its label below.
+    Actor,
+    UseCase,
 }
 
 fn geo(shape: Shape) -> Geo {
     match shape {
+        Shape::Actor | Shape::HollowActor | Shape::AwesomeActor => Geo::Actor,
+        Shape::UseCase => Geo::UseCase,
         Shape::Rounded => Geo::Rounded,
         Shape::Stadium => Geo::Stadium,
         Shape::FramedRect => Geo::Framed,
@@ -101,6 +106,14 @@ pub(super) fn has_label(shape: Shape) -> bool {
 const SLOPE: f32 = 10.0;
 const NOTCH: f32 = 12.0;
 const FRAME: f32 = 8.0;
+/// An actor's figure, the gap below it, and the padding around figure and label, as Mermaid
+/// draws them.
+const FIGURE_W: f32 = 56.0;
+const FIGURE_H: f32 = 72.0;
+const FIGURE_GAP: f32 = 8.0;
+const ACTOR_PAD: f32 = 10.0;
+/// The room between a use case's label and its ellipse on every side.
+const USECASE_PAD: f32 = 20.0;
 
 /// Radius of a cylinder's end ellipses.
 fn cylinder_ry(w: f32) -> f32 {
@@ -133,6 +146,11 @@ pub(super) fn size(shape: Shape, tw: f32, th: f32) -> (f32, f32) {
         Geo::Diamond | Geo::Triangle | Geo::Flipped => (2.0 * w0 - 2.0 * PAD_X, 2.0 * h0),
         Geo::Text => (tw + 4.0, th + 4.0),
         Geo::Sloped => (w0, h0 + SLOPE),
+        Geo::Actor => (
+            tw.max(FIGURE_W) + 2.0 * ACTOR_PAD,
+            FIGURE_H + FIGURE_GAP + th + 2.0 * ACTOR_PAD,
+        ),
+        Geo::UseCase => (tw + 2.0 * USECASE_PAD, th + 2.0 * USECASE_PAD),
     }
 }
 
@@ -158,7 +176,101 @@ pub(super) fn text_box(shape: Shape, b: BoxF) -> BoxF {
             h: b.h - SLOPE,
             ..b
         },
+        Geo::Actor => {
+            let top = ACTOR_PAD + FIGURE_H + FIGURE_GAP;
+            BoxF {
+                y: b.y + top,
+                h: (b.h - top - ACTOR_PAD).max(0.0),
+                ..b
+            }
+        }
         _ => b,
+    }
+}
+
+/// The business slash across a use case or an actor's head, for the `business` metadata.
+pub(super) fn business_marker(shape: Shape, b: BoxF) -> Option<Vec<Segment>> {
+    match shape {
+        Shape::UseCase => {
+            let (c, rx, ry) = (b.center(), b.w / 2.0, b.h / 2.0);
+            let inset = 2.0;
+            let (sx, ex) = ((rx - USECASE_PAD + inset).max(0.0), rx - inset);
+            let y_at = |x: f32| ry * (1.0 - (x / rx).powi(2)).max(0.0).sqrt();
+            Some(line((c.x + sx, c.y + y_at(sx)), (c.x + ex, c.y - y_at(ex))))
+        }
+        Shape::Actor | Shape::HollowActor => {
+            let (cy, r) = if shape == Shape::Actor {
+                (-24.0, 12.0)
+            } else {
+                (-23.0, 9.0)
+            };
+            let (dx, dy) = (0.5_f32, -(3.0_f32.sqrt()) / 2.0);
+            let (off, half) = (r * 0.6, r * 0.8);
+            let (mx, my) = (off * -dy, cy + off * dx);
+            let o = figure_origin(b);
+            let p = |x: f32, y: f32| (o.x + x, o.y + y);
+            Some(line(
+                p(mx - half * dx, my - half * dy),
+                p(mx + half * dx, my + half * dy),
+            ))
+        }
+        _ => None,
+    }
+}
+
+/// Where an actor's figure is drawn from: its coordinates run from y = -36 to 30.
+fn figure_origin(b: BoxF) -> Pt {
+    Pt::new(b.center().x, b.y + ACTOR_PAD + FIGURE_H / 2.0)
+}
+
+/// An actor's figure, as Mermaid's `usecaseActor`, `usecaseActorHollow`, and
+/// `usecaseActorAwesome` draw it. The figure paths and the business slash are ported from Mermaid
+/// (Copyright (c) 2014-2022 Knut Sveidqvist; MIT); see THIRD-PARTY-NOTICES.
+fn figure(shape: Shape, b: BoxF, out: &mut Outline) {
+    let o = figure_origin(b);
+    let p = |x: f32, y: f32| (o.x + x, o.y + y);
+    let pt = |x: f32, y: f32| Pt::new(o.x + x, o.y + y);
+    match shape {
+        Shape::HollowActor => {
+            out.lines.push(ellipse(pt(0.0, -23.0), 9.0, 9.0));
+            out.lines.push(polygon(&[
+                p(-22.0, -10.0),
+                p(22.0, -10.0),
+                p(22.0, 0.0),
+                p(6.0, 0.0),
+                p(22.0, 17.0),
+                p(13.0, 28.0),
+                p(0.0, 13.0),
+                p(-13.0, 28.0),
+                p(-22.0, 17.0),
+                p(-6.0, 0.0),
+                p(-22.0, 0.0),
+            ]));
+        }
+        Shape::AwesomeActor => {
+            out.dots.push(ellipse(pt(0.0, -21.0), 13.0, 13.0));
+            let c = |x1, y1, x2, y2, x, y| Segment::Cubic {
+                c1: pt(x1, y1),
+                c2: pt(x2, y2),
+                to: pt(x, y),
+            };
+            out.dots.push(vec![
+                Segment::Move(pt(-24.0, 25.0)),
+                c(-24.0, 7.0, -14.0, -3.0, 0.0, -3.0),
+                c(14.0, -3.0, 24.0, 7.0, 24.0, 25.0),
+                c(24.0, 28.0, 21.0, 30.0, 18.0, 30.0),
+                Segment::Line(pt(-18.0, 30.0)),
+                c(-21.0, 30.0, -24.0, 28.0, -24.0, 25.0),
+                Segment::Close,
+            ]);
+        }
+        _ => {
+            out.lines.push(ellipse(pt(0.0, -24.0), 12.0, 12.0));
+            out.lines.push(line(p(0.0, -12.0), p(0.0, 8.0)));
+            out.lines.push(line(p(-17.0, -5.0), p(17.0, -5.0)));
+            out.lines.push(line(p(0.0, 8.0), p(-15.0, 28.0)));
+            out.lines.push(line(p(0.0, 8.0), p(15.0, 28.0)));
+        }
     }
 }
 
@@ -267,7 +379,11 @@ pub(super) fn outline(shape: Shape, b: BoxF) -> Outline {
                 Segment::Close,
             ]
         }
-        Geo::Circle | Geo::Ellipse => ellipse(b.center(), rx, ry),
+        Geo::Circle | Geo::Ellipse | Geo::UseCase => ellipse(b.center(), rx, ry),
+        Geo::Actor => {
+            figure(shape, b, &mut out);
+            Vec::new()
+        }
         Geo::Crossed => {
             let (dx, dy) = (rx * FRAC_1_SQRT_2, ry * FRAC_1_SQRT_2);
             out.lines.push(line((cx - dx, cy - dy), (cx + dx, cy + dy)));
@@ -341,7 +457,18 @@ pub(super) fn outline(shape: Shape, b: BoxF) -> Outline {
         ]),
         Geo::Sloped => polygon(&[(x, y + SLOPE), (r, y), (r, bottom), (x, bottom)]),
     };
-    out.boundary = if out.body.is_empty() {
+    out.boundary = if geo(shape) == Geo::Actor {
+        // Edges meet the figure, not the label below it.
+        let o = figure_origin(b);
+        let (l, t) = (o.x - FIGURE_W / 2.0, b.y + ACTOR_PAD);
+        let (r, bottom) = (o.x + FIGURE_W / 2.0, t + FIGURE_H);
+        vec![
+            Pt::new(l, t),
+            Pt::new(r, t),
+            Pt::new(r, bottom),
+            Pt::new(l, bottom),
+        ]
+    } else if out.body.is_empty() {
         rect.iter().map(|&(x, y)| Pt::new(x, y)).collect()
     } else {
         flatten(&out.body)

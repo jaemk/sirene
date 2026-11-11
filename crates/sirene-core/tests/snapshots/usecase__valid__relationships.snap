@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nactor Admin\nactor Person\nCheckout\nPayment\nApplyCoupon\nAdmin --|> Person\nCheckout ..> : include Payment\nApplyCoupon ..> : extend Checkout\nApplyCoupon --|> Checkout\n"
+---
+
+   ┌───────┐                  ┌────────┐
+   │ Admin ├─────────────────▷│ Person │
+   └───────┘                  └────────┘
+
+
+
+
+╭─────────────╮ ┌┄«extend»┄┐ ╭──────────╮              ╭─────────╮
+( ApplyCoupon ├┄┘          └►( Checkout ) ┌┄«include»┄►( Payment )
+(             ├─────────────▷(          ├┄┘            ╰─────────╯
+╰─────────────╯              ╰──────────╯

@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nsystemBoundary sb1[\"Payment service\"]@{ type: package }:::system\n  actor Clerk(\"Payment clerk\")\n  Authorize(\"Authorize payment\")\n  Receipt[Create receipt]\nend\nClerk --> Authorize\nAuthorize --> Receipt\nclassDef system stroke:#4b4b7a\n"
+---
+
+┌─ Payment service ──────────────────────────────────────────────────┐
+│  ┌───────────────┐    ╭───────────────────╮    ┌────────────────┐  │
+│  │ Payment clerk ├───►( Authorize payment ├───►│ Create receipt │  │
+│  └───────────────┘    ╰───────────────────╯    └────────────────┘  │
+└────────────────────────────────────────────────────────────────────┘

@@ -1,0 +1,24 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\ndirection LR\naccTitle: Online ordering use cases\naccDescr {\n  A customer places an order through the storefront.\n  Staff review the order and inspect its data.\n}\nactor Customer(\"Customer\")\nactor Staff(\"Order staff\")@{ type: hollow, business: true } <<Employee>>\nsystemBoundary ordering[\"Ordering System\"]@{ type: package }:::system\n  Browse(\"Browse products\")\n  Checkout(\"Checkout\") <<Core>>:::critical\n  Payment(\"Process payment\")\n  Review[Review order]\nend\njson OrderData@{\n  \"status\": \"pending\",\n  \"items\": [{ \"name\": \"Book\", \"quantity\": 1 }],\n  \"total\": 29.95\n}:::data\nnote for Checkout \"`Validates the **cart** before payment`\"\nCustomer starts@-- \"places order\" ---> Checkout\nCustomer --> Browse\nCheckout pays@..> : include Payment\nStaff --> Review\nReview --> OrderData\nclassDef system stroke:#4b4b7a\nclassDef critical stroke:#c33\nclassDef data stroke:#3572a5\nstyle pays stroke:#06c\nstarts@{ animate: true }\n"
+---
+                                      +- Ordering System -------------------------------------------------------+
+                                      |              .----------.                                               |
+                                      |              (  «Core»  )                          .-----------------.  |
+                                  +---+------------->( Checkout +...............«include».>( Process payment )  |
+                +--places order---+   |              '----------'                          '-----------------'  |
+             +--+                     |                    :                                                    |
++----------+ |                        |                    :                                                    |
+| Customer +-+                        |  +-----------------------------------.                                  |
+|          +-+                        |  | Validates the cart before payment |                                  |
++----------+ |                        |  +-----------------------------------+                                  |
+             |                        |                                                                         |
+             |                        |           .-----------------.                                           |
+             +------------------------+---------->( Browse products )                                           |    +---------------------------+
+                                      |           '-----------------'                                           |    |         OrderData         |
+                  +-------------+     |                                                                         |    +---------------------------+
+                  | «Employee»  |     |            +--------------+                                             |    | status            pending |
+                  | Order staff +-----+----------->| Review order +---------------------------------------------+--->| items[0].name     Book    |
+                  +-------------+     |            +--------------+                                             |    | items[0].quantity 1       |
+                                      +-------------------------------------------------------------------------+    | total             29.95   |
+                                                                                                                     +---------------------------+

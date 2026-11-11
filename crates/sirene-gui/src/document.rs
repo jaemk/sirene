@@ -153,6 +153,7 @@ impl Document {
             Kind::Venn => Some("drawing edits are not supported for venn diagrams yet"),
             Kind::Wardley => Some("drawing edits are not supported for Wardley maps yet"),
             Kind::TreeView => Some("drawing edits are not supported for tree views yet"),
+            Kind::UseCase => Some("drawing edits are not supported for use case diagrams yet"),
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")

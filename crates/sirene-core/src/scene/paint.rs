@@ -361,12 +361,32 @@ pub(super) fn draw(
             Some(stroke(&r, theme.cluster_stroke, 1.0, dash)),
         );
         if let Some(t) = layout.titles[i] {
+            let t = at(t);
             p.lines(
                 Owner::Cluster(i),
                 &[vec![Span::plain(subgraph_title(s))]],
-                at(t).center(),
+                t.center(),
                 text_color(&r, theme),
             );
+            // A use case `package` boundary: a tab around its title.
+            if s.metadata
+                .iter()
+                .any(|(k, v)| k == "type" && v == "package")
+            {
+                let (left, right) = (t.x.max(b.x), t.right().min(b.right()));
+                let bottom = t.bottom().min(b.bottom());
+                p.path(
+                    Owner::Cluster(i),
+                    vec![
+                        Segment::Move(Pt::new(left, b.y)),
+                        Segment::Line(Pt::new(left, bottom)),
+                        Segment::Line(Pt::new(right, bottom)),
+                        Segment::Line(Pt::new(right, b.y)),
+                    ],
+                    None,
+                    Some(stroke(&r, theme.cluster_stroke, 1.0, None)),
+                );
+            }
         }
     }
 
@@ -684,6 +704,14 @@ impl Painter<'_> {
         }
         for d in o.dots {
             self.path(owner, d, ink, None);
+        }
+        if node
+            .metadata
+            .iter()
+            .any(|(k, v)| k == "business" && v == "true")
+            && let Some(slash) = shapes::business_marker(node.shape, b)
+        {
+            self.path(owner, slash, None, Some(line));
         }
         if !node.sections.is_empty() {
             self.compartments(owner, node, lines, s, b);

@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\ndirection TB\nactor User\nUser --> Login\nLogin ---> Dashboard\n"
+---
+
+  ┌──────┐
+  │ User │
+  └───┬──┘
+      │
+      ▼
+  ╭───────╮
+  ( Login )
+  ╰───┬───╯
+      │
+      │
+      │
+      ▼
+╭───────────╮
+( Dashboard )
+╰───────────╯

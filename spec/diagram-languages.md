@@ -26,7 +26,7 @@ Each language has a parser to a lossless syntax tree with diagnostics (the `synt
 `diagnostic` modules, as FLOWCH-1 to FLOWCH-3), and lowers to one of three models:
 
 - the graph model: the flowchart model (FLOWMO) with the additions in LANGS-3, for flowcharts,
-  state, class, ER, requirement, DOT, D2, and PlantUML's graph-shaped diagrams. It reuses the layered layout
+  state, class, ER, requirement, use case, DOT, D2, and PlantUML's graph-shaped diagrams. It reuses the layered layout
   (LAYOUT), the scene builder (DISPLA), the ASCII renderer, and hit testing.
 - the sequence model (MSEQ-2), for Mermaid and PlantUML sequence diagrams, with its own layout,
   scene builder, and ASCII renderer.
@@ -85,11 +85,11 @@ as `flowchart::edit` does; a language without one has a read-only drawing, and t
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
 DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
-Sequence, state, class, ER, and requirement diagrams, git graphs, timelines, pie and gantt charts,
-mindmaps, user journeys, quadrant, XY, and radar charts, kanban boards, packet, sankey, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, and tree view diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
+Sequence, state, class, ER, requirement, and use case diagrams, git graphs, timelines, pie and gantt charts,
+mindmaps, user journeys, quadrant, XY, and radar charts, kanban boards, packet, sankey, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, and use case diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
 disabled Add Node, Select All, and Fit Window, a press on a node pans instead of connecting, and
 every edit action says `Can't ...: drawing edits are not supported for state diagrams yet` (or
-class diagrams, ER diagrams, requirement diagrams, git graphs, timelines, sequence diagrams, pie charts, gantt
+class diagrams, ER diagrams, requirement diagrams, use case diagrams, git graphs, timelines, sequence diagrams, pie charts, gantt
 charts, mindmaps, user journeys, quadrant charts, XY charts, kanban boards, packet diagrams,
 radar charts, sankey diagrams, treemaps, block diagrams, architecture diagrams, C4 diagrams, ZenUML diagrams, ishikawa diagrams, venn diagrams, Wardley maps, or tree views; an info diagram says it has
 nothing to edit).

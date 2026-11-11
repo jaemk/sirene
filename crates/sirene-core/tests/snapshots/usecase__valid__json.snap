@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nInspect(\"Inspect payload\")\njson Payload@{\n  \"2\": \"second in source\",\n  \"1\": \"first after 2\",\n  \"enabled\": true,\n  \"count\": 3,\n  \"missing\": null,\n  \"colors\": [\"Red\", \"Green\"],\n  \"address\": { \"city\": \"Oslo\" },\n  \"items\": [{ \"name\": \"Book\" }],\n  \"emptyObject\": {},\n  \"emptyArray\": []\n}:::data\nInspect --> Payload\nclassDef data stroke:#3572a5\nstyle Payload stroke-width:2px\n"
+---
+
+                       ┌────────────────────────────────┐
+                       │            Payload             │
+                       ├────────────────────────────────┤
+                       │ 2             second in source │
+                       │ 1             first after 2    │
+                       │ enabled       true             │
+╭─────────────────╮    │ count         3                │
+( Inspect payload ├───►│ missing       null             │
+╰─────────────────╯    │ colors        Red              │
+                       │               Green            │
+                       │ address.city  Oslo             │
+                       │ items[0].name Book             │
+                       │ emptyObject   {}               │
+                       │ emptyArray    []               │
+                       └────────────────────────────────┘

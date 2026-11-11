@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nactor SalesAgent(\"Sales agent\")@{ business: true } <<Employee>>\nactor Broker@{ type: hollow, business: true }\nQuote(\"Prepare quote\")@{ business: true } <<Core>>\nArchive[Archive quote] <<Record>>\nSalesAgent --> Quote\nBroker --> Quote\nQuote --> Archive\n"
+---
++-------------+
+| «Employee»  |
+| Sales agent +-+
++-------------+ +--+ .---------------.    +---------------+
+                   +>(    «Core»     )    |   «Record»    |
+  +--------+    +--->( Prepare quote +--->| Archive quote |
+  | Broker +----+    '---------------'    +---------------+
+  +--------+

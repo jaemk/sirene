@@ -1,0 +1,9 @@
+usecase-beta
+actor A
+actor I@{ icon: "fa:user", type: hollow }
+actor W@{ type: awesome, business: true }
+R[Rect]@{ business: true }
+A ..> : include B
+A --|> B
+json J@{ "a": 1 }
+J --o A
