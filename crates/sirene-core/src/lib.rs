@@ -32,6 +32,7 @@ pub mod scene;
 pub mod sequence;
 pub mod state;
 pub mod syntax;
+pub mod theme;
 pub mod timeline;
 pub mod treemap;
 pub mod treeview;

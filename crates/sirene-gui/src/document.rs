@@ -170,6 +170,8 @@ impl Document {
 
     /// The drawing of whichever diagram the document holds.
     pub fn scene(&self, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
+        // The diagram's own theme settings win over the app's (MTHEME-1).
+        let theme = &sirene_core::theme::ThemeConfig::read(&self.source).apply(theme);
         match &self.other {
             Some(d) => d.scene(metrics, theme),
             None => sirene_core::scene::flowchart(&self.chart, metrics, theme),

@@ -23,6 +23,7 @@ use crate::railroad::{self, Railroad};
 use crate::sankey::{self, Sankey};
 use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
+use crate::theme::ThemeConfig;
 use crate::timeline::{self, Timeline};
 use crate::treemap::{self, Treemap};
 use crate::treeview::{self, TreeView};
@@ -279,6 +280,8 @@ impl Diagram {
 pub struct Lowered {
     pub diagram: Diagram,
     pub diagnostics: Vec<Diagnostic>,
+    /// The diagram's own `theme` and `themeVariables` (MTHEME-1).
+    pub theme: ThemeConfig,
 }
 
 impl From<flowchart::Lowered> for Lowered {
@@ -286,6 +289,7 @@ impl From<flowchart::Lowered> for Lowered {
         Lowered {
             diagram: Diagram::Graph(l.flowchart),
             diagnostics: l.diagnostics,
+            ..Default::default()
         }
     }
 }
@@ -322,8 +326,16 @@ pub(crate) fn header(src: &str) -> &str {
     &r[..end]
 }
 
-/// Parses and lowers `src` with the parser its header picks (LANGS-2).
+/// Parses and lowers `src` with the parser its header picks (LANGS-2), and reads its theme
+/// settings (MTHEME-1).
 pub fn lower(src: &str) -> Lowered {
+    let mut lowered = lower_diagram(src);
+    lowered.theme = ThemeConfig::read(src);
+    lowered.diagnostics.extend(lowered.theme.diagnostics());
+    lowered
+}
+
+fn lower_diagram(src: &str) -> Lowered {
     match Kind::of(src) {
         Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => flowchart::parse(src).lower().into(),
         Kind::Sequence => {
@@ -331,6 +343,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Sequence(seq),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::State => state::parse(src).lower().into(),
@@ -343,6 +356,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Git(graph),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Timeline => {
@@ -350,6 +364,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Timeline(timeline),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Pie => {
@@ -357,6 +372,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Pie(pie),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Gantt => {
@@ -364,6 +380,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Gantt(gantt),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Mindmap => {
@@ -371,6 +388,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Mindmap(mindmap),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Journey => {
@@ -378,6 +396,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Journey(journey),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Quadrant => {
@@ -385,6 +404,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Quadrant(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::XyChart => {
@@ -392,6 +412,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::XyChart(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Kanban => {
@@ -399,6 +420,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Kanban(board),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Packet => {
@@ -406,6 +428,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Packet(packet),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Radar => {
@@ -413,6 +436,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Radar(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Sankey => {
@@ -420,6 +444,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Sankey(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Treemap => {
@@ -427,6 +452,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Treemap(treemap),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Block => {
@@ -434,6 +460,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Block(block),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Architecture => {
@@ -441,6 +468,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Architecture(arch),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::C4 => {
@@ -448,6 +476,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::C4(c4),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::ZenUml => {
@@ -455,6 +484,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Sequence(seq),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Info => {
@@ -462,6 +492,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Info(info),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Ishikawa => {
@@ -469,6 +500,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Ishikawa(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Venn => {
@@ -476,6 +508,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Venn(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Wardley => {
@@ -483,6 +516,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Wardley(map),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::TreeView => {
@@ -490,6 +524,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::TreeView(view),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Railroad => {
@@ -497,6 +532,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Railroad(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::Cynefin => {
@@ -504,6 +540,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::Cynefin(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
         Kind::EventModel => {
@@ -511,6 +548,7 @@ pub fn lower(src: &str) -> Lowered {
             Lowered {
                 diagram: Diagram::EventModel(chart),
                 diagnostics,
+                ..Default::default()
             }
         }
     }

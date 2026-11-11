@@ -236,6 +236,32 @@ fn svg_output() {
         .stderr(predicate::str::contains(": error: "));
 }
 
+/// A diagram's own theme and theme variables win over `--theme` (MTHEME-1, MTHEME-3).
+#[test]
+fn diagram_themes() {
+    sirene()
+        .args(["svg", "--theme", "dark", "-"])
+        .write_stdin("%%{init: {'theme': 'forest'}}%%\nflowchart\nA\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fill=\"#cde498\""))
+        .stderr("");
+    sirene()
+        .args(["svg", "-"])
+        .write_stdin(
+            "---\nconfig:\n  themeVariables:\n    lineColor: '#ff0000'\n---\nflowchart\nA --> B\n",
+        )
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("stroke=\"#ff0000\""));
+    sirene()
+        .args(["svg", "-"])
+        .write_stdin("%%{init: {'theme': 'sunset'}}%%\nflowchart\nA\n")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("not a Mermaid theme"));
+}
+
 /// The width and height in a PNG's header.
 fn png_size(bytes: &[u8]) -> (u32, u32) {
     assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"), "not a PNG");

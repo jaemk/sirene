@@ -8,6 +8,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its
+  frontmatter `config:` or an `%%{init}%%` directive set its colors in SVG, PNG, and the editor,
+  for all 11 Mermaid 12.3 themes; an unknown theme name is a warning.
 - `sirene update` replaces the running binary with the latest release (`--check`, `--to
   VERSION`, `--yes`), checked against `SHA256SUMS` and its build provenance; it refuses for a
   Homebrew or `cargo install` binary and names the command to use instead.

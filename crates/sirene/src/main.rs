@@ -281,7 +281,7 @@ fn run(cli: Cli) -> ExitCode {
             output,
         }) => {
             let render = |l: &Lowered| {
-                let scene = l.diagram.scene(&Approx, &theme.theme());
+                let scene = l.diagram.scene(&Approx, &l.theme.apply(&theme.theme()));
                 Ok(scene::svg::write(&scene).into_bytes())
             };
             if let Some(md) = file
@@ -303,7 +303,9 @@ fn run(cli: Cli) -> ExitCode {
         }) => {
             let quality = quality.quality();
             let render = |l: &Lowered| {
-                let scene = l.diagram.scene(&FontMetrics, &theme.theme());
+                let scene = l
+                    .diagram
+                    .scene(&FontMetrics, &l.theme.apply(&theme.theme()));
                 // A given scale is kept (and may be too large); the quality's own shrinks to fit.
                 let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
                 png::write(&scene, png::Options { scale, quality })
