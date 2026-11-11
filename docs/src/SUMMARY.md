@@ -49,6 +49,7 @@
 - [Ishikawa diagrams](ishikawa.md)
 - [Venn diagrams](venn.md)
 - [Wardley maps](wardley.md)
+- [Tree views](treeview.md)
 
 # Project
 

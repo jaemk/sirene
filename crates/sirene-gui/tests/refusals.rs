@@ -339,6 +339,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for Wardley maps yet")
     );
     assert!(map.chart.nodes.is_empty() && map.other.is_some());
+    let tree = Document::from_source(None, "treeView-beta\n  src/\n".to_owned());
+    assert_eq!(
+        tree.read_only(),
+        Some("drawing edits are not supported for tree views yet")
+    );
+    assert!(tree.chart.nodes.is_empty() && tree.other.is_some());
 }
 
 #[gpui::test]

@@ -22,6 +22,7 @@ use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
 use crate::timeline::{self, Timeline};
 use crate::treemap::{self, Treemap};
+use crate::treeview::{self, TreeView};
 use crate::venn::{self, Venn};
 use crate::wardley::{self, Wardley};
 use crate::xychart::{self, XyChart};
@@ -57,6 +58,7 @@ pub enum Kind {
     Ishikawa,
     Venn,
     Wardley,
+    TreeView,
 }
 
 impl Kind {
@@ -117,6 +119,8 @@ impl Kind {
             Kind::Venn
         } else if wardley::HEADERS.contains(&word) {
             Kind::Wardley
+        } else if treeview::HEADERS.contains(&word) {
+            Kind::TreeView
         } else {
             Kind::Flowchart
         }
@@ -125,7 +129,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, and Wardley diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, and tree view diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -153,6 +157,7 @@ pub enum Diagram {
     Ishikawa(Ishikawa),
     Venn(Venn),
     Wardley(Wardley),
+    TreeView(TreeView),
 }
 
 impl Default for Diagram {
@@ -203,6 +208,7 @@ impl Diagram {
             Diagram::Ishikawa(i) => scene::ishikawa(i, metrics, theme),
             Diagram::Venn(v) => scene::venn(v, metrics, theme),
             Diagram::Wardley(w) => scene::wardley(w, metrics, theme),
+            Diagram::TreeView(t) => scene::treeview(t, metrics, theme),
         }
     }
 
@@ -231,6 +237,7 @@ impl Diagram {
             Diagram::Ishikawa(i) => ascii::ishikawa(i, options),
             Diagram::Venn(v) => ascii::venn(v, options),
             Diagram::Wardley(w) => ascii::wardley(w, options),
+            Diagram::TreeView(t) => ascii::treeview(t, options),
         }
     }
 }
@@ -445,6 +452,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::TreeView => {
+            let (view, diagnostics) = treeview::parse(src).lower();
+            Lowered {
+                diagram: Diagram::TreeView(view),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -500,6 +514,7 @@ mod tests {
         assert_eq!(Kind::of("ishikawa\n"), Kind::Ishikawa);
         assert_eq!(Kind::of("venn-beta\n"), Kind::Venn);
         assert_eq!(Kind::of("wardley-beta\n"), Kind::Wardley);
+        assert_eq!(Kind::of("treeView-beta\n"), Kind::TreeView);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -516,9 +531,10 @@ mod tests {
         assert_eq!(other_diagram("info\n"), None);
         assert_eq!(other_diagram("venn-beta\n"), None);
         assert_eq!(other_diagram("wardley-beta\n"), None);
+        assert_eq!(other_diagram("treeView-beta\n"), None);
         assert_eq!(
-            other_diagram("treeView-beta\n"),
-            Some("treeView-beta".to_owned())
+            other_diagram("usecase-beta\n"),
+            Some("usecase-beta".to_owned())
         );
         assert_eq!(other_diagram("xychart-beta\n"), None);
         assert_eq!(other_diagram("requirementDiagram\n"), None);

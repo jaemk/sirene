@@ -28,9 +28,10 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | `ishikawa-beta` | tree | A fishbone: the effect at the end of a spine, causes on bones; ASCII is an outline: `mermaid-ishikawa-diagrams.md`. |
 | `venn-beta` | circles | Sets as circles sized and overlapped by their sizes; ASCII lists each set and overlap: `mermaid-venn-diagrams.md`. |
 | `wardley-beta` | map | Components placed by visibility and evolution, with links and trends; ASCII plots them by name over the stages: `mermaid-wardley-maps.md`. |
+| `treeView-beta` | tree | Files and directories nested by indentation or box-drawing characters; ASCII prints the tree as `tree` does: `mermaid-tree-views.md`. |
 | `kanban` | board | Columns of cards, with the mindmap grammar; ASCII is a box per column: `mermaid-kanban-boards.md`. |
 
-Mermaid 12 also adds `treeView-beta`, `usecase-beta`,
+Mermaid 12 also adds `usecase-beta`,
 `railroad-beta` (and its `-ebnf`, `-abnf`, and `-peg` forms), `swimlane-beta`, `eventmodeling`,
 `cynefin-beta`, and `agentflow-beta`. Until each is built it is FLOWCH-16's "not supported"
 error.

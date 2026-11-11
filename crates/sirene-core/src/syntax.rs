@@ -138,6 +138,10 @@ syntax_kinds! {
     // marker such as `+>` or `+'label'<>`.
     WARDLEY_KW,
     PORT,
+    // Tree views: a box-drawing prefix such as `│   ├── `, `icon(name)`, and `## text`.
+    TREE_BRANCH,
+    TREE_ICON,
+    TREE_DESC,
     ERROR_TOKEN,
 
     // Nodes.

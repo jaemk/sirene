@@ -69,7 +69,6 @@ const OTHER_DIAGRAMS: &[&str] = &[
     "timeline",
     "treemap",
     "treemap-beta",
-    "treeView-beta",
     "usecase-beta",
     "xychart",
     "xychart-beta",

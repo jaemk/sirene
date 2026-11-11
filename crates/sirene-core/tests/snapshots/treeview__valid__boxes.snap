@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/treeview.rs
+expression: "treeView-beta\n├── packages/\n│   ├── mermaid/\n│   │   ├── src/\n│   │   │   ├── parser.ts\n│   │   │   └── renderer.ts\n│   │   └── package.json\n│   └── parser/\n│       └── src/\n└── README.md\n"
+---
+/
+├── packages/
+│   ├── mermaid/
+│   │   ├── src/
+│   │   │   ├── parser.ts
+│   │   │   └── renderer.ts
+│   │   └── package.json
+│   └── parser/
+│       └── src/
+└── README.md

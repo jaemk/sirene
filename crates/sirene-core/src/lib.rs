@@ -31,6 +31,7 @@ pub mod state;
 pub mod syntax;
 pub mod timeline;
 pub mod treemap;
+pub mod treeview;
 pub mod venn;
 pub mod wardley;
 pub mod xychart;
