@@ -20,6 +20,9 @@ pub use model::{
 use crate::diagnostic::Diagnostic;
 use crate::syntax::SyntaxNode;
 
+/// The header of a swimlane diagram: a flowchart whose top-level subgraphs are lanes.
+pub(crate) const SWIMLANE: &str = "swimlane-beta";
+
 /// The result of parsing flowchart source: a lossless syntax tree plus diagnostics.
 #[derive(Debug, Clone)]
 pub struct Parse {

@@ -52,6 +52,7 @@
 - [Tree views](treeview.md)
 - [Use case diagrams](usecase.md)
 - [Railroad diagrams](railroad.md)
+- [Swimlane diagrams](swimlane.md)
 
 # Project
 

@@ -22,8 +22,11 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
             l.chart.title = text::frontmatter_title(t.text());
         }
     }
-    if let Some(dir) = child(root, HEADER).and_then(|h| token(&h, DIR)) {
-        l.chart.direction = Direction::from_text(dir.text()).unwrap_or_default();
+    if let Some(header) = child(root, HEADER) {
+        l.chart.lanes = token(&header, GRAPH_KW).is_some_and(|t| t.text() == super::SWIMLANE);
+        if let Some(dir) = token(&header, DIR) {
+            l.chart.direction = Direction::from_text(dir.text()).unwrap_or_default();
+        }
     }
     l.statements(root, false);
     l.finish()
@@ -118,7 +121,12 @@ struct Lowerer {
     /// Subgraphs in the order their `end`s appear (FLOWMO-10).
     subgraphs: Vec<Subgraph>,
     subgraph_count: usize,
+    /// Subgraphs that lost a member to one that listed it first.
+    lost: Vec<String>,
 }
+
+/// The id of the untitled lane that holds a swimlane diagram's nodes outside every lane.
+pub const DEFAULT_LANE: &str = "__swimlane_default__";
 
 impl Lowerer {
     fn error(&mut self, range: TextRange, message: impl Into<String>) {
@@ -142,8 +150,76 @@ impl Lowerer {
         }
         self.chart.nodes.retain(|n| !merged.contains(&n.id));
         self.subgraphs.sort_by_key(|s| s.range.start());
-        self.chart.subgraphs = self.subgraphs;
+        self.chart.subgraphs = std::mem::take(&mut self.subgraphs);
+        if self.chart.lanes {
+            self.lanes();
+        }
         (self.chart, self.diagnostics)
+    }
+
+    /// Swimlane lanes (MSWIM-2): drops a lane emptied by a node another lane listed first,
+    /// warns about subgraphs nested in a lane, and gathers nodes outside every lane into an
+    /// untitled last lane.
+    fn lanes(&mut self) {
+        let chart = &self.chart;
+        let nested = |id: &str| {
+            chart
+                .subgraphs
+                .iter()
+                .any(|s| s.members.iter().any(|m| m == id))
+        };
+        let emptied: Vec<String> = chart
+            .subgraphs
+            .iter()
+            .filter(|s| {
+                s.members.is_empty()
+                    && self.lost.contains(&s.id)
+                    && !nested(&s.id)
+                    && !chart.edges.iter().any(|e| e.from == s.id || e.to == s.id)
+            })
+            .map(|s| s.id.clone())
+            .collect();
+        let inner: Vec<(TextRange, String)> = chart
+            .subgraphs
+            .iter()
+            .filter(|s| nested(&s.id))
+            .map(|s| {
+                (
+                    TextRange::at(s.range.start(), "subgraph".len().try_into().unwrap()),
+                    s.id.clone(),
+                )
+            })
+            .collect();
+        self.chart.subgraphs.retain(|s| !emptied.contains(&s.id));
+        for (range, id) in inner {
+            self.warning(
+                range,
+                format!(
+                    "subgraph `{id}` is nested in a lane; only top-level subgraphs are lanes, so \
+                     it is drawn as a plain box"
+                ),
+            );
+        }
+        let chart = &self.chart;
+        let loose: Vec<String> = chart
+            .nodes
+            .iter()
+            .filter(|n| chart.parent(&n.id).is_none())
+            .map(|n| n.id.clone())
+            .collect();
+        if !loose.is_empty() {
+            self.chart.subgraphs.push(Subgraph {
+                id: DEFAULT_LANE.to_owned(),
+                title: Label::default(),
+                direction: None,
+                members: loose,
+                classes: Vec::new(),
+                styles: Vec::new(),
+                metadata: Vec::new(),
+                range: TextRange::default(),
+                region: false,
+            });
+        }
     }
 
     /// Lowers the statements directly under `parent`. Returns the ids of the nodes and
@@ -417,6 +493,7 @@ impl Lowerer {
                             header.text_range(),
                             format!("`{m}` already belongs to subgraph `{owner}`"),
                         );
+                        self.lost.push(id.clone());
                     }
                 }
                 None => kept.push(m.clone()),

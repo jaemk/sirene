@@ -60,6 +60,7 @@ fn graph() -> impl Strategy<Value = Graph> {
                         parent: parent.filter(|&p| p < j),
                         direction,
                         title: title.map_or(Size::default(), |(w, h)| Size::new(w, h)),
+                        lane: false,
                     })
             })
             .collect::<Vec<_>>();

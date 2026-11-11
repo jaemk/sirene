@@ -106,7 +106,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   terminals, non-terminals, special sequences, sequences, choices, optionals, repetition,
   ABNF repeats and `%x` numbers, EBNF exceptions, and PEG predicates; in text, boxed
   elements on a track with branches, bypasses, and loops.
-- Mermaid 12's other new types (`swimlane-beta` and the rest) are
+- Mermaid swimlane diagrams (`swimlane-beta`), read-only in the editor: flowcharts whose
+  top-level subgraphs are lanes side by side across the flow, with an untitled lane for
+  nodes outside every lane.
+- Mermaid 12's other new types (`eventmodeling` and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 - `THIRD-PARTY-NOTICES` with the licenses of the code sirene ports (venn.js, fmin, d3-sankey,

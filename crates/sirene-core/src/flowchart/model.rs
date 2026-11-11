@@ -365,6 +365,8 @@ pub struct Flowchart {
     pub default_edge_styles: Vec<Style>,
     /// Curve from `linkStyle default interpolate`.
     pub default_curve: Option<String>,
+    /// A swimlane diagram: top-level subgraphs are lanes side by side across the flow.
+    pub lanes: bool,
 }
 
 impl Flowchart {

@@ -1,0 +1,17 @@
+swimlane-beta TB
+  subgraph applicant [Applicant]
+    apply[Submit application]
+    sign[Sign agreement]
+  end
+
+  subgraph reviewer [Reviewer]
+    subgraph checks [Checks]
+      screen[Screen application]
+    end
+    decide{Approved?}
+  end
+
+  apply -->|Application received| screen
+  screen --> decide
+  decide -->|Approved| sign
+  decide -->|Needs changes| apply

@@ -62,6 +62,8 @@ pub enum Kind {
     TreeView,
     UseCase,
     Railroad,
+    /// A flowchart whose top-level subgraphs are lanes (`swimlane-beta`).
+    Swimlane,
 }
 
 impl Kind {
@@ -128,6 +130,8 @@ impl Kind {
             Kind::UseCase
         } else if railroad::HEADERS.contains(&word) {
             Kind::Railroad
+        } else if word == flowchart::SWIMLANE {
+            Kind::Swimlane
         } else {
             Kind::Flowchart
         }
@@ -136,7 +140,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, and railroad diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, and swimlane diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -303,7 +307,7 @@ pub(crate) fn header(src: &str) -> &str {
 /// Parses and lowers `src` with the parser its header picks (LANGS-2).
 pub fn lower(src: &str) -> Lowered {
     match Kind::of(src) {
-        Kind::Flowchart => flowchart::parse(src).lower().into(),
+        Kind::Flowchart | Kind::Swimlane => flowchart::parse(src).lower().into(),
         Kind::Sequence => {
             let (seq, diagnostics) = sequence::parse(src).lower();
             Lowered {
@@ -538,6 +542,7 @@ mod tests {
         assert_eq!(Kind::of("railroad-ebnf-beta\n"), Kind::Railroad);
         assert_eq!(Kind::of("railroad-abnf-beta\n"), Kind::Railroad);
         assert_eq!(Kind::of("railroad-peg-beta\n"), Kind::Railroad);
+        assert_eq!(Kind::of("swimlane-beta LR\n"), Kind::Swimlane);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -557,9 +562,10 @@ mod tests {
         assert_eq!(other_diagram("treeView-beta\n"), None);
         assert_eq!(other_diagram("usecase-beta\n"), None);
         assert_eq!(other_diagram("railroad-ebnf-beta\n"), None);
+        assert_eq!(other_diagram("swimlane-beta\n"), None);
         assert_eq!(
-            other_diagram("swimlane-beta\n"),
-            Some("swimlane-beta".to_owned())
+            other_diagram("eventmodeling\n"),
+            Some("eventmodeling".to_owned())
         );
         assert_eq!(other_diagram("xychart-beta\n"), None);
         assert_eq!(other_diagram("requirementDiagram\n"), None);

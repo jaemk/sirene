@@ -1,0 +1,52 @@
+---
+source: crates/sirene-core/tests/swimlane.rs
+expression: "swimlane-beta TB\n  accTitle: Request intake\n  accDescr: A request is collected, reviewed, and scheduled.\n  subgraph Intake\n    collect[Collect request]\n    validate[Validate details]\n  end\n\n  subgraph Review\n    review[Review request]\n    decide{Ready?}\n  end\n\n  subgraph Delivery\n    schedule[Schedule work]\n    complete[Complete work]\n  end\n\n  collect --> validate --> review --> decide\n  decide -->|Yes| schedule --> complete\n  decide -->|No| collect\n"
+---
+
+┌─ Intake ───────────────────┬─ Review ───────────────┬─ Delivery ────────┐
+│                            │                        │                   │
+│        ┌─────────────────┐ │                        │                   │
+│        │ Collect request │ │                        │                   │
+│        └────┬────────────┘ │                        │                   │
+│             │       ▲      │                        │                   │
+│            ┌┘       └──┐   │                        │                   │
+│            │           │   │                        │                   │
+│            │           │   │                        │                   │
+│           ┌┘           │   │                        │                   │
+│           ▼            │   │                        │                   │
+│ ┌──────────────────┐   │   │                        │                   │
+│ │ Validate details │   │   │                        │                   │
+│ └─────────┬────────┘   │   │                        │                   │
+│           │            │   │                        │                   │
+│           │            └───┼──────────────────────┐ │                   │
+│           └────────────────┼──────────┐           │ │                   │
+│                            │          │           │ │                   │
+│                            │          │          No │                   │
+│                            │          ▼           │ │                   │
+│                            │ ┌────────────────┐   │ │                   │
+│                            │ │ Review request │   │ │                   │
+│                            │ └────────┬───────┘   │ │                   │
+│                            │          │           │ │                   │
+│                            │          └──┐        │ │                   │
+│                            │             │        │ │                   │
+│                            │             │        │ │                   │
+│                            │             └─┐   ┌──┘ │                   │
+│                            │               ▼   │    │                   │
+│                            │            ╱──────┴─╲  │                   │
+│                            │            │ Ready? │  │                   │
+│                            │            ╲────┬───╱  │                   │
+│                            │                 │      │                   │
+│                            │                 └──────┼─────────┐         │
+│                            │                        │         │         │
+│                            │                        │        Yes        │
+│                            │                        │         ▼         │
+│                            │                        │ ┌───────────────┐ │
+│                            │                        │ │ Schedule work │ │
+│                            │                        │ └───────┬───────┘ │
+│                            │                        │         │         │
+│                            │                        │         ▼         │
+│                            │                        │ ┌───────────────┐ │
+│                            │                        │ │ Complete work │ │
+│                            │                        │ └───────────────┘ │
+│                            │                        │                   │
+└────────────────────────────┴────────────────────────┴───────────────────┘

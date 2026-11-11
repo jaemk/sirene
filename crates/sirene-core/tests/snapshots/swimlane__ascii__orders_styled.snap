@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/swimlane.rs
+expression: "swimlane-beta LR\n  subgraph buyer [Buyer]\n    choose([Choose product])\n    pay[Pay invoice]\n  end\n\n  subgraph store [Store]\n    reserve[Reserve stock]\n    ship((Ship))\n  end\n\n  choose --> reserve\n  reserve -.->|Invoice ready| pay\n  pay ==> ship\n  ship --> audit[Audit]\n\n  classDef attention fill:#fff2cc,stroke:#d6a500,color:#111;\n  class reserve attention;\n"
+---
+
++- Buyer ------------------------------------------------------------------------------------------------+
+|  .----------------.                                        +-------------+                             |
+|  ( Choose product +-+                     +.Invoice ready.>| Pay invoice +=+                           |
+|  '----------------' |                     :                +-------------+ |                           |
++- Store -------------+---------------------+--------------------------------+---------------------------+
+|                     |   +---------------+ :                                |   .------.                |
+|                     +-->| Reserve stock +.+                                +==>( Ship +-+              |
+|                         +---------------+                                      '------' |              |
++-----------------------------------------------------------------------------------------+--------------+
+|                                                                                         |   +-------+  |
+|                                                                                         +-->| Audit |  |
+|                                                                                             +-------+  |
++--------------------------------------------------------------------------------------------------------+

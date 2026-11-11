@@ -95,6 +95,9 @@ pub struct ClusterSpec {
     pub direction: Option<Direction>,
     /// Size of the title, whose rect starts on the top border row; empty for no title.
     pub title: Size,
+    /// A top-level cluster laid out as a lane (LAYOUT-12): its items join the diagram's ranks,
+    /// and it is a band across the whole diagram along the flow, beside the other lanes.
+    pub lane: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -282,6 +285,8 @@ struct Placed {
     loops: Vec<(usize, Vec<Point>, Option<Rect>)>,
     notes: Vec<(usize, Rect)>,
     title: Option<Rect>,
+    /// Title rects of the lanes, in the diagram.
+    lane_titles: Vec<(usize, Rect)>,
     /// Canonical cross offset of each border crossing from the block's anchor.
     ports: HashMap<(usize, Side), i32>,
 }
@@ -296,6 +301,10 @@ struct Builder<'a> {
     classes: Vec<Class>,
     directions: Vec<Direction>,
     reversed: Vec<bool>,
+    /// Lane clusters in input order.
+    lanes: Vec<usize>,
+    /// The position in `lanes` of each diagram-scope item that is in a lane.
+    item_lane: HashMap<Item, usize>,
 }
 
 impl<'a> Builder<'a> {
@@ -318,11 +327,29 @@ impl<'a> Builder<'a> {
                 current = cluster_parent[p];
             }
         }
-        let node_parent = graph
+        let mut node_parent: Vec<Option<usize>> = graph
             .nodes
             .iter()
             .map(|n| n.parent.filter(|&p| p < nc))
             .collect();
+        // A lane's items move up into the diagram, remembering their lane.
+        let lanes: Vec<usize> = (0..nc)
+            .filter(|&c| graph.clusters[c].lane && cluster_parent[c].is_none())
+            .collect();
+        let mut item_lane = HashMap::new();
+        let lane_index = |p: Option<usize>| p.and_then(|p| lanes.iter().position(|&l| l == p));
+        for (n, parent) in node_parent.iter_mut().enumerate() {
+            if let Some(i) = lane_index(*parent) {
+                item_lane.insert(Item::Node(n), i);
+                *parent = None;
+            }
+        }
+        for (c, parent) in cluster_parent.iter_mut().enumerate() {
+            if let Some(i) = lane_index(*parent) {
+                item_lane.insert(Item::Cluster(c), i);
+                *parent = None;
+            }
+        }
         Builder {
             graph,
             config,
@@ -332,7 +359,13 @@ impl<'a> Builder<'a> {
             classes: Vec::new(),
             directions: vec![graph.direction; nc + 1],
             reversed: vec![false; graph.edges.len()],
+            lanes,
+            item_lane,
         }
+    }
+
+    fn is_lane(&self, item: Item) -> bool {
+        matches!(item, Item::Cluster(c) if self.lanes.contains(&c))
     }
 
     fn parent(&self, item: Item) -> Option<usize> {
@@ -361,7 +394,12 @@ impl<'a> Builder<'a> {
         let order = self.bottom_up();
         let mut placed: Vec<Option<Placed>> = (0..self.scopes.len()).map(|_| None).collect();
         for &s in &order {
-            let p = self.place(s, &placed);
+            // A lane is placed with the diagram.
+            let p = if s > 0 && self.is_lane(Item::Cluster(s - 1)) {
+                Placed::default()
+            } else {
+                self.place(s, &placed)
+            };
             placed[s] = Some(p);
         }
         let placed: Vec<Placed> = placed
@@ -378,12 +416,17 @@ impl<'a> Builder<'a> {
             self.scopes[s].items.push(Item::Node(n));
         }
         for c in 0..self.graph.clusters.len() {
+            if self.is_lane(Item::Cluster(c)) {
+                continue;
+            }
             let s = self.cluster_parent[c].map_or(0, |p| p + 1);
             self.scopes[s].items.push(Item::Cluster(c));
         }
         let mut crossed = vec![false; self.graph.clusters.len()];
         for (e, spec) in self.graph.edges.iter().enumerate() {
-            let class = if spec.from == spec.to {
+            let class = if self.is_lane(spec.from) || self.is_lane(spec.to) {
+                Class::Unroutable
+            } else if spec.from == spec.to {
                 let scope = self.parent(spec.from).map_or(0, |c| c + 1);
                 self.scopes[scope].loops.push((e, spec.from));
                 Class::Loop
@@ -524,8 +567,13 @@ impl<'a> Builder<'a> {
         for &s in order.iter().rev() {
             let (dx, dy) = offset[s];
             let p = &placed[s];
-            if let Some(c) = s.checked_sub(1) {
+            if let Some(c) = s.checked_sub(1)
+                && !self.is_lane(Item::Cluster(c))
+            {
                 titles[c] = p.title.map(|r| r.translate(dx, dy));
+            }
+            for &(c, r) in &p.lane_titles {
+                titles[c] = Some(r.translate(dx, dy));
             }
             for &(n, r) in &p.nodes {
                 nodes[n] = r.translate(dx, dy);
@@ -683,6 +731,16 @@ impl<'a, 'b> Placer<'a, 'b> {
         self.s != 0
     }
 
+    /// The diagram scope of a graph with lanes.
+    fn has_lanes(&self) -> bool {
+        self.s == 0 && !self.b.lanes.is_empty()
+    }
+
+    /// Whether the first and last layers are border rows.
+    fn bordered(&self) -> bool {
+        self.is_cluster() || self.has_lanes()
+    }
+
     fn elem(&mut self, kind: Kind, layer: usize, size: Size) -> usize {
         self.elems.push(Elem {
             kind,
@@ -713,7 +771,7 @@ impl<'a, 'b> Placer<'a, 'b> {
     fn build(&mut self) -> usize {
         let b = self.b;
         let scope = &b.scopes[self.s];
-        let base = usize::from(self.is_cluster());
+        let base = usize::from(self.bordered());
         let max_rank = scope.ranks.values().copied().max().unwrap_or(-1);
         let item_layers = (max_rank + 1) as usize;
         let last = base + item_layers;
@@ -805,7 +863,99 @@ impl<'a, 'b> Placer<'a, 'b> {
                 self.elem(Kind::Title, layer, title);
             }
         }
-        if self.is_cluster() { last + 1 } else { last }
+        if self.bordered() { last + 1 } else { last }
+    }
+
+    /// The lane of each element, by position in `lanes`, or `lanes.len()` for items outside
+    /// every lane. Edge dummies take the upper end's lane above the edge's middle layer and the
+    /// lower end's from it on.
+    fn lane_keys(&self) -> Vec<usize> {
+        let outside = self.b.lanes.len();
+        let mut keys = vec![outside; self.elems.len()];
+        for (e, el) in self.elems.iter().enumerate() {
+            if let Kind::Item(item) = el.kind {
+                keys[e] = self.b.item_lane.get(&item).copied().unwrap_or(outside);
+            }
+        }
+        for chain in &self.chains {
+            let (Some(&u), Some(&v)) = (chain.elems.first(), chain.elems.last()) else {
+                continue;
+            };
+            let (lu, lv) = (self.elems[u].layer, self.elems[v].layer);
+            let mid = lu + (lv - lu) / 2;
+            for &d in &chain.elems[1..chain.elems.len() - 1] {
+                keys[d] = if self.elems[d].layer < mid {
+                    keys[u]
+                } else {
+                    keys[v]
+                };
+            }
+        }
+        keys
+    }
+
+    /// The real title size of lane `k`, or empty past the last lane.
+    fn lane_title(&self, k: usize) -> Size {
+        self.b
+            .lanes
+            .get(k)
+            .map_or_else(Size::default, |&c| self.b.graph.clusters[c].title)
+    }
+
+    /// Cross positions with each lane in a band of its own, the bands side by side and sharing
+    /// their borders (LAYOUT-12). Returns the positions, the total width, and each lane's
+    /// band as `(start, width)`.
+    fn lane_positions(
+        &self,
+        keys: &[usize],
+        spans: &[Span],
+        links: &[Link],
+    ) -> (Vec<i32>, i32, Vec<(i32, i32)>) {
+        let pad = self.sp.cluster_cross_pad;
+        let vertical = !horizontal(self.dir);
+        let mut x = vec![0; self.elems.len()];
+        let mut bands = Vec::new();
+        let mut at = 0;
+        for k in 0..=self.b.lanes.len() {
+            let layers: Vec<Vec<usize>> = self
+                .layers
+                .iter()
+                .map(|l| l.iter().copied().filter(|&e| keys[e] == k).collect())
+                .collect();
+            let members: Vec<usize> = layers.iter().flatten().copied().collect();
+            if k == self.b.lanes.len() && members.is_empty() {
+                break;
+            }
+            let inside: Vec<Link> = links
+                .iter()
+                .filter(|l| keys[l.upper] == k && keys[l.lower] == k)
+                .copied()
+                .collect();
+            let px =
+                position::position(&layers, spans, &inside, self.sp.node_gap, self.sp.edge_gap);
+            let lo = members.iter().map(|&e| px[e] - spans[e].left).min();
+            let hi = members.iter().map(|&e| px[e] + spans[e].right).max();
+            let (lo, content) = match (lo, hi) {
+                (Some(lo), Some(hi)) => (lo, hi - lo + 1),
+                _ => (0, 0),
+            };
+            let title = self.lane_title(k);
+            // In a horizontal diagram the title sits on the lane's real top border.
+            let title_room = if vertical { 0 } else { (title.h - 1).max(0) };
+            let mut width = (content + 2 * pad + title_room).max(2 * pad + 1);
+            if vertical && title.w > 0 {
+                width = width.max(title.w + 2 * pad);
+            }
+            let room = width - 2 * pad - title_room;
+            let shift = at + pad + title_room + (room - content) / 2 - lo;
+            for &e in &members {
+                x[e] = px[e] + shift;
+            }
+            bands.push((at, width));
+            at += width - 1;
+        }
+        let total = bands.last().map_or(0, |&(start, w)| start + w);
+        (x, total, bands)
     }
 
     /// `(upper, lower, chain)` for each consecutive pair in every chain.
@@ -910,6 +1060,15 @@ impl<'a, 'b> Placer<'a, 'b> {
         self.init_layers(count, &segments);
         let pairs: Vec<(usize, usize)> = segments.iter().map(|&(u, v, _)| (u, v)).collect();
         order::order(&mut self.layers, &pairs, self.elems.len());
+        let keys = if self.has_lanes() {
+            let keys = self.lane_keys();
+            for layer in &mut self.layers {
+                layer.sort_by_key(|&e| keys[e]);
+            }
+            keys
+        } else {
+            Vec::new()
+        };
         self.fit_ports(&segments);
         let offsets = self.ports(&segments);
         let spans: Vec<Span> = (0..self.elems.len())
@@ -935,42 +1094,58 @@ impl<'a, 'b> Placer<'a, 'b> {
                 lower_off: vo,
             })
             .collect();
-        let mut x = position::position(
-            &self.layers,
-            &spans,
-            &links,
-            self.sp.node_gap,
-            self.sp.edge_gap,
-        );
-
-        // Cross-axis extent and padding.
-        let lo = (0..x.len())
-            .map(|e| x[e] - spans[e].left)
-            .min()
-            .unwrap_or(0);
-        let hi = (0..x.len())
-            .map(|e| x[e] + spans[e].right)
-            .max()
-            .unwrap_or(-1);
-        let content = hi - lo + 1;
         let cluster = self.cluster_spec();
         // In a horizontal cluster the title runs along the main axis at the cross-axis start.
         let side_title = cluster
             .map(|c| c.title)
             .filter(|t| t.w > 0 && horizontal(self.dir));
-        let (min_main, cross_start) = side_title.map_or((0, 0), |t| {
-            (t.w + 2 * self.sp.cluster_main_pad, (t.h - 1).max(0))
-        });
-        let pad = if cluster.is_some() {
-            self.sp.cluster_cross_pad
+        let (x, width, bands, min_main) = if self.has_lanes() {
+            let (x, width, bands) = self.lane_positions(&keys, &spans, &links);
+            let min_main = if horizontal(self.dir) {
+                (0..self.b.lanes.len())
+                    .map(|k| self.lane_title(k).w)
+                    .filter(|&w| w > 0)
+                    .map(|w| w + 2 * self.sp.cluster_main_pad)
+                    .max()
+                    .unwrap_or(0)
+            } else {
+                0
+            };
+            (x, width, bands, min_main)
         } else {
-            0
+            let mut x = position::position(
+                &self.layers,
+                &spans,
+                &links,
+                self.sp.node_gap,
+                self.sp.edge_gap,
+            );
+
+            // Cross-axis extent and padding.
+            let lo = (0..x.len())
+                .map(|e| x[e] - spans[e].left)
+                .min()
+                .unwrap_or(0);
+            let hi = (0..x.len())
+                .map(|e| x[e] + spans[e].right)
+                .max()
+                .unwrap_or(-1);
+            let content = hi - lo + 1;
+            let (min_main, cross_start) = side_title.map_or((0, 0), |t| {
+                (t.w + 2 * self.sp.cluster_main_pad, (t.h - 1).max(0))
+            });
+            let pad = if cluster.is_some() {
+                self.sp.cluster_cross_pad
+            } else {
+                0
+            };
+            let width = content + 2 * pad + cross_start;
+            let shift = pad + cross_start - lo;
+            for a in &mut x {
+                *a += shift;
+            }
+            (x, width, Vec::new(), min_main)
         };
-        let width = content + 2 * pad + cross_start;
-        let shift = pad + cross_start - lo;
-        for a in &mut x {
-            *a += shift;
-        }
 
         // Main axis: layer heights, gaps sized by their tracks.
         let layers = self.layers.len();
@@ -984,10 +1159,23 @@ impl<'a, 'b> Placer<'a, 'b> {
                     .unwrap_or(0)
             })
             .collect();
-        if cluster.is_some() {
+        if self.bordered() {
             // The border rows.
             heights[0] = heights[0].max(1);
             heights[layers - 1] = heights[layers - 1].max(1);
+        }
+        if self.has_lanes() && !horizontal(self.dir) {
+            // Lane titles sit on the real top border.
+            let title = (0..self.b.lanes.len())
+                .map(|k| self.lane_title(k).h)
+                .max()
+                .unwrap_or(0);
+            let top = if self.dir == Direction::TopBottom {
+                0
+            } else {
+                layers - 1
+            };
+            heights[top] = heights[top].max(title);
         }
         let port = |i: usize, upper: bool| {
             let (u, v, _) = segments[i];
@@ -1015,7 +1203,7 @@ impl<'a, 'b> Placer<'a, 'b> {
                 track_of[i] = t;
             }
             let mut min = self.sp.rank_gap;
-            if cluster.is_some() && (g == 0 || g + 2 == layers) {
+            if self.bordered() && (g == 0 || g + 2 == layers) {
                 min = min.max(self.sp.cluster_main_pad);
             }
             let needed = if k > 0 {
@@ -1090,6 +1278,22 @@ impl<'a, 'b> Placer<'a, 'b> {
         }
         if let Some(t) = side_title {
             placed.title = Some(Rect::new(self.sp.cluster_main_pad, 0, t.w, t.h));
+        }
+        // Empty unless this is the diagram scope of a graph with lanes.
+        for (k, (&c, &(start, w))) in self.b.lanes.iter().zip(&bands).enumerate() {
+            let r = real_rect(Rect::new(start, 0, w, height));
+            placed.clusters.push((c, r));
+            let t = self.lane_title(k);
+            if t.w > 0 {
+                let inset = if horizontal(self.dir) {
+                    self.sp.cluster_main_pad
+                } else {
+                    self.sp.cluster_cross_pad
+                };
+                placed
+                    .lane_titles
+                    .push((c, Rect::new(r.x + inset, r.y, t.w, t.h)));
+            }
         }
 
         for (c, chain) in self.chains.iter().enumerate() {

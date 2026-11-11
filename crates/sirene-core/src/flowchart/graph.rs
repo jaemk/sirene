@@ -105,6 +105,7 @@ impl Flowchart {
                     parent,
                     direction: s.direction,
                     title: measure.subgraph_title(s),
+                    lane: self.lanes && parent.is_none(),
                 })
                 .collect(),
             edges: self
