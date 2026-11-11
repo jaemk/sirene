@@ -1,0 +1,20 @@
+---
+title: Cart read model
+---
+eventmodeling
+  rf 02 evt CartCreated
+  rf 03 evt ItemAdded `json`{ "id": 1 }
+  rf 04 evt ItemRemoved
+  rf 05 evt CartCleared
+  tf 01 rmo CartItems ->> 02 ->> 03 ->> 04 ->> 05
+  tf 06 ui CartUI
+
+  entity ItemAdded
+  note 03 `md` {
+    Raised once per item.
+  }
+  gwt 03
+    given
+      evt ItemAdded
+    then
+      evt ItemAdded

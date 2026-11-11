@@ -155,6 +155,12 @@ syntax_kinds! {
     RR_SPECIAL,
     // Cynefin diagrams: a domain name such as `complex`.
     CYNEFIN_KW,
+    // Event modeling diagrams: a statement keyword such as `tf`, `data`, or `given`, an entity
+    // type such as `cmd`, data in braces or quotes, and a data type such as `` `json` ``.
+    EM_KW,
+    EM_TYPE,
+    EM_DATA,
+    EM_DATA_TYPE,
     ERROR_TOKEN,
 
     // Nodes.
@@ -254,6 +260,11 @@ syntax_kinds! {
     // Cynefin diagrams: a domain block's opening line, and a line of quoted items.
     DOMAIN_STMT,
     ITEM_STMT,
+    // Event modeling diagrams: a time or reset frame, a data block, and a given/when/then
+    // scenario.
+    FRAME_STMT,
+    DATA_STMT,
+    GWT_STMT,
     ERROR,
 }
 

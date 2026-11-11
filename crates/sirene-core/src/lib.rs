@@ -9,6 +9,7 @@ pub mod cynefin;
 pub mod diagnostic;
 pub mod diagram;
 pub mod er;
+pub mod eventmodel;
 pub mod flowchart;
 pub mod gantt;
 pub mod git;

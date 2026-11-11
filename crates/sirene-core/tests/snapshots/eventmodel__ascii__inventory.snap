@@ -1,0 +1,39 @@
+---
+source: crates/sirene-core/tests/eventmodel.rs
+expression: "%% A translation: an external event drives a processor.\neventmodeling\n\ntimeframe 01 ui CartUI\ntimeframe 02 command AddItem { description: string }\ntimeframe 03 event ItemAdded { description: string }\n\nresetframe 04 event External.InventoryChanged\ntimeframe 05 processor InventoryProcessor\ntimeframe 06 command ChangeInventory\ntimeframe 07 event Cart.InventoryChanged // in the cart's stream\n"
+---
++-----------------------------------------------------------------------------------------------------+
+|                                                                                                     |
+| UI/Automation        + 01 ui -+                           + 05 pcr ------------+                    |
+|                      | CartUI |                           | InventoryProcessor |                    |
+|                      +------+-+                           +---------------+----+                    |
+|                             |                                 ^           |                         |
++.............................+.................................+...........+.........................+
+|                             v                                 |           v                         |
+| Command/Read Model        + 02 cmd -------------+             |      + 06 cmd ---------+            |
+|                           |       AddItem       |             |      | ChangeInventory |            |
+|                           +---------------------+             |      +------------+----+            |
+|                           | description: string |             |                   |                 |
+|                           +---------------+-----+             |                   |                 |
+|                                           |                   |                   |                 |
++...........................................+...................+...................+.................+
+|                                           v                   |                   |                 |
+| Events                               + 03 evt -------------+  |                   |                 |
+|                                      |      ItemAdded      |  |                   |                 |
+|                                      +---------------------+  |                   |                 |
+|                                      | description: string |  |                   |                 |
+|                                      +---------------------+  |                   |                 |
+|                                                               |                   |                 |
++...............................................................+...................+.................+
+|                                                               |                   |                 |
+| Stream: External                                + 04 evt -----+----+              |                 |
+|                                                 | InventoryChanged |              |                 |
+|                                                 +------------------+              |                 |
+|                                                                                   |                 |
++...................................................................................+.................+
+|                                                                                   v                 |
+| Stream: Cart                                                                  + 07 evt ----------+  |
+|                                                                               | InventoryChanged |  |
+|                                                                               +------------------+  |
+|                                                                                                     |
++-----------------------------------------------------------------------------------------------------+

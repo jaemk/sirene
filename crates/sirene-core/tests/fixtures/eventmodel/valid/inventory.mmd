@@ -1,0 +1,11 @@
+%% A translation: an external event drives a processor.
+eventmodeling
+
+timeframe 01 ui CartUI
+timeframe 02 command AddItem { description: string }
+timeframe 03 event ItemAdded { description: string }
+
+resetframe 04 event External.InventoryChanged
+timeframe 05 processor InventoryProcessor
+timeframe 06 command ChangeInventory
+timeframe 07 event Cart.InventoryChanged // in the cart's stream
