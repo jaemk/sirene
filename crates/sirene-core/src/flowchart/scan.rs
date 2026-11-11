@@ -34,12 +34,29 @@ pub(crate) fn keyword(s: &str, kw: &str) -> bool {
     s.starts_with(kw) && id_len(s) == kw.len()
 }
 
+/// The byte order mark a file may start with (LANGS-9). It reads as inline whitespace.
+pub(crate) const BOM: char = '\u{feff}';
+
+/// Whether `c` is whitespace or a byte order mark.
+pub(crate) fn is_space(c: char) -> bool {
+    c.is_whitespace() || c == BOM
+}
+
+/// Length of the byte order mark at the start of `s`, or 0.
+pub(crate) fn bom_len(s: &str) -> usize {
+    if s.starts_with(BOM) {
+        BOM.len_utf8()
+    } else {
+        0
+    }
+}
+
 /// Length of inline whitespace (not newlines) at the start of `s`.
 pub(crate) fn ws_len(s: &str) -> usize {
     let mut chars = s.char_indices().peekable();
     while let Some((i, c)) = chars.next() {
         let newline = c == '\n' || (c == '\r' && chars.peek().is_some_and(|&(_, n)| n == '\n'));
-        if newline || !c.is_whitespace() {
+        if newline || !is_space(c) {
             return i;
         }
     }
@@ -388,6 +405,9 @@ mod tests {
         assert_eq!(ws_len(" \r\nA"), 1);
         assert_eq!(ws_len(" \rA"), 2);
         assert_eq!(ws_len("   "), 3);
+        assert_eq!(ws_len("\u{feff} A"), 4);
+        assert_eq!(bom_len("\u{feff}A"), 3);
+        assert_eq!(bom_len("A\u{feff}"), 0);
         assert_eq!(newline_len("\r\nx"), 2);
         assert_eq!(newline_len("\nx"), 1);
         assert_eq!(newline_len("x"), 0);

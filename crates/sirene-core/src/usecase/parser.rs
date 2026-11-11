@@ -263,7 +263,7 @@ impl<'a> Parser<'a> {
     fn at_line_start(&self) -> bool {
         let before = &self.src[..self.pos];
         let line = before.rfind('\n').map_or(before, |i| &before[i + 1..]);
-        line.chars().all(char::is_whitespace)
+        line.chars().all(scan::is_space)
     }
 
     /// Requires the statement to end with its line.

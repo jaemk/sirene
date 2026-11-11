@@ -100,7 +100,13 @@ pub fn mermaid_blocks(src: &str) -> Vec<Block> {
     let mut lines = Vec::new();
     let mut at = 0;
     for raw in src.split_inclusive('\n') {
-        lines.push((at, raw.trim_end_matches(['\n', '\r'])));
+        // A byte order mark before the first line is not part of it (LANGS-9).
+        let text = if at == 0 {
+            raw.trim_start_matches(crate::flowchart::scan::BOM)
+        } else {
+            raw
+        };
+        lines.push((at, text.trim_end_matches(['\n', '\r'])));
         at += raw.len();
     }
     let mut i = 0;
@@ -221,6 +227,16 @@ mod tests {
         );
         assert_eq!(parse("flowchart TD\n  pie\n").other_diagram(), None);
         assert_eq!(parse("nonsense here\n").other_diagram(), None);
+    }
+
+    #[test]
+    fn byte_order_mark() {
+        let src = "\u{feff}```mermaid\r\nflowchart LR\r\n  A\r\n```\r\n";
+        let blocks = mermaid_blocks(src);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].code, "flowchart LR\n  A\n");
+        assert_eq!(blocks[0].line, 2);
+        assert!(blocks[0].closed);
     }
 
     #[test]

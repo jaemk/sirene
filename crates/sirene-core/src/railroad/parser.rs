@@ -11,7 +11,7 @@ use rowan::GreenNode;
 use super::Notation;
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, MAX_DEPTH, too_deep};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) const HEADERS: &[&str] = &[
@@ -38,6 +38,7 @@ pub(crate) fn parse(src: &str, notation: Notation) -> (GreenNode, Vec<Diagnostic
         base: Base::new(src),
         notation,
         failed: false,
+        depth: 0,
     };
     p.start(ROOT);
     p.header(HEADERS, "railroad-beta", header_len);
@@ -148,6 +149,8 @@ struct Parser<'a> {
     notation: Notation,
     /// Whether the current rule has failed; the rest of it is skipped.
     failed: bool,
+    /// How many groups or constructors are open around the cursor (LANGS-8).
+    depth: usize,
 }
 
 impl<'a> Deref for Parser<'a> {
@@ -574,10 +577,16 @@ impl<'a> Parser<'a> {
             });
             return false;
         };
+        if self.depth >= MAX_DEPTH {
+            self.fail_here(&too_deep("groups", MAX_DEPTH));
+            return false;
+        }
         self.start(RR_GROUP);
         self.token(open, 1);
         self.trivia(false);
+        self.depth += 1;
         self.choice();
+        self.depth -= 1;
         if !self.failed {
             self.trivia(false);
             if self.rest().starts_with(close) {
@@ -604,6 +613,11 @@ impl<'a> Parser<'a> {
             self.finish();
             return;
         }
+        if self.depth >= MAX_DEPTH {
+            self.fail_here(&too_deep("expressions", MAX_DEPTH));
+            self.finish();
+            return;
+        }
         self.token(RAILROAD_KW, n);
         self.trivia(false);
         if !self.rest().starts_with('(') {
@@ -613,6 +627,7 @@ impl<'a> Parser<'a> {
         }
         self.token(L_PAREN, 1);
         self.trivia(false);
+        self.depth += 1;
         match name {
             "terminal" | "nonterminal" | "special" => {
                 match string_len(self.rest(), self.notation) {
@@ -635,6 +650,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
+        self.depth -= 1;
         if !self.failed {
             self.trivia(false);
             if self.rest().starts_with(')') {

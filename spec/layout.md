@@ -40,7 +40,8 @@ middle rank of its edge.
 ## LAYOUT-5 Order
 
 Long edges get a dummy per intermediate rank. Items in each rank are ordered by barycenter
-sweeps, keeping the order with the fewest crossings. Layout is deterministic.
+sweeps, keeping the order with the fewest crossings, counted in O(E log V) per gap. Layout is
+deterministic.
 
 ## LAYOUT-6 Positions
 
@@ -60,7 +61,9 @@ at its own port on the corresponding side.
 
 Routes are orthogonal. Between two ranks a route runs along the main axis and turns at most once
 onto a cross-axis track in the gap; gaps grow to fit their tracks. Tracks are ordered so a route
-does not run along another route's segment. A route starts on its source's border, ends on its
+does not run along another route's segment. In a gap of up to 1,000 turning routes a route also
+turns before crossing another's cross-axis part where it can; past that, only shared columns
+order the tracks, so a large gap costs time near linear in its routes (LANGS-8). A route starts on its source's border, ends on its
 target's border, and passes through its label rect. The points run from the edge's source to its
 target.
 

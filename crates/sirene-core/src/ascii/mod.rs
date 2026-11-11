@@ -143,17 +143,17 @@ fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String
         draw_node_frame(&mut canvas, n, *r);
     }
     // An endpoint's rect, and whether it is one character that edges stop short of.
-    let rect_of = |id: &str| -> (Rect, bool) {
-        match chart.subgraphs.iter().position(|s| s.id == id) {
-            Some(i) => (layout.clusters[i], false),
-            None => {
-                let i = chart.nodes.iter().position(|n| n.id == id);
-                let i = i.expect("edge endpoint exists");
-                let glyph = matches!(frame_of(&chart.nodes[i]), Frame::Glyph(_));
-                (layout.nodes[i], glyph)
-            }
-        }
-    };
+    // Nodes first, so a subgraph wins when both have the id.
+    let mut ends: std::collections::HashMap<&str, (Rect, bool)> = chart
+        .nodes
+        .iter()
+        .zip(&layout.nodes)
+        .map(|(n, &r)| (n.id.as_str(), (r, matches!(frame_of(n), Frame::Glyph(_)))))
+        .collect();
+    for (s, &r) in chart.subgraphs.iter().zip(&layout.clusters) {
+        ends.insert(s.id.as_str(), (r, false));
+    }
+    let rect_of = |id: &str| -> (Rect, bool) { ends[id] };
     for (e, route) in chart.edges.iter().zip(&layout.edges) {
         if let Some(route) = route
             && e.stroke != Stroke::Invisible

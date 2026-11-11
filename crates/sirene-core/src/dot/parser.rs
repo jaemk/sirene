@@ -3,6 +3,8 @@
 use rowan::{GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use crate::diagnostic::Diagnostic;
+use crate::flowchart::scan;
+use crate::lines::{MAX_DEPTH, too_deep};
 use crate::syntax::SyntaxKind::{self, *};
 
 /// One token: its kind and its byte range in the source.
@@ -74,9 +76,9 @@ impl Iterator for Lexer<'_> {
             (NEWLINE, 1)
         } else if r.starts_with("\r\n") {
             (NEWLINE, 2)
-        } else if c.is_whitespace() {
+        } else if scan::is_space(c) {
             let n = r
-                .find(|c: char| !c.is_whitespace() || c == '\n' || c == '\r')
+                .find(|c: char| !scan::is_space(c) || c == '\n' || c == '\r')
                 .unwrap_or(r.len());
             (WHITESPACE, n.max(c.len_utf8()))
         } else if r.starts_with("//") || (c == '#' && line_start) {
@@ -286,10 +288,6 @@ struct Parser<'a> {
     /// How many subgraphs enclose the statement being parsed.
     depth: usize,
 }
-
-/// The deepest subgraph nesting parsed. A deeper subgraph is an error, so no source can
-/// overflow the stack here or in what reads the tree.
-const MAX_DEPTH: usize = 64;
 
 impl Parser<'_> {
     fn at_end(&self) -> bool {
@@ -646,7 +644,7 @@ impl Parser<'_> {
             &mut self.diagnostics,
             start,
             end.max(start),
-            format!("subgraphs nested more than {MAX_DEPTH} deep"),
+            too_deep("subgraphs", MAX_DEPTH),
         );
     }
 

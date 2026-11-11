@@ -5,7 +5,7 @@ use crate::ascii::{self, Options};
 use crate::block::{self, Block};
 use crate::c4::{self, C4};
 use crate::cynefin::{self, Cynefin};
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, Severity};
 use crate::eventmodel::{self, EventModel};
 use crate::flowchart::{self, Flowchart, scan};
 use crate::gantt::{self, Gantt};
@@ -346,7 +346,7 @@ impl From<flowchart::Lowered> for Lowered {
 
 /// The first word of `src` after frontmatter, comments, and directives.
 pub(crate) fn header(src: &str) -> &str {
-    let mut r = src;
+    let mut r = &src[scan::bom_len(src)..];
     let first = scan::line_len(r);
     if r[..first].trim_end() == "---" {
         let mut at = first + scan::newline_len(&r[first..]);
@@ -385,13 +385,35 @@ pub fn lower(src: &str) -> Lowered {
 /// [`lower`], reading `src` as `lang` when given instead of detecting it (DOT-5).
 pub fn lower_as(src: &str, lang: Option<Lang>) -> Lowered {
     let kind = Kind::of_lang(src, lang);
-    if kind == Kind::Dot {
-        return lower_dot(src);
-    }
-    let mut lowered = lower_diagram(src, kind);
-    lowered.theme = ThemeConfig::read(src);
-    lowered.diagnostics.extend(lowered.theme.diagnostics());
+    let mut lowered = if kind == Kind::Dot {
+        lower_dot(src)
+    } else {
+        let mut lowered = lower_diagram(src, kind);
+        lowered.theme = ThemeConfig::read(src);
+        lowered.diagnostics.extend(lowered.theme.diagnostics());
+        lowered
+    };
+    cap(&mut lowered.diagnostics);
     lowered
+}
+
+/// The most diagnostics one diagram reports (LANGS-8).
+pub const MAX_DIAGNOSTICS: usize = 500;
+
+/// Keeps the first [`MAX_DIAGNOSTICS`] and replaces the rest with one that counts them, an error
+/// when any of them is.
+fn cap(diagnostics: &mut Vec<Diagnostic>) {
+    if diagnostics.len() <= MAX_DIAGNOSTICS {
+        return;
+    }
+    let rest = diagnostics.split_off(MAX_DIAGNOSTICS);
+    let message = format!("{} more problems not shown", rest.len());
+    let error = rest.iter().any(|d| d.severity == Severity::Error);
+    diagnostics.push(if error {
+        Diagnostic::new(rest[0].range, message)
+    } else {
+        Diagnostic::warning(rest[0].range, message)
+    });
 }
 
 /// A DOT graph (DOT-2), its `bgcolor` as the theme's background.
@@ -727,6 +749,21 @@ mod tests {
                 .diagnostics
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn caps_diagnostics() {
+        let mut src = String::from("pie\n");
+        for _ in 0..MAX_DIAGNOSTICS + 9 {
+            src.push_str("?\n");
+        }
+        let l = lower(&src);
+        assert_eq!(l.diagnostics.len(), MAX_DIAGNOSTICS + 1);
+        let last = l.diagnostics.last().unwrap();
+        assert_eq!(last.message, "9 more problems not shown");
+        assert_eq!(last.severity, Severity::Error);
+        // At the first one left out: the header is line 1, so problem 501 is on line 502.
+        assert_eq!(last.line_col(&src).0, MAX_DIAGNOSTICS + 2);
     }
 
     /// Every Mermaid 12.3 type has a parser: none is refused by its header.

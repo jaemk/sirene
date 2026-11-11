@@ -8,6 +8,7 @@ use super::{
 };
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
+use crate::lines::{MAX_DEPTH, too_deep};
 use crate::scene::parse_color;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
@@ -24,6 +25,10 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sequence, Vec<Diagnostic>) {
     for stmt in root.children() {
         // A statement the parser could not read is reported there and skipped here.
         if stmt.descendants().any(|n| n.kind() == ERROR) {
+            continue;
+        }
+        // Inside a block nested too deep, only the statements that open and close blocks count.
+        if l.skipped > 0 && stmt.kind() != SEQ_STMT {
             continue;
         }
         match stmt.kind() {
@@ -52,6 +57,11 @@ struct Lower {
     diagnostics: Vec<Diagnostic>,
     title: Option<String>,
     stack: Vec<Open>,
+    /// How many blocks are open past the nesting limit; their content is left out (LANGS-8).
+    skipped: usize,
+    /// Whether the nesting limit has been reported for blocks, and for activations.
+    deep_block: bool,
+    deep_activation: bool,
     /// Where each participant's open activations began.
     active: Vec<Vec<TextRange>>,
     /// The next `autonumber` number and the step, while numbering is on.
@@ -190,6 +200,28 @@ impl Lower {
         }
     }
 
+    /// Opens an activation of participant `i`; whether it is drawn. One nested more than
+    /// `MAX_DEPTH` deep is tracked, so its `deactivate` pairs up, but not drawn (LANGS-8).
+    fn activate(&mut self, i: usize, range: TextRange) -> bool {
+        let drawn = self.active[i].len() < MAX_DEPTH;
+        if !drawn && !std::mem::replace(&mut self.deep_activation, true) {
+            self.error(range, too_deep("activations", MAX_DEPTH));
+        }
+        self.active[i].push(range);
+        drawn
+    }
+
+    /// Closes participant `i`'s latest activation; whether a drawn one closed. Reports one that
+    /// is not open at `range()`.
+    fn deactivate(&mut self, i: usize, range: impl FnOnce() -> TextRange) -> bool {
+        if self.active[i].pop().is_none() {
+            let id = self.seq.participants[i].id.clone();
+            self.error(range(), format!("`{id}` is not active"));
+            return false;
+        }
+        self.active[i].len() < MAX_DEPTH
+    }
+
     fn message(&mut self, stmt: &SyntaxNode) {
         let ids = tokens(stmt, IDENT);
         let (Some(from), Some(to), Some(arrow)) = (
@@ -202,16 +234,17 @@ impl Lower {
         let from = self.ensure(from.text().trim());
         let to = self.ensure(to.text().trim());
         let activation = token(stmt, ACTIVATION);
-        let activate = activation.as_ref().is_some_and(|a| a.text() == "+");
+        let mut activate = activation.as_ref().is_some_and(|a| a.text() == "+");
         let mut deactivate = activation.as_ref().is_some_and(|a| a.text() == "-");
-        if deactivate && self.active[from].pop().is_none() {
-            let id = self.seq.participants[from].id.clone();
-            let range = activation.map_or(stmt.text_range(), |a| a.text_range());
-            self.error(range, format!("`{id}` is not active"));
-            deactivate = false;
+        if deactivate {
+            deactivate = self.deactivate(from, || {
+                activation
+                    .as_ref()
+                    .map_or(stmt.text_range(), |a| a.text_range())
+            });
         }
         if activate {
-            self.active[to].push(stmt.text_range());
+            activate = self.activate(to, stmt.text_range());
         }
         let number = self.numbering.map(|(n, step)| {
             self.numbering = Some((n.saturating_add(step), step));
@@ -273,7 +306,23 @@ impl Lower {
             "rect" => Some(BlockKind::Rect),
             _ => None,
         };
+        if self.skipped > 0 {
+            if kind.is_some() || kw == "box" {
+                self.skipped += 1;
+            } else if kw == "end" {
+                self.skipped -= 1;
+            }
+            return;
+        }
         if let Some(kind) = kind {
+            let open = self.stack.iter().filter(|o| matches!(o, Open::Block(..)));
+            if open.count() >= MAX_DEPTH {
+                if !std::mem::replace(&mut self.deep_block, true) {
+                    self.error(range, too_deep("blocks", MAX_DEPTH));
+                }
+                self.skipped = 1;
+                return;
+            }
             self.stack.push(Open::Block(kind, range));
             self.seq.events.push(Event::Start(kind, label));
             return;
@@ -282,15 +331,14 @@ impl Lower {
             "activate" => {
                 let Some(name) = name else { return };
                 let i = self.ensure(&name);
-                self.active[i].push(range);
-                self.seq.events.push(Event::Activate(i));
+                if self.activate(i, range) {
+                    self.seq.events.push(Event::Activate(i));
+                }
             }
             "deactivate" => {
                 let Some(name) = name else { return };
                 let i = self.ensure(&name);
-                if self.active[i].pop().is_none() {
-                    self.error(range, format!("`{name}` is not active"));
-                } else {
+                if self.deactivate(i, || range) {
                     self.seq.events.push(Event::Deactivate(i));
                 }
             }

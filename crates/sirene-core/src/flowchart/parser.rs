@@ -8,6 +8,7 @@ use rowan::{GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::scan::{self, Opener, Stroke};
 use crate::diagnostic::Diagnostic;
+use crate::lines::{MAX_DEPTH, end_block_len, too_deep};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -157,7 +158,7 @@ impl<'a> Parser<'a> {
     fn at_line_start(&self) -> bool {
         let before = &self.src[..self.pos];
         let line = before.rfind('\n').map_or(before, |i| &before[i + 1..]);
-        line.chars().all(char::is_whitespace)
+        line.chars().all(scan::is_space)
     }
 
     /// Wraps the rest of the statement in an `ERROR` node and reports `message`.
@@ -229,15 +230,21 @@ impl<'a> Parser<'a> {
         self.finish();
     }
 
-    /// FLOWCH-3: frontmatter block at byte 0.
+    /// FLOWCH-3: frontmatter block at the start of the source, after a byte order mark
+    /// (LANGS-9).
     fn frontmatter(&mut self) {
-        let first = scan::line_len(self.src);
-        if self.src[..first].trim_end() != "---" {
+        let bom = scan::bom_len(self.src);
+        if bom > 0 {
+            self.token(WHITESPACE, bom);
+        }
+        let (start, src) = (self.pos, self.rest());
+        let first = scan::line_len(src);
+        if src[..first].trim_end() != "---" {
             return;
         }
-        let mut line_start = first + scan::newline_len(&self.src[first..]);
-        while line_start < self.src.len() {
-            let rest = &self.src[line_start..];
+        let mut line_start = first + scan::newline_len(&src[first..]);
+        while line_start < src.len() {
+            let rest = &src[line_start..];
             let len = scan::line_len(rest);
             if rest[..len].trim() == "---" {
                 self.token(FRONTMATTER, line_start + len);
@@ -249,8 +256,8 @@ impl<'a> Parser<'a> {
         self.token(ERROR_TOKEN, first);
         self.finish();
         self.error(
-            0,
-            first,
+            start,
+            start + first,
             "unclosed frontmatter: expected a closing `---` line",
         );
     }
@@ -633,15 +640,7 @@ impl<'a> Parser<'a> {
         }
         self.finish();
         self.end_of_statement();
-        if self.statements(depth + 1) {
-            self.token(END_KW, "end".len());
-        } else {
-            self.error(
-                kw_start,
-                kw_start + keyword.len(),
-                format!("unclosed `{keyword}`: expected `end`"),
-            );
-        }
+        self.body(depth, kw_start, keyword);
         self.finish();
     }
 
@@ -651,16 +650,44 @@ impl<'a> Parser<'a> {
         self.start(GLOBAL);
         self.token(GLOBAL_KW, "global".len());
         self.end_of_statement();
-        if self.statements(depth + 1) {
+        self.body(depth, kw_start, "global");
+        self.finish();
+    }
+
+    /// The statements of a container opened by `keyword` at `kw_start`, and its `end`. A
+    /// container nested more than `MAX_DEPTH` deep is not read: its content is one `ERROR` node
+    /// (LANGS-8).
+    fn body(&mut self, depth: usize, kw_start: usize, keyword: &str) {
+        let closed = if depth < MAX_DEPTH {
+            self.statements(depth + 1)
+        } else {
+            self.trivia();
+            let (openers, what): (&[&str], _) = if self.agentflow {
+                (&["flow", "global"], "flows")
+            } else {
+                (&["subgraph"], "subgraphs")
+            };
+            let end = end_block_len(self.rest(), openers);
+            let start = self.pos;
+            let len = end.unwrap_or(self.rest().len());
+            let line = scan::line_len(self.rest()).min(len);
+            self.error(start, start + line, too_deep(what, MAX_DEPTH));
+            if len > 0 {
+                self.start(ERROR);
+                self.token(ERROR_TOKEN, len);
+                self.finish();
+            }
+            end.is_some()
+        };
+        if closed {
             self.token(END_KW, "end".len());
         } else {
             self.error(
                 kw_start,
-                kw_start + "global".len(),
-                "unclosed `global`: expected `end`",
+                kw_start + keyword.len(),
+                format!("unclosed `{keyword}`: expected `end`"),
             );
         }
-        self.finish();
     }
 
     /// MAGF-2: `connector id["Title"]`, with optional metadata.

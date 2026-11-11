@@ -1,5 +1,7 @@
 //! A strict JSON reader for use case JSON tables, flattened to key/value rows (MUSE-5).
 
+use crate::lines::{MAX_DEPTH, too_deep};
+
 #[derive(Debug, Clone, PartialEq)]
 enum Value {
     Null,
@@ -15,6 +17,8 @@ enum Value {
 struct Reader<'a> {
     s: &'a str,
     pos: usize,
+    /// How many arrays and objects are open around the cursor (LANGS-8).
+    depth: usize,
 }
 
 impl Reader<'_> {
@@ -55,9 +59,24 @@ impl Reader<'_> {
                 return Ok(v);
             }
         }
+        if r.starts_with(['{', '[']) {
+            if self.depth >= MAX_DEPTH {
+                return Err(format!(
+                    "invalid JSON at byte {}: {}",
+                    self.pos,
+                    too_deep("values", MAX_DEPTH)
+                ));
+            }
+            self.depth += 1;
+            let v = if r.starts_with('{') {
+                self.object()
+            } else {
+                self.array()
+            };
+            self.depth -= 1;
+            return v;
+        }
         match r.chars().next() {
-            Some('{') => self.object(),
-            Some('[') => self.array(),
             Some('"') => self.string().map(Value::String),
             Some(c) if c == '-' || c.is_ascii_digit() => self.number(),
             _ => self.err("a value"),
@@ -222,7 +241,11 @@ fn flatten(prefix: &str, v: &Value, rows: &mut Vec<(String, String)>) {
 
 /// The `{ ... }` object as `(key, value)` rows, or why it is not valid JSON.
 pub(crate) fn rows(src: &str) -> Result<Vec<(String, String)>, String> {
-    let mut r = Reader { s: src, pos: 0 };
+    let mut r = Reader {
+        s: src,
+        pos: 0,
+        depth: 0,
+    };
     let v = r.value()?;
     r.ws();
     if r.pos != src.len() {

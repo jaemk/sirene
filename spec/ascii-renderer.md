@@ -8,6 +8,10 @@ The output is the diagram's rows, one line each, with trailing spaces removed an
 A character as wide as two cells (per Unicode East Asian width) takes two cells. An empty diagram
 renders as an empty string.
 
+A drawing of more than 2^22 cells keeps its full width (up to 2^22 columns) and as many top rows
+as fit, and ends with the line `... cut off: the drawing is <columns> columns by <rows> rows`.
+Tests: `cuts_off_past_the_limit` in `ascii/canvas.rs`.
+
 ## ASCIIR-2 Charsets
 
 `unicode` (the default) draws with box-drawing characters. `ascii` uses only `-`, `|`, `+`, `.`,

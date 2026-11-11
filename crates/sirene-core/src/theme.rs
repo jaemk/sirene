@@ -9,6 +9,7 @@ use std::ops::Range;
 use rowan::{TextRange, TextSize};
 
 use crate::diagnostic::Diagnostic;
+use crate::lines::MAX_DEPTH;
 use crate::scene::{Color, Theme, parse_color};
 
 /// Mermaid's theme names.
@@ -638,14 +639,15 @@ fn from_hsl(h: f32, s: f32, l: f32) -> (u8, u8, u8) {
 
 /// The frontmatter's `config:` `theme` and `themeVariables`; returns where the body starts.
 fn frontmatter(src: &str, out: &mut ThemeConfig) -> usize {
-    let mut lines = src.split_inclusive('\n');
+    let bom = crate::flowchart::scan::bom_len(src);
+    let mut lines = src[bom..].split_inclusive('\n');
     let Some(first) = lines.next() else {
         return 0;
     };
     if first.trim_end() != "---" {
         return 0;
     }
-    let mut at = first.len();
+    let mut at = bom + first.len();
     let indent = |line: &str| line.len() - line.trim_start().len();
     let mut in_config = false;
     let mut vars_at: Option<usize> = None;
@@ -708,6 +710,7 @@ fn directives(src: &str, from: usize, out: &mut ThemeConfig) {
             src,
             at: open,
             end: close,
+            depth: 0,
         };
         let mut entries = Vec::new();
         if p.object_body("", &mut entries).is_some() {
@@ -745,6 +748,8 @@ struct Parser<'a> {
     src: &'a str,
     at: usize,
     end: usize,
+    /// How many objects are open around the cursor.
+    depth: usize,
 }
 
 type Entry = (String, String, Range<usize>);
@@ -802,8 +807,15 @@ impl Parser<'_> {
         self.skip_space();
         match self.peek()? {
             '{' => {
+                // LANGS-8: a directive nested deeper than any setting is not read.
+                if self.depth >= MAX_DEPTH {
+                    return None;
+                }
                 self.at += 1;
-                self.object_body(path, out)?;
+                self.depth += 1;
+                let body = self.object_body(path, out);
+                self.depth -= 1;
+                body?;
                 self.eat('}').then_some(())
             }
             '[' => {

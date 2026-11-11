@@ -8,7 +8,7 @@ use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::scan::{self, Stroke};
-use crate::lines::Base;
+use crate::lines::{Base, end_block_len, too_deep};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -25,6 +25,10 @@ pub(crate) const HEADERS: &[&str] = &["block-beta", "block"];
 const STATEMENT: &str = "expected a block such as `a` or `a[\"Label\"]`, `space`, `columns`, \
                          `block:id`, `end`, an edge such as `a --> b`, `classDef`, `class`, or \
                          `style`";
+
+/// How deep groups nest (LANGS-8). Lower than the shared limit: sizing a group sizes each of
+/// its groups twice, as Mermaid does, so the work doubles with every level.
+const MAX_GROUPS: usize = 12;
 
 struct Parser<'a>(Base<'a>);
 
@@ -78,8 +82,7 @@ impl Parser<'_> {
             self.trivia();
             if self.at_eof() {
                 if depth > 0 {
-                    let at = self.pos;
-                    self.error(at, at, "unclosed `block`: expected `end`");
+                    self.unclosed("unclosed `block`: expected `end`".into());
                 }
                 return;
             }
@@ -152,7 +155,18 @@ impl Parser<'_> {
             }
         }
         self.finish();
-        self.statements(depth + 1);
+        if depth < MAX_GROUPS {
+            self.statements(depth + 1);
+        } else {
+            // LANGS-8: not read; its content is one `ERROR` node.
+            let end = end_block_len(self.rest(), &["block:", "block"]).map(|n| self.pos + n);
+            self.skip(end, too_deep("blocks", MAX_GROUPS));
+            if end.is_some() {
+                self.token(END_KW, 3);
+            } else {
+                self.unclosed("unclosed `block`: expected `end`".into());
+            }
+        }
         self.finish();
     }
 
