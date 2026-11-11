@@ -1,7 +1,7 @@
 # Mermaid Charts
 
-Status: research. The Mermaid types that are not covered by the state, class, ER, and sequence
-specs. Each needs its own model and scene builder (LANGS-2); some fit the graph model. Reference:
+The Mermaid types that are not covered by the state, class, ER, and sequence specs. Each has its
+own model and scene builder (LANGS-2), or fits the graph model. Reference:
 <https://mermaid.js.org/intro/syntax-reference.html>.
 
 ## MCHART-1 Grouping
@@ -39,12 +39,11 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 
 Every Mermaid 12.3 diagram type is drawn.
 
-## MCHART-2 Open questions
+## MCHART-2 Decisions
 
-- Which types to build. Usage suggests `gantt`, `pie`, `mindmap`, and `gitGraph` first.
-- Whether `gantt` dates follow Mermaid's dayjs formats exactly, and which calendar features
-  (`excludes`, `weekend`, `todayMarker`) matter.
-- How charts look in ASCII, and whether `sirene ascii` refuses the ones with no useful text form.
-- Whether the editor offers drawing edits for any of them (LANGS-5), or only the source pane.
-
-The outcome is one `pending` spec per chosen type.
+- Every type is built, each with its own spec (MCHART-1).
+- `gantt` reads dayjs date formats and supports `excludes`, `includes`, `weekend`, and
+  `todayMarker` (`mermaid-gantt-charts.md`).
+- Every type has a text form for `sirene ascii`, described in its spec; none is refused.
+- Only graph types are edited in the drawing; the others draw read-only and are edited in the
+  source pane (LANGS-5).
