@@ -232,6 +232,12 @@ pub struct Theme {
     pub cluster_stroke: Color,
     /// Selection outlines and other editing marks.
     pub accent: Color,
+    /// Section colors for mindmaps, timelines, radar charts, and treemaps (Mermaid's `cScale0`
+    /// to `cScale11`), cycled; `None` uses sirene's series colors for the background.
+    pub scale: Option<[Color; 12]>,
+    /// Pie slice colors (Mermaid's `pie1` to `pie12`), cycled; `None` uses sirene's series
+    /// colors.
+    pub pie: Option<[Color; 12]>,
 }
 
 impl Theme {
@@ -247,6 +253,8 @@ impl Theme {
         cluster_fill: Color::rgb(0xffffde),
         cluster_stroke: Color::rgb(0xaaaa33),
         accent: Color::rgb(0x2563eb),
+        scale: None,
+        pie: None,
     };
 
     pub const DARK: Theme = Theme {
@@ -261,6 +269,8 @@ impl Theme {
         cluster_fill: Color::rgb(0x2a2a24),
         cluster_stroke: Color::rgb(0x8a8a5c),
         accent: Color::rgb(0x60a5fa),
+        scale: None,
+        pie: None,
     };
 }
 

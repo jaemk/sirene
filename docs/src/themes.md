@@ -34,5 +34,9 @@ Themes: `default`, `base`, `dark`, `forest`, `neutral`, `neo`, `neo-dark`, `redu
 `edgeLabelBackground` feed the colors the theme derives. With no `theme`, the variables apply to
 the application's theme.
 
-Note that text output is not themed, and chart palettes (pie slices, `cScale`) are not applied
-yet.
+A theme also colors pie slices (`pie1` to `pie12`) and the sections of mindmaps, timelines,
+radar charts, and treemaps (`cScale0` to `cScale11`); set one of those variables to change a
+single color.
+
+Note that text output is not themed, and other charts (git graphs, gantt charts, journeys, sankey
+diagrams, XY charts, Venn diagrams) keep sirene's own colors.

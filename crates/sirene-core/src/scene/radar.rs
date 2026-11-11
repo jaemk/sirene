@@ -4,7 +4,7 @@
 use std::f32::consts::PI;
 
 use super::Theme;
-use super::git::branch_color;
+use super::git::scale_color;
 use super::paint::Painter;
 use super::shapes::{self, BoxF};
 use super::{Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle};
@@ -19,7 +19,7 @@ const RING_ALPHA: u8 = 0x14;
 
 /// Curve `k`'s color.
 pub(super) fn curve_color(theme: &Theme, k: usize) -> Color {
-    branch_color(theme, k)
+    scale_color(theme, k)
 }
 
 /// The direction of axis `i` of `n`: the first straight up, the rest clockwise.

@@ -47,6 +47,20 @@ pub(super) fn branch_color(theme: &Theme, k: usize) -> Color {
     Color::rgb(palette[k % palette.len()])
 }
 
+/// Section `k`'s color in a diagram Mermaid colors with `cScale` (MTHEME-4).
+pub(super) fn scale_color(theme: &Theme, k: usize) -> Color {
+    theme
+        .scale
+        .map_or_else(|| branch_color(theme, k), |s| s[k % s.len()])
+}
+
+/// Pie slice `k`'s color (MTHEME-4).
+pub(super) fn pie_color(theme: &Theme, k: usize) -> Color {
+    theme
+        .pie
+        .map_or_else(|| branch_color(theme, k), |s| s[k % s.len()])
+}
+
 /// Black or white, whichever reads better on `fill`.
 pub(super) fn ink(fill: Color) -> Color {
     if luminance(fill) > 0.6 {

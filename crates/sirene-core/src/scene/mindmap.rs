@@ -3,7 +3,7 @@
 use std::f32::consts::{PI, SQRT_2};
 
 use super::Theme;
-use super::git::{branch_color, ink};
+use super::git::{ink, scale_color};
 use super::paint::{Painter, Px};
 use super::shapes::{self, BoxF};
 use super::{Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle};
@@ -142,7 +142,7 @@ fn outline(shape: Shape, b: BoxF) -> Vec<Segment> {
 
 /// The fill of a node in `section`, the root's when `None`.
 fn fill(theme: &Theme, section: Option<usize>) -> Color {
-    section.map_or(theme.node_stroke, |s| branch_color(theme, s))
+    section.map_or(theme.node_stroke, |s| scale_color(theme, s))
 }
 
 /// The width of the edge into a node at `depth`.

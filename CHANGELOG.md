@@ -12,7 +12,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its
   frontmatter `config:` or an `%%{init}%%` directive set its colors in SVG, PNG, and the editor,
-  for all 11 Mermaid 12.3 themes; an unknown theme name is a warning.
+  for all 11 Mermaid 12.3 themes; an unknown theme name is a warning. Pie slices and the
+  sections of mindmaps, timelines, radar charts, and treemaps take the theme's `pie` and
+  `cScale` colors.
 - `sirene update` replaces the running binary with the latest release (`--check`, `--to
   VERSION`, `--yes`), checked against `SHA256SUMS` and its build provenance; it refuses for a
   Homebrew or `cargo install` binary and names the command to use instead.

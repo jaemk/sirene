@@ -1,6 +1,6 @@
 //! Timeline to scene (TIMELI-3).
 
-use super::git::{branch_color, ink};
+use super::git::{ink, scale_color};
 use super::shapes::{self, BoxF};
 use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
@@ -156,7 +156,7 @@ impl<M: TextMetrics> Painter<'_, M> {
 
 /// The fills of section or period `k`: its box, and its events'.
 fn fills(theme: &Theme, k: usize) -> (Color, Color) {
-    let c = branch_color(theme, k);
+    let c = scale_color(theme, k);
     (
         c.with_alpha(0xd0).over(theme.background),
         c.with_alpha(0x40).over(theme.background),
@@ -201,7 +201,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
         })
         .collect();
     let section_color = |s: usize| if named { s } else { 0 };
-    let event_stroke = |k: usize| Some(branch_color(theme, k));
+    let event_stroke = |k: usize| Some(scale_color(theme, k));
 
     let (width, height);
     if timeline.direction == Direction::LeftRight {
@@ -256,7 +256,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 w: x1 - x0,
                 h: section_h,
             };
-            let fill = branch_color(theme, section_color(s));
+            let fill = scale_color(theme, section_color(s));
             p.boxed(b, &block.lines, fill, None);
         }
         let mut bottom = events_y;
@@ -270,7 +270,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 p.dashed(
                     Pt::new(cx, period_y + period_h),
                     Pt::new(cx, last),
-                    branch_color(theme, k),
+                    scale_color(theme, k),
                 );
             }
         }
@@ -333,7 +333,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 w: section_w,
                 h: (y1 - y0).max(block.h),
             };
-            p.boxed(b, &block.lines, branch_color(theme, section_color(s)), None);
+            p.boxed(b, &block.lines, scale_color(theme, section_color(s)), None);
         }
         let mut right = events_x;
         for (i, (_, k, _, events)) in periods.iter().enumerate() {
@@ -343,7 +343,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 p.dashed(
                     Pt::new(period_x + period_w, cy),
                     Pt::new(end, cy),
-                    branch_color(theme, *k),
+                    scale_color(theme, *k),
                 );
             }
         }
