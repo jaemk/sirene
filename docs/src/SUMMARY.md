@@ -51,6 +51,7 @@
 - [Wardley maps](wardley.md)
 - [Tree views](treeview.md)
 - [Use case diagrams](usecase.md)
+- [Railroad diagrams](railroad.md)
 
 # Project
 

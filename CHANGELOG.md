@@ -101,7 +101,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and awesome figures), ellipse and rectangle use cases, business marks, stereotypes, system
   boundaries (`rect` and `package`), associations with every marker, `include`, `extend`,
   generalization, edge ids and animation, notes, JSON tables, classes, and styles.
-- Mermaid 12's other new types (`railroad-beta` and the rest) are
+- Mermaid railroad diagrams in all four notations (`railroad-ebnf-beta`, `railroad-abnf-beta`,
+  `railroad-peg-beta`, and the `railroad-beta` constructors), read-only in the editor:
+  terminals, non-terminals, special sequences, sequences, choices, optionals, repetition,
+  ABNF repeats and `%x` numbers, EBNF exceptions, and PEG predicates; in text, boxed
+  elements on a track with branches, bypasses, and loops.
+- Mermaid 12's other new types (`swimlane-beta` and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 - `THIRD-PARTY-NOTICES` with the licenses of the code sirene ports (venn.js, fmin, d3-sankey,

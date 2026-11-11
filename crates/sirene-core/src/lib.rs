@@ -23,6 +23,7 @@ pub mod packet;
 pub mod pie;
 pub mod quadrant;
 pub mod radar;
+pub mod railroad;
 pub mod requirement;
 pub mod sankey;
 pub mod scene;

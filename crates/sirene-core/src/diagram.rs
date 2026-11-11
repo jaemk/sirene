@@ -17,6 +17,7 @@ use crate::packet::{self, Packet};
 use crate::pie::{self, Pie};
 use crate::quadrant::{self, QuadrantChart};
 use crate::radar::{self, Radar};
+use crate::railroad::{self, Railroad};
 use crate::sankey::{self, Sankey};
 use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
@@ -60,6 +61,7 @@ pub enum Kind {
     Wardley,
     TreeView,
     UseCase,
+    Railroad,
 }
 
 impl Kind {
@@ -124,6 +126,8 @@ impl Kind {
             Kind::TreeView
         } else if usecase::HEADERS.contains(&word) {
             Kind::UseCase
+        } else if railroad::HEADERS.contains(&word) {
+            Kind::Railroad
         } else {
             Kind::Flowchart
         }
@@ -132,7 +136,7 @@ impl Kind {
 
 /// The Mermaid types sirene draws, for messages about the others (LANGS-4).
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
-     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, and use case diagrams";
+     mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, and railroad diagrams";
 
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
@@ -161,6 +165,7 @@ pub enum Diagram {
     Venn(Venn),
     Wardley(Wardley),
     TreeView(TreeView),
+    Railroad(Railroad),
 }
 
 impl Default for Diagram {
@@ -212,6 +217,7 @@ impl Diagram {
             Diagram::Venn(v) => scene::venn(v, metrics, theme),
             Diagram::Wardley(w) => scene::wardley(w, metrics, theme),
             Diagram::TreeView(t) => scene::treeview(t, metrics, theme),
+            Diagram::Railroad(r) => scene::railroad(r, metrics, theme),
         }
     }
 
@@ -241,6 +247,7 @@ impl Diagram {
             Diagram::Venn(v) => ascii::venn(v, options),
             Diagram::Wardley(w) => ascii::wardley(w, options),
             Diagram::TreeView(t) => ascii::treeview(t, options),
+            Diagram::Railroad(r) => ascii::railroad(r, options),
         }
     }
 }
@@ -262,7 +269,7 @@ impl From<flowchart::Lowered> for Lowered {
 }
 
 /// The first word of `src` after frontmatter, comments, and directives.
-fn header(src: &str) -> &str {
+pub(crate) fn header(src: &str) -> &str {
     let mut r = src;
     let first = scan::line_len(r);
     if r[..first].trim_end() == "---" {
@@ -463,6 +470,13 @@ pub fn lower(src: &str) -> Lowered {
                 diagnostics,
             }
         }
+        Kind::Railroad => {
+            let (chart, diagnostics) = railroad::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Railroad(chart),
+                diagnostics,
+            }
+        }
     }
 }
 
@@ -520,6 +534,10 @@ mod tests {
         assert_eq!(Kind::of("wardley-beta\n"), Kind::Wardley);
         assert_eq!(Kind::of("treeView-beta\n"), Kind::TreeView);
         assert_eq!(Kind::of("usecase-beta\n"), Kind::UseCase);
+        assert_eq!(Kind::of("railroad-beta\n"), Kind::Railroad);
+        assert_eq!(Kind::of("railroad-ebnf-beta\n"), Kind::Railroad);
+        assert_eq!(Kind::of("railroad-abnf-beta\n"), Kind::Railroad);
+        assert_eq!(Kind::of("railroad-peg-beta\n"), Kind::Railroad);
         assert_eq!(
             Kind::of("---\ntitle: x\n---\n%% c\n%%{init: {}}%%\nstateDiagram-v2\n"),
             Kind::State
@@ -538,9 +556,10 @@ mod tests {
         assert_eq!(other_diagram("wardley-beta\n"), None);
         assert_eq!(other_diagram("treeView-beta\n"), None);
         assert_eq!(other_diagram("usecase-beta\n"), None);
+        assert_eq!(other_diagram("railroad-ebnf-beta\n"), None);
         assert_eq!(
-            other_diagram("railroad-beta\n"),
-            Some("railroad-beta".to_owned())
+            other_diagram("swimlane-beta\n"),
+            Some("swimlane-beta".to_owned())
         );
         assert_eq!(other_diagram("xychart-beta\n"), None);
         assert_eq!(other_diagram("requirementDiagram\n"), None);

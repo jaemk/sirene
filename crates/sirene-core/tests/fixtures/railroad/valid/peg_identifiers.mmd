@@ -1,0 +1,5 @@
+railroad-peg-beta
+# keywords excluded
+Identifier <- !Keyword Letter Letter* ;
+Keyword <- "if" / "else" / "while" ;
+Any <- &Letter . ;

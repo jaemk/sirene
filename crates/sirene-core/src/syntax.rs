@@ -145,6 +145,14 @@ syntax_kinds! {
     // Use case diagrams: `actor`, `systemBoundary`, or `json`, and a JSON table's object.
     USECASE_KW,
     JSON_BODY,
+    // Railroad diagrams: a constructor such as `choice`, an operator such as `|` or `*`, an
+    // ABNF repeat such as `1*` or `3`, an ABNF number such as `%x30-39`, and an EBNF special
+    // sequence `? text ?`.
+    RAILROAD_KW,
+    RR_OP,
+    RR_REPEAT,
+    RR_NUMVAL,
+    RR_SPECIAL,
     ERROR_TOKEN,
 
     // Nodes.
@@ -233,6 +241,14 @@ syntax_kinds! {
     // Use case diagrams: `id@{ ... }` on its own line, and a `json` table.
     META_STMT,
     JSON_STMT,
+    // Railroad diagrams: a rule, alternatives, a sequence, an element with its operators, a
+    // bracketed group, and a constructor call.
+    RULE,
+    RR_CHOICE,
+    RR_SEQ,
+    RR_TERM,
+    RR_GROUP,
+    RR_CALL,
     ERROR,
 }
 

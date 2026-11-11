@@ -1,0 +1,23 @@
+---
+source: crates/sirene-core/tests/railroad.rs
+expression: "railroad-peg-beta\n# keywords excluded\nIdentifier <- !Keyword Letter Letter* ;\nKeyword <- \"if\" / \"else\" / \"while\" ;\nAny <- &Letter . ;\n"
+---
+                                             ┌────────────┐
+               ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┄┐  ┌────────┐  │ ┌────────┐ │
+Identifier = ●─┤ ? !Keyword ? ├──┤ Letter ├──┼─┤ Letter ├─┼─●
+               └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘  └────────┘  │ └────────┘ │
+                                             └──────◄─────┘
+
+              ╭────╮
+Keyword = ●─┬─┤ if ├────┬─●
+            │ ╰────╯    │
+            │ ╭──────╮  │
+            ├─┤ else ├──┤
+            │ ╰──────╯  │
+            │ ╭───────╮ │
+            └─┤ while ├─┘
+              ╰───────╯
+
+        ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┐  ┌┄┄┄┄┄┄┄┐
+Any = ●─┤ ? &Letter ? ├──┤ ? . ? ├─●
+        └┄┄┄┄┄┄┄┄┄┄┄┄┄┘  └┄┄┄┄┄┄┄┘
