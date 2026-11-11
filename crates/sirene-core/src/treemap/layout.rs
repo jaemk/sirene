@@ -1,6 +1,9 @@
 //! The treemap layout (MTREE-3), as d3's `treemap` with `treemapSquarify` lays it out for
 //! Mermaid: items sorted by value, sections padded with room for a header, and every edge
 //! rounded to a whole pixel.
+//!
+//! The tiling is ported from d3-hierarchy (Copyright 2010-2021 Mike Bostock; ISC). See
+//! THIRD-PARTY-NOTICES.
 
 use super::Treemap;
 

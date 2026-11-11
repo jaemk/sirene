@@ -711,6 +711,20 @@ fn the_release_workflow_runs_only_on_main() {
     );
 }
 
+/// The release tarballs carry the licenses and third-party notices.
+#[test]
+fn the_release_tarball_carries_the_notices() {
+    let workflow = read(&repo_root().join(".github/workflows/release.yml"));
+    let tar = workflow
+        .lines()
+        .find(|l| l.trim_start().starts_with("tar -czf"))
+        .expect("a tar line");
+    for name in ["LICENSE-MIT", "LICENSE-APACHE", "THIRD-PARTY-NOTICES"] {
+        assert!(tar.contains(name), "{name} missing from: {tar}");
+        assert!(repo_root().join(name).is_file(), "{name}");
+    }
+}
+
 #[test]
 fn install_refuses_a_bad_or_missing_checksum() {
     let fx = Install::new("Linux", "x86_64");

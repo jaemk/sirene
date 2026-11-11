@@ -1,5 +1,7 @@
 //! A port of d3-sankey's layout, which Mermaid uses (MSANKEY-3): nodes in columns by depth,
 //! heights by value, and six passes that pull each node toward the nodes it links to.
+//!
+//! Ported from d3-sankey (Copyright 2015, Mike Bostock; BSD-3-Clause). See THIRD-PARTY-NOTICES.
 
 use super::{Align, Sankey};
 

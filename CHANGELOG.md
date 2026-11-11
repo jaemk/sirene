@@ -91,6 +91,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid 12's other new types (`wardley-beta`, `usecase-beta`, and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
+- `THIRD-PARTY-NOTICES` with the licenses of the code sirene ports (venn.js, fmin, d3-sankey,
+  and other d3 modules, Day.js, Mermaid) and the Noto Sans fonts. Release tarballs, the macOS
+  app, and the published crates now include it along with `LICENSE-MIT` and `LICENSE-APACHE`.
 
 ### Changed
 

@@ -145,3 +145,8 @@ RustSec audit, builds the binaries and `Sirene.app`, creates the `vX.Y.Z` releas
 then, after approval in the `release` environment, publishes `sirene-core`, `sirene-gui`, and
 `sirene` and commits the formula, the cask, and the next `-dev` version to `main`. See
 `spec/workspace.md` (WORKSP-8, WORKSP-9) and `spec/macos-packaging.md`.
+
+## License
+
+MIT or Apache-2.0 (`LICENSE-MIT`, `LICENSE-APACHE`). Code ported from other projects and the
+embedded fonts keep their own licenses; see `THIRD-PARTY-NOTICES`.

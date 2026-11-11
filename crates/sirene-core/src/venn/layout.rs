@@ -4,6 +4,9 @@
 //! overlaps by its overlap's size, refined with Nelder-Mead, rotated and mirrored into a standard
 //! orientation, and scaled to fit the drawing. A region's label goes at the point inside it
 //! farthest from its edges.
+//!
+//! Ported from venn.js (Copyright (c) 2013 Ben Frederickson, Copyright (c) 2021 Samuel Gratzl;
+//! MIT) and fmin (Copyright 2016, Ben Frederickson; BSD-3-Clause). See THIRD-PARTY-NOTICES.
 
 use std::collections::HashMap;
 use std::f64::consts::PI;
