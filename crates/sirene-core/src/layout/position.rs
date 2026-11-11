@@ -137,7 +137,13 @@ impl Placer<'_> {
         if layer.is_empty() {
             return;
         }
-        let center = self.center();
+        // Only layers with a floating element need the center, which costs a pass over all
+        // elements.
+        let center = if layer.iter().any(|&e| self.spans[e].floating) {
+            self.center()
+        } else {
+            0.0
+        };
         let mut desired = Vec::with_capacity(layer.len());
         let mut weights = Vec::with_capacity(layer.len());
         for &e in layer {

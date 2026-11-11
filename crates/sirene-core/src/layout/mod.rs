@@ -180,6 +180,12 @@ pub struct Layout {
     pub notes: Vec<Rect>,
 }
 
+/// Segment indices per element: those leaving it downward and those reaching it from above.
+struct Incident {
+    down: Vec<Vec<usize>>,
+    up: Vec<Vec<usize>>,
+}
+
 /// Lays out `graph`.
 pub fn layout(graph: &Graph, config: &Config) -> Layout {
     let start = std::time::Instant::now();
@@ -992,8 +998,19 @@ impl<'a, 'b> Placer<'a, 'b> {
         }
     }
 
+    /// For each element, the segments leaving it downward and those reaching it from above.
+    fn incident(&self, segments: &[(usize, usize, usize)]) -> Incident {
+        let mut down = vec![Vec::new(); self.elems.len()];
+        let mut up = vec![Vec::new(); self.elems.len()];
+        for (i, &(u, v, _)) in segments.iter().enumerate() {
+            down[u].push(i);
+            up[v].push(i);
+        }
+        Incident { down, up }
+    }
+
     /// Port offsets from the anchor for each segment's upper and lower end.
-    fn ports(&self, segments: &[(usize, usize, usize)]) -> Vec<(i32, i32)> {
+    fn ports(&self, segments: &[(usize, usize, usize)], inc: &Incident) -> Vec<(i32, i32)> {
         let mut pos = vec![0usize; self.elems.len()];
         for layer in &self.layers {
             for (i, &e) in layer.iter().enumerate() {
@@ -1010,12 +1027,11 @@ impl<'a, 'b> Placer<'a, 'b> {
                 _ => continue,
             };
             for (downward, side) in [(true, Side::Bottom), (false, Side::Top)] {
-                let mut list: Vec<usize> = (0..segments.len())
-                    .filter(|&i| {
-                        let (u, v, _) = segments[i];
-                        if downward { u == e } else { v == e }
-                    })
-                    .collect();
+                let mut list = if downward {
+                    inc.down[e].clone()
+                } else {
+                    inc.up[e].clone()
+                };
                 list.sort_by_key(|&i| {
                     let (u, v, c) = segments[i];
                     (pos[if downward { v } else { u }], self.chains[c].edge)
@@ -1039,12 +1055,11 @@ impl<'a, 'b> Placer<'a, 'b> {
 
     /// Grows nodes along the cross axis until the ports on each side fit inside the corners
     /// (LAYOUT-7).
-    fn fit_ports(&mut self, segments: &[(usize, usize, usize)]) {
+    fn fit_ports(&mut self, inc: &Incident) {
         for (e, el) in self.elems.iter_mut().enumerate() {
             if let Kind::Item(Item::Node(_)) = el.kind {
-                let down = segments.iter().filter(|s| s.0 == e).count();
-                let up = segments.iter().filter(|s| s.1 == e).count();
-                let need = down.max(up).max(1) as i32 + 2 * self.sp.port_inset;
+                let ports = inc.down[e].len().max(inc.up[e].len());
+                let need = ports.max(1) as i32 + 2 * self.sp.port_inset;
                 el.cross = el.cross.max(need);
             }
         }
@@ -1072,8 +1087,9 @@ impl<'a, 'b> Placer<'a, 'b> {
         } else {
             Vec::new()
         };
-        self.fit_ports(&segments);
-        let offsets = self.ports(&segments);
+        let inc = self.incident(&segments);
+        self.fit_ports(&inc);
+        let offsets = self.ports(&segments, &inc);
         let spans: Vec<Span> = (0..self.elems.len())
             .map(|e| {
                 let el = self.elems[e];
@@ -1083,7 +1099,8 @@ impl<'a, 'b> Placer<'a, 'b> {
                     line: matches!(el.kind, Kind::Dummy | Kind::Proxy(_)),
                     floating: el.kind == Kind::Title
                         || matches!(el.kind, Kind::Proxy(_))
-                            && !segments.iter().any(|&(u, v, _)| u == e || v == e),
+                            && inc.down[e].is_empty()
+                            && inc.up[e].is_empty(),
                 }
             })
             .collect();
@@ -1190,10 +1207,13 @@ impl<'a, 'b> Placer<'a, 'b> {
         };
         let mut track_of = vec![None; segments.len()];
         let mut gaps = vec![0; layers.saturating_sub(1)];
-        for (g, gap) in gaps.iter_mut().enumerate() {
-            let in_gap: Vec<usize> = (0..segments.len())
-                .filter(|&i| self.elems[segments[i].0].layer == g)
-                .collect();
+        let mut by_gap = vec![Vec::new(); gaps.len()];
+        for (i, &(u, _, _)) in segments.iter().enumerate() {
+            if let Some(g) = by_gap.get_mut(self.elems[u].layer) {
+                g.push(i);
+            }
+        }
+        for ((g, gap), in_gap) in gaps.iter_mut().enumerate().zip(by_gap) {
             let jogs: Vec<Jog> = in_gap
                 .iter()
                 .map(|&i| Jog {
@@ -1299,22 +1319,20 @@ impl<'a, 'b> Placer<'a, 'b> {
             }
         }
 
-        for (c, chain) in self.chains.iter().enumerate() {
-            let mut points = Vec::new();
-            for (i, &(u, v, _)) in segments.iter().enumerate() {
-                if segments[i].2 != c {
-                    continue;
-                }
-                let (xu, xv) = (port(i, true), port(i, false));
-                points.push(real(Point::new(xu, rows[u].1)));
-                if let Some(t) = track_of[i] {
-                    let gap_start = tops[self.elems[u].layer] + heights[self.elems[u].layer];
-                    let row = gap_start + self.sp.track_gap * (t as i32 + 1);
-                    points.push(real(Point::new(xu, row)));
-                    points.push(real(Point::new(xv, row)));
-                }
-                points.push(real(Point::new(xv, rows[v].0)));
+        let mut points_of = vec![Vec::new(); self.chains.len()];
+        for (i, &(u, v, c)) in segments.iter().enumerate() {
+            let points: &mut Vec<Point> = &mut points_of[c];
+            let (xu, xv) = (port(i, true), port(i, false));
+            points.push(real(Point::new(xu, rows[u].1)));
+            if let Some(t) = track_of[i] {
+                let gap_start = tops[self.elems[u].layer] + heights[self.elems[u].layer];
+                let row = gap_start + self.sp.track_gap * (t as i32 + 1);
+                points.push(real(Point::new(xu, row)));
+                points.push(real(Point::new(xv, row)));
             }
+            points.push(real(Point::new(xv, rows[v].0)));
+        }
+        for (chain, points) in self.chains.iter().zip(points_of) {
             placed.pieces.push((chain.edge, chain.key, points));
         }
 

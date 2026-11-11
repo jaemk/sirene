@@ -174,6 +174,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   milliseconds; 1,600 such edges took seconds and 22,500 did not finish.
 - A file starting with a byte order mark draws as it does without one; before, its header or
   frontmatter was not found.
+- Long flowcharts and large subgraphs read, lay out, and draw in time near linear in their
+  size; a 2,000-node chain took several seconds.
 
 ## [0.2.0] - 2026-11-08
 

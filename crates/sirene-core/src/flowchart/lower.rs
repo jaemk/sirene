@@ -1,6 +1,6 @@
 //! Lowers the flowchart syntax tree to the semantic model (FLOWMO-*).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
@@ -46,9 +46,23 @@ fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
     tokens(node).find(|t| t.kind() == kind)
 }
 
-fn push_unique(list: &mut Vec<String>, id: String) {
-    if !list.contains(&id) {
-        list.push(id);
+/// Ids in first-mention order, without repeats.
+#[derive(Default)]
+struct Ids {
+    list: Vec<String>,
+    seen: HashSet<String>,
+}
+
+impl Ids {
+    fn push(&mut self, id: String) {
+        if !self.seen.contains(&id) {
+            self.seen.insert(id.clone());
+            self.list.push(id);
+        }
+    }
+
+    fn contains(&self, id: &str) -> bool {
+        self.seen.contains(id)
     }
 }
 
@@ -122,11 +136,15 @@ struct Lowerer {
     edge_ids: HashMap<String, usize>,
     /// Subgraphs in the order their `end`s appear (FLOWMO-10).
     subgraphs: Vec<Subgraph>,
+    /// Index in `subgraphs` by id.
+    subgraph_index: HashMap<String, usize>,
+    /// The id of the subgraph in `subgraphs` that has each member.
+    owners: HashMap<String, String>,
     subgraph_count: usize,
     /// Subgraphs that lost a member to one that listed it first.
     lost: Vec<String>,
     /// Ids in agentflow `global` blocks, which belong to no `flow` (MAGF-2).
-    globals: Vec<String>,
+    globals: Ids,
 }
 
 /// The id of the untitled lane that holds a swimlane diagram's nodes outside every lane.
@@ -143,13 +161,13 @@ impl Lowerer {
 
     fn finish(mut self) -> (Flowchart, Vec<Diagnostic>) {
         // FLOWMO-10: a node with a subgraph's id is that subgraph.
-        let mut merged = Vec::new();
+        let mut merged = HashSet::new();
         for sg in &mut self.subgraphs {
             if let Some(&i) = self.node_index.get(&sg.id) {
                 let node = &self.chart.nodes[i];
                 sg.classes.extend(node.classes.iter().cloned());
                 sg.styles.extend(node.styles.iter().cloned());
-                merged.push(sg.id.clone());
+                merged.insert(sg.id.clone());
             }
         }
         self.chart.nodes.retain(|n| !merged.contains(&n.id));
@@ -231,33 +249,29 @@ impl Lowerer {
 
     /// Lowers the statements directly under `parent`. Returns the ids of the nodes and
     /// subgraphs they mention, and the last `direction`.
-    fn statements(
-        &mut self,
-        parent: &SyntaxNode,
-        nested: bool,
-    ) -> (Vec<String>, Option<Direction>) {
-        let mut members = Vec::new();
+    fn statements(&mut self, parent: &SyntaxNode, nested: bool) -> (Ids, Option<Direction>) {
+        let mut members = Ids::default();
         let mut direction = None;
         for stmt in parent.children() {
             match stmt.kind() {
                 VERTEX_STMT => {
                     for id in self.vertex_stmt(&stmt) {
-                        push_unique(&mut members, id);
+                        members.push(id);
                     }
                 }
                 SUBGRAPH => {
                     let id = self.subgraph(&stmt);
-                    push_unique(&mut members, id);
+                    members.push(id);
                 }
                 GLOBAL => {
                     let (inner, _) = self.statements(&stmt, false);
-                    for id in inner {
-                        push_unique(&mut self.globals, id);
+                    for id in inner.list {
+                        self.globals.push(id);
                     }
                 }
                 CONNECTOR_STMT => {
                     if let Some(id) = self.connector(&stmt) {
-                        push_unique(&mut members, id);
+                        members.push(id);
                     }
                 }
                 DIRECTION_STMT => {
@@ -288,7 +302,7 @@ impl Lowerer {
 
     /// FLOWMO-4, FLOWMO-8. Returns the ids of the nodes mentioned.
     fn vertex_stmt(&mut self, stmt: &SyntaxNode) -> Vec<String> {
-        let mut members = Vec::new();
+        let mut members = Ids::default();
         let mut prev: Option<Vec<String>> = None;
         let mut edge = None;
         for part in stmt.children() {
@@ -303,7 +317,7 @@ impl Lowerer {
                         self.edges(from, &ids, &e);
                     }
                     for id in &ids {
-                        push_unique(&mut members, id.clone());
+                        members.push(id.clone());
                     }
                     prev = Some(ids);
                 }
@@ -311,7 +325,7 @@ impl Lowerer {
                 _ => {}
             }
         }
-        members
+        members.list
     }
 
     /// Applies one node mention. Returns the node id, or `None` when the mention refers to an
@@ -329,8 +343,9 @@ impl Lowerer {
             return None;
         }
         if let Some(entries) = &meta
-            && let Some(sg) = self.subgraphs.iter_mut().find(|s| s.id == id)
+            && let Some(&s) = self.subgraph_index.get(&id)
         {
+            let sg = &mut self.subgraphs[s];
             merge_metadata(&mut sg.metadata, entries.clone());
             return None;
         }
@@ -516,27 +531,28 @@ impl Lowerer {
         if self.chart.agentflow && child(&header, SHAPE).is_none() {
             title = Label::default();
         }
-        let (mut members, direction) = self.statements(syntax, true);
-        members.retain(|m| !self.globals.contains(m));
+        let (members, direction) = self.statements(syntax, true);
         let meta = child(&header, METADATA).map(|m| self.metadata(&m));
         let id = explicit.unwrap_or_else(|| format!("subGraph{}", self.subgraph_count));
         self.subgraph_count += 1;
 
         let mut kept = Vec::new();
-        for m in &members {
-            if *m == id {
+        for m in &members.list {
+            if *m == id || self.globals.contains(m) {
                 continue;
             }
-            if self.nested_in(&id, std::slice::from_ref(m)) {
+            if self.nested_in(&id, |c| c == m) {
                 self.warning(
                     header.text_range(),
                     format!("subgraph `{m}` cannot be nested in its own descendant `{id}`"),
                 );
                 continue;
             }
-            match self.owner(m) {
+            match self.owners.get(m) {
                 Some(owner) => {
-                    if owner != id && !self.nested_in(&owner, &members) {
+                    let listed = |c: &str| members.contains(c) && !self.globals.contains(c);
+                    if *owner != id && !self.nested_in(owner, listed) {
+                        let owner = owner.clone();
                         self.warning(
                             header.text_range(),
                             format!("`{m}` already belongs to subgraph `{owner}`"),
@@ -547,51 +563,48 @@ impl Lowerer {
                 None => kept.push(m.clone()),
             }
         }
-        match self.subgraphs.iter_mut().find(|s| s.id == id) {
-            Some(existing) => {
-                for m in kept {
-                    push_unique(&mut existing.members, m);
-                }
+        for m in &kept {
+            self.owners.insert(m.clone(), id.clone());
+        }
+        match self.subgraph_index.get(&id) {
+            Some(&s) => {
+                let existing = &mut self.subgraphs[s];
+                // `kept` has no members owned before, so none of `existing.members`.
+                existing.members.extend(kept);
                 if let Some(meta) = meta {
                     merge_metadata(&mut existing.metadata, meta);
                 }
             }
-            None => self.subgraphs.push(Subgraph {
-                id: id.clone(),
-                title,
-                direction,
-                members: kept,
-                classes: Vec::new(),
-                styles: Vec::new(),
-                metadata: meta.unwrap_or_default(),
-                range: syntax.text_range(),
-                region: false,
-            }),
+            None => {
+                self.subgraph_index.insert(id.clone(), self.subgraphs.len());
+                self.subgraphs.push(Subgraph {
+                    id: id.clone(),
+                    title,
+                    direction,
+                    members: kept,
+                    classes: Vec::new(),
+                    styles: Vec::new(),
+                    metadata: meta.unwrap_or_default(),
+                    range: syntax.text_range(),
+                    region: false,
+                });
+            }
         }
         id
     }
 
-    /// The id of the resolved subgraph that has `id` as a member.
-    fn owner(&self, id: &str) -> Option<String> {
-        self.subgraphs
-            .iter()
-            .find(|s| s.members.iter().any(|m| m == id))
-            .map(|s| s.id.clone())
-    }
-
-    /// Whether subgraph `id` sits, at any depth, under a subgraph with `members`.
-    fn nested_in(&self, id: &str, members: &[String]) -> bool {
-        let mut seen = Vec::new();
-        let mut current = Some(id.to_owned());
+    /// Whether subgraph `id`, or a resolved subgraph it sits in at any depth, is `listed`.
+    fn nested_in(&self, id: &str, listed: impl Fn(&str) -> bool) -> bool {
+        let mut seen = HashSet::new();
+        let mut current = Some(id);
         while let Some(c) = current {
-            if members.contains(&c) {
+            if listed(c) {
                 return true;
             }
-            if seen.contains(&c) {
+            if !seen.insert(c) {
                 break;
             }
-            current = self.owner(&c);
-            seen.push(c);
+            current = self.owners.get(c).map(String::as_str);
         }
         false
     }
