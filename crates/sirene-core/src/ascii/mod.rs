@@ -121,7 +121,10 @@ fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String
         draw_box(&mut canvas, *r, line);
     }
     for ((target, note), &r) in chart.placed_notes().zip(&layout.notes) {
-        let n = layout.nodes[target];
+        let n = match target {
+            layout::Item::Node(i) => layout.nodes[i],
+            layout::Item::Cluster(c) => layout.clusters[c],
+        };
         let (cx, cy) = (n.x + n.w / 2, n.y + n.h / 2);
         if r.x > n.right() {
             canvas.hline(n.right() + 1, r.x - 1, cy, Line::Dotted);
@@ -411,6 +414,10 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
         canvas.glyph(r.right(), r.y, tr);
         canvas.glyph(r.x, r.bottom(), bl);
         canvas.glyph(r.right(), r.bottom(), br);
+    }
+    // A note's folded corner, as notes beside nodes draw it.
+    if node.shape == Shape::Note {
+        canvas.glyph(r.right(), r.y, glyph('╮', '.'));
     }
     let sides = match f {
         Frame::Round => Some((glyph('(', '('), glyph(')', ')'))),

@@ -109,10 +109,10 @@ pub struct EdgeSpec {
     pub label: Option<Size>,
 }
 
-/// A box placed beside a node, in the same rank (LANGS-3).
+/// A box placed beside a node or a cluster, in the same rank (LANGS-3).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoteSpec {
-    pub node: usize,
+    pub target: Item,
     pub size: Size,
     /// On the cross axis's far side (right, or below in a horizontal container) rather than
     /// its near side.
@@ -844,7 +844,10 @@ impl<'a, 'b> Placer<'a, 'b> {
         for note in self.notes() {
             let size = swap_if(self.dir, note.size);
             let gap = self.sp.loop_size;
-            let el = &mut self.elems[self.item_elem[&Item::Node(note.node)]];
+            let Some(&el) = self.item_elem.get(&note.target) else {
+                continue;
+            };
+            let el = &mut self.elems[el];
             if note.after {
                 el.after += gap + size.w;
             } else {
@@ -1340,7 +1343,7 @@ impl<'a, 'b> Placer<'a, 'b> {
         // Notes, outward from their node in input order, centered on its layer.
         let mut reach: HashMap<(usize, bool), i32> = HashMap::new();
         for (k, note) in self.b.graph.notes.iter().enumerate() {
-            let Some(&el) = self.item_elem.get(&Item::Node(note.node)) else {
+            let Some(&el) = self.item_elem.get(&note.target) else {
                 continue;
             };
             let r = rect(el);
@@ -1373,15 +1376,18 @@ impl<'a, 'b> Placer<'a, 'b> {
         self.s.checked_sub(1).map(|c| &self.b.graph.clusters[c])
     }
 
-    /// Notes on nodes of this scope.
+    /// Notes on nodes and clusters of this scope.
     fn notes(&self) -> Vec<NoteSpec> {
         self.b
             .graph
             .notes
             .iter()
             .filter(|n| {
-                n.node < self.b.graph.nodes.len()
-                    && self.b.node_parent[n.node].map_or(0, |c| c + 1) == self.s
+                let known = match n.target {
+                    Item::Node(i) => i < self.b.graph.nodes.len(),
+                    Item::Cluster(c) => c < self.b.graph.clusters.len(),
+                };
+                known && self.b.parent(n.target).map_or(0, |c| c + 1) == self.s
             })
             .cloned()
             .collect()

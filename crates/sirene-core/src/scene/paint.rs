@@ -489,8 +489,11 @@ pub(super) fn draw(
 
     for (note, &r) in chart.placed_notes().zip(&layout.notes) {
         let (target, note) = note;
-        let (b, nb) = (at(r), at(layout.nodes[target]));
-        let owner = Owner::Node(target);
+        let (nb, owner) = match target {
+            layout::Item::Node(i) => (at(layout.nodes[i]), Owner::Node(i)),
+            layout::Item::Cluster(c) => (at(layout.clusters[c]), Owner::Cluster(c)),
+        };
+        let b = at(r);
         // A dashed line from the node's side to the note's, through the node's center.
         let c = nb.center();
         let (a, z) = if b.x > nb.right() {
@@ -721,8 +724,9 @@ impl Painter<'_> {
         let owner = Owner::Node(i);
         let theme = self.theme;
         let hollow = o.hollow;
-        // A collapsed subgraph keeps its cluster colors (FLOWMO-15).
-        let (fill, border, ink) = if node.shape == Shape::Collapsed {
+        // A collapsed subgraph keeps its cluster colors (FLOWMO-15), and a note is drawn in
+        // them as notes beside nodes are.
+        let (fill, border, ink) = if matches!(node.shape, Shape::Collapsed | Shape::Note) {
             (
                 theme.cluster_fill,
                 theme.cluster_stroke,

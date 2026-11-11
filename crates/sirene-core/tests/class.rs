@@ -7,7 +7,7 @@ use std::path::Path;
 
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::diagram::{self, Kind, Lowered};
-use sirene_core::flowchart::{Arrow, Direction, Flowchart, NoteSide, Row, Stroke};
+use sirene_core::flowchart::{Arrow, Direction, Flowchart, NoteSide, Row, Shape, Stroke};
 use sirene_core::scene::{self, Approx, Primitive, Theme};
 use sirene_core::{Severity, class};
 
@@ -224,6 +224,34 @@ fn namespaces_notes_and_styling() {
     assert_eq!(c.node("C").unwrap().styles[0].property, "stroke");
 }
 
+/// A note with no class is a node of its own (MCLASS-3).
+#[test]
+fn floating_notes() {
+    let c = chart("classDiagram\n  class A\n  note \"on its own\\nline two\"\n");
+    assert_eq!(c.nodes.len(), 2);
+    let n = &c.nodes[1];
+    assert_eq!(n.shape, Shape::Note);
+    assert_eq!(n.label.text, "on its own\nline two");
+    assert!(n.sections.is_empty());
+    let s = scene::flowchart(&c, &Approx, &Theme::LIGHT);
+    let fill = s.elements.iter().find_map(|e| match &e.primitive {
+        Primitive::Path { fill, .. } if e.owner == scene::Owner::Node(1) => *fill,
+        _ => None,
+    });
+    assert_eq!(
+        fill,
+        Some(Theme::LIGHT.cluster_fill),
+        "drawn in the note colors"
+    );
+    let text = ascii::render(
+        &c,
+        &Options {
+            charset: Charset::Unicode,
+        },
+    );
+    assert!(text.contains("on its own") && text.contains('╮'), "{text}");
+}
+
 /// MCLASS-4, LANGS-6.
 #[test]
 fn unsupported_is_a_warning() {
@@ -237,10 +265,6 @@ fn unsupported_is_a_warning() {
             "`callback` is not supported",
         ),
         ("classDiagram\n  link A \"x\"\n", "`link` is not supported"),
-        (
-            "classDiagram\n  note \"x\"\n",
-            "notes not attached to a class",
-        ),
         ("classDiagram\n  style X fill:#f00\n", "unknown class `X`"),
     ] {
         let d = diagram::lower(src).diagnostics;

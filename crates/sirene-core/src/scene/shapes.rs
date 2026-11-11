@@ -67,6 +67,8 @@ enum Geo {
     UseCase,
     /// A collapsed subgraph: its title over a dashed rule and three dots.
     Collapsed,
+    /// A box with a folded top right corner.
+    Note,
     /// One of the shapes in `expanded`.
     Expanded,
 }
@@ -77,6 +79,7 @@ fn geo(shape: Shape) -> Geo {
         Shape::Actor | Shape::HollowActor | Shape::AwesomeActor => Geo::Actor,
         Shape::UseCase => Geo::UseCase,
         Shape::Collapsed => Geo::Collapsed,
+        Shape::Note => Geo::Note,
         Shape::Rounded => Geo::Rounded,
         Shape::Stadium => Geo::Stadium,
         Shape::FramedRect => Geo::Framed,
@@ -116,6 +119,8 @@ pub(super) fn has_label(shape: Shape) -> bool {
 const SLOPE: f32 = 10.0;
 const NOTCH: f32 = 12.0;
 const FRAME: f32 = 8.0;
+/// A note's folded corner, as notes beside nodes draw it.
+const NOTE_FOLD: f32 = 8.0;
 /// An actor's figure, the gap below it, and the padding around figure and label, as Mermaid
 /// draws them.
 const FIGURE_W: f32 = 56.0;
@@ -148,6 +153,7 @@ pub(super) fn size(shape: Shape, tw: f32, th: f32) -> (f32, f32) {
     let circle = (tw.hypot(th) + 2.0 * PAD_Y).max(h0);
     match geo(shape) {
         Geo::Rect | Geo::Rounded | Geo::Notched => (w0, h0),
+        Geo::Note => (w0 + NOTE_FOLD, h0),
         Geo::Stadium | Geo::Hexagon | Geo::LeanRight | Geo::LeanLeft => (w0 + h0 / 2.0, h0),
         Geo::TrapBottom | Geo::TrapTop => (w0 + h0 / 2.0, h0),
         Geo::Odd => (w0 + h0 / 4.0, h0),
@@ -202,6 +208,10 @@ pub(super) fn text_box(shape: Shape, b: BoxF) -> BoxF {
         Geo::Flipped => BoxF { h: b.h / 2.0, ..b },
         Geo::Collapsed => BoxF {
             h: (b.h - COLLAPSED_GAP - COLLAPSED_ROW).max(0.0),
+            ..b
+        },
+        Geo::Note => BoxF {
+            w: b.w - NOTE_FOLD,
             ..b
         },
         Geo::Sloped => BoxF {
@@ -503,6 +513,15 @@ pub(super) fn outline(shape: Shape, b: BoxF) -> Outline {
             (x, y + NOTCH),
         ]),
         Geo::Sloped => polygon(&[(x, y + SLOPE), (r, y), (r, bottom), (x, bottom)]),
+        Geo::Note => {
+            let f = NOTE_FOLD;
+            out.lines.push(vec![
+                Segment::Move(Pt::new(r - f, y)),
+                Segment::Line(Pt::new(r - f, y + f)),
+                Segment::Line(Pt::new(r, y + f)),
+            ]);
+            polygon(&[(x, y), (r - f, y), (r, y + f), (r, bottom), (x, bottom)])
+        }
         Geo::Collapsed => {
             // A dashed rule above the indicator row, then three dots centered in it.
             let rule = bottom - COLLAPSED_PAD - COLLAPSED_ROW;

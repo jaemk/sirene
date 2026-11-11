@@ -8,7 +8,6 @@ expression: "stateDiagram-v2\n    state Split {\n        a --> b\n        --\n  
 10:5: warning: floating notes are not supported; ignoring it
 11:5: warning: `click` is not supported in state diagrams; ignoring it
 12:5: warning: `--` separates regions only inside a composite state
-16:5: warning: notes on composite states are not supported; ignoring the note on `Split2`
 17:11: warning: unknown state `nowhere`
 
         ┌──────── Split ────────┐
@@ -17,9 +16,9 @@ expression: "stateDiagram-v2\n    state Split {\n        a --> b\n        --\n  
         │ ┆       ┆   ┆       ┆ │
         │ ┆ ╭───╮ ┆   ┆ ╭───╮ ┆ │   ┌─ Split2 ─┐
         │ ┆ │ a │ ┆   ┆ │ c │ ┆ │   │          │
-╭───╮   │ ┆ ╰─┬─╯ ┆   ┆ ╰─┬─╯ ┆ │   │   ╭───╮  │
-│ h │   │ ┆   │   ┆   ┆   │   ┆ │   │   │ x │  │
-╰───╯   │ ┆   ▼   ┆   ┆   ▼   ┆ │   │   ╰───╯  │
+╭───╮   │ ┆ ╰─┬─╯ ┆   ┆ ╰─┬─╯ ┆ │   │   ╭───╮  │  ┌────────────────╮
+│ h │   │ ┆   │   ┆   ┆   │   ┆ │   │   │ x │  │┄┄│ on a composite │
+╰───╯   │ ┆   ▼   ┆   ┆   ▼   ┆ │   │   ╰───╯  │  └────────────────┘
         │ ┆ ╭───╮ ┆   ┆ ╭───╮ ┆ │   │          │
         │ ┆ │ b │ ┆   ┆ │ d │ ┆ │   └──────────┘
         │ ┆ ╰───╯ ┆   ┆ ╰───╯ ┆ │

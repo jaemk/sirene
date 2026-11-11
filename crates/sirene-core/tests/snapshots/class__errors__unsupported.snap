@@ -5,10 +5,9 @@ expression: "classDiagram\n    class A\n    click A href \"https://example.com\"
 3:5: warning: `click` is not supported in class diagrams; ignoring it
 4:5: warning: `callback` is not supported in class diagrams; ignoring it
 5:5: warning: `link` is not supported in class diagrams; ignoring it
-6:5: warning: notes not attached to a class are not supported; ignoring it
 7:11: warning: unknown class `Nowhere`
 8:14: warning: unknown class `Gone`
 
-┌───┐
-│ A │
-└───┘
+┌───┐   ┌─────────────────╮
+│ A │   │ a floating note │
+└───┘   └─────────────────┘

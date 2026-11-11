@@ -49,6 +49,7 @@ In the editor a class diagram is read-only on the drawing side, as state diagram
 | `A "1" --> "*" B : label` | cardinalities beside each end, the label in the middle |
 | `namespace N { ... }` | a box around its classes |
 | `note for A "text"` | a note beside the class |
+| `note "text"` | a note on its own |
 | `direction`, `classDef`, `cssClass "A,B" name`, `A:::name`, `style` | as in flowcharts |
 
 An edge runs from the left class to the right one, so in `Super <|-- Sub` the superclass is drawn
@@ -59,5 +60,5 @@ does.
 
 ## Not drawn
 
-These are warnings, and the rest of the diagram is drawn: `click`, `callback`, `link`, notes not
-attached to a class (`note "text"`), and styling of a class that does not exist.
+These are warnings, and the rest of the diagram is drawn: `click`, `callback`, `link`, and
+styling of a class that does not exist.

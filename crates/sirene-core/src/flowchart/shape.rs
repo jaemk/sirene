@@ -19,6 +19,9 @@ macro_rules! shapes {
             UseCase,
             /// A collapsed subgraph (FLOWMO-15): its title over a dashed rule and three dots.
             Collapsed,
+            /// A note that stands on its own, such as a class diagram's `note "text"`: a box
+            /// with a folded corner in the note colors.
+            Note,
         }
 
         const NAMES: &[(&str, Shape)] = &[
@@ -41,6 +44,7 @@ macro_rules! shapes {
                     Shape::AwesomeActor => "usecaseActorAwesome",
                     Shape::UseCase => "usecaseEllipse",
                     Shape::Collapsed => "collapsedGroup",
+                    Shape::Note => "note",
                 }
             }
 

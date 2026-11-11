@@ -8,6 +8,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Notes on composite states in state diagrams, and class diagram notes with no class
+  (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its
   frontmatter `config:` or an `%%{init}%%` directive set its colors in SVG, PNG, and the editor,
   for all 11 Mermaid 12.3 themes; an unknown theme name is a warning.

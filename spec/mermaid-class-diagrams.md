@@ -43,10 +43,11 @@ Layered layout, top to bottom by default. An edge runs from the left class to th
 in the usual `Super <|-- Sub` the superclass ranks above. Markers are drawn over the line, the
 hollow ones filled with the background. End labels sit beside the line near their end. In
 ASCII compartments are split by `├─┤` rows (`+-+`), and markers are `△▽◁▷` (`^v<>`), `◆` (`*`),
-and `◇` (`o`); an arrow is as in flowcharts. Tests: `superclasses_rank_above`, `drawing`,
-`snapshots`, `ascii_charset_snapshots`.
+and `◇` (`o`); an arrow is as in flowcharts. A note with no class (`note "text"`) is a node of
+its own: a box with a folded corner in the note colors (`╮` in ASCII). Tests:
+`superclasses_rank_above`, `drawing`, `floating_notes`, `snapshots`, `ascii_charset_snapshots`.
 
 ## MCLASS-4 Unsupported
 
-`click`, `callback`, `link`, notes not attached to a class, and styling of an unknown class are
+`click`, `callback`, `link`, and styling of an unknown class are
 warnings (LANGS-6). Tests: `unsupported_is_a_warning`.
