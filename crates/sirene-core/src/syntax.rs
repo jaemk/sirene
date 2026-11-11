@@ -132,6 +132,8 @@ syntax_kinds! {
     ZEN_KW,
     // Info diagrams: `showInfo`.
     SHOW_INFO_KW,
+    // Venn diagrams: `set`, `union`, or `text`.
+    VENN_KW,
     ERROR_TOKEN,
 
     // Nodes.
@@ -206,6 +208,9 @@ syntax_kinds! {
     BRANCH,
     // Info diagrams: `showInfo` on its own line.
     SHOW_INFO_STMT,
+    // Venn diagrams: a `set` or `union`, and a `text` node.
+    SET_STMT,
+    TEXT_STMT,
     ERROR,
 }
 

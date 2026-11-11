@@ -327,6 +327,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for ishikawa diagrams yet")
     );
     assert!(fish.chart.nodes.is_empty() && fish.other.is_some());
+    let venn = Document::from_source(None, "venn-beta\nset A\n".to_owned());
+    assert_eq!(
+        venn.read_only(),
+        Some("drawing edits are not supported for venn diagrams yet")
+    );
+    assert!(venn.chart.nodes.is_empty() && venn.other.is_some());
 }
 
 #[gpui::test]

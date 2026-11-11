@@ -19,6 +19,7 @@ mod sankey;
 mod sequence;
 mod timeline;
 mod treemap;
+mod venn;
 mod xychart;
 
 pub use architecture::render as architecture;
@@ -39,6 +40,7 @@ pub use sankey::render as sankey;
 pub use sequence::render as sequence;
 pub use timeline::render as timeline;
 pub use treemap::render as treemap;
+pub use venn::render as venn;
 pub use xychart::render as xychart;
 
 use unicode_width::UnicodeWidthStr;

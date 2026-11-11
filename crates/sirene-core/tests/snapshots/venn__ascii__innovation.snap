@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/venn.rs
+expression: "---\ntitle: Innovation\n---\n%% the pairwise overlaps of a three-set union are implied\nvenn-beta\n  set Desirable\n  set Feasible\n  set Viable\n  set \"Out of scope\":4\n  union Desirable,Feasible,Viable[\"Innovation\"]\n  text Desirable,Feasible,Viable 42\n  style \"Out of scope\" fill:gray, fill-opacity:0.3, stroke-width:1px\n"
+---
+               Innovation
+
+Desirable
+Feasible
+Viable
+Out of scope
+Desirable & Feasible & Viable: Innovation
+  - 42

@@ -85,7 +85,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid ishikawa diagrams (`ishikawa-beta`), read-only in the editor: the effect in a head
   at the end of a spine, causes on bones above and below, and sub-causes nested by
   indentation; in text, an outline.
-- Mermaid 12's other new types (`venn-beta`, `wardley-beta`, `usecase-beta`, and the rest) are
+- Mermaid venn diagrams (`venn-beta`), read-only in the editor: sets, unions, sizes, labels,
+  `text` nodes, and `style`, laid out as venn.js does for Mermaid; in text, each set and
+  overlap with its text nodes.
+- Mermaid 12's other new types (`wardley-beta`, `usecase-beta`, and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 

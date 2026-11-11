@@ -26,7 +26,7 @@ charts](pie.md) (`pie`), [gantt charts](gantt.md) (`gantt`), [mindmaps](mindmap.
 (`quadrantChart`), [XY charts](xychart.md) (`xychart-beta`), [requirement
 diagrams](requirement.md) (`requirementDiagram`), [kanban boards](kanban.md) (`kanban`),
 [packet diagrams](packet.md) (`packet`), [radar charts](radar.md) (`radar-beta`), [sankey
-diagrams](sankey.md) (`sankey-beta`), [treemaps](treemap.md) (`treemap-beta`), [block diagrams](block.md) (`block-beta`), [architecture diagrams](architecture.md) (`architecture-beta`), [C4 diagrams](c4.md) (`C4Context` and the other C4 types), [ZenUML diagrams](zenuml.md) (`zenuml`), [info diagrams](info.md) (`info`), and [ishikawa diagrams](ishikawa.md) (`ishikawa-beta`) are drawn; other Mermaid diagram types are reported
+diagrams](sankey.md) (`sankey-beta`), [treemaps](treemap.md) (`treemap-beta`), [block diagrams](block.md) (`block-beta`), [architecture diagrams](architecture.md) (`architecture-beta`), [C4 diagrams](c4.md) (`C4Context` and the other C4 types), [ZenUML diagrams](zenuml.md) (`zenuml`), [info diagrams](info.md) (`info`), [ishikawa diagrams](ishikawa.md) (`ishikawa-beta`), and [venn diagrams](venn.md) (`venn-beta`) are drawn; other Mermaid diagram types are reported
 as unsupported. See [Supported
 syntax](syntax.md) for what is read and how it differs from Mermaid.
 
