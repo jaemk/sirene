@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/treeview.rs
+expression: "treeView-beta\n    my-project/\n        src/\n            App.tsx :::highlight icon(logos:react) ## main component\n            index.js ## entry point\n        .env ## environment variables\n        Dockerfile\n        package.json\n"
+---
+/
+└── my-project/
+    ├── src/
+    │   ├── App.tsx   main component
+    │   └── index.js  entry point
+    ├── .env          environment variables
+    ├── Dockerfile
+    └── package.json

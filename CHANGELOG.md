@@ -93,7 +93,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   labels, `evolve` trends, `pipeline` blocks, `(build)`, `(buy)`, `(outsource)`, `(market)`,
   and `(inertia)`, notes, annotations, and accelerators; in text, the components plotted over
   the stages with the rest listed below.
-- Mermaid 12's other new types (`treeView-beta`, `usecase-beta`, and the rest) are
+- Mermaid tree views (`treeView-beta`), read-only in the editor: files and directories nested
+  by indentation or box-drawing characters, `:::highlight`, `## descriptions`, the built-in
+  `file` and `folder` icons, and the `treeView` frontmatter config; in text, the tree as `tree`
+  prints it.
+- Mermaid 12's other new types (`usecase-beta`, and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 - `THIRD-PARTY-NOTICES` with the licenses of the code sirene ports (venn.js, fmin, d3-sankey,

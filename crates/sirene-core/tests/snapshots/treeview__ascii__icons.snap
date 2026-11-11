@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/treeview.rs
+expression: "---\nconfig:\n  treeView:\n    showIcons: true\n---\ntreeView-beta\n    %% Generated files: do not edit\n    \"my project\"\n        \"folder with spaces/\"\n            'file.js'\n        index.js icon(none)\n        notes.txt icon(file)\n"
+---
+/
+`-- my project
+    |-- folder with spaces/
+    |   `-- file.js
+    |-- index.js
+    `-- notes.txt
