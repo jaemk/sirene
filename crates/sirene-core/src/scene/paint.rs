@@ -367,17 +367,27 @@ pub(super) fn draw(
         let classes: Vec<&str> = s.classes.iter().map(String::as_str).collect();
         let r = style::resolve(&[], &classes, &s.styles, &chart.classes);
         let b = at(layout.clusters[i]);
-        let (fill, dash) = if s.region {
-            (r.fill, Some((5.0, 4.0)))
+        if chart.agentflow {
+            // An agentflow `flow`: unfilled, rounded, thin (MAGF-2).
+            p.path(
+                Owner::Cluster(i),
+                shapes::rounded(b, 10.0),
+                r.fill,
+                Some(stroke(&r, theme.cluster_stroke, 0.75, None)),
+            );
         } else {
-            (Some(r.fill.unwrap_or(theme.cluster_fill)), None)
-        };
-        p.path(
-            Owner::Cluster(i),
-            rect(b),
-            fill,
-            Some(stroke(&r, theme.cluster_stroke, 1.0, dash)),
-        );
+            let (fill, dash) = if s.region {
+                (r.fill, Some((5.0, 4.0)))
+            } else {
+                (Some(r.fill.unwrap_or(theme.cluster_fill)), None)
+            };
+            p.path(
+                Owner::Cluster(i),
+                rect(b),
+                fill,
+                Some(stroke(&r, theme.cluster_stroke, 1.0, dash)),
+            );
+        }
         if let Some(t) = layout.titles[i] {
             let t = at(t);
             p.lines(
@@ -467,6 +477,13 @@ pub(super) fn draw(
         classes.extend(n.classes.iter().map(String::as_str));
         let s = style::resolve(&[], &classes, &n.styles, &chart.classes);
         let lines = px.label_lines(&n.label, Some(n.shape));
+        let mut o = o;
+        if chart.agentflow && n.shape == Shape::Collapsed {
+            // An agentflow collapsed flow is drawn like an open one: unfilled, rx 10, thin
+            // (MAGF-2).
+            o.body = shapes::rounded(at(r), 10.0);
+            o.hollow = true;
+        }
         p.node(i, n, &lines, &s, at(r), o);
     }
 
@@ -703,6 +720,7 @@ impl Painter<'_> {
     ) {
         let owner = Owner::Node(i);
         let theme = self.theme;
+        let hollow = o.hollow;
         // A collapsed subgraph keeps its cluster colors (FLOWMO-15).
         let (fill, border, ink) = if node.shape == Shape::Collapsed {
             (
@@ -713,10 +731,12 @@ impl Painter<'_> {
         } else {
             (theme.node_fill, theme.node_stroke, theme.edge)
         };
-        let line = stroke(s, border, 1.0, None);
+        let line = stroke(s, border, if hollow { 0.75 } else { 1.0 }, None);
         let ink = Some(s.stroke.unwrap_or(ink));
         if !o.body.is_empty() {
-            if o.solid {
+            if hollow {
+                self.path(owner, o.body, s.fill, Some(line));
+            } else if o.solid {
                 self.path(owner, o.body, Some(s.fill.unwrap_or(theme.edge)), None);
             } else {
                 self.path(owner, o.body, Some(s.fill.unwrap_or(fill)), Some(line));

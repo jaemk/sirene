@@ -1,5 +1,6 @@
 //! Mermaid flowchart parsing and lowering.
 
+mod agentflow;
 mod collapse;
 pub mod edit;
 mod graph;
@@ -24,6 +25,9 @@ use crate::syntax::SyntaxNode;
 
 /// The header of a swimlane diagram: a flowchart whose top-level subgraphs are lanes.
 pub(crate) const SWIMLANE: &str = "swimlane-beta";
+
+/// The header of an agentflow diagram: a flowchart of `flow` containers (MAGF-1).
+pub(crate) const AGENTFLOW: &str = "agentflow-beta";
 
 /// The result of parsing flowchart source: a lossless syntax tree plus diagnostics.
 #[derive(Debug, Clone)]

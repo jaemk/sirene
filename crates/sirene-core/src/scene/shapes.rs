@@ -298,6 +298,8 @@ pub(super) struct Outline {
     pub body: Vec<Segment>,
     /// The body is filled with the stroke color.
     pub solid: bool,
+    /// The body is unfilled and thinly stroked: an agentflow collapsed flow (MAGF-2).
+    pub hollow: bool,
     /// Extra strokes drawn over the body.
     pub lines: Vec<Vec<Segment>>,
     /// Extra shapes filled with the stroke color.

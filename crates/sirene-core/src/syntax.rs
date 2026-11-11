@@ -161,6 +161,9 @@ syntax_kinds! {
     EM_TYPE,
     EM_DATA,
     EM_DATA_TYPE,
+    // Agentflow diagrams: the `global` and `connector` keywords (`flow` is a `SUBGRAPH_KW`).
+    GLOBAL_KW,
+    CONNECTOR_KW,
     ERROR_TOKEN,
 
     // Nodes.
@@ -265,6 +268,9 @@ syntax_kinds! {
     FRAME_STMT,
     DATA_STMT,
     GWT_STMT,
+    // Agentflow: a `global ... end` block and a `connector` declaration.
+    GLOBAL,
+    CONNECTOR_STMT,
     ERROR,
 }
 

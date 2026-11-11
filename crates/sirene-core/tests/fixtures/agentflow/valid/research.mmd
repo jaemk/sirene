@@ -1,0 +1,26 @@
+agentflow-beta LR
+  global
+    user["User"]
+  end
+
+  flow plan["Planner"]
+    goal@{ shape: input, label: "Read the goal" }
+    split{"Split into tasks?"}
+  end
+
+  flow work["Workers"]
+    search@{ shape: tool, label: "Web search" }
+    notes@{ shape: refdoc, label: "Notes" }
+    act@{ shape: action, label: "Draft answer" }
+  end
+
+  connector bus["Message bus"]
+
+  user --> goal
+  goal --> split
+  split -- yes --> search
+  split -->|no| act
+  search --> notes
+  notes -.- bus
+  bus --> act
+  act --x user

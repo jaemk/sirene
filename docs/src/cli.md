@@ -79,7 +79,7 @@ same output (`a.mmd` beside `a.mermaid`), the first in path order wins and the o
 
 `sirene svg FILE.md` and `sirene png FILE.md` (also `.markdown`) render each `mermaid` code block
 to `STEM-N.svg` or `STEM-N.png` beside the file, N counting blocks from 1; `-o OUTDIR` writes
-them there instead. Blocks of other diagram types are skipped with a warning.
+them there instead.
 
 The Markdown file is not changed unless `--link` is given. `--link` adds an image link on the
 line after each rendered block, and only when that line is not already the link, so running it
@@ -88,7 +88,7 @@ again changes nothing. The blocks themselves are never changed or removed.
 ```
 $ sirene svg guide.md --link
 wrote guide-1.svg
-guide.md:9:1: warning: skipping a `agentflow-beta` diagram; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, and event modeling diagrams
+wrote guide-2.svg
 guide.md:15:8: error: expected a node after the edge
 wrote guide-3.svg
 linked the images in guide.md
@@ -112,7 +112,6 @@ FILE and exits 1 if any has an error, so it fits a pre-commit hook or a CI step:
 
 ```
 $ sirene check guide.md docs/
-guide.md:9:1: warning: skipping a `agentflow-beta` diagram; sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, and event modeling diagrams
 guide.md:15:8: error: expected a node after the edge
 ```
 

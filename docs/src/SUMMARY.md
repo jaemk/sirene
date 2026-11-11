@@ -55,6 +55,7 @@
 - [Swimlane diagrams](swimlane.md)
 - [Cynefin diagrams](cynefin.md)
 - [Event modeling diagrams](eventmodel.md)
+- [Agentflow diagrams](agentflow.md)
 
 # Project
 

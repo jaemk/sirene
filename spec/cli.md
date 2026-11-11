@@ -25,7 +25,6 @@ and prints it to stdout with the ASCII renderer (`ascii-renderer.md`).
 Diagnostics are printed to stderr as `NAME:LINE:COL: error: MESSAGE` (or `warning:`), where NAME
 is the file path or `<stdin>`, and LINE and COL count from 1 (COL in characters). The diagram is
 printed even when there are errors. The exit status is 1 when there is an error and 0 otherwise.
-Another Mermaid diagram type is one error and draws nothing (FLOWCH-16).
 
 ## CLI-4 Read failures
 
@@ -104,24 +103,17 @@ diagnostics and read or write errors; none of these stop the watch. Watching std
 and prints diagnostics as in CLI-3. A FILE may be a diagram, `-` for stdin, a directory (each
 `.mmd` and `.mermaid` file under it, as in CLI-9; none is `error: no .mmd or .mermaid files in
 DIR`), or a Markdown file (`.md` or `.markdown`), whose mermaid blocks (MARKDO-1) are checked with
-positions in the Markdown file; a block of another Mermaid diagram type (MARKDO-2) is skipped with
-`NAME:LINE:COL: warning: skipping a `KIND` diagram; sirene draws flowchart, sequence, state, class,
-ER, git graph, timeline, pie, gantt, mindmap, journey, quadrant, XY, requirement, kanban,
-packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, and event modeling diagrams` (the list is
-`diagram::DRAWN`).
-Every FILE is
-checked. The exit status is 1 when any FILE cannot be read or has an error, else 0. A mistyped
+positions in the Markdown file. Every FILE is checked. The exit status is 1 when any FILE cannot be read or has an error, else 0. A mistyped
 `check` is suggested as in CLI-1. Tests: `check` in `crates/sirene/tests/cli.rs`.
 
 ## CLI-12 Markdown files
 
-`sirene svg FILE.md` and `sirene png FILE.md` (or `.markdown`) write each flowchart block
+`sirene svg FILE.md` and `sirene png FILE.md` (or `.markdown`) write each mermaid block
 (MARKDO-1) of the file as its own image, `STEM-N.svg` or `STEM-N.png` beside it, where N counts
 the file's mermaid blocks from 1; `-o DIR` writes them into DIR instead (created as needed; an
 existing file there is `error: DIR is not a directory; a Markdown file renders one image per
 block into one`). Each image written is reported as `wrote PATH`; a file with no mermaid blocks
-prints `NAME: no mermaid blocks`. Blocks of other diagram types are skipped as in CLI-11, and
-diagnostics have positions in the Markdown file. The exit status is 1 when the file cannot be
+prints `NAME: no mermaid blocks`. Diagnostics have positions in the Markdown file. The exit status is 1 when the file cannot be
 read, a block has an error, or an image cannot be written.
 
 The Markdown file is never changed, except with `--link`: then, after each closed block that

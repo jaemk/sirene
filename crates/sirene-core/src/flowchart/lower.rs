@@ -8,7 +8,7 @@ use super::model::{
     Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Metadata, Node, Shape, Stroke,
     Style, Subgraph,
 };
-use super::text;
+use super::{agentflow, text};
 use crate::diagnostic::Diagnostic;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
@@ -23,7 +23,9 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
         }
     }
     if let Some(header) = child(root, HEADER) {
-        l.chart.lanes = token(&header, GRAPH_KW).is_some_and(|t| t.text() == super::SWIMLANE);
+        let kw = token(&header, GRAPH_KW);
+        l.chart.lanes = kw.as_ref().is_some_and(|t| t.text() == super::SWIMLANE);
+        l.chart.agentflow = kw.is_some_and(|t| t.text() == super::AGENTFLOW);
         if let Some(dir) = token(&header, DIR) {
             l.chart.direction = Direction::from_text(dir.text()).unwrap_or_default();
         }
@@ -123,6 +125,8 @@ struct Lowerer {
     subgraph_count: usize,
     /// Subgraphs that lost a member to one that listed it first.
     lost: Vec<String>,
+    /// Ids in agentflow `global` blocks, which belong to no `flow` (MAGF-2).
+    globals: Vec<String>,
 }
 
 /// The id of the untitled lane that holds a swimlane diagram's nodes outside every lane.
@@ -149,6 +153,9 @@ impl Lowerer {
             }
         }
         self.chart.nodes.retain(|n| !merged.contains(&n.id));
+        for sg in &mut self.subgraphs {
+            sg.members.retain(|m| !self.globals.contains(m));
+        }
         self.subgraphs.sort_by_key(|s| s.range.start());
         self.chart.subgraphs = std::mem::take(&mut self.subgraphs);
         if self.chart.lanes {
@@ -242,6 +249,17 @@ impl Lowerer {
                     let id = self.subgraph(&stmt);
                     push_unique(&mut members, id);
                 }
+                GLOBAL => {
+                    let (inner, _) = self.statements(&stmt, false);
+                    for id in inner {
+                        push_unique(&mut self.globals, id);
+                    }
+                }
+                CONNECTOR_STMT => {
+                    if let Some(id) = self.connector(&stmt) {
+                        push_unique(&mut members, id);
+                    }
+                }
                 DIRECTION_STMT => {
                     let dir = token(&stmt, DIR).and_then(|t| Direction::from_text(t.text()));
                     if nested {
@@ -321,11 +339,15 @@ impl Lowerer {
         if let Some(shape) = child(syntax, SHAPE) {
             let open = token(&shape, SHAPE_OPEN).map(|t| t.text().to_owned());
             let close = token(&shape, SHAPE_CLOSE).map(|t| t.text().to_owned());
-            let node = &mut self.chart.nodes[i];
-            node.shape = Shape::from_delimiters(
+            let mut kind = Shape::from_delimiters(
                 open.as_deref().unwrap_or("["),
                 close.as_deref().unwrap_or(""),
             );
+            if self.chart.agentflow {
+                kind = self.agentflow_delimited(kind, shape.text_range());
+            }
+            let node = &mut self.chart.nodes[i];
+            node.shape = kind;
             node.label = child(&shape, LABEL)
                 .map(|l| label_of(&l))
                 .unwrap_or_default();
@@ -348,7 +370,11 @@ impl Lowerer {
         self.chart.nodes.push(Node {
             id: id.to_owned(),
             label: Label::plain(id),
-            shape: Shape::Rect,
+            shape: if self.chart.agentflow {
+                Shape::Rounded
+            } else {
+                Shape::Rect
+            },
             sections: Vec::new(),
             classes: Vec::new(),
             styles: Vec::new(),
@@ -381,7 +407,15 @@ impl Lowerer {
                 .find(|(k, _)| k == key)
                 .map(|(_, v)| v.as_str())
         };
-        let shape = get("shape").map(|name| (name.to_owned(), Shape::from_name(name)));
+        let agentflow = self.chart.agentflow;
+        let shape = get("shape").map(|name| {
+            let s = if agentflow {
+                agentflow::named(name)
+            } else {
+                Shape::from_name(name).map(agentflow::Named::Shape)
+            };
+            (name.to_owned(), s)
+        });
         let markdown = !matches!(get("labelType"), Some("text" | "string"));
         let label = get("label")
             .filter(|l| !l.is_empty())
@@ -392,7 +426,15 @@ impl Lowerer {
         }
         merge_metadata(&mut node.metadata, entries);
         match shape {
-            Some((_, Some(s))) => node.shape = s,
+            Some((_, Some(agentflow::Named::Shape(s)))) => node.shape = s,
+            Some((name, Some(agentflow::Named::Removed))) => {
+                node.shape = Shape::Rounded;
+                self.error(range, agentflow::removed(&name));
+            }
+            Some((name, Some(agentflow::Named::Unsupported))) => {
+                node.shape = Shape::Rounded;
+                self.warning(range, agentflow::unsupported(&name));
+            }
             Some((name, None)) => self.error(range, format!("unknown shape `{name}`")),
             None => {}
         }
@@ -469,8 +511,14 @@ impl Lowerer {
     /// FLOWMO-9, FLOWMO-10. Returns the subgraph's id.
     fn subgraph(&mut self, syntax: &SyntaxNode) -> String {
         let header = child(syntax, SUBGRAPH_HEADER).expect("subgraph without a header");
-        let (explicit, title) = subgraph_header(&header);
-        let (members, direction) = self.statements(syntax, true);
+        let (explicit, mut title) = subgraph_header(&header);
+        // MAGF-2: a `flow` is titled only by `flow id["Title"]`.
+        if self.chart.agentflow && child(&header, SHAPE).is_none() {
+            title = Label::default();
+        }
+        let (mut members, direction) = self.statements(syntax, true);
+        members.retain(|m| !self.globals.contains(m));
+        let meta = child(&header, METADATA).map(|m| self.metadata(&m));
         let id = explicit.unwrap_or_else(|| format!("subGraph{}", self.subgraph_count));
         self.subgraph_count += 1;
 
@@ -504,6 +552,9 @@ impl Lowerer {
                 for m in kept {
                     push_unique(&mut existing.members, m);
                 }
+                if let Some(meta) = meta {
+                    merge_metadata(&mut existing.metadata, meta);
+                }
             }
             None => self.subgraphs.push(Subgraph {
                 id: id.clone(),
@@ -512,7 +563,7 @@ impl Lowerer {
                 members: kept,
                 classes: Vec::new(),
                 styles: Vec::new(),
-                metadata: Vec::new(),
+                metadata: meta.unwrap_or_default(),
                 range: syntax.text_range(),
                 region: false,
             }),
@@ -543,6 +594,43 @@ impl Lowerer {
             seen.push(c);
         }
         false
+    }
+
+    // ---- agentflow ----
+
+    /// MAGF-4: the shape an agentflow node drawn with `delimited`'s brackets gets, reporting the
+    /// shapes agentflow removed.
+    fn agentflow_delimited(&mut self, delimited: Shape, range: TextRange) -> Shape {
+        match delimited {
+            Shape::Rect | Shape::Rounded => Shape::Rounded,
+            Shape::Diamond | Shape::Hexagon | Shape::FramedRect | Shape::LeanRight => delimited,
+            other => {
+                let name = agentflow::delimited_name(other);
+                self.error(range, agentflow::removed(name));
+                Shape::Rounded
+            }
+        }
+    }
+
+    /// MAGF-2: a `connector id["Title"]` declaration. Returns the connector's id.
+    fn connector(&mut self, stmt: &SyntaxNode) -> Option<String> {
+        let syntax = child(stmt, NODE)?;
+        let shape = child(&syntax, SHAPE);
+        if let Some(open) = shape.as_ref().and_then(|s| token(s, SHAPE_OPEN))
+            && open.text() != "["
+        {
+            self.error(open.text_range(), "a connector takes only a `[title]`");
+        }
+        let id = self.node(&syntax)?;
+        let i = self.node_index[&id];
+        let node = &mut self.chart.nodes[i];
+        if node.label.text.trim().is_empty() {
+            node.label = Label::plain(id.clone());
+        }
+        if !node.metadata.iter().any(|(k, _)| k == "shape") {
+            node.shape = Shape::Rounded;
+        }
+        Some(id)
     }
 
     // ---- other statements ----

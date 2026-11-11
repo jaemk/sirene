@@ -60,6 +60,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Swimlane Diagrams | done | [mermaid-swimlane-diagrams.md](mermaid-swimlane-diagrams.md) |
 | Mermaid Cynefin Diagrams | done | [mermaid-cynefin-diagrams.md](mermaid-cynefin-diagrams.md) |
 | Mermaid Event Modeling Diagrams | done | [mermaid-event-modeling-diagrams.md](mermaid-event-modeling-diagrams.md) |
+| Mermaid Agentflow Diagrams | done | [mermaid-agentflow-diagrams.md](mermaid-agentflow-diagrams.md) |
 
 ## Conventions
 
