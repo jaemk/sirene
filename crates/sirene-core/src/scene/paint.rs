@@ -1,5 +1,7 @@
 //! Flowchart to scene (DISPLA-8).
 
+use std::collections::HashMap;
+
 use super::shapes::{self, BoxF, Outline};
 use super::style::{self, Resolved};
 use super::{
@@ -424,13 +426,18 @@ pub(super) fn draw(
         .zip(&layout.nodes)
         .map(|(n, &r)| shapes::outline(n.shape, at(r)))
         .collect();
+    // A subgraph's id wins over a node's, as in the layout.
+    let mut endpoints: HashMap<&str, Result<usize, usize>> = HashMap::new();
+    for (i, n) in chart.nodes.iter().enumerate() {
+        endpoints.entry(&n.id).or_insert(Ok(i));
+    }
+    for (i, s) in chart.subgraphs.iter().enumerate().rev() {
+        endpoints.insert(&s.id, Err(i));
+    }
     let boundary = |id: &str| -> Vec<Pt> {
-        match chart.subgraphs.iter().position(|s| s.id == id) {
-            Some(i) => shapes::flatten(&rect(at(layout.clusters[i]))),
-            None => {
-                let i = chart.nodes.iter().position(|n| n.id == id);
-                outlines[i.expect("edge endpoint exists")].boundary.clone()
-            }
+        match endpoints.get(id).expect("edge endpoint exists") {
+            Err(i) => shapes::flatten(&rect(at(layout.clusters[*i]))),
+            Ok(i) => outlines[*i].boundary.clone(),
         }
     };
     let edge_styles: Vec<Resolved> = chart

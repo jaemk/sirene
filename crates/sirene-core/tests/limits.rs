@@ -160,8 +160,28 @@ fn flowchart_subgraphs() {
 #[test]
 fn flowchart_chain() {
     let mut s = String::from("flowchart TD\n");
-    for i in 0..2_000 {
+    for i in 0..20_000 {
         let _ = writeln!(s, "n{i} --> n{}", i + 1);
+    }
+    check(&s, &[]);
+}
+
+/// Member lookups stay near linear: one subgraph with many members, and many subgraphs each
+/// listed again by the next.
+#[test]
+fn flowchart_members() {
+    let mut s = String::from("flowchart TD\nsubgraph big\n");
+    for i in 0..20_000 {
+        let _ = writeln!(s, "n{i}");
+    }
+    s.push_str("end\n");
+    check(&s, &[]);
+    let mut s = String::from("flowchart TD\n");
+    for i in 0..2_000 {
+        let _ = writeln!(s, "subgraph s{i}\na{i} --> b{i}\nend");
+    }
+    for i in 1..2_000 {
+        let _ = writeln!(s, "subgraph t{i}\ns{}\nend", i - 1);
     }
     check(&s, &[]);
 }
