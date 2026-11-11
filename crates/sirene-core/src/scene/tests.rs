@@ -558,6 +558,96 @@ fn self_loops_draw() {
     assert_eq!(owned(&s, Owner::Edge(0)).len(), 4);
 }
 
+/// The box around every path point and text center.
+fn extent(s: &Scene) -> (Pt, Pt) {
+    let mut points = Vec::new();
+    for e in &s.elements {
+        match &e.primitive {
+            Primitive::Path { segments, .. } => points.extend(shapes::flatten(segments)),
+            Primitive::Text { center, .. } => points.push(*center),
+        }
+    }
+    points.iter().fold(
+        (Pt::new(f32::MAX, f32::MAX), Pt::new(f32::MIN, f32::MIN)),
+        |(lo, hi), p| {
+            (
+                Pt::new(lo.x.min(p.x), lo.y.min(p.y)),
+                Pt::new(hi.x.max(p.x), hi.y.max(p.y)),
+            )
+        },
+    )
+}
+
+/// The scene grows to hold the labels at an edge's ends, which sit beside its route
+/// (DISPLA-1).
+#[test]
+fn end_labels_stay_inside() {
+    for dir in ["TD", "LR", "BT", "RL"] {
+        let mut c = chart(&format!("flowchart {dir}\nA --> B\n"));
+        let plain = flowchart(&c, &Approx, &Theme::LIGHT);
+        c.edges[0].start_label = Some(flowchart::Label::plain("a label at the tail"));
+        c.edges[0].end_label = Some(flowchart::Label::plain("one\nat\nthe\nhead"));
+        let s = flowchart(&c, &Approx, &Theme::LIGHT);
+        assert!(texts(&s).contains(&"a label at the tail"), "{dir}");
+        assert!(s.width > plain.width || s.height > plain.height, "{dir}");
+        let (lo, hi) = extent(&s);
+        assert!(lo.x >= 0.0 && lo.y >= 0.0, "{dir}: {lo:?}");
+        assert!(hi.x <= s.width && hi.y <= s.height, "{dir}: {hi:?}");
+        // The label's whole box is inside, not only its center.
+        let half = Approx.width("a label at the tail", Theme::LIGHT.font_size) / 2.0;
+        let center = s
+            .elements
+            .iter()
+            .find_map(|e| match &e.primitive {
+                Primitive::Text { text, center, .. } if text == "a label at the tail" => {
+                    Some(*center)
+                }
+                _ => None,
+            })
+            .expect("the tail label is drawn");
+        assert!(
+            center.x - half >= 0.0 && center.x + half <= s.width,
+            "{dir}"
+        );
+    }
+}
+
+/// A line wider than the margin, with the markers that scale with it, stays inside
+/// (DISPLA-1), and no line is wider than 32px (DISPLA-6).
+#[test]
+fn wide_lines_stay_inside() {
+    for dir in ["TD", "LR"] {
+        let s = draw(&format!(
+            "flowchart {dir}\nA <--> B\nlinkStyle 0 stroke-width:99px\n"
+        ));
+        let mut widest: f32 = 0.0;
+        for p in owned(&s, Owner::Edge(0)) {
+            let Primitive::Path {
+                segments, stroke, ..
+            } = p
+            else {
+                continue;
+            };
+            // Each path's ink: its points and half its stroke around them.
+            let half = stroke.map_or(0.0, |st| st.width / 2.0);
+            widest = widest.max(half * 2.0);
+            for p in shapes::flatten(segments) {
+                assert!(p.x - half >= -0.01 && p.y - half >= -0.01, "{dir}: {p:?}");
+                assert!(
+                    p.x + half <= s.width + 0.01 && p.y + half <= s.height + 0.01,
+                    "{dir}: {p:?} in {}x{}",
+                    s.width,
+                    s.height
+                );
+            }
+        }
+        assert_eq!(widest, 32.0, "{dir}");
+        let (lo, hi) = extent(&s);
+        assert!(lo.x >= 0.0 && lo.y >= 0.0, "{dir}: {lo:?}");
+        assert!(hi.x <= s.width && hi.y <= s.height, "{dir}: {hi:?}");
+    }
+}
+
 #[test]
 fn flatten_arcs() {
     let p = |x, y| Pt::new(x, y);

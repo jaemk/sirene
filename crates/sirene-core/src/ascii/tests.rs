@@ -47,6 +47,24 @@ fn empty_diagram() {
     assert_eq!(draw("---\ntitle: Only\n---\nflowchart\n"), "Only\n\n");
 }
 
+/// A blank title prints no line, and a title's own padding is not printed (ASCIIR-1).
+#[test]
+fn blank_titles() {
+    let plain = draw("flowchart LR\nA --> B\n");
+    let mut c = flowchart::parse("flowchart LR\nA --> B\n")
+        .lower()
+        .flowchart;
+    for blank in ["", " ", "\t \n"] {
+        c.title = Some(blank.into());
+        assert_eq!(render(&c, &Options::default()), plain, "{blank:?}");
+    }
+    c.title = Some("  T  ".into());
+    assert_eq!(
+        render(&c, &Options::default()),
+        format!("      T\n\n{plain}")
+    );
+}
+
 #[test]
 fn title_is_centered() {
     assert_eq!(

@@ -186,13 +186,13 @@ fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String
     }
 
     let body = canvas.render(options.charset);
-    match &chart.title {
-        Some(t) => {
-            let t = clean(t);
-            let pad = ((layout.size.w - width(&t)).max(0) / 2) as usize;
+    let title = chart.title.as_deref().map(clean);
+    match title.as_deref().map(str::trim) {
+        Some(t) if !t.is_empty() => {
+            let pad = ((layout.size.w - width(t)).max(0) / 2) as usize;
             format!("{}{t}\n\n{body}", " ".repeat(pad))
         }
-        None => body,
+        _ => body,
     }
 }
 

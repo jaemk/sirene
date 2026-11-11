@@ -2,14 +2,17 @@
 
 Backend-independent drawing of diagrams (`sirene_core::scene`): paths and text in pixels, painted
 by the GUI and written as SVG. Tests: `crates/sirene-core/src/scene/tests.rs`,
-`crates/sirene-core/tests/svg.rs`, and `check_scene` in `flowchart_props.rs`.
+`crates/sirene-core/tests/svg.rs`, and `check_scene` in `crates/sirene-core/tests/common/mod.rs`,
+which the property tests of each graph language run.
 
 ## DISPLA-1 Scenes
 
 `scene::flowchart(chart, metrics, theme)` lays out a flowchart with the layout engine
 (`layout.md`) in pixel spacing (`scene::CONFIG`) and returns a `Scene`: a width, a height, a
 background color, and elements in paint order. Every coordinate is finite and inside the scene.
-There is a 16px margin around the drawing.
+There is a 16px margin around the drawing. What an edge draws outside the laid-out area (the
+labels at its ends, which sit beside its route, and a line or marker wider than the margin) grows
+the scene on that side, with 4px around a label.
 
 ## DISPLA-2 Primitives
 
@@ -46,6 +49,8 @@ Node, edge, and subgraph styles apply `fill`, `stroke`, `stroke-width`, `stroke-
 `linkStyle default`; then the item's classes in order; then its own `style` or `linkStyle`
 declarations. Colors may be `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()`, a common
 CSS name, `none`, or `transparent`. Unknown properties and unparsable values are ignored. A
+`stroke-width` over 32px is drawn 32px wide, so a source cannot make a line and its markers
+larger than any drawing. A
 `stroke-dasharray` whose dash and gap together are under 1 unit draws a solid line, so a source
 cannot make an edge into millions of dashes. A node or subgraph with a `fill` and no `color`
 keeps the theme's text color where it reads on the fill (contrast at least 3:1) and otherwise

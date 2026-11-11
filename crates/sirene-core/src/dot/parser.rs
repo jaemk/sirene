@@ -39,13 +39,36 @@ fn numeral_len(s: &str) -> usize {
     if n == 0 { 0 } else { sign + n }
 }
 
-/// Splits `src` into tokens; every byte belongs to exactly one.
-fn lex(src: &str, diagnostics: &mut Vec<Diagnostic>) -> Vec<Tok> {
-    let mut out = Vec::new();
-    let mut at = 0;
-    let mut line_start = true;
-    while at < src.len() {
-        let r = &src[at..];
+/// Splits a source into tokens; every byte belongs to exactly one.
+struct Lexer<'a> {
+    src: &'a str,
+    at: usize,
+    /// Whether the next token starts a line.
+    line_start: bool,
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl<'a> Lexer<'a> {
+    fn new(src: &'a str) -> Self {
+        Self {
+            src,
+            at: 0,
+            line_start: true,
+            diagnostics: Vec::new(),
+        }
+    }
+}
+
+impl Iterator for Lexer<'_> {
+    type Item = Tok;
+
+    fn next(&mut self) -> Option<Tok> {
+        let src = self.src;
+        if self.at >= src.len() {
+            return None;
+        }
+        let line_start = self.line_start;
+        let r = &src[self.at..];
         let c = r.chars().next().expect("not at the end");
         let (kind, len) = if c == '\n' {
             (NEWLINE, 1)
@@ -63,8 +86,8 @@ fn lex(src: &str, diagnostics: &mut Vec<Diagnostic>) -> Vec<Tok> {
                 Some(i) => (COMMENT, i + 4),
                 None => {
                     error(
-                        diagnostics,
-                        at,
+                        &mut self.diagnostics,
+                        self.at,
                         src.len(),
                         "unclosed comment: expected `*/`",
                     );
@@ -77,7 +100,12 @@ fn lex(src: &str, diagnostics: &mut Vec<Diagnostic>) -> Vec<Tok> {
             (
                 STRING,
                 string_len(r).unwrap_or_else(|| {
-                    error(diagnostics, at, src.len(), "unclosed string: expected `\"`");
+                    error(
+                        &mut self.diagnostics,
+                        self.at,
+                        src.len(),
+                        "unclosed string: expected `\"`",
+                    );
                     r.len()
                 }),
             )
@@ -86,8 +114,8 @@ fn lex(src: &str, diagnostics: &mut Vec<Diagnostic>) -> Vec<Tok> {
                 HTML_STRING,
                 html_len(r).unwrap_or_else(|| {
                     error(
-                        diagnostics,
-                        at,
+                        &mut self.diagnostics,
+                        self.at,
                         src.len(),
                         "unclosed HTML string: expected `>`",
                     );
@@ -109,19 +137,24 @@ fn lex(src: &str, diagnostics: &mut Vec<Diagnostic>) -> Vec<Tok> {
             (kind, n)
         } else {
             let n = c.len_utf8();
-            error(diagnostics, at, at + n, format!("unexpected `{c}`"));
+            error(
+                &mut self.diagnostics,
+                self.at,
+                self.at + n,
+                format!("unexpected `{c}`"),
+            );
             (ERROR_TOKEN, n)
         };
         // Graphviz discards a line starting with `#` as C preprocessor output.
-        line_start = kind == NEWLINE;
-        out.push(Tok {
+        self.line_start = kind == NEWLINE;
+        let start = self.at;
+        self.at += len;
+        Some(Tok {
             kind,
-            start: at,
-            end: at + len,
-        });
-        at += len;
+            start,
+            end: self.at,
+        })
     }
-    out
 }
 
 fn punct(c: char) -> Option<SyntaxKind> {
@@ -186,9 +219,8 @@ fn error(d: &mut Vec<Diagnostic>, start: usize, end: usize, message: impl Into<S
 /// Whether `src` starts, after whitespace and comments, with a DOT graph header: an optional
 /// `strict`, `graph` or `digraph`, an optional ID, and `{` (LANGS-1).
 pub(crate) fn is_dot(src: &str) -> bool {
-    let toks = lex(src, &mut Vec::new());
-    let mut it = toks
-        .iter()
+    // Only the first few tokens are read: this runs on whole documents of any language.
+    let mut it = Lexer::new(src)
         .filter(|t| !t.kind.is_trivia())
         .map(|t| (t.kind, src[t.start..t.end].to_ascii_lowercase()));
     let mut next = it.next();
@@ -215,15 +247,16 @@ pub(crate) fn is_dot(src: &str) -> bool {
 }
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
-    let mut diagnostics = Vec::new();
-    let toks = lex(src, &mut diagnostics);
+    let mut lexer = Lexer::new(src);
+    let toks: Vec<Tok> = lexer.by_ref().collect();
     let mut p = Parser {
         src,
         toks,
         pos: 0,
         builder: GreenNodeBuilder::new(),
-        diagnostics,
+        diagnostics: lexer.diagnostics,
         directed: false,
+        depth: 0,
     };
     p.builder.start_node(ROOT.into());
     p.trivia();
@@ -250,7 +283,13 @@ struct Parser<'a> {
     diagnostics: Vec<Diagnostic>,
     /// Whether the graph being parsed is a `digraph`.
     directed: bool,
+    /// How many subgraphs enclose the statement being parsed.
+    depth: usize,
 }
+
+/// The deepest subgraph nesting parsed. A deeper subgraph is an error, so no source can
+/// overflow the stack here or in what reads the tree.
+const MAX_DEPTH: usize = 64;
 
 impl Parser<'_> {
     fn at_end(&self) -> bool {
@@ -408,7 +447,16 @@ impl Parser<'_> {
         loop {
             match self.peek() {
                 None => {
-                    self.error_here("unclosed block: expected `}`");
+                    // Once for the innermost block, not for each one around it.
+                    let message = "unclosed block: expected `}`";
+                    let end = offset(self.src.len());
+                    let reported = self
+                        .diagnostics
+                        .last()
+                        .is_some_and(|d| d.message == message && d.range == TextRange::empty(end));
+                    if !reported {
+                        self.error_here(message);
+                    }
                     return;
                 }
                 Some(R_BRACE) => {
@@ -544,6 +592,11 @@ impl Parser<'_> {
 
     /// `[subgraph [ID]] { stmt_list }`.
     fn subgraph(&mut self) {
+        if self.depth == MAX_DEPTH {
+            self.skip_subgraph();
+            return;
+        }
+        self.depth += 1;
         self.start(SUBGRAPH);
         if self.at_kw("subgraph") {
             self.bump();
@@ -555,6 +608,46 @@ impl Parser<'_> {
             self.stmt_list();
         }
         self.finish();
+        self.depth -= 1;
+    }
+
+    /// Wraps a subgraph nested too deep in an `ERROR` node, up to its closing `}`, and reports
+    /// it on its head.
+    fn skip_subgraph(&mut self) {
+        self.start(ERROR);
+        let start = self.toks.get(self.pos).map_or(self.src.len(), |t| t.start);
+        if self.at_kw("subgraph") {
+            self.bump();
+            if self.at_id() {
+                self.id();
+            }
+        }
+        let end = match self.peek_tok() {
+            Some(t) if t.kind == L_BRACE => t.end,
+            _ => self.toks[self.pos.saturating_sub(1)].end,
+        };
+        if self.at(L_BRACE) {
+            self.trivia();
+            let mut open = 0usize;
+            while let Some(t) = self.toks.get(self.pos) {
+                match t.kind {
+                    L_BRACE => open += 1,
+                    R_BRACE => open -= 1,
+                    _ => {}
+                }
+                self.bump_raw();
+                if open == 0 {
+                    break;
+                }
+            }
+        }
+        self.finish();
+        error(
+            &mut self.diagnostics,
+            start,
+            end.max(start),
+            format!("subgraphs nested more than {MAX_DEPTH} deep"),
+        );
     }
 
     /// One or more `[a = b, ...]` lists.
@@ -698,5 +791,47 @@ mod tests {
             ["expected a node, edge, attribute, or subgraph statement"]
         );
         assert_eq!(e("flowchart LR"), ["expected `graph` or `digraph`"]);
+        // Once, however many blocks are open.
+        assert_eq!(e("digraph { { { {"), ["unclosed block: expected `}`"]);
+        assert_eq!(
+            e("digraph { subgraph a { b -> { c"),
+            ["unclosed block: expected `}`"]
+        );
+    }
+
+    #[test]
+    fn nesting_limit() {
+        let nested = |n: usize| format!("digraph {{ {}a{} }}", "{ ".repeat(n), " }".repeat(n));
+        let (t, d) = tree(&nested(MAX_DEPTH));
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(t.matches("SUBGRAPH@").count(), MAX_DEPTH);
+
+        let (t, d) = tree(&nested(MAX_DEPTH + 3));
+        assert_eq!(d, ["subgraphs nested more than 64 deep"]);
+        assert_eq!(t.matches("SUBGRAPH@").count(), MAX_DEPTH);
+        assert_eq!(t.matches("ERROR@").count(), 1);
+
+        // The statements after a skipped subgraph are still read.
+        let src = format!(
+            "digraph {{ {}subgraph x {{ a }} b -> {{ c }} d{} e }}",
+            "{ ".repeat(MAX_DEPTH),
+            " }".repeat(MAX_DEPTH)
+        );
+        let (t, d) = tree(&src);
+        assert_eq!(d.len(), 2, "{d:?}");
+        assert_eq!(t.matches("DOT_NODE_STMT@").count(), 2);
+        assert_eq!(t.matches("DOT_EDGE_STMT@").count(), 1);
+
+        // Openers alone neither overflow the stack nor report each level.
+        let (green, d) = parse(&format!("digraph {}", "{ ".repeat(100_000)));
+        let messages: Vec<_> = d.iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(
+            messages,
+            [
+                "subgraphs nested more than 64 deep",
+                "unclosed block: expected `}`"
+            ]
+        );
+        assert_eq!(usize::from(green.text_len()), "digraph ".len() + 200_000);
     }
 }

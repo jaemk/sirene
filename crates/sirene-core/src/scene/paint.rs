@@ -446,6 +446,7 @@ pub(super) fn draw(
             )
         })
         .collect();
+    let mut reach = Reach::default();
     for (i, (e, route)) in chart.edges.iter().zip(&layout.edges).enumerate() {
         let Some(route) = route else { continue };
         if e.stroke == Line::Invisible {
@@ -461,8 +462,8 @@ pub(super) fn draw(
             e,
             &edge_styles[i],
             points,
-            &boundary(&e.from),
-            &boundary(&e.to),
+            [&boundary(&e.from), &boundary(&e.to)],
+            &mut reach,
         );
     }
 
@@ -564,19 +565,93 @@ pub(super) fn draw(
         }
     }
 
+    // The labels at an edge's ends sit beside its route, and a wide line and its markers reach
+    // past it, outside what the layout measured: the scene grows to hold them (DISPLA-1).
+    let mut elements = p.elements;
+    let (left, top, right, bottom) = reach.beyond(width, height);
+    if left > 0.0 || top > 0.0 {
+        for e in &mut elements {
+            translate(&mut e.primitive, Pt::new(left, top));
+        }
+    }
+    let (width, height) = (width + left + right, height + top + bottom);
+    let off = Pt::new(off.x + left, off.y + top);
+
     log::debug!(
         "drew a {width}x{height} scene of {} elements",
-        p.elements.len()
+        elements.len()
     );
     (
         Scene {
             width,
             height,
             background: theme.background,
-            elements: p.elements,
+            elements,
         },
         off,
     )
+}
+
+/// The box around what is drawn outside the layout's area.
+#[derive(Default)]
+struct Reach(Option<(Pt, Pt)>);
+
+impl Reach {
+    /// Space kept between a label and the scene's edge.
+    const PAD: f32 = 4.0;
+
+    /// Takes in the box that reaches `rx` to each side of `center` and `ry` above and below.
+    fn add(&mut self, center: Pt, rx: f32, ry: f32) {
+        let (lo, hi) = (
+            Pt::new(center.x - rx, center.y - ry),
+            Pt::new(center.x + rx, center.y + ry),
+        );
+        self.0 = Some(match self.0 {
+            Some((min, max)) => (
+                Pt::new(min.x.min(lo.x), min.y.min(lo.y)),
+                Pt::new(max.x.max(hi.x), max.y.max(hi.y)),
+            ),
+            None => (lo, hi),
+        });
+    }
+
+    /// How far the box passes the left, top, right, and bottom of a `width` by `height` scene.
+    fn beyond(&self, width: f32, height: f32) -> (f32, f32, f32, f32) {
+        let Some((min, max)) = self.0 else {
+            return (0.0, 0.0, 0.0, 0.0);
+        };
+        (
+            (-min.x).max(0.0),
+            (-min.y).max(0.0),
+            (max.x - width).max(0.0),
+            (max.y - height).max(0.0),
+        )
+    }
+}
+
+/// Moves a primitive by `d`.
+fn translate(primitive: &mut Primitive, d: Pt) {
+    let shift = |p: &mut Pt| {
+        p.x += d.x;
+        p.y += d.y;
+    };
+    match primitive {
+        Primitive::Path { segments, .. } => {
+            for s in segments {
+                match s {
+                    Segment::Move(p) | Segment::Line(p) => shift(p),
+                    Segment::Arc { to, .. } => shift(to),
+                    Segment::Cubic { c1, c2, to } => {
+                        shift(c1);
+                        shift(c2);
+                        shift(to);
+                    }
+                    Segment::Close => {}
+                }
+            }
+        }
+        Primitive::Text { center, .. } => shift(center),
+    }
 }
 
 fn rect(b: BoxF) -> Vec<Segment> {
@@ -852,8 +927,8 @@ impl Painter<'_> {
         e: &Edge,
         s: &Resolved,
         mut points: Vec<Pt>,
-        from: &[Pt],
-        to: &[Pt],
+        [from, to]: [&[Pt]; 2],
+        reach: &mut Reach,
     ) {
         points.dedup();
         straighten(&mut points);
@@ -877,6 +952,7 @@ impl Painter<'_> {
         }
         let n = points.len();
         let owner = Owner::Edge(i);
+        let first = self.elements.len();
         let solid = Stroke { dash: None, ..line };
         // Labels beside each end, before the markers move the line's ends (LANGS-3).
         let ends = [
@@ -933,7 +1009,32 @@ impl Painter<'_> {
                     Pt::new(0.0, d.x.signum() * self.theme.line_height / 2.0)
                 };
                 let center = Pt::new(at.x + shift.x, at.y + shift.y);
+                let h = spans.len() as f32 * self.theme.line_height;
+                reach.add(center, w / 2.0 + Reach::PAD, h / 2.0 + Reach::PAD);
                 self.lines(owner, &spans, center, self.theme.text);
+            }
+        }
+        // A wide line and its markers pass the layout's area too.
+        for e in &self.elements[first..] {
+            if let Primitive::Path {
+                segments, stroke, ..
+            } = &e.primitive
+            {
+                let half = stroke.map_or(0.0, |s| s.width / 2.0);
+                for s in segments {
+                    match *s {
+                        Segment::Move(p) | Segment::Line(p) => reach.add(p, half, half),
+                        Segment::Arc { radii, to, .. } => {
+                            reach.add(to, radii.x + half, radii.y + half);
+                        }
+                        Segment::Cubic { c1, c2, to } => {
+                            for p in [c1, c2, to] {
+                                reach.add(p, half, half);
+                            }
+                        }
+                        Segment::Close => {}
+                    }
+                }
             }
         }
     }
