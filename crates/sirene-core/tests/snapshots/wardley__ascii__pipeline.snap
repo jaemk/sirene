@@ -1,0 +1,31 @@
+---
+source: crates/sirene-core/tests/wardley.rs
+expression: "wardley-beta\ntitle Storage Options\nanchor App [0.95, 0.70]\ncomponent Database [0.40, 0.60]\nApp -> Database\n\npipeline Database {\n  component \"File System\" [0.25]\n  component \"SQL DB\" [0.50]\n  component \"NoSQL\" [0.70]\n  component \"Cloud DB\" [0.85]\n}\n"
+---
+                         Storage Options
+
+Visibility
+|                :               :              :
+|                :               :           @ App
+|                :               :              :
+|                :               :              :
+|                :               :              :
+|                :               :              :
+|                :               :              :
+|                :               :     # Database
+|                * File System   * SQL DB    * NoSQL   * Cloud DB
+|                :               :              :
+|                :               :              :
+|                :               :              :
+|                :               :              :
+|                :               :              :
+|                :               :              :
++-----------------------------------------------------------------
+     Genesis       Custom Built      Product       Commodity
+                            Evolution
+
+Links:
+  App -- Database
+
+Pipelines:
+  Database: File System, SQL DB, NoSQL, Cloud DB

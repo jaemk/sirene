@@ -1,0 +1,56 @@
+---
+source: crates/sirene-core/tests/wardley.rs
+expression: "wardley-beta\ntitle Software Platform Strategy\nsize [1100, 800]\n\nevolution Genesis@0.25 -> Custom@0.5 -> Product@0.75 -> Commodity@1.0\n\nanchor Customer [0.90, 0.95]\n\ncomponent \"Mobile App\" [0.80, 0.85] (build)\ncomponent \"Web App\" [0.75, 0.80] label [-60, 10] (build)\ncomponent \"API Gateway\" [0.70, 0.65] (buy)\ncomponent \"Auth Service\" [0.60, 0.55] (outsource)\ncomponent \"Database\" [0.50, 0.45] (buy) (inertia)\ncomponent \"Cloud Platform\" [0.30, 0.95] (market)\n\nCustomer -> \"Mobile App\"\nCustomer -> \"Web App\"\n\"Mobile App\" -> \"API Gateway\"\n\"Web App\" -> \"API Gateway\"\n\"API Gateway\" -> \"Auth Service\"\n\"API Gateway\" -> \"Database\"\n\"Database\" -> \"Cloud Platform\"\n\nevolve \"API Gateway\" 0.85\nevolve \"Database\" 0.75\n\naccelerator \"Cloud Native\" [0.20, 0.85]\ndeaccelerator \"Legacy Data\" [0.45, 0.35]\n\nannotations [0.10, 0.20]\nannotation 1,[0.78, 0.82] \"User touchpoints\"\nannotation 2,[0.70, 0.60] \"Integration layer\"\nannotation 3,[0.50, 0.40] \"Data persistence\"\n\nnote \"Build mobile-first experience\" [0.85, 0.90]\nnote \"Migrate to cloud-native database\" [0.60, 0.50]\n"
+---
+                    Software Platform Strategy
+
+Visibility
+│                ┆               ┆              ┆
+│                ┆               ┆              ┆   Customer ◆
+│                ┆               ┆              ┆
+│                ┆               ┆  Mobile App (build) ●
+│                ┆      API Gateway (buy) ●     ┆  1
+│                ┆               ┆              ┆
+│                ┆               ┆  ● Auth Service (outsource)
+│                ┆           ● Database (buy, inertia)
+│                ┆               ┆              ┆
+│                ┆               ┆              ┆
+│                ┆               ┆   Cloud Platform (market) ●
+│                ┆               ┆              ┆
+│                ┆               ┆              ┆
+│                ┆               ┆              ┆
+│                ┆               ┆              ┆
+└─────────────────────────────────────────────────────────────────
+     Genesis          Custom         Product       Commodity
+                            Evolution
+
+Key:
+  1 Web App (build)
+
+Links:
+  Customer -- Mobile App
+  Customer -- Web App
+  Mobile App -- API Gateway
+  Web App -- API Gateway
+  API Gateway -- Auth Service
+  API Gateway -- Database
+  Database -- Cloud Platform
+
+Evolve:
+  API Gateway -> 0.85
+  Database -> 0.75
+
+Notes:
+  Build mobile-first experience
+  Migrate to cloud-native database
+
+Annotations:
+  1. User touchpoints
+  2. Integration layer
+  3. Data persistence
+
+Accelerators:
+  Cloud Native
+
+Deaccelerators:
+  Legacy Data

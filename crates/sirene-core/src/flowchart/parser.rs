@@ -71,7 +71,6 @@ const OTHER_DIAGRAMS: &[&str] = &[
     "treemap-beta",
     "treeView-beta",
     "usecase-beta",
-    "wardley-beta",
     "xychart",
     "xychart-beta",
     "zenuml",

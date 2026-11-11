@@ -48,6 +48,7 @@
 - [Info diagrams](info.md)
 - [Ishikawa diagrams](ishikawa.md)
 - [Venn diagrams](venn.md)
+- [Wardley maps](wardley.md)
 
 # Project
 

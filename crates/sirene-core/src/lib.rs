@@ -32,6 +32,7 @@ pub mod syntax;
 pub mod timeline;
 pub mod treemap;
 pub mod venn;
+pub mod wardley;
 pub mod xychart;
 pub mod zenuml;
 

@@ -138,7 +138,7 @@ pub fn render(chart: &QuadrantChart, options: &Options) -> String {
 }
 
 /// The `n`th key for a point whose name does not fit: `1` to `9`, then `a` to `z`, then `#`.
-fn key(n: usize) -> char {
+pub(super) fn key(n: usize) -> char {
     match n {
         0..9 => char::from(b'1' + n as u8),
         9..35 => char::from(b'a' + (n - 9) as u8),

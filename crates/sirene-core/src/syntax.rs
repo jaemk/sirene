@@ -134,6 +134,10 @@ syntax_kinds! {
     SHOW_INFO_KW,
     // Venn diagrams: `set`, `union`, or `text`.
     VENN_KW,
+    // Wardley maps: a statement keyword such as `component` or `evolve`, and a link's flow
+    // marker such as `+>` or `+'label'<>`.
+    WARDLEY_KW,
+    PORT,
     ERROR_TOKEN,
 
     // Nodes.
@@ -211,6 +215,14 @@ syntax_kinds! {
     // Venn diagrams: a `set` or `union`, and a `text` node.
     SET_STMT,
     TEXT_STMT,
+    // Wardley maps: a keyword statement, a link, a `pipeline` block, an evolution stage, a
+    // `[visibility, evolution]` pair, and a `(build)` or `(inertia)` decorator.
+    WARDLEY_STMT,
+    LINK_STMT,
+    PIPELINE,
+    STAGE,
+    COORDS,
+    DECORATOR,
     ERROR,
 }
 
