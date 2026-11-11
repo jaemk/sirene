@@ -142,6 +142,9 @@ more than 64 deep`, which is reported once per diagram (once per rule in a railr
 - JSON (use case sources, `%%{init}%%` directives): a deeper value is invalid JSON. A directive
   that is not valid JSON is ignored, as Mermaid ignores it.
 
+A diagram reports at most `diagram::MAX_DIAGNOSTICS` (500) problems; the rest are one more,
+`<n> more problems not shown`, at the first one left out, an error when any of them is.
+
 A gantt chart dates each task once, in dependency order; `excludes` that leaves no working day is
 an error and is ignored (MGANTT-3). An ASCII drawing is cut off at 2^22 cells (ASCIIR-1).
 
