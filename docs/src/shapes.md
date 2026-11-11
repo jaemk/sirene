@@ -69,9 +69,8 @@ When a node has both, `@{ shape }` wins, and the bracket text stays its label.
 | `flag` | | `paper-tape` |
 | `lin-doc` | | `lined-document` |
 
-The classic shapes, circles, the ellipse, triangles, the fork, and the notched and sloped
-rectangles have their own outlines; the other shapes are drawn as rectangles for now. Small,
-filled, and framed circles and forks show no label. An unknown name, or one with uppercase
-letters or `_`, is an error and leaves the shape unchanged.
+Every shape has its own outline, as Mermaid draws it. Small, filled, and framed circles, forks,
+hourglasses, and bolts show no label. An unknown name, or one with uppercase letters or `_`, is an
+error and leaves the shape unchanged.
 
 The [shapes example](examples.md#shapes) draws the shapes that have delimiters.

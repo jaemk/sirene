@@ -130,6 +130,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Every flowchart shape has its own outline, as Mermaid 12.3 draws it: documents, paper tape,
+  delay, side and lined cylinders, display, divided and window panes, loop limit, stacked,
+  stored-data, tagged and lined rectangles, hourglass, bolt, braces, datastore, folder, bucket,
+  console, browser, person, bang, and cloud were drawn as rectangles before. Hourglasses and
+  bolts show no label.
 - In ASCII, start and stop circles (`sm-circ`, `f-circ`, `fr-circ`) are one character, a `fork`
   is a heavy bar, and an unlabeled diamond is `◇`.
 

@@ -2,7 +2,7 @@
 
 use std::f32::consts::{FRAC_1_SQRT_2, PI, SQRT_2};
 
-use super::{Pt, Segment};
+use super::{Pt, Segment, expanded};
 use crate::flowchart::Shape;
 
 /// Horizontal padding between a label and its node's sides.
@@ -67,17 +67,20 @@ enum Geo {
     UseCase,
     /// A collapsed subgraph: its title over a dashed rule and three dots.
     Collapsed,
+    /// One of the shapes in `expanded`.
+    Expanded,
 }
 
 fn geo(shape: Shape) -> Geo {
     match shape {
+        s if expanded::is_expanded(s) => Geo::Expanded,
         Shape::Actor | Shape::HollowActor | Shape::AwesomeActor => Geo::Actor,
         Shape::UseCase => Geo::UseCase,
         Shape::Collapsed => Geo::Collapsed,
         Shape::Rounded => Geo::Rounded,
         Shape::Stadium => Geo::Stadium,
         Shape::FramedRect => Geo::Framed,
-        Shape::Cylinder | Shape::LinedCylinder | Shape::HorizontalCylinder => Geo::Cylinder,
+        Shape::Cylinder | Shape::LinedCylinder => Geo::Cylinder,
         Shape::Circle => Geo::Circle,
         Shape::CrossedCircle => Geo::Crossed,
         Shape::DoubleCircle => Geo::Double,
@@ -103,7 +106,11 @@ fn geo(shape: Shape) -> Geo {
 
 /// Whether the shape shows its label.
 pub(super) fn has_label(shape: Shape) -> bool {
-    !matches!(geo(shape), Geo::Dot | Geo::Stop | Geo::Fork)
+    match geo(shape) {
+        Geo::Dot | Geo::Stop | Geo::Fork => false,
+        Geo::Expanded => expanded::has_label(shape),
+        _ => true,
+    }
 }
 
 const SLOPE: f32 = 10.0;
@@ -145,7 +152,9 @@ pub(super) fn size(shape: Shape, tw: f32, th: f32) -> (f32, f32) {
         Geo::TrapBottom | Geo::TrapTop => (w0 + h0 / 2.0, h0),
         Geo::Odd => (w0 + h0 / 4.0, h0),
         Geo::Framed => (w0 + 2.0 * FRAME, h0),
+        Geo::Cylinder if shape == Shape::LinedCylinder => (w0, h0 + 3.0 * cylinder_ry(w0)),
         Geo::Cylinder => (w0, h0 + 2.0 * cylinder_ry(w0)),
+        Geo::Expanded => expanded::size(shape, tw, th),
         Geo::Circle | Geo::Crossed => (circle, circle),
         Geo::Double => (circle + 10.0, circle + 10.0),
         Geo::Dot => (14.0, 14.0),
@@ -172,12 +181,19 @@ pub(super) fn text_box(shape: Shape, b: BoxF) -> BoxF {
     match geo(shape) {
         Geo::Cylinder => {
             let ry = cylinder_ry(b.w);
+            // A lined cylinder's label sits below its second rim.
+            let k = if shape == Shape::LinedCylinder {
+                3.0
+            } else {
+                2.0
+            };
             BoxF {
-                y: b.y + 2.0 * ry,
-                h: b.h - 3.0 * ry,
+                y: b.y + k * ry,
+                h: b.h - (k + 1.0) * ry,
                 ..b
             }
         }
+        Geo::Expanded => expanded::text_box(shape, b),
         Geo::Triangle => BoxF {
             y: b.y + b.h / 2.0,
             h: b.h / 2.0,
@@ -300,6 +316,12 @@ pub(super) struct Outline {
     pub solid: bool,
     /// The body is unfilled and thinly stroked: an agentflow collapsed flow (MAGF-2).
     pub hollow: bool,
+    /// The body is filled but not stroked: a datastore, whose lines draw its top and bottom.
+    pub bare: bool,
+    /// The body is neither filled nor stroked, only hit: the box behind a brace's strokes.
+    pub ghost: bool,
+    /// Extra shapes filled and stroked like the body, drawn over it: a person's head.
+    pub parts: Vec<Vec<Segment>>,
     /// Extra strokes drawn over the body.
     pub lines: Vec<Vec<Segment>>,
     /// Extra shapes filled with the stroke color.
@@ -390,6 +412,12 @@ pub(super) fn outline(shape: Shape, b: BoxF) -> Outline {
                 Segment::Move(Pt::new(x, y + e)),
                 arc(rx, e, false, r, y + e),
             ]);
+            if shape == Shape::LinedCylinder {
+                out.lines.push(vec![
+                    Segment::Move(Pt::new(x, y + 2.0 * e)),
+                    arc(rx, e, false, r, y + 2.0 * e),
+                ]);
+            }
             vec![
                 Segment::Move(Pt::new(x, y + e)),
                 arc(rx, e, true, r, y + e),
@@ -493,8 +521,11 @@ pub(super) fn outline(shape: Shape, b: BoxF) -> Outline {
             }
             rounded(b, 8.0)
         }
+        Geo::Expanded => expanded::outline(shape, b, &mut out),
     };
-    out.boundary = if geo(shape) == Geo::Actor {
+    out.boundary = if !out.boundary.is_empty() {
+        std::mem::take(&mut out.boundary)
+    } else if geo(shape) == Geo::Actor {
         // Edges meet the figure, not the label below it.
         let o = figure_origin(b);
         let (l, t) = (o.x - FIGURE_W / 2.0, b.y + ACTOR_PAD);

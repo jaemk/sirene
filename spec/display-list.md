@@ -53,10 +53,10 @@ takes the light or dark theme's text color, whichever contrasts more.
 
 ## DISPLA-7 Shapes
 
-Each node shape is sized around its label and drawn with a distinct outline for the classic
-shapes, circles, ellipse, triangles, fork, notched and sloped rectangles; the remaining mermaid
-shapes draw as rectangles. Small, filled, and framed circles and forks show no label. Edge ends
-are clipped to the outline of the shape they touch, so arrow tips meet the visible border.
+Each node shape is sized around its label and drawn with its own outline, following Mermaid
+12.3's shape geometry. Small, filled, and framed circles, forks, hourglasses, and bolts show no
+label. Edge ends are clipped to the outline of the shape they touch, so arrow tips meet the
+visible border; braces and hourglasses clip to their box.
 
 ## DISPLA-8 Drawing order and edges
 

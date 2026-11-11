@@ -98,10 +98,22 @@ fn edges_end_on_every_outline() {
             c.nodes[1].shape = shape;
             let s = flowchart(&c, &Approx, &Theme::LIGHT);
             let node = owned(&s, Owner::Node(1));
-            let Some(Primitive::Path { segments, .. }) = node.first() else {
-                panic!("{shape:?} draws nothing")
-            };
-            let outline = shapes::flatten(segments);
+            // Every stroke counts: a person's head is drawn apart from its body.
+            let outlines: Vec<Vec<Pt>> = node
+                .iter()
+                .filter_map(|p| match p {
+                    Primitive::Path { segments, .. } => Some(shapes::flatten(segments)),
+                    _ => None,
+                })
+                .filter(|o| !o.is_empty())
+                .collect();
+            assert!(!outlines.is_empty(), "{shape:?} draws nothing");
+            // An hourglass clips edges to its box: a tip only has to land on one of its sides.
+            let boxed = shape == Shape::Hourglass;
+            let (x0, y0, x1, y1) = outlines.iter().flatten().fold(
+                (f32::MAX, f32::MAX, f32::MIN, f32::MIN),
+                |(a, b, c, d), p| (a.min(p.x), b.min(p.y), c.max(p.x), d.max(p.y)),
+            );
             for e in 0..3 {
                 let Primitive::Path { segments, .. } = owned(&s, Owner::Edge(e))[0] else {
                     panic!("no arrowhead")
@@ -109,7 +121,19 @@ fn edges_end_on_every_outline() {
                 let Segment::Move(tip) = segments[0] else {
                     panic!("arrowhead starts with a move")
                 };
-                let d = distance_to_outline(tip, &outline);
+                let d = if boxed {
+                    let horizontal = matches!(dir, "LR" | "RL");
+                    if horizontal {
+                        (tip.x - x0).abs().min((tip.x - x1).abs())
+                    } else {
+                        (tip.y - y0).abs().min((tip.y - y1).abs())
+                    }
+                } else {
+                    outlines
+                        .iter()
+                        .map(|o| distance_to_outline(tip, o))
+                        .fold(f32::INFINITY, f32::min)
+                };
                 assert!(d < 1.0, "{dir} {shape:?} edge {e}: tip {tip:?} is {d} off");
             }
         }
