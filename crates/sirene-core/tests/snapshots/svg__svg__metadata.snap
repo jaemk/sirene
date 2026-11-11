@@ -2,26 +2,27 @@
 source: crates/sirene-core/tests/svg.rs
 expression: "flowchart TD\n    A@{ shape: manual-file, label: \"File {Handling}\" }\n    B@{ shape: docs } --> C@{ shape: hex, label: \"x\" } & D\n    A e1@==> B\n    e1@{ animate: true }\n    one@{ view: collapsed }\n    E:::cls@{ shape: rounded }\n    F@{\n      shape: doc\n      label: \"multi line\"\n    }\n"
 ---
-<svg xmlns="http://www.w3.org/2000/svg" width="592" height="260" viewBox="0 0 592 260" font-family="trebuchet ms, verdana, arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="592" height="297" viewBox="0 0 592 297" font-family="trebuchet ms, verdana, arial, sans-serif">
 <rect width="100%" height="100%" fill="#ffffff"/>
-<path d="M117 208 L112.5 199 L121.5 199 Z" fill="#333333"/>
-<path d="M150 165 L150 168 A8 8 0 0 1 142 176 L125 176 A8 8 0 0 0 117 184 L117 200" fill="none" stroke="#333333" stroke-width="1.5"/>
-<path d="M190 208 L185.5 199 L194.5 199 Z" fill="#333333"/>
-<path d="M157 165 L157 168 A8 8 0 0 0 165 176 L182 176 A8 8 0 0 1 190 184 L190 200" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M117 245 L112.5 236 L121.5 236 Z" fill="#333333"/>
+<path d="M145 198.59 L145 205 A8 8 0 0 1 137 213 L125 213 A8 8 0 0 0 117 221 L117 237" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M190 245 L185.5 236 L194.5 236 Z" fill="#333333"/>
+<path d="M162 181.12 L162 205 A8 8 0 0 0 170 213 L182 213 A8 8 0 0 1 190 221 L190 237" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M154 129 L147.25 115.5 L160.75 115.5 Z" fill="#333333"/>
 <path d="M154 88 L154 116.5" fill="none" stroke="#333333" stroke-width="3.5"/>
 <path d="M16 16 L292 16 L154 88 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
 <text x="154" y="34" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">File {Handling}</text>
-<path d="M137 129 L170 129 L170 165 L137 165 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="153.5" y="147" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">B</text>
-<path d="M100 208 L133 208 L142 226 L133 244 L100 244 L91 226 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="116.5" y="226" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">x</text>
-<path d="M173 208 L206 208 L206 244 L173 244 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="189.5" y="226" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">D</text>
+<path d="M127 149 L127 196.42 L127.66 196.98 L128.32 197.54 L128.98 198.08 L129.64 198.6 L130.3 199.11 L130.96 199.59 L131.62 200.03 L132.28 200.44 L132.94 200.81 L133.6 201.13 L134.26 201.41 L134.92 201.63 L135.58 201.81 L136.24 201.93 L136.9 201.99 L137.56 202 L138.22 201.95 L138.88 201.84 L139.54 201.68 L140.2 201.47 L140.86 201.21 L141.52 200.89 L142.18 200.54 L142.84 200.14 L143.5 199.7 L144.16 199.23 L144.82 198.73 L145.48 198.21 L146.14 197.67 L146.8 197.12 L147.46 196.56 L148.12 196 L148.78 195.44 L149.44 194.9 L150.1 194.37 L150.76 193.86 L151.42 193.37 L152.08 192.92 L152.74 192.5 L153.4 192.12 L154.06 191.79 L154.72 191.5 L155.38 191.26 L156.04 191.07 L156.7 190.94 L157.36 190.86 L158.02 190.84 L158.68 190.88 L159.34 190.97 L160 191.12 L160 181.12 L170 181.12 L170 171.12 L180 171.12 L180 129 L147 129 L147 139 L137 139 L137 149 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<path d="M137 149 L160 149 L160 181.12 L170 181.12 L170 139 L137 139 Z" fill="none" stroke="#9370db" stroke-width="1"/>
+<text x="143.5" y="172.71" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">B</text>
+<path d="M100 245 L133 245 L142 263 L133 281 L100 281 L91 263 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="116.5" y="263" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">x</text>
+<path d="M173 245 L206 245 L206 281 L173 281 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="189.5" y="263" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">D</text>
 <path d="M323 34 L373 34 L373 70 L323 70 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
 <text x="348" y="52" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">one</text>
 <path d="M410 34 L431 34 A6 6 0 0 1 437 40 L437 64 A6 6 0 0 1 431 70 L410 70 A6 6 0 0 1 404 64 L404 40 A6 6 0 0 1 410 34 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
 <text x="420.5" y="52" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">E</text>
-<path d="M468 34 L576 34 L576 70 L468 70 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="522" y="52" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">multi line</text>
+<path d="M468 67.44 L468 67.44 L470.16 67.9 L472.32 68.35 L474.48 68.8 L476.64 69.23 L478.8 69.64 L480.96 70.03 L483.12 70.39 L485.28 70.73 L487.44 71.03 L489.6 71.29 L491.76 71.52 L493.92 71.7 L496.08 71.84 L498.24 71.94 L500.4 71.99 L502.56 72 L504.72 71.96 L506.88 71.87 L509.04 71.74 L511.2 71.57 L513.36 71.35 L515.52 71.1 L517.68 70.8 L519.84 70.48 L522 70.12 L524.16 69.74 L526.32 69.33 L528.48 68.91 L530.64 68.47 L532.8 68.02 L534.96 67.56 L537.12 67.1 L539.28 66.65 L541.44 66.2 L543.6 65.77 L545.76 65.35 L547.92 64.96 L550.08 64.58 L552.24 64.24 L554.4 63.93 L556.56 63.66 L558.72 63.43 L560.88 63.23 L563.04 63.08 L565.2 62.97 L567.36 62.91 L569.52 62.89 L571.68 62.92 L573.84 62.99 L576 63.11 L576 31 L468 31 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="522" y="49.22" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">multi line</text>
 </svg>

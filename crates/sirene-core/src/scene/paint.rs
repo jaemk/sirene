@@ -738,9 +738,16 @@ impl Painter<'_> {
                 self.path(owner, o.body, s.fill, Some(line));
             } else if o.solid {
                 self.path(owner, o.body, Some(s.fill.unwrap_or(theme.edge)), None);
+            } else if o.ghost {
+                self.path(owner, o.body, None, None);
+            } else if o.bare {
+                self.path(owner, o.body, Some(s.fill.unwrap_or(fill)), None);
             } else {
                 self.path(owner, o.body, Some(s.fill.unwrap_or(fill)), Some(line));
             }
+        }
+        for p in o.parts {
+            self.path(owner, p, Some(s.fill.unwrap_or(fill)), Some(line));
         }
         for l in o.lines {
             self.path(owner, l, None, Some(line));

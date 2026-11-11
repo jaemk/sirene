@@ -5,6 +5,7 @@ mod block;
 mod c4;
 mod cynefin;
 mod eventmodel;
+mod expanded;
 mod gantt;
 mod git;
 mod hit;
