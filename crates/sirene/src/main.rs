@@ -6,7 +6,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use clap::{Parser, Subcommand, ValueEnum};
 use sirene_core::ascii::{Charset, Options};
-use sirene_core::diagram::{self, Lowered};
+use sirene_core::diagram::{self, Lang, Lowered};
 use sirene_core::scene::png::{self, FontMetrics};
 use sirene_core::scene::{self, Approx, Theme};
 
@@ -24,6 +24,31 @@ struct Cli {
     /// Print what each step does, with timings, to stderr.
     #[arg(short, long, global = true)]
     verbose: bool,
+    /// Read every diagram as this language, instead of by its file extension, its Markdown
+    /// block's name, or its first line.
+    #[arg(long, global = true, value_enum)]
+    lang: Option<LangArg>,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum LangArg {
+    Mermaid,
+    /// Graphviz DOT.
+    Dot,
+}
+
+/// The language `--lang` forces, set once at startup (DOT-5).
+static FORCED_LANG: std::sync::OnceLock<Option<Lang>> = std::sync::OnceLock::new();
+
+/// The language to read a diagram as: `--lang`, else `named` (by the file's extension or the
+/// Markdown block's info string), else detected from the source.
+fn lang(named: Option<Lang>) -> Option<Lang> {
+    FORCED_LANG.get().copied().flatten().or(named)
+}
+
+/// Parses and lowers the diagram read from `path` (stdin for `None`) in its language.
+fn lower_file(path: Option<&Path>, src: &str) -> Lowered {
+    diagram::lower_as(src, lang(path.and_then(Lang::of_path)))
 }
 
 /// Writes log records to stderr as `[elapsed] target: message` (`--verbose`).
@@ -189,6 +214,10 @@ impl ThemeArg {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     verbose(cli.verbose);
+    let _ = FORCED_LANG.set(cli.lang.map(|l| match l {
+        LangArg::Mermaid => Lang::Mermaid,
+        LangArg::Dot => Lang::Dot,
+    }));
     log::debug!(
         "sirene {} ({}, {}): {:?}",
         env!("CARGO_PKG_VERSION"),
@@ -648,7 +677,7 @@ fn render_one(
     };
     log::debug!("read {name}: {} bytes", src.len());
     let start = Instant::now();
-    let lowered = diagram::lower(&src);
+    let lowered = lower_file(file.filter(|f| f.as_os_str() != "-"), &src);
     log::debug!("parsed and lowered in {:.1?}", start.elapsed());
     let errors = markdown::report(&name, &src, &lowered, |l, c| (l, c));
     let start = Instant::now();

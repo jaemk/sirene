@@ -1,10 +1,14 @@
-//! Mermaid code blocks in Markdown (MARKDO-1).
+//! Diagram code blocks in Markdown (MARKDO-1).
 
-/// A fenced code block whose info string starts with `mermaid`.
+use crate::diagram::Lang;
+
+/// A fenced code block whose info string starts with `mermaid`, `dot`, or `graphviz`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     /// The block's text, with the fence's indentation taken off each line.
     pub code: String,
+    /// The language the info string names (DOT-5).
+    pub lang: Lang,
     /// The line of the block's first code line, from 1.
     pub line: usize,
     /// The columns of indentation taken off each line.
@@ -55,9 +59,9 @@ impl Block {
     }
 }
 
-/// An opening fence on `line`: its indent, character, and length, and whether the info
-/// string's first word names a diagram language: `mermaid`, or `dot` or `graphviz` (LANGS-1).
-fn opening(line: &str) -> Option<(usize, char, usize, bool)> {
+/// An opening fence on `line`: its indent, character, and length, and the diagram language
+/// the info string's first word names, if any: `mermaid`, or `dot` or `graphviz` (LANGS-1).
+fn opening(line: &str) -> Option<(usize, char, usize, Option<Lang>)> {
     let indent = line.len() - line.trim_start_matches(' ').len();
     if indent > 3 {
         return None;
@@ -74,12 +78,7 @@ fn opening(line: &str) -> Option<(usize, char, usize, bool)> {
         return None;
     }
     let word = info.split_whitespace().next().unwrap_or("");
-    Some((
-        indent,
-        c,
-        len,
-        matches!(word, "mermaid" | "dot" | "graphviz"),
-    ))
+    Some((indent, c, len, Lang::of_info(word)))
 }
 
 /// Whether `line` closes a fence of `c` at least `len` long.
@@ -106,7 +105,7 @@ pub fn mermaid_blocks(src: &str) -> Vec<Block> {
     }
     let mut i = 0;
     while i < lines.len() {
-        let Some((indent, c, len, mermaid)) = opening(lines[i].1) else {
+        let Some((indent, c, len, lang)) = opening(lines[i].1) else {
             i += 1;
             continue;
         };
@@ -120,11 +119,12 @@ pub fn mermaid_blocks(src: &str) -> Vec<Block> {
             j += 1;
         }
         let end = lines.get(j + 1).map_or(src.len(), |(at, _)| *at);
-        if mermaid {
+        if let Some(lang) = lang {
             let start = lines.get(i + 1).map_or(src.len(), |(at, _)| *at);
             let stop = lines.get(j).map_or(src.len(), |(at, _)| *at);
             blocks.push(Block {
                 code,
+                lang,
                 line: i + 2,
                 indent,
                 end,
@@ -225,11 +225,17 @@ mod tests {
 
     #[test]
     fn fences() {
-        assert_eq!(opening("```mermaid"), Some((0, '`', 3, true)));
-        assert_eq!(opening("```dot"), Some((0, '`', 3, true)));
-        assert_eq!(opening("~~~ graphviz {.x}"), Some((0, '~', 3, true)));
-        assert_eq!(opening("```dotnet"), Some((0, '`', 3, false)));
-        assert_eq!(opening("   ~~~ js"), Some((3, '~', 3, false)));
+        assert_eq!(
+            opening("```mermaid"),
+            Some((0, '`', 3, Some(Lang::Mermaid)))
+        );
+        assert_eq!(opening("```dot"), Some((0, '`', 3, Some(Lang::Dot))));
+        assert_eq!(
+            opening("~~~ graphviz {.x}"),
+            Some((0, '~', 3, Some(Lang::Dot)))
+        );
+        assert_eq!(opening("```dotnet"), Some((0, '`', 3, None)));
+        assert_eq!(opening("   ~~~ js"), Some((3, '~', 3, None)));
         assert_eq!(opening("    ```mermaid"), None);
         assert_eq!(opening("``mermaid"), None);
         assert_eq!(opening("``` a`b"), None);
