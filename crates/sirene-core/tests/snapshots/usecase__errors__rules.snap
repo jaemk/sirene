@@ -1,0 +1,28 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nactor A\nactor I@{ icon: \"fa:user\", type: hollow }\nactor W@{ type: awesome, business: true }\nR[Rect]@{ business: true }\nA ..> : include B\nA --|> B\njson J@{ \"a\": 1 }\nJ --o A\n"
+---
+3:7: warning: actor `I` cannot combine `icon` with `type: hollow`
+4:7: warning: business actor `W` must have `type: normal` or `type: hollow`
+5:1: warning: rectangular use case `R` cannot be a business use case
+6:3: warning: an include relationship joins two use cases
+7:3: warning: a generalization joins two actors or two use cases
+9:3: warning: a relationship with a JSON table takes only `-->`, `<--`, or `--`
+
+ ┌───┐
+ │ I │
+ └───┘
+
+ ┌───┐
+ │ W │
+ └───┘
+
+┌──────┐
+│ Rect │
+└──────┘
+
+┌─────┐     ┌───┐ ┌┄«include»┄┐ ╭───╮
+│  J  │     │ A ├┄┘           └►( B )
+├─────┼────o│   ├──────────────▷(   )
+│ a 1 │     └───┘               ╰───╯
+└─────┘

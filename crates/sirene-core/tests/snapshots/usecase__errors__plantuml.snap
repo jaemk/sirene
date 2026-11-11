@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nskinparam monochrome true\nactor A\n"
+---
+2:1: error: `skinparam` is PlantUML syntax that Mermaid use case diagrams do not support
+
+┌───┐
+│ A │
+└───┘

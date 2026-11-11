@@ -12,7 +12,8 @@ fonts. Their copyright notices and licenses follow.
 * d3-array (crates/sirene-core/src/xychart/mod.rs, gantt/time.rs: ticks, tickStep): ISC
 * d3-time, d3-time-format, d3-scale (crates/sirene-core/src/gantt/time.rs): ISC
 * Day.js (crates/sirene-core/src/gantt/time.rs: date formats): MIT
-* Mermaid (diagram syntax, layout rules, theme colors, and sizes throughout): MIT
+* Mermaid (diagram syntax, layout rules, theme colors, and sizes throughout; use case actor
+  figures in crates/sirene-core/src/scene/shapes.rs): MIT
 * Noto Sans (crates/sirene-core/fonts/, embedded in PNG output): SIL Open Font License 1.1
 
 ------------------------------------------------------------------------------

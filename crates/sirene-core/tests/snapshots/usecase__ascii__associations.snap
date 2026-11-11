@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\n%% Every solid association operator.\nactor User\nactor Support\nStart\nFinish\nUser --> Start\nStart <-- Support\nStart -- Finish\nUser --o Start\nStart o-- Support\nUser --x Finish\nFinish x-- Support\n"
+---
+                       +-------------------+
+             .-------. |                   | +---------+
++------+ +-->(       )<+     .--------.    +-+         |
+|      +-+   ( Start +-------+ Finish ) +----+ Support |
+| User +----o(       )o+  +-x(        )x+  +-+         |
+|      +-+   '-------' |  |  '--------'    | +---------+
++------+ |             +--++               |
+         +----------------++---------------+

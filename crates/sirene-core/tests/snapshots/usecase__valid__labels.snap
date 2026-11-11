@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nactor Reviewer(\"`*Reviewer*`\")\nLiteral(\"**Literal markers**\")\nFormatted(\"`**Formatted label**\nwith a physical line break`\")\nQuoted(\"Show #quot;quoted#quot; text\")\nPriced[Costs 19.95 EUR - VAT included!]\nReviewer -- \"`opens **form**`\" --> Formatted\nReviewer --> Literal\nReviewer --> Quoted\nReviewer -- files R&D report --> Priced\n"
+---
+
+                                     ╭────────────────────────────╮
+                                     (      Formatted label       )
+                                 ┌──►( with a physical line break )
+                                 │   ╰────────────────────────────╯
+                                 │
+             ┌─────opens form────┘       ╭─────────────────────╮
+┌──────────┐ │                   ┌──────►( **Literal markers** )
+│          ├─┘┌──────────────────┘       ╰─────────────────────╯
+│ Reviewer ├──┘
+│          ├──┐
+│          ├─┐└──────────────────┐       ╭────────────────────╮
+└──────────┘ │                   └──────►( Show "quoted" text )
+             └──files R&D report─┐       ╰────────────────────╯
+                                 │
+                                 │ ┌─────────────────────────────────┐
+                                 └►│ Costs 19.95 EUR - VAT included! │
+                                   └─────────────────────────────────┘

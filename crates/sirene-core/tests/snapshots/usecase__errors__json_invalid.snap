@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\njson J@{ 'a': 1 }\n"
+---
+2:8: warning: invalid JSON at byte 2: expected a quoted key
+
+┌───┐
+│ J │
+└───┘

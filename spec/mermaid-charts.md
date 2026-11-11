@@ -9,6 +9,7 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | Type | Model | Notes |
 |---|---|---|
 | `requirementDiagram` | graph | Requirements and elements as compartment boxes, labeled relationships: `mermaid-requirement-diagrams.md`. |
+| `usecase-beta` | graph | Actors, use cases, system boundaries, notes, and JSON tables: `mermaid-use-case-diagrams.md`. |
 | `C4Context` (and the other C4 types) | graph | People, systems, containers, and components in nested boundaries, placed in rows: `mermaid-c4-diagrams.md`. |
 | `architecture-beta` | graph | Services with icons in groups, placed on a grid by their edge sides: `mermaid-architecture-diagrams.md`. |
 | `block-beta` | graph | Blocks in a grid of columns, drawn with the flowchart shapes: `mermaid-block-diagrams.md`. |
@@ -31,7 +32,7 @@ specs. Each needs its own model and scene builder (LANGS-2); some fit the graph 
 | `treeView-beta` | tree | Files and directories nested by indentation or box-drawing characters; ASCII prints the tree as `tree` does: `mermaid-tree-views.md`. |
 | `kanban` | board | Columns of cards, with the mindmap grammar; ASCII is a box per column: `mermaid-kanban-boards.md`. |
 
-Mermaid 12 also adds `usecase-beta`,
+Mermaid 12 also adds
 `railroad-beta` (and its `-ebnf`, `-abnf`, and `-peg` forms), `swimlane-beta`, `eventmodeling`,
 `cynefin-beta`, and `agentflow-beta`. Until each is built it is FLOWCH-16's "not supported"
 error.

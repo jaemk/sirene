@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nactor A@{ color: red }\nB@{ type: hollow }\nA --> B\n"
+---
+2:8: warning: ignoring metadata `color: red`, which is not valid for actor `A`
+3:2: warning: ignoring metadata `type: hollow`, which is not valid for use case `B`
+
+┌───┐    ╭───╮
+│ A ├───►( B )
+└───┘    ╰───╯

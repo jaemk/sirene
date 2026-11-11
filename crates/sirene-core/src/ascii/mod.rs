@@ -320,7 +320,9 @@ fn frame(shape: Shape) -> Frame {
         Shape::SmallCircle | Shape::FilledCircle => Frame::Glyph(glyph('●', '*')),
         Shape::FramedCircle => Frame::Glyph(glyph('◉', '@')),
         Shape::Fork => Frame::Bar,
-        Shape::Stadium | Shape::Circle | Shape::CrossedCircle | Shape::Ellipse => Frame::Round,
+        Shape::Stadium | Shape::Circle | Shape::CrossedCircle | Shape::Ellipse | Shape::UseCase => {
+            Frame::Round
+        }
         Shape::DoubleCircle => Frame::Double,
         Shape::Diamond => Frame::Diamond,
         Shape::Hexagon => Frame::Hexagon,

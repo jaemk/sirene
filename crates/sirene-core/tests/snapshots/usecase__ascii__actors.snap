@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nactor Normal(\"Normal actor\")\nactor Hollow(\"Hollow actor\")@{ type: hollow }\nactor Awesome(\"Awesome actor\")@{ type: awesome }\nactor Icon(\"Registered icon\")@{ icon: \"fa:user\" }\nNormal --> Manage\nHollow --> Manage\nAwesome --> Manage\nIcon --> Manage\n"
+---
+ +--------------+
+ | Normal actor +---+
+ +--------------+   |
+                    +---+
+ +--------------+       |
+ | Hollow actor +---+   | .--------.
+ +--------------+   +--++>(        )
+                       +->( Manage )
+ +---------------+  +---->(        )
+ | Awesome actor +--+  +->(        )
+ +---------------+     |  '--------'
+                    +--+
++-----------------+ |
+| Registered icon +-+
++-----------------+

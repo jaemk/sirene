@@ -2,12 +2,21 @@
 
 macro_rules! shapes {
     ($($variant:ident => $name:literal $([$($alias:literal),*])?,)*) => {
-        /// A node shape. Every variant except `Ellipse` has a mermaid `@{ shape }` name.
+        /// A node shape. Every variant except `Ellipse` and the use case shapes has a mermaid
+        /// `@{ shape }` name.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum Shape {
             $($variant,)*
             /// The classic `(- -)` shape, which has no `@{ shape }` name.
             Ellipse,
+            /// A use case diagram's stick figure actor, its label below.
+            Actor,
+            /// A use case diagram's outlined actor.
+            HollowActor,
+            /// A use case diagram's filled silhouette actor.
+            AwesomeActor,
+            /// A use case diagram's ellipse, roomier than `Ellipse`.
+            UseCase,
         }
 
         const NAMES: &[(&str, Shape)] = &[
@@ -15,15 +24,26 @@ macro_rules! shapes {
         ];
 
         impl Shape {
-            /// Every shape, in mermaid's documentation order, then `Ellipse`.
+            /// Every shape a flowchart can name, in mermaid's documentation order, then
+            /// `Ellipse`. The use case shapes are not among them.
             pub const ALL: &[Shape] = &[$(Shape::$variant,)* Shape::Ellipse];
 
-            /// The mermaid short name, e.g. `fr-rect`. `Ellipse` is `ellipse`.
+            /// The mermaid short name, e.g. `fr-rect`. `Ellipse` is `ellipse`, and the use case
+            /// shapes have mermaid's internal names, such as `usecaseActor`.
             pub fn name(self) -> &'static str {
                 match self {
                     $(Shape::$variant => $name,)*
                     Shape::Ellipse => "ellipse",
+                    Shape::Actor => "usecaseActor",
+                    Shape::HollowActor => "usecaseActorHollow",
+                    Shape::AwesomeActor => "usecaseActorAwesome",
+                    Shape::UseCase => "usecaseEllipse",
                 }
+            }
+
+            /// Whether the shape is one of a use case diagram's actors.
+            pub fn is_actor(self) -> bool {
+                matches!(self, Shape::Actor | Shape::HollowActor | Shape::AwesomeActor)
             }
         }
     };

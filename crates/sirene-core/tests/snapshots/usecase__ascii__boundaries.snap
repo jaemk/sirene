@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\ndirection LR\nactor Customer\nactor Support\nsystemBoundary Storefront\n  Browse(\"Browse catalogue\")\n  Checkout(\"Checkout\")\nend\nsystemBoundary Fulfilment\n  Track(\"Track delivery\")\nend\nCustomer --> Browse\nCustomer --> Checkout\nCustomer --> Track\nSupport --> Track\nCheckout ..> : include Browse\n"
+---
+                  +- Storefront --------------------------------------+
+                  |                             .------------------.  |
+                +-+---------------------------->( Browse catalogue )  |
++----------+ +--+ |                           +>(                  )  |
+|          +-+    |  .----------. +.«include».+ '------------------'  |
+| Customer +------+->( Checkout +.+                                   |
+|          +-+    |  '----------'                                     |
++----------+ |    +---------------------------------------------------+
+             |
+             +--+               +- Fulfilment ---------+
+                |               |  .----------------.  |
+                +---------------+->( Track delivery )  |
++---------+     +---------------+->(                )  |
+| Support +-----+               |  '----------------'  |
++---------+                     +----------------------+

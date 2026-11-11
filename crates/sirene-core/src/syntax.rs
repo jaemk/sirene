@@ -142,6 +142,9 @@ syntax_kinds! {
     TREE_BRANCH,
     TREE_ICON,
     TREE_DESC,
+    // Use case diagrams: `actor`, `systemBoundary`, or `json`, and a JSON table's object.
+    USECASE_KW,
+    JSON_BODY,
     ERROR_TOKEN,
 
     // Nodes.
@@ -227,6 +230,9 @@ syntax_kinds! {
     STAGE,
     COORDS,
     DECORATOR,
+    // Use case diagrams: `id@{ ... }` on its own line, and a `json` table.
+    META_STMT,
+    JSON_STMT,
     ERROR,
 }
 

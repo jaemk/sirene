@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\ndirection LR\nactor Customer(\"Customer\")\nsystemBoundary \"Order system\"\n  Checkout(\"Place order\")\nend\nCustomer --> Checkout\n"
+---
+                +- Order system ----+
++----------+    |  .-------------.  |
+| Customer +----+->( Place order )  |
++----------+    |  '-------------'  |
+                +-------------------+

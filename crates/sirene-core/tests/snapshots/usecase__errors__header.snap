@@ -1,0 +1,5 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase\nactor A\n"
+---
+1:1: error: expected `usecase-beta` header

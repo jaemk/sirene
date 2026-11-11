@@ -97,7 +97,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   by indentation or box-drawing characters, `:::highlight`, `## descriptions`, the built-in
   `file` and `folder` icons, and the `treeView` frontmatter config; in text, the tree as `tree`
   prints it.
-- Mermaid 12's other new types (`usecase-beta`, and the rest) are
+- Mermaid use case diagrams (`usecase-beta`), read-only in the editor: actors (stick, hollow,
+  and awesome figures), ellipse and rectangle use cases, business marks, stereotypes, system
+  boundaries (`rect` and `package`), associations with every marker, `include`, `extend`,
+  generalization, edge ids and animation, notes, JSON tables, classes, and styles.
+- Mermaid 12's other new types (`railroad-beta` and the rest) are
   reported as not supported instead of read as flowcharts.
 - Labels decode HTML entities such as `&nbsp;` as well as Mermaid's `#nbsp;`.
 - `THIRD-PARTY-NOTICES` with the licenses of the code sirene ports (venn.js, fmin, d3-sankey,

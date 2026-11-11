@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/usecase.rs
+expression: "usecase-beta\nactor Customer:::external\nCheckout(\"Checkout\"):::critical\nsystemBoundary Account\n  Profile[Edit profile]\nend\njson Session@{ \"active\": true }:::data\nCustomer --> Checkout\nCheckout --> Profile\nProfile --> Session\nclassDef default stroke:#7f8ea3\nclassDef external,critical stroke-width:3px\nclass Customer,Checkout external,critical\nclass Account,Session data\nstyle Checkout stroke:#c33,stroke-width:4px\nstyle Account stroke:#536878\n"
+---
+
+                                ┌─ Account ──────────┐    ┌─────────────┐
+┌──────────┐    ╭──────────╮    │  ┌──────────────┐  │    │   Session   │
+│ Customer ├───►( Checkout ├────┼─►│ Edit profile ├──┼───►├─────────────┤
+└──────────┘    ╰──────────╯    │  └──────────────┘  │    │ active true │
+                                └────────────────────┘    └─────────────┘

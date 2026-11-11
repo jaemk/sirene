@@ -198,6 +198,12 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for requirement diagrams yet")
     );
     assert_eq!(req.chart.edges.len(), 1);
+    let uc = Document::from_source(None, "usecase-beta\n  actor A\n  A --> B\n".to_owned());
+    assert_eq!(
+        uc.read_only(),
+        Some("drawing edits are not supported for use case diagrams yet")
+    );
+    assert_eq!(uc.chart.edges.len(), 1);
     // A git graph is not a graph: it draws from `other`, with nothing to select or edit.
     let git = Document::from_source(None, "gitGraph\n  commit\n  commit\n".to_owned());
     assert_eq!(
