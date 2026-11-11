@@ -41,12 +41,13 @@ Layered layout (LAYOUT), top to bottom unless `direction` says otherwise. A tran
 composite state's border (`Composite --> s`) connects to the cluster, as flowchart edges to
 subgraphs do. In ASCII the start state is `●` (`*`), the end state `◉` (`@`), a choice `◇` (`?`),
 and a bar is a row of `━` (`=`), or a column of `┃` (`|`) across a horizontal flow. A note is a box
-with a `╮` corner joined by `┄`. Tests: `fork_bars_turn_with_the_direction`, `snapshots`,
+with a `╮` corner joined by `┄`; a note on a composite state sits beside the cluster. Tests:
+`fork_bars_turn_with_the_direction`, `notes_on_composite_states`, `snapshots`,
 `ascii_charset_snapshots`.
 
 ## MSTATE-4 Unsupported
 
-`click`, floating notes, notes on composite states, other stereotypes (such as `<<history>>`,
+`click`, floating notes (which Mermaid 12.3 parses and does not draw), other stereotypes (such as `<<history>>`,
 drawn as a plain state), `--` outside a composite state, and transitions between states in two
 regions of one composite state are warnings on their span (LANGS-6). Tests:
 `unsupported_is_a_warning`.

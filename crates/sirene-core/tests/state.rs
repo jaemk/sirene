@@ -239,6 +239,33 @@ fn notes() {
     );
 }
 
+/// A note on a composite state sits beside its box (MSTATE-3).
+#[test]
+fn notes_on_composite_states() {
+    let src = "stateDiagram-v2\n  state C {\n    x --> y\n  }\n  [*] --> C\n";
+    let with = format!("{src}  note right of C : beside\n");
+    let c = chart(&with);
+    assert!(c.nodes.iter().all(|n| n.id != "C"), "C stays a composite");
+    assert_eq!(c.notes.len(), 1);
+    assert_eq!(c.notes[0].target, "C");
+    let width = |c: &Flowchart| {
+        let s = scene::flowchart(c, &Approx, &Theme::LIGHT);
+        let (lo, hi) = s.bounds(scene::Owner::Cluster(0)).unwrap();
+        hi.x - lo.x
+    };
+    assert!(
+        width(&c) > width(&chart(src)) + 40.0,
+        "the note widens what C owns"
+    );
+    let text = ascii::render(
+        &c,
+        &Options {
+            charset: Charset::Unicode,
+        },
+    );
+    assert!(text.contains("beside"), "{text}");
+}
+
 /// A stand-in measure for layout graph sizes.
 struct CellsOf;
 
@@ -308,10 +335,6 @@ fn unsupported_is_a_warning() {
             "`<<history>>` states",
         ),
         ("stateDiagram-v2\n  --\n", "only inside a composite"),
-        (
-            "stateDiagram-v2\n  state C {\n    x\n  }\n  note left of C : n\n",
-            "notes on composite states",
-        ),
         (
             "stateDiagram-v2\n  class nowhere c\n",
             "unknown state `nowhere`",

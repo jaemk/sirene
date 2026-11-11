@@ -329,10 +329,22 @@ impl Lowerer {
             return;
         };
         let Some(target) = text_of(stmt, IDENT) else {
-            self.warning(
-                stmt.text_range(),
-                "notes not attached to a class are not supported; ignoring it",
-            );
+            // A note on its own is a node that no relation can name: `:` never appears in a
+            // class name.
+            let id = format!("note:{}", self.chart.nodes.len());
+            self.chart.nodes.push(Node {
+                id,
+                label: text::label(&body, false),
+                shape: Shape::Note,
+                sections: Vec::new(),
+                classes: Vec::new(),
+                styles: Vec::new(),
+                click: None,
+                tooltip: None,
+                metadata: Vec::new(),
+                mentions: vec![stmt.text_range()],
+            });
+            self.classes.push(Class::default());
             return;
         };
         self.class(&target, None);

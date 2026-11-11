@@ -42,12 +42,13 @@ work, and the source pane edits as usual. Drawing edits say why they are off.
 | `%%` comments, frontmatter `title`, `accTitle`, `accDescr` | as in flowcharts |
 
 A note left of a state sits above it in a left-to-right diagram, and one on the right sits below.
+A note on a composite state sits beside its box.
 
 ## Not drawn
 
 These are warnings on the line that has them, and the rest of the diagram is drawn:
 
 - `click`
-- floating notes (`note "text" as N`) and notes on composite states
+- floating notes (`note "text" as N`), which Mermaid parses but does not draw either
 - transitions between two concurrent regions of one composite state
 - other stereotypes, such as `<<history>>`, which draw as a plain state

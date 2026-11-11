@@ -17,12 +17,15 @@ pub trait Measure {
 }
 
 impl Flowchart {
-    /// Each note whose target is a node, with that node's index, in the order of the layout
-    /// graph's notes.
-    pub fn placed_notes(&self) -> impl Iterator<Item = (usize, &Note)> {
+    /// Each note whose target is a node or a subgraph, with that item, in the order of the
+    /// layout graph's notes.
+    pub fn placed_notes(&self) -> impl Iterator<Item = (Item, &Note)> {
         self.notes.iter().filter_map(|n| {
-            let i = self.nodes.iter().position(|node| node.id == n.target)?;
-            Some((i, n))
+            let item = match self.nodes.iter().position(|node| node.id == n.target) {
+                Some(i) => Item::Node(i),
+                None => Item::Cluster(self.subgraphs.iter().position(|s| s.id == n.target)?),
+            };
+            Some((item, n))
         })
     }
 
@@ -120,8 +123,8 @@ impl Flowchart {
                 .collect(),
             notes: self
                 .placed_notes()
-                .map(|(node, n)| NoteSpec {
-                    node,
+                .map(|(target, n)| NoteSpec {
+                    target,
                     size: measure.note(&n.label),
                     after: n.side == NoteSide::After,
                 })

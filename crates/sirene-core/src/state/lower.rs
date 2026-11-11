@@ -402,17 +402,11 @@ impl Lowerer {
         let Some(target) = text_of(stmt, IDENT) else {
             return;
         };
-        if self.composites.contains(&target) {
-            self.warning(
-                stmt.text_range(),
-                format!(
-                    "notes on composite states are not supported; ignoring the note on `{target}`"
-                ),
-            );
-            return;
+        // A note on a composite state sits beside its box.
+        if !self.composites.contains(&target) {
+            let label = Label::plain(target.clone());
+            self.node(&target, scope, Shape::Rounded, label);
         }
-        let label = Label::plain(target.clone());
-        self.node(&target, scope, Shape::Rounded, label);
         let body: Vec<String> = token(stmt, TEXT)
             .map(|t| {
                 t.text()
