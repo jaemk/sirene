@@ -57,7 +57,7 @@ fn apply(out: &mut Resolved, property: &str, value: &str) {
         }
         "stroke-width" => {
             if let Some(w) = parse_length(value) {
-                out.stroke_width = Some(w);
+                out.stroke_width = Some(w.min(MAX_STROKE_WIDTH));
             }
         }
         "stroke-dasharray" => {
@@ -80,6 +80,10 @@ fn apply(out: &mut Resolved, property: &str, value: &str) {
         _ => {}
     }
 }
+
+/// The widest stroke drawn; a wider `stroke-width` is drawn this wide, so a source cannot make
+/// a line and its markers larger than any drawing.
+const MAX_STROKE_WIDTH: f32 = 32.0;
 
 /// The shortest dash plus gap drawn as dashes; shorter patterns are solid.
 const MIN_DASH_PERIOD: f32 = 1.0;
@@ -280,6 +284,18 @@ mod tests {
                 ..Resolved::default()
             }
         );
+    }
+
+    #[test]
+    fn stroke_widths() {
+        let width = |v: &str| resolve(&[], &[], &[style("stroke-width", v)], &[]).stroke_width;
+        assert_eq!(width("0"), Some(0.0));
+        assert_eq!(width(" 2.5px "), Some(2.5));
+        assert_eq!(width("32"), Some(32.0));
+        assert_eq!(width("33px"), Some(MAX_STROKE_WIDTH));
+        assert_eq!(width("1e30"), Some(MAX_STROKE_WIDTH));
+        assert_eq!(width("inf"), None);
+        assert_eq!(width("nan"), None);
     }
 
     #[test]

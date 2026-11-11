@@ -156,6 +156,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `brew install --cask sirene` no longer fails with "calling `depends_on macos: :catalina` is
   disabled"; the cask drops its `depends_on macos` line.
+- The labels at an edge's ends (class and ER cardinalities, DOT `headlabel` and `taillabel`) no
+  longer run past the edge of an image: the drawing grows to hold them.
+- A `stroke-width` over 32px is drawn 32px wide; a wider line and its arrowheads ran off the
+  image.
+- A blank diagram title no longer prints an empty line in text output.
 
 ## [0.2.0] - 2026-11-08
 

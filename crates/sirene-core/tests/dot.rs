@@ -217,6 +217,176 @@ fn clusters() {
     assert_eq!(style(&c.subgraphs[0].styles, "stroke"), Some("#ff0000"));
 }
 
+/// DOT-2: a node is a member of the innermost cluster that mentions it, wherever it is
+/// mentioned first or last.
+#[test]
+fn cluster_membership() {
+    let c = chart(
+        "digraph {\n  x; y\n  subgraph cluster_a {\n    x; z\n    subgraph cluster_b { x; y }\n    y\n  }\n  subgraph cluster_c { z; w }\n  x -> y\n}\n",
+    );
+    let members: Vec<_> = c
+        .subgraphs
+        .iter()
+        .map(|s| (s.id.as_str(), s.members.join(" ")))
+        .collect();
+    assert_eq!(
+        members,
+        [
+            ("cluster_a", "z cluster_b".to_owned()),
+            ("cluster_b", "x y".to_owned()),
+            ("cluster_c", "w".to_owned()),
+        ]
+    );
+}
+
+/// DOT-2: Graphviz names nodes and subgraphs apart; a cluster named as a node is renamed.
+#[test]
+fn cluster_named_as_a_node() {
+    let c = chart("digraph { subgraph cluster_a { cluster_a -> cluster_a_ } }");
+    let ids: Vec<&str> = c.nodes.iter().map(|n| n.id.as_str()).collect();
+    assert_eq!(ids, ["cluster_a", "cluster_a_"]);
+    assert_eq!(c.subgraphs[0].id, "cluster_a__");
+    assert_eq!(c.subgraphs[0].members, ["cluster_a", "cluster_a_"]);
+}
+
+/// DOT-3: a cluster's `bgcolor` fills it; `style=filled` fills with `fillcolor`, then `color`,
+/// then `bgcolor`. A node has neither `bgcolor` nor `pencolor`.
+#[test]
+fn cluster_fills() {
+    let c = chart(
+        "digraph {\n  subgraph cluster_a { bgcolor=yellow; a }\n  subgraph cluster_b { style=filled; bgcolor=yellow; color=red; b }\n  subgraph cluster_c { style=filled; bgcolor=yellow; c }\n  subgraph cluster_d { style=filled; d }\n}\n",
+    );
+    let fills: Vec<_> = c
+        .subgraphs
+        .iter()
+        .map(|s| (style(&s.styles, "fill"), style(&s.styles, "stroke")))
+        .collect();
+    assert_eq!(
+        fills,
+        [
+            (Some("#ffff00"), None),
+            (Some("#ff0000"), Some("#ff0000")),
+            (Some("#ffff00"), None),
+            (Some("#d3d3d3"), None),
+        ]
+    );
+    let (c, d) = lowered("digraph { a [bgcolor=red, pencolor=blue] }");
+    assert!(c.nodes[0].styles.is_empty(), "{:?}", c.nodes[0].styles);
+    assert_eq!(d.len(), 2, "{d:?}");
+}
+
+/// DOT-2: the escapes in a name are read where the name is a label.
+#[test]
+fn names_in_labels() {
+    let c = chart(
+        "digraph \"G\\nH\" {\n  \"a\\nb\" -> c [label=\"\\T to \\H\"]\n  d [label=\"\\\\N is \\N\"]\n  label=\"\\G\"\n}\n",
+    );
+    assert_eq!(c.nodes[0].id, "a\\nb");
+    assert_eq!(c.nodes[0].label.text, "a\nb");
+    assert_eq!(c.edges[0].label.as_ref().unwrap().text, "a\nb to c");
+    assert_eq!(c.nodes[2].label.text, "\\N is d");
+    assert_eq!(c.title.as_deref(), Some("G\nH"));
+}
+
+/// DOT-3: an HTML label is drawn as its text, a line per `<br/>` and per table row.
+#[test]
+fn html_labels() {
+    let (c, d) = lowered(
+        "digraph {\n  a [label=<<table>\n    <tr><td>x</td><td>y &amp; z</td></tr>\n    <tr><td>w</td></tr>\n  </table>>]\n  b [label=<one<br/>two>]\n  a -> b [label=<<i>e</i>>]\n}\n",
+    );
+    assert_eq!(
+        d,
+        [(
+            Severity::Warning,
+            "HTML labels are drawn as their text".to_owned()
+        )]
+    );
+    assert_eq!(c.nodes[0].label.text, "x y & z\nw");
+    assert_eq!(c.nodes[1].label.text, "one\ntwo");
+    assert_eq!(c.edges[0].label.as_ref().unwrap().text, "e");
+}
+
+/// DOT-3: a blank graph label is no title; `minlen` is a whole number of ranks from 1 to 10.
+#[test]
+fn blank_labels_and_lengths() {
+    for src in [
+        "digraph { label=\"\"; a }",
+        "digraph { label=\" \\n \"; a }",
+        "digraph { label=<<b> </b>>; a }",
+    ] {
+        let lowered = diagram::lower(src);
+        let c = lowered.diagram.into_graph();
+        assert_eq!(c.title, None, "{src}");
+        let out = ascii::render(&c, &Options::default());
+        assert!(out.starts_with('╭'), "{src}\n{out}");
+    }
+    let c = chart(
+        "digraph { a -> b [minlen=nan]; a -> c [minlen=99]; a -> d [minlen=\"-inf\"]; a -> e [minlen=2.6] }",
+    );
+    let lengths: Vec<u8> = c.edges.iter().map(|e| e.length).collect();
+    assert_eq!(lengths, [1, 10, 1, 3]);
+}
+
+/// DOT-3: an attribute that many nodes or edges share is reported once.
+#[test]
+fn shared_attributes_warn_once() {
+    let (_, d) = lowered(
+        "digraph {\n  node [color=nope]\n  edge [color=nope, dir=sideways]\n  a -> b -> c -> a\n  d [color=nope]\n}\n",
+    );
+    let messages: Vec<&str> = d.iter().map(|(_, m)| m.as_str()).collect();
+    assert_eq!(
+        messages,
+        [
+            "unknown color `nope`; ignored",
+            "unknown color `nope`; ignored",
+            "unknown `dir` `sideways`: expected forward, back, both, or none",
+            "unknown color `nope`; ignored",
+        ]
+    );
+}
+
+/// DOT-1: subgraphs nest 64 deep; a deeper one is an error, and neither it nor a wide stroke
+/// breaks the drawing.
+#[test]
+fn limits() {
+    let src = format!("digraph {{ a {}", "{ b -> ".repeat(50_000));
+    let lowered = diagram::lower(&src);
+    let messages: Vec<&str> = lowered
+        .diagnostics
+        .iter()
+        .map(|d| d.message.as_str())
+        .collect();
+    assert!(
+        messages.contains(&"subgraphs nested more than 64 deep"),
+        "{messages:?}"
+    );
+    let c = lowered.diagram.into_graph();
+    assert_eq!(c.nodes.len(), 2);
+    assert!(!ascii::render(&c, &Options::default()).is_empty());
+
+    // No edge is drawn across a subgraph that was skipped.
+    let src = format!(
+        "digraph {{ {}a -> {{ b }} -> c{} }}",
+        "{ ".repeat(64),
+        " }".repeat(64)
+    );
+    let c = diagram::lower(&src).diagram.into_graph();
+    let ids: Vec<&str> = c.nodes.iter().map(|n| n.id.as_str()).collect();
+    assert_eq!(ids, ["a", "c"]);
+    assert!(c.edges.is_empty(), "{:?}", c.edges);
+
+    let lowered =
+        diagram::lower("digraph { a -> b [penwidth=1000000000, dir=both]; c [penwidth=99999] }");
+    assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+    let s = lowered.diagram.scene(&Approx, &Theme::LIGHT);
+    assert!(
+        s.width < 1000.0 && s.height < 1000.0,
+        "{}x{}",
+        s.width,
+        s.height
+    );
+}
+
 /// DOT-3: graph, node, and edge attributes.
 #[test]
 fn attributes() {

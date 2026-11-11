@@ -49,7 +49,7 @@ drawing side. Only the first graph in a file is drawn.
 | `digraph`, `graph`, `strict` | arrows at heads, no arrows, repeated edges merged |
 | `a -> b -> c`, `a -> {b c}` | edge chains, and edges to every node in a subgraph |
 | `node [...]`, `edge [...]` | defaults for later statements in the same braces |
-| `subgraph cluster_x { ... }` | a cluster titled by its `label`; other subgraphs only scope defaults |
+| `subgraph cluster_x { ... }` | a cluster titled by its `label`, filled by `bgcolor`; other subgraphs only scope defaults |
 | `rankdir`, `label`, `bgcolor` | the direction, the title, and the background |
 | `shape` | the nearest sirene shape; `record` and `Mrecord` as compartments |
 | `style` | `filled`, `rounded`, `dashed`, `dotted`, `bold`, `invis` |
@@ -62,9 +62,9 @@ Colors are X11 names, `#rrggbb`, `#rrggbbaa`, or `H,S,V` fractions. See
 
 ## Errors
 
-Syntax errors, `->` in a `graph`, and `--` in a `digraph` are errors. An attribute that is not
-drawn, an unknown shape, color, arrow, or style, and a second graph in a file are warnings, each
-once per file.
+Syntax errors, `->` in a `graph`, `--` in a `digraph`, and subgraphs nested more than 64 deep
+are errors. An attribute that is not drawn, an unknown shape, color, arrow, or style, and a
+second graph in a file are warnings, each once.
 
 ## Not drawn
 

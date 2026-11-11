@@ -189,10 +189,31 @@ fn value(id: &SyntaxNode) -> Value {
 }
 
 /// A label's escapes: `\n`, `\l`, and `\r` break lines, `\N` is the node's name, `\G` the
-/// graph's, `\E` the edge's, `\T` and `\H` its tail and head, and `\x` is `x`.
+/// graph's, `\E` the edge's, `\T` and `\H` its tail and head, and `\x` is `x`. A name's own
+/// escapes are read too, as Graphviz does: the node `"a\nb"` is labeled on two lines.
 fn escape(text: &str, names: &Names) -> String {
-    let mut out = String::new();
+    let mut named = String::new();
     let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            named.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('N') => named.push_str(names.node),
+            Some('G') => named.push_str(names.graph),
+            Some('E') => named.push_str(&names.edge()),
+            Some('T') => named.push_str(names.tail),
+            Some('H') => named.push_str(names.head),
+            Some(c) => {
+                named.push('\\');
+                named.push(c);
+            }
+            None => named.push('\\'),
+        }
+    }
+    let mut out = String::new();
+    let mut chars = named.chars();
     while let Some(c) = chars.next() {
         if c != '\\' {
             out.push(c);
@@ -200,11 +221,6 @@ fn escape(text: &str, names: &Names) -> String {
         }
         match chars.next() {
             Some('n' | 'l' | 'r') => out.push('\n'),
-            Some('N') => out.push_str(names.node),
-            Some('G') => out.push_str(names.graph),
-            Some('E') => out.push_str(&names.edge()),
-            Some('T') => out.push_str(names.tail),
-            Some('H') => out.push_str(names.head),
             Some(c) => out.push(c),
             None => out.push('\\'),
         }
@@ -232,21 +248,30 @@ impl Names<'_> {
     }
 }
 
-/// An HTML label's text: tags dropped, `<br/>` as a line break, and the common entities
-/// decoded.
+/// An HTML label's text: tags dropped, a line per `<br/>` and per table row with a space
+/// between its cells, and the common entities decoded. Line breaks in the source are not text,
+/// as in Graphviz.
 fn html_text(s: &str) -> String {
     let mut out = String::new();
     let mut rest = s;
     while let Some(i) = rest.find('<') {
-        out.push_str(&rest[..i]);
-        let end = rest[i..].find('>').map_or(rest.len(), |j| i + j + 1);
-        let tag = rest[i + 1..end.saturating_sub(1).max(i + 1)].trim();
-        if tag.get(..2).is_some_and(|t| t.eq_ignore_ascii_case("br")) {
-            out.push('\n');
+        out.extend(rest[..i].chars().filter(|c| !c.is_control()));
+        let (tag, after) = match rest[i..].find('>') {
+            Some(j) => (&rest[i + 1..i + j], i + j + 1),
+            None => (&rest[i + 1..], rest.len()),
+        };
+        let tag = tag.trim().to_ascii_lowercase();
+        let name = tag.trim_end_matches('/').split_whitespace().next();
+        match name {
+            Some("br") => out.push('\n'),
+            // Nested tables end several rows at once.
+            Some("/tr") if !out.trim_end_matches(' ').ends_with('\n') => out.push('\n'),
+            Some("/td") => out.push(' '),
+            _ => {}
         }
-        rest = &rest[end..];
+        rest = &rest[after..];
     }
-    out.push_str(rest);
+    out.extend(rest.chars().filter(|c| !c.is_control()));
     let out = out
         .replace("&lt;", "<")
         .replace("&gt;", ">")
@@ -269,10 +294,13 @@ enum Field {
     Group(Vec<Field>),
 }
 
+/// How deep a record label's groups nest; a brace past that is text.
+const MAX_RECORD_DEPTH: usize = 16;
+
 /// The fields of a record label: `|` separates them, braces group them, and a `<port>` names
 /// one. `\{`, `\}`, `\|`, `\<`, `\>`, and `\ ` are literal.
 fn record_fields(s: &str) -> Vec<Field> {
-    fn group(chars: &mut std::iter::Peekable<std::str::Chars>) -> Vec<Field> {
+    fn group(chars: &mut std::str::Chars, depth: usize) -> Vec<Field> {
         let mut fields = Vec::new();
         let mut text = String::new();
         let mut nested: Option<Vec<Field>> = None;
@@ -293,8 +321,8 @@ fn record_fields(s: &str) -> Vec<Field> {
                     }
                     None => {}
                 },
-                '{' => nested = Some(group(chars)),
-                '}' => break,
+                '{' if depth < MAX_RECORD_DEPTH => nested = Some(group(chars, depth + 1)),
+                '}' if depth > 0 => break,
                 '|' => push(&mut fields, &mut text, &mut nested),
                 '<' => {
                     for p in chars.by_ref() {
@@ -309,7 +337,7 @@ fn record_fields(s: &str) -> Vec<Field> {
         push(&mut fields, &mut text, &mut nested);
         fields
     }
-    let mut fields = group(&mut s.chars().peekable());
+    let mut fields = group(&mut s.chars(), 0);
     // `{a|b|c}` stacks its fields, as compartments do.
     if let [Field::Group(g)] = fields.as_slice() {
         fields = g.clone();
@@ -649,7 +677,12 @@ impl Lowerer {
     fn node(&mut self, id: &str, range: TextRange, scope: &Scope) -> usize {
         let i = match self.node_index.get(id) {
             Some(&i) => {
-                if self.node_cluster[i].is_none() {
+                // The innermost cluster of those a node is mentioned in holds it.
+                let inner = match self.node_cluster[i] {
+                    None => true,
+                    Some(held) => self.encloses(held, scope.cluster),
+                };
+                if inner {
                     self.node_cluster[i] = scope.cluster;
                 }
                 i
@@ -668,6 +701,18 @@ impl Lowerer {
         i
     }
 
+    /// Whether the cluster `outer` holds the cluster `inner`, at any depth.
+    fn encloses(&self, outer: usize, inner: Option<usize>) -> bool {
+        let mut at = inner.and_then(|c| self.clusters[c].parent);
+        while let Some(c) = at {
+            if c == outer {
+                return true;
+            }
+            at = self.clusters[c].parent;
+        }
+        false
+    }
+
     /// `a -> b -> {c d} [attrs]`: an edge from every node of each operand to every node of
     /// the next. Returns the nodes mentioned.
     fn edge_stmt(&mut self, stmt: &SyntaxNode, scope: &mut Scope) -> Vec<usize> {
@@ -682,6 +727,8 @@ impl Lowerer {
                     let nodes = self.subgraph(&n, scope);
                     operands.push((nodes, n.text_range()));
                 }
+                // A subgraph nested too deep to read: no nodes, and no edge across it.
+                ERROR => operands.push((Vec::new(), n.text_range())),
                 _ => {}
             }
         }
@@ -754,12 +801,14 @@ impl Lowerer {
             }
         }
         if let Some(a) = get(&root, "label") {
-            chart.title = Some(self.label_text(&a.value.clone(), &graph, ""));
+            let title = self.label_text(&a.value.clone(), &graph, "");
+            chart.title = Some(title).filter(|t| !t.trim().is_empty());
         }
         let background = get(&root, "bgcolor")
             .cloned()
             .and_then(|a| self.color_of(&a));
 
+        self.name_clusters();
         for i in 0..self.ids.len() {
             let node = self.lower_node(i, &graph);
             chart.nodes.push(node);
@@ -777,6 +826,21 @@ impl Lowerer {
             flowchart: chart,
             diagnostics: self.diagnostics,
             background,
+        }
+    }
+
+    /// Renames each cluster that shares a node's name: Graphviz names nodes and subgraphs
+    /// apart, and the graph model does not.
+    fn name_clusters(&mut self) {
+        for c in 0..self.clusters.len() {
+            if !self.node_index.contains_key(&self.clusters[c].id) {
+                continue;
+            }
+            let mut id = self.clusters[c].id.clone();
+            while self.node_index.contains_key(&id) || self.clusters.iter().any(|k| k.id == id) {
+                id.push('_');
+            }
+            self.clusters[c].id = id;
         }
     }
 
@@ -819,11 +883,17 @@ impl Lowerer {
         escape(&v.text, &names)
     }
 
+    /// The color `a` names. An unknown one is a warning, once however many nodes or edges
+    /// the attribute applies to.
     fn color_of(&mut self, a: &Attr) -> Option<Color> {
         let c = color(&a.value.text);
         if c.is_none() {
             let v = a.value.text.clone();
-            self.warning(a.range, format!("unknown color `{v}`; ignored"));
+            self.warn_once(
+                &format!("color@{:?}", a.range),
+                a.range,
+                format!("unknown color `{v}`; ignored"),
+            );
         }
         c
     }
@@ -932,7 +1002,7 @@ impl Lowerer {
         if words.iter().any(|w| w == "rounded") && shape == Shape::Rect {
             shape = Shape::Rounded;
         }
-        let styles = self.shape_styles(&attrs, &words, "fillcolor");
+        let styles = self.shape_styles(&attrs, &words, false);
         Node {
             id,
             label: Label::plain(label),
@@ -947,23 +1017,18 @@ impl Lowerer {
         }
     }
 
-    /// The fill, stroke, text color, width, and dashes of a node or cluster.
-    fn shape_styles(&mut self, attrs: &[Attr], words: &[String], fill_key: &str) -> Vec<Style> {
+    /// The fill, stroke, text color, width, and dashes of a node or cluster. A cluster also
+    /// has `pencolor` for its border and `bgcolor` for its fill.
+    fn shape_styles(&mut self, attrs: &[Attr], words: &[String], cluster: bool) -> Vec<Style> {
         let has = |w: &str| words.iter().any(|x| x == w);
         let mut out = Vec::new();
-        let stroke = get(attrs, "pencolor")
-            .or_else(|| get(attrs, "color"))
-            .cloned()
-            .and_then(|a| self.color_of(&a));
-        let fill = get(attrs, fill_key)
-            .cloned()
-            .and_then(|a| self.color_of(&a));
-        let bg = get(attrs, "bgcolor")
-            .cloned()
-            .and_then(|a| self.color_of(&a));
-        let line = get(attrs, "color").and_then(|a| color(&a.value.text));
+        let mut color_at = |key: &str| get(attrs, key).cloned().and_then(|a| self.color_of(&a));
+        let line = color_at("color");
+        let stroke = cluster.then(|| color_at("pencolor")).flatten().or(line);
+        let fill = color_at("fillcolor");
+        let bg = cluster.then(|| color_at("bgcolor")).flatten();
         if has("filled") {
-            let c = fill.or(line).unwrap_or(Color::rgb(0xd3d3d3));
+            let c = fill.or(line).or(bg).unwrap_or(Color::rgb(0xd3d3d3));
             out.push(style("fill", hex(c)));
         } else if let Some(c) = bg {
             out.push(style("fill", hex(c)));
@@ -971,10 +1036,7 @@ impl Lowerer {
         if let Some(c) = stroke {
             out.push(style("stroke", hex(c)));
         }
-        if let Some(c) = get(attrs, "fontcolor")
-            .cloned()
-            .and_then(|a| self.color_of(&a))
-        {
+        if let Some(c) = color_at("fontcolor") {
             out.push(style("color", hex(c)));
         }
         let width = get_text(attrs, "penwidth").and_then(|w| w.trim().parse::<f32>().ok());
@@ -1026,7 +1088,8 @@ impl Lowerer {
                     d
                 } else {
                     let range = a.range;
-                    self.warning(
+                    self.warn_once(
+                        &format!("dir@{range:?}"),
                         range,
                         format!("unknown `dir` `{d}`: expected forward, back, both, or none"),
                     );
@@ -1092,6 +1155,7 @@ impl Lowerer {
         }
         let length = get_text(attrs, "minlen")
             .and_then(|m| m.trim().parse::<f32>().ok())
+            .filter(|m| !m.is_nan())
             .map_or(1, |m| m.round().clamp(1.0, 10.0) as u8);
         Edge {
             id: None,
@@ -1128,7 +1192,7 @@ impl Lowerer {
                 "filled", "rounded", "dashed", "dotted", "bold", "solid", "invis",
             ],
         );
-        let styles = self.shape_styles(&attrs, &words, "fillcolor");
+        let styles = self.shape_styles(&attrs, &words, true);
         let mut members: Vec<String> = (0..self.ids.len())
             .filter(|&i| self.node_cluster[i] == Some(c))
             .map(|i| self.ids[i].clone())
@@ -1177,6 +1241,17 @@ mod tests {
         assert_eq!(e("x\\\\y\\q"), "x\\yq");
         assert_eq!(unquote("\"say \\\"hi\\\"\""), "say \"hi\"");
         assert_eq!(unquote("\"a\\\nb\""), "ab");
+        // An escaped backslash is not the start of a name escape.
+        assert_eq!(e("\\\\N and \\\\n"), "\\N and \\n");
+        assert_eq!(e("end\\"), "end\\");
+        // A name's own escapes are read where it is substituted.
+        let named = Names {
+            node: "a\\nb",
+            graph: "g\\\\N",
+            ..names()
+        };
+        assert_eq!(escape("\\N", &named), "a\nb");
+        assert_eq!(escape("\\G", &named), "g\\N");
     }
 
     #[test]
@@ -1184,6 +1259,34 @@ mod tests {
         assert_eq!(html_text("<b>bold</b> &amp; plain"), "bold & plain");
         assert_eq!(html_text("one<BR/>two<br align=\"left\"/>"), "one\ntwo");
         assert_eq!(html_text("<table><tr><td>a</td></tr></table>"), "a");
+        assert_eq!(
+            html_text("<TABLE>\n  <TR><TD>a</TD><TD>b</TD></TR>\n  <TR><TD>c</TD></TR>\n</TABLE>"),
+            "a b\nc"
+        );
+        assert_eq!(
+            html_text(
+                "<table><tr><td><table><tr><td>in</td></tr></table></td></tr><tr><td>out</td></tr></table>"
+            ),
+            "in\nout"
+        );
+        // An entity is decoded once, and is not a tag.
+        assert_eq!(html_text("&lt;br/&gt; &amp;lt;"), "<br/> &lt;");
+        // Unclosed and empty tags, with multibyte text at the cut.
+        assert_eq!(html_text("a<é"), "a");
+        assert_eq!(html_text("é<"), "é");
+        assert_eq!(html_text("<>é</>"), "é");
+        assert_eq!(html_text(""), "");
+    }
+
+    #[test]
+    fn record_nesting_is_bounded() {
+        let deep = "{".repeat(100_000);
+        let fields = record_fields(&deep);
+        let mut out = Vec::new();
+        fields.iter().for_each(|f| leaves(f, &mut out));
+        // The braces past the limit are text.
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].len(), 100_000 - MAX_RECORD_DEPTH);
     }
 
     #[test]

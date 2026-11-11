@@ -53,7 +53,8 @@ the layout places it (LAYOUT-11). Edges crossing the border join it.
 
 ## ASCIIR-7 Title
 
-A diagram title is printed centered on the first line, followed by a blank line.
+A diagram title is printed centered on the first line, followed by a blank line. A blank title
+prints nothing.
 
 ## ASCIIR-8 Spacing
 
