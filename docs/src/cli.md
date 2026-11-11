@@ -12,6 +12,17 @@ sirene update                 replace sirene with the latest release
 `svg`, `png`, `ascii`, and `check` never open a window, and work in a build without the GUI. With no FILE,
 or `-`, they read stdin.
 
+## Languages
+
+A diagram's language comes from its file extension (`.mmd` and `.mermaid` Mermaid, `.dot` and
+`.gv` [Graphviz DOT](dot.md)) or its Markdown block's name (`mermaid`, `dot`, `graphviz`). Stdin
+and other files are DOT when they start with a DOT graph header and Mermaid otherwise.
+`--lang mermaid|dot`, before or after the command, reads every diagram as that language:
+
+```
+printf 'digraph { a -> b }\n' | sirene ascii --lang dot
+```
+
 ## Opening files
 
 `sirene a.mmd b.mmd` opens a window for each file; `sirene` alone opens a new document with a

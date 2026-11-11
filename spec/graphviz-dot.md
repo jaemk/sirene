@@ -68,8 +68,13 @@ need a constraint in LAYOUT-4), `constraint=false`, ports (`a:p:n`; the edge joi
 HTML labels (drawn as their text), `group`, `compound` with `lhead` and `ltail`, `ordering`, and
 images.
 
-## DOT-5 Not done yet
+## DOT-5 Choosing the language
 
-The language is detected from the source (LANGS-1); a `.dot` or `.gv` file, a `dot` or
-`graphviz` Markdown block, and `--lang dot` do not force it yet, so such a source that does not
-start with a DOT graph header is read as Mermaid. Drawing edits (LANGS-5) come later.
+A source is read as DOT when `--lang dot` is given, else when its file ends in `.dot` or `.gv`
+(any case) or its Markdown block is named `dot` or `graphviz`, else when it starts with a DOT graph
+header (LANGS-1). `--lang mermaid`, a `.mmd` or `.mermaid` file, and a `mermaid` block are read
+as Mermaid even when they start like a DOT graph. A source forced to DOT without a graph header is
+a syntax error, not a flowchart. The editor reads a file by its extension or block name the same
+way (`Lang::of_path`, `Lang::of_info`, `diagram::lower_as`). Tests: `forced_languages` in
+`diagram.rs` and in `crates/sirene/tests/cli.rs`, and `refusals.rs` in `sirene-gui`. Drawing
+edits (LANGS-5) come later.

@@ -204,6 +204,20 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for DOT yet")
     );
     assert_eq!(dot.chart.edges.len(), 1);
+    // The extension or the Markdown block's name picks the language (DOT-5).
+    let gv = Document::from_source(Some("a.gv".into()), "flowchart LR\n".to_owned());
+    assert!(gv.read_only().is_some());
+    assert!(gv.problems.iter().any(|p| p.message.contains("`digraph`")));
+    let mmd = Document::from_source(Some("a.mmd".into()), "digraph { a -> b }\n".to_owned());
+    assert_eq!(mmd.read_only(), None);
+    let md = Document::from_source(
+        Some("a.md".into()),
+        "```dot\ndigraph { a -> b }\n```\n```mermaid\nflowchart LR\n```\n".to_owned(),
+    );
+    assert!(md.read_only().is_some());
+    let mut md = md;
+    assert!(md.show_block(1));
+    assert_eq!(md.read_only(), None);
     let uc = Document::from_source(None, "usecase-beta\n  actor A\n  A --> B\n".to_owned());
     assert_eq!(
         uc.read_only(),

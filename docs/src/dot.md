@@ -36,10 +36,11 @@ digraph classes {
 }
 ```
 
-A source that starts with `graph`, `digraph`, or `strict` and then `{` (after an optional ID) is
-DOT. Directories are scanned for `.dot` and `.gv` files, and `dot` and `graphviz` blocks in
-Markdown are drawn. In the editor a DOT graph is read-only on the drawing side. Only the first
-graph in a file is drawn.
+A `.dot` or `.gv` file, a `dot` or `graphviz` block in Markdown, and any source given with
+`--lang dot` is DOT; so is stdin or another file that starts with `graph`, `digraph`, or `strict`
+and then `{` (after an optional ID). `--lang mermaid` reads a source as Mermaid instead.
+Directories are scanned for `.dot` and `.gv` files. In the editor a DOT graph is read-only on the
+drawing side. Only the first graph in a file is drawn.
 
 ## What is read
 

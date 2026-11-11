@@ -125,3 +125,11 @@ the image is under it) is inserted unless the line after the block already is th
 changed. `--watch` renders again whenever the file changes; the links it adds do not count as
 a change. Tests: `markdown_images` and `watch_markdown` in `crates/sirene/tests/cli.rs`, and
 the unit tests in `crates/sirene/src/markdown.rs`.
+
+## CLI-13 `--lang`
+
+`--lang mermaid|dot`, a global option given before or after the command, reads every diagram
+`check`, `ascii`, `svg`, and `png` read (files, directory entries, Markdown blocks, and stdin)
+as that language. Without it, a file's extension or a block's info string picks the language,
+and other sources are detected (LANGS-1, DOT-5). Tests: `forced_languages` in
+`crates/sirene/tests/cli.rs`.

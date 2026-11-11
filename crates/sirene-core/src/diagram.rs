@@ -75,13 +75,57 @@ pub enum Kind {
     Dot,
 }
 
+/// A diagram language (LANGS-1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lang {
+    Mermaid,
+    /// Graphviz DOT (DOT-1).
+    Dot,
+}
+
+impl Lang {
+    /// The language a diagram file's extension names: `.mmd` or `.mermaid` for Mermaid, `.dot`
+    /// or `.gv` for DOT, in any case (DOT-5).
+    pub fn of_path(path: &std::path::Path) -> Option<Lang> {
+        let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+        match ext.as_str() {
+            "mmd" | "mermaid" => Some(Lang::Mermaid),
+            "dot" | "gv" => Some(Lang::Dot),
+            _ => None,
+        }
+    }
+
+    /// The language a Markdown code block's info word names: `mermaid`, or `dot` or `graphviz`
+    /// (MARKDO-1).
+    pub fn of_info(word: &str) -> Option<Lang> {
+        match word {
+            "mermaid" => Some(Lang::Mermaid),
+            "dot" | "graphviz" => Some(Lang::Dot),
+            _ => None,
+        }
+    }
+}
+
 impl Kind {
     /// The type of the diagram `src` starts with: DOT when it starts with a DOT graph header,
     /// otherwise the Mermaid type its header names, and a flowchart when it names none.
     pub fn of(src: &str) -> Kind {
-        if dot::is_dot(src) {
-            return Kind::Dot;
+        Kind::of_lang(src, None)
+    }
+
+    /// The type of the diagram `src` starts with, read as `lang` when given (DOT-5): DOT
+    /// whatever the source looks like, or a Mermaid type even when it starts like a DOT graph.
+    pub fn of_lang(src: &str, lang: Option<Lang>) -> Kind {
+        match lang {
+            Some(Lang::Dot) => Kind::Dot,
+            Some(Lang::Mermaid) => Kind::mermaid(src),
+            None if dot::is_dot(src) => Kind::Dot,
+            None => Kind::mermaid(src),
         }
+    }
+
+    /// The Mermaid type `src`'s header names, and a flowchart when it names none.
+    fn mermaid(src: &str) -> Kind {
         let word = header(src);
         // `gitGraph:` and `gitGraph TB:` name the direction in the same word or the next.
         let word = word.strip_suffix(':').unwrap_or(word);
@@ -335,10 +379,16 @@ pub(crate) fn header(src: &str) -> &str {
 /// Parses and lowers `src` with the parser its header picks (LANGS-2), and reads its theme
 /// settings (MTHEME-1).
 pub fn lower(src: &str) -> Lowered {
-    if Kind::of(src) == Kind::Dot {
+    lower_as(src, None)
+}
+
+/// [`lower`], reading `src` as `lang` when given instead of detecting it (DOT-5).
+pub fn lower_as(src: &str, lang: Option<Lang>) -> Lowered {
+    let kind = Kind::of_lang(src, lang);
+    if kind == Kind::Dot {
         return lower_dot(src);
     }
-    let mut lowered = lower_diagram(src);
+    let mut lowered = lower_diagram(src, kind);
     lowered.theme = ThemeConfig::read(src);
     lowered.diagnostics.extend(lowered.theme.diagnostics());
     lowered
@@ -359,8 +409,8 @@ fn lower_dot(src: &str) -> Lowered {
     }
 }
 
-fn lower_diagram(src: &str) -> Lowered {
-    match Kind::of(src) {
+fn lower_diagram(src: &str, kind: Kind) -> Lowered {
+    match kind {
         Kind::Dot => lower_dot(src),
         Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => flowchart::parse(src).lower().into(),
         Kind::Sequence => {
@@ -642,6 +692,41 @@ mod tests {
         assert_eq!(Kind::of("stateDiagramX\n"), Kind::Flowchart);
         assert_eq!(Kind::of(""), Kind::Flowchart);
         assert_eq!(Kind::of("---\nunclosed\n"), Kind::Flowchart);
+    }
+
+    #[test]
+    fn forced_languages() {
+        use std::path::Path;
+        assert_eq!(Lang::of_path(Path::new("a/b.gv")), Some(Lang::Dot));
+        assert_eq!(Lang::of_path(Path::new("b.DOT")), Some(Lang::Dot));
+        assert_eq!(Lang::of_path(Path::new("b.Mermaid")), Some(Lang::Mermaid));
+        assert_eq!(Lang::of_path(Path::new("b.mmd")), Some(Lang::Mermaid));
+        assert_eq!(Lang::of_path(Path::new("b.txt")), None);
+        assert_eq!(Lang::of_path(Path::new("-")), None);
+        assert_eq!(Lang::of_info("graphviz"), Some(Lang::Dot));
+        assert_eq!(Lang::of_info("mermaid"), Some(Lang::Mermaid));
+        assert_eq!(Lang::of_info("dotnet"), None);
+
+        let dot = "digraph { a -> b }\n";
+        assert_eq!(Kind::of_lang(dot, None), Kind::Dot);
+        assert_eq!(Kind::of_lang(dot, Some(Lang::Mermaid)), Kind::Flowchart);
+        assert_eq!(Kind::of_lang("pie\n", Some(Lang::Dot)), Kind::Dot);
+        assert_eq!(Kind::of_lang("pie\n", Some(Lang::Mermaid)), Kind::Pie);
+
+        // A forced DOT source without a graph header is an error, not a Mermaid flowchart.
+        let l = lower_as("a -> b\n", Some(Lang::Dot));
+        assert!(
+            l.diagnostics
+                .iter()
+                .any(|d| d.message.contains("`digraph`")),
+            "{:?}",
+            l.diagnostics
+        );
+        assert!(
+            lower_as("flowchart LR\n  a --> b\n", Some(Lang::Mermaid))
+                .diagnostics
+                .is_empty()
+        );
     }
 
     /// Every Mermaid 12.3 type has a parser: none is refused by its header.

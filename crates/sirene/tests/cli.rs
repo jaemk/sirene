@@ -960,6 +960,78 @@ fn dot_graphs() {
     sirene().arg("check").arg(&md).assert().success().stderr("");
 }
 
+/// The extension, the Markdown block's name, and `--lang` pick the language (DOT-5).
+#[test]
+fn forced_languages() {
+    let not_dot = "flowchart LR\n  a --> b\n";
+    let missing_header = "expected `graph` or `digraph`";
+    let tmp = tempfile::tempdir().unwrap();
+    let gv = tmp.path().join("a.gv");
+    std::fs::write(&gv, not_dot).unwrap();
+    sirene()
+        .arg("check")
+        .arg(&gv)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(missing_header));
+    // `--lang` overrides the extension, before or after the command.
+    sirene()
+        .args(["check", "--lang", "mermaid"])
+        .arg(&gv)
+        .assert()
+        .success();
+    sirene()
+        .args(["--lang", "dot", "check", "-"])
+        .write_stdin(not_dot)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(missing_header));
+    sirene()
+        .args(["check", "-"])
+        .write_stdin(not_dot)
+        .assert()
+        .success();
+
+    let md = tmp.path().join("doc.md");
+    std::fs::write(
+        &md,
+        "```graphviz\nflowchart LR\n```\n\n```mermaid\nflowchart LR\n```\n",
+    )
+    .unwrap();
+    sirene()
+        .arg("check")
+        .arg(&md)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(format!(
+            "doc.md:2:1: error: {missing_header}"
+        )));
+
+    // A DOT-looking source in a `.mmd` file is read as Mermaid.
+    let mmd = tmp.path().join("b.mmd");
+    std::fs::write(&mmd, "digraph { x -> y }\n").unwrap();
+    let svg = tmp.path().join("b.svg");
+    sirene()
+        .arg("svg")
+        .arg(&mmd)
+        .arg("-o")
+        .arg(&svg)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("b.mmd:1:1: error:"));
+    let detected = tmp.path().join("c.svg");
+    sirene()
+        .args(["svg", "-o"])
+        .arg(&detected)
+        .write_stdin("digraph { x -> y }\n")
+        .assert()
+        .success();
+    assert_ne!(
+        std::fs::read_to_string(&svg).unwrap(),
+        std::fs::read_to_string(&detected).unwrap()
+    );
+}
+
 /// An agentflow diagram draws in text (MAGF-1).
 #[test]
 fn agentflow_draws() {

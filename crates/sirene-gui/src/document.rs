@@ -4,7 +4,7 @@ use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use sirene_core::Severity;
-use sirene_core::diagram::{self, Diagram, Kind};
+use sirene_core::diagram::{self, Diagram, Kind, Lang};
 use sirene_core::flowchart::Flowchart;
 use sirene_core::markdown::{Block, is_markdown, mermaid_blocks};
 use sirene_core::scene::{Scene, TextMetrics, Theme};
@@ -99,15 +99,14 @@ impl Document {
                 text: source.clone(),
                 block: 0,
             });
-        let code = match &markdown {
+        let (code, lang) = match &markdown {
             Some(md) => md
                 .blocks
                 .first()
-                .map(|b| b.code.clone())
-                .unwrap_or_default(),
-            None => source.clone(),
+                .map_or_else(Default::default, |b| (b.code.clone(), Some(b.lang))),
+            None => (source.clone(), path.as_deref().and_then(Lang::of_path)),
         };
-        let (chart, other, problems) = parse(&code);
+        let (chart, other, problems) = parse(&code, lang);
         Self {
             path,
             saved: source,
@@ -122,9 +121,18 @@ impl Document {
         }
     }
 
+    /// The language the shown diagram is read as: its Markdown block's, or its file extension's,
+    /// and otherwise detected from the source (DOT-5).
+    fn lang(&self) -> Option<Lang> {
+        match &self.markdown {
+            Some(md) => md.blocks.get(md.block).map(|b| b.lang),
+            None => self.path.as_deref().and_then(Lang::of_path),
+        }
+    }
+
     /// Why drawing edits are off for this diagram's type, when they are (LANGS-5).
     pub fn read_only(&self) -> Option<&'static str> {
-        match Kind::of(&self.source) {
+        match Kind::of_lang(&self.source, self.lang()) {
             Kind::Flowchart => None,
             Kind::Sequence => Some("drawing edits are not supported for sequence diagrams yet"),
             Kind::State => Some("drawing edits are not supported for state diagrams yet"),
@@ -200,7 +208,7 @@ impl Document {
         }
         md.block = i;
         self.source = block.code.clone();
-        (self.chart, self.other, self.problems) = parse(&self.source);
+        (self.chart, self.other, self.problems) = parse(&self.source, Some(block.lang));
         true
     }
 
@@ -252,7 +260,7 @@ impl Document {
         if source == self.source {
             return false;
         }
-        (self.chart, self.other, self.problems) = parse(&source);
+        (self.chart, self.other, self.problems) = parse(&source, self.lang());
         if let Some(md) = &mut self.markdown {
             // The code goes back in its block; a file with no block gets one at the end.
             md.text = match md.blocks.get(md.block) {
@@ -438,9 +446,10 @@ impl Document {
     }
 }
 
-/// The graph (empty for other types), any other diagram, and the problems in `source`.
-fn parse(source: &str) -> (Flowchart, Option<Diagram>, Vec<Problem>) {
-    let lowered = diagram::lower(source);
+/// The graph (empty for other types), any other diagram, and the problems in `source`, read as
+/// `lang` when given.
+fn parse(source: &str, lang: Option<Lang>) -> (Flowchart, Option<Diagram>, Vec<Problem>) {
+    let lowered = diagram::lower_as(source, lang);
     let problems = lowered
         .diagnostics
         .iter()

@@ -66,7 +66,7 @@ pub fn check(path: &Path) -> bool {
         log::debug!("{name}: {} mermaid block(s)", blocks.len());
         let mut ok = true;
         for block in &blocks {
-            let lowered = diagram::lower(&block.code);
+            let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
             ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
         }
         return ok;
@@ -78,7 +78,7 @@ pub fn check(path: &Path) -> bool {
 fn check_source(path: Option<&Path>) -> bool {
     match crate::read(path.map(Path::to_path_buf)) {
         Ok((name, src)) => {
-            let lowered = diagram::lower(&src);
+            let lowered = crate::lower_file(path.filter(|p| p.as_os_str() != "-"), &src);
             !report(&name, &src, &lowered, |l, c| (l, c))
         }
         Err(message) => {
@@ -182,7 +182,7 @@ pub fn render(
     let mut links = Vec::new();
     for (i, block) in blocks.into_iter().enumerate() {
         let n = i + 1;
-        let lowered = diagram::lower(&block.code);
+        let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
         ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
         let image = image_path(md, out, n, ext);
         let written = render(&lowered).and_then(|bytes| {
