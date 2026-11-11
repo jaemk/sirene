@@ -28,7 +28,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Class Diagrams | done | [mermaid-class-diagrams.md](mermaid-class-diagrams.md) |
 | Mermaid ER Diagrams | done | [mermaid-er-diagrams.md](mermaid-er-diagrams.md) |
 | Mermaid Sequence Diagrams | done | [mermaid-sequence-diagrams.md](mermaid-sequence-diagrams.md) |
-| Mermaid Charts | research | [mermaid-charts.md](mermaid-charts.md) |
+| Mermaid Charts | done | [mermaid-charts.md](mermaid-charts.md) |
 | Graphviz DOT | pending | [graphviz-dot.md](graphviz-dot.md) |
 | D2 | research | [d2.md](d2.md) |
 | PlantUML | research | [plantuml.md](plantuml.md) |
