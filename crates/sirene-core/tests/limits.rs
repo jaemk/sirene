@@ -166,6 +166,30 @@ fn flowchart_chain() {
     check(&s, &[]);
 }
 
+/// `a0 & ... --> b0 & ...` and DOT's `{...} -> {...}` make an edge per pair: 3,600 edges
+/// through one gap, past the track preference limit.
+#[test]
+fn edge_products() {
+    let side = |p: &str, sep: &str| {
+        (0..60)
+            .map(|i| format!("{p}{i}"))
+            .collect::<Vec<_>>()
+            .join(sep)
+    };
+    let src = format!(
+        "flowchart TD\n{} --> {}\n",
+        side("a", " & "),
+        side("b", " & ")
+    );
+    check(&src, &[]);
+    let src = format!(
+        "digraph {{ {{{}}} -> {{{}}} }}\n",
+        side("a", " "),
+        side("b", " ")
+    );
+    check(&src, &[]);
+}
+
 #[test]
 fn flowchart_shapes() {
     draw(&format!(

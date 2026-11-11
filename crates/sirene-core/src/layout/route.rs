@@ -1,5 +1,7 @@
 //! Track assignment for the cross-axis part of routes in a gap between ranks (LAYOUT-8).
 
+use std::collections::{BTreeSet, HashMap};
+
 /// A route segment through a gap, entering at cross position `top` and leaving at `bottom`.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Jog {
@@ -31,36 +33,26 @@ pub(super) fn tracks(jogs: &[Jog]) -> (Vec<Option<usize>>, usize) {
         .filter(|&i| jogs[i].top != jogs[i].bottom)
         .collect();
     let m = moving.len();
-    // before[a][b]: moving[a] must take a lower track number than moving[b].
-    let mut before = vec![vec![false; m]; m];
-    for a in 0..m {
-        for b in 0..m {
-            let (ja, jb) = (jogs[moving[a]], jogs[moving[b]]);
-            if a != b && ja.top == jb.bottom {
-                before[a][b] = true;
-            }
+    let after = if m <= PREFER_LIMIT {
+        preferred(jogs, &moving)
+    } else {
+        same_column(jogs, &moving)
+    };
+    let mut before: Vec<Vec<usize>> = vec![Vec::new(); m];
+    for (a, next) in after.iter().enumerate() {
+        for &b in next {
+            before[b].push(a);
         }
     }
-    for a in 0..m {
-        for b in 0..m {
-            let (ja, jb) = (jogs[moving[a]], jogs[moving[b]]);
-            let prefer = a != b
-                && (jb.strictly_inside(ja.top) || ja.strictly_inside(jb.bottom))
-                && !(ja.strictly_inside(jb.top) || jb.strictly_inside(ja.bottom));
-            if prefer && !before[b][a] {
-                before[a][b] = true;
-            }
-        }
-    }
-    let order = topological(&before);
+    let order = topological(&after, &before);
     let mut track = vec![None; jogs.len()];
     let mut rows: Vec<Vec<Jog>> = Vec::new();
     let mut assigned = vec![None; m];
     for &a in &order {
         let j = jogs[moving[a]];
-        let min = (0..m)
-            .filter(|&p| before[p][a])
-            .filter_map(|p| assigned[p])
+        let min = before[a]
+            .iter()
+            .filter_map(|&p| assigned[p])
             .map(|t: usize| t + 1)
             .max()
             .unwrap_or(0);
@@ -80,20 +72,65 @@ pub(super) fn tracks(jogs: &[Jog]) -> (Vec<Option<usize>>, usize) {
     (track, rows.len())
 }
 
-/// A topological order of `before`, taking the lowest index first; on a cycle, the remaining
-/// node with the fewest remaining predecessors goes next.
-fn topological(before: &[Vec<bool>]) -> Vec<usize> {
-    let m = before.len();
-    let mut done = vec![false; m];
+/// The most moving jogs in one gap for which every pair is checked for crossings; past it only
+/// shared columns order the tracks, so a gap costs time linear in its jogs and their overlaps.
+const PREFER_LIMIT: usize = 1_000;
+
+/// For each moving jog, the ones that must take a higher track: those whose lower part shares
+/// its upper part's column.
+fn same_column(jogs: &[Jog], moving: &[usize]) -> Vec<Vec<usize>> {
+    let mut by_bottom: HashMap<i32, Vec<usize>> = HashMap::new();
+    for (b, &i) in moving.iter().enumerate() {
+        by_bottom.entry(jogs[i].bottom).or_default().push(b);
+    }
+    moving
+        .iter()
+        .map(|&i| by_bottom.get(&jogs[i].top).cloned().unwrap_or_default())
+        .collect()
+}
+
+/// [`same_column`], plus a jog turning before it crosses another's cross-axis part, unless
+/// the other must already come first.
+fn preferred(jogs: &[Jog], moving: &[usize]) -> Vec<Vec<usize>> {
+    let m = moving.len();
+    let mut before = vec![vec![false; m]; m];
+    for (a, next) in same_column(jogs, moving).into_iter().enumerate() {
+        for b in next {
+            before[a][b] = true;
+        }
+    }
+    for a in 0..m {
+        for b in 0..m {
+            let (ja, jb) = (jogs[moving[a]], jogs[moving[b]]);
+            let prefer = a != b
+                && (jb.strictly_inside(ja.top) || ja.strictly_inside(jb.bottom))
+                && !(ja.strictly_inside(jb.top) || jb.strictly_inside(ja.bottom));
+            if prefer && !before[b][a] {
+                before[a][b] = true;
+            }
+        }
+    }
+    before
+        .iter()
+        .map(|row| (0..m).filter(|&b| row[b]).collect())
+        .collect()
+}
+
+/// A topological order of the relation `after` (with `before`, its inverse), taking the lowest
+/// index first; on a cycle, the remaining node with the fewest remaining predecessors goes next.
+fn topological(after: &[Vec<usize>], before: &[Vec<usize>]) -> Vec<usize> {
+    let m = after.len();
+    let mut waiting: Vec<usize> = before.iter().map(Vec::len).collect();
+    let mut queue: BTreeSet<(usize, usize)> = (0..m).map(|b| (waiting[b], b)).collect();
     let mut order = Vec::with_capacity(m);
-    while order.len() < m {
-        let waiting = |b: usize| (0..m).filter(|&a| !done[a] && before[a][b]).count();
-        let next = (0..m)
-            .filter(|&b| !done[b])
-            .min_by_key(|&b| (waiting(b), b))
-            .expect("a remaining node");
-        done[next] = true;
+    while let Some((_, next)) = queue.pop_first() {
         order.push(next);
+        for &b in &after[next] {
+            if queue.remove(&(waiting[b], b)) {
+                waiting[b] -= 1;
+                queue.insert((waiting[b], b));
+            }
+        }
     }
     order
 }

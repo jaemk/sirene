@@ -170,6 +170,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of an overflow or an allocation failure.
 - Architecture diagrams with many groups lay out in time proportional to their size.
 - A diagram reports at most 500 problems, then one line counting the rest.
+- Graphs with many edges between two ranks, such as `a & b & ... --> c & d & ...`, lay out in
+  milliseconds; 1,600 such edges took seconds and 22,500 did not finish.
 - A file starting with a byte order mark draws as it does without one; before, its header or
   frontmatter was not found.
 

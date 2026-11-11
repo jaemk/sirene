@@ -69,21 +69,44 @@ fn reorder(layer: &mut [usize], adj: &[Vec<usize>], pos: &mut [usize]) {
     }
 }
 
-/// Number of segment crossings between consecutive layers.
+/// Number of segment crossings between consecutive layers: pairs of segments whose upper ends
+/// and lower ends are in opposite orders, counted with a Fenwick tree over lower positions.
 fn crossings(layers: &[Vec<usize>], down: &[Vec<usize>], pos: &[usize]) -> usize {
     let mut total = 0;
     for layer in layers {
-        let pairs: Vec<(usize, usize)> = layer
+        let mut pairs: Vec<(usize, usize)> = layer
             .iter()
             .flat_map(|&u| down[u].iter().map(move |&v| (u, v)))
             .map(|(u, v)| (pos[u], pos[v]))
             .collect();
-        for (i, a) in pairs.iter().enumerate() {
-            for b in &pairs[i + 1..] {
-                if (a.0 < b.0 && a.1 > b.1) || (a.0 > b.0 && a.1 < b.1) {
-                    total += 1;
+        pairs.sort_unstable();
+        let size = pairs.iter().map(|p| p.1 + 1).max().unwrap_or(0);
+        // tree[i]: how many inserted segments have their lower end in a range ending at i.
+        let mut tree = vec![0usize; size + 1];
+        let mut inserted = 0;
+        let mut i = 0;
+        while i < pairs.len() {
+            // Segments with the same upper end never cross each other: count the group against
+            // the segments before it, then insert it.
+            let group = pairs[i..].iter().take_while(|p| p.0 == pairs[i].0).count();
+            for &(_, lower) in &pairs[i..i + group] {
+                let mut at_most = 0;
+                let mut k = lower + 1;
+                while k > 0 {
+                    at_most += tree[k];
+                    k &= k - 1;
+                }
+                total += inserted - at_most;
+            }
+            for &(_, lower) in &pairs[i..i + group] {
+                let mut k = lower + 1;
+                while k <= size {
+                    tree[k] += 1;
+                    k += k & k.wrapping_neg();
                 }
             }
+            inserted += group;
+            i += group;
         }
     }
     total
@@ -115,6 +138,45 @@ mod tests {
         order(&mut layers, &[(0, 3), (1, 2)], 5);
         assert_eq!(layers[1][1], 4);
         assert_eq!(layers, [vec![0, 1], vec![3, 4, 2]]);
+    }
+
+    /// The count matches the pairwise definition on layers with shared ends.
+    #[test]
+    fn counts_crossings() {
+        let slow = |segments: &[(usize, usize)]| {
+            let mut n = 0;
+            for (i, a) in segments.iter().enumerate() {
+                for b in &segments[i + 1..] {
+                    n += usize::from((a.0 < b.0 && a.1 > b.1) || (a.0 > b.0 && a.1 < b.1));
+                }
+            }
+            n
+        };
+        let mut seed = 7u64;
+        for _ in 0..200 {
+            let mut next = |m: u64| {
+                seed = seed
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                ((seed >> 33) % m) as usize
+            };
+            let (top, bottom) = (next(6) + 1, next(6) + 1);
+            let count = next(12);
+            let mut down = vec![Vec::new(); top + bottom];
+            let mut segments = Vec::new();
+            for _ in 0..count {
+                let (u, v) = (next(top as u64), next(bottom as u64));
+                down[u].push(top + v);
+                segments.push((u, v));
+            }
+            let pos: Vec<usize> = (0..top).chain(0..bottom).collect();
+            let layers = [(0..top).collect(), (top..top + bottom).collect()];
+            assert_eq!(
+                crossings(&layers, &down, &pos),
+                slow(&segments),
+                "{segments:?}"
+            );
+        }
     }
 
     #[test]
