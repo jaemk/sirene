@@ -5,6 +5,7 @@ pub mod ascii;
 pub mod block;
 pub mod c4;
 pub mod class;
+pub mod cynefin;
 pub mod diagnostic;
 pub mod diagram;
 pub mod er;

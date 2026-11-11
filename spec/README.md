@@ -58,6 +58,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Use Case Diagrams | done | [mermaid-use-case-diagrams.md](mermaid-use-case-diagrams.md) |
 | Mermaid Railroad Diagrams | done | [mermaid-railroad-diagrams.md](mermaid-railroad-diagrams.md) |
 | Mermaid Swimlane Diagrams | done | [mermaid-swimlane-diagrams.md](mermaid-swimlane-diagrams.md) |
+| Mermaid Cynefin Diagrams | done | [mermaid-cynefin-diagrams.md](mermaid-cynefin-diagrams.md) |
 
 ## Conventions
 

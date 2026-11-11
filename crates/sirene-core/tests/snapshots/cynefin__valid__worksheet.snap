@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/cynefin.rs
+expression: "---\nconfig:\n  cynefin:\n    showDomainDescriptions: false\n---\ncynefin-beta:\n  complex \"Adaptive work\" 'New feature discovery'\n  complicated\n  clear\n  chaotic\n  confusion\n    \"Vendor outage?\" \"Flaky test?\"\n    \"Slow builds?\" \"Odd metrics?\"\n  confusion --> complicated\n"
+---
+┌─────────────────────────┬───────────────┐
+│         Complex         ┆  Complicated  │
+│                         ┆               │
+│      Adaptive work      ┆               │
+│  New feature discovery  ┆               │
+│                         ┆               │
+│                ┌────────┴───────┐       │
+│                │    Confusion   │       │
+│                │ Vendor outage? │       │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤   Flaky test?  ├┄┄┄┄┄┄┄┤
+│                │  Slow builds?  │       │
+│                │     +1 more    │       │
+│                └────────┬───────┘       │
+│                         ┃               │
+│         Chaotic         ┃     Clear     │
+└─────────────────────────┴───────────────┘
+
+Confusion → Complicated

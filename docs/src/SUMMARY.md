@@ -53,6 +53,7 @@
 - [Use case diagrams](usecase.md)
 - [Railroad diagrams](railroad.md)
 - [Swimlane diagrams](swimlane.md)
+- [Cynefin diagrams](cynefin.md)
 
 # Project
 

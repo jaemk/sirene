@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/cynefin.rs
+expression: "cynefin-beta\n  title Incident Response\n  accTitle: Incident response by domain\n  accDescr: Where each incident task sits in the Cynefin framework\n\n  complex\n    \"Investigate root cause\"\n    \"Run chaos experiment\"\n\n  complicated\n    \"Analyze performance data\"\n    \"Expert review needed\"\n\n  clear\n    \"Restart service\"\n    \"Apply known fix\"\n\n  chaotic\n    \"Page on-call immediately\"\n\n  confusion\n    \"Unknown failure mode\"\n"
+---
+                       Incident Response
+
+┌────────────────────────────┬────────────────────────────────┐
+│           Complex          ┆           Complicated          │
+│   Probe → Sense → Respond  ┆    Sense → Analyse → Respond   │
+│     Emergent Practices     ┆         Good Practices         │
+│                            ┆                                │
+│   Investigate root cause   ┆    Analyze performance data    │
+│    Run chaos experiment    ┆      Expert review needed      │
+│                            ┆                                │
+│                ┌───────────┴──────────┐                     │
+│                │       Confusion      │                     │
+├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤       Disorder       ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤
+│                │ Unknown failure mode │                     │
+│                └───────────┬──────────┘                     │
+│                            ┃                                │
+│                            ┃              Clear             │
+│           Chaotic          ┃  Sense → Categorise → Respond  │
+│    Act → Sense → Respond   ┃         Best Practices         │
+│       Novel Practices      ┃                                │
+│                            ┃         Restart service        │
+│  Page on-call immediately  ┃         Apply known fix        │
+└────────────────────────────┴────────────────────────────────┘

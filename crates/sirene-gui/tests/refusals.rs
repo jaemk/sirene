@@ -209,6 +209,11 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
         sl.read_only(),
         Some("drawing edits are not supported for swimlane diagrams yet")
     );
+    let cy = Document::from_source(None, "cynefin-beta\ncomplex \"a\"\n".to_owned());
+    assert_eq!(
+        cy.read_only(),
+        Some("drawing edits are not supported for Cynefin diagrams yet")
+    );
     let rr = Document::from_source(None, "railroad-ebnf-beta\na = b ;\n".to_owned());
     assert_eq!(
         rr.read_only(),

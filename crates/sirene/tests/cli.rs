@@ -896,7 +896,7 @@ fn other_diagram_types() {
             "<stdin>:1:1: error: `eventmodeling` diagrams are not supported; \
              sirene draws flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
              mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, \
-             treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, and swimlane diagrams\n",
+             treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, and Cynefin diagrams\n",
         );
 }
 
