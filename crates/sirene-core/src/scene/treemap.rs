@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 
 use super::Theme;
-use super::git::branch_color;
+use super::git::scale_color;
 use super::paint::Painter;
 use super::shapes;
 use super::style;
@@ -196,7 +196,7 @@ pub fn treemap(treemap: &Treemap, metrics: &impl TextMetrics, theme: &Theme) -> 
         let n = colors.len();
         colors
             .entry(treemap.items[i].name.as_str())
-            .or_insert_with(|| branch_color(theme, n));
+            .or_insert_with(|| scale_color(theme, n));
     }
     let rect = |a: Pt, b: Pt| shapes::polygon(&[(a.x, a.y), (b.x, a.y), (b.x, b.y), (a.x, b.y)]);
 

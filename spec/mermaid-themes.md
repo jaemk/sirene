@@ -27,7 +27,13 @@ without a theme name apply to the application's theme. Values that are not color
 `fontSize` (a number, optionally with `px`, from 1 to 200) sets the font size and scales the
 line height.
 
-## MTHEME-4 Scope
+## MTHEME-4 Chart colors
 
-Text output is not themed. Chart palettes (pie slices, `cScale` colors) and diagram-specific
-variables are not applied yet.
+A named theme also sets the section colors of mindmaps, timelines, radar charts, and treemaps
+(`cScale0` to `cScale11`) and the pie slice colors (`pie1` to `pie12`), derived as Mermaid 12.3's
+theme derives them; `cScaleN` and `pieN` variables override single colors. Without a theme name,
+these colors keep sirene's series colors unless a `cScaleN` or `pieN` variable is set, and then
+the others are the `default` theme's. Other charts (git graphs, gantt charts, journeys, sankey
+diagrams, XY charts, Venn diagrams) keep sirene's series colors, and other diagram-specific
+variables are not applied. Text output is not themed. Tests: `chart_colors` in
+`crates/sirene-core/src/theme.rs`, `diagram_themes`.

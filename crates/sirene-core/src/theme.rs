@@ -79,9 +79,25 @@ impl ThemeConfig {
                 .map(|(_, v)| v.as_str())
         };
         let color = |key: &str| var(key).and_then(parse_color);
-        let p = match name.filter(|n| NAMES.contains(n)) {
+        let dark = var("darkMode") == Some("true");
+        let name = name.filter(|n| NAMES.contains(n));
+        let p = match name {
             None => classic(&color, &from_theme(base)),
-            Some(n) => resolve(n, &color, var("darkMode") == Some("true")),
+            Some(n) => resolve(n, &color, dark),
+        };
+        // Without a theme name, chart colors change only when the diagram sets one; the rest
+        // are then the `default` theme's, as in Mermaid.
+        let chart_var = |k: &str| {
+            let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+            k.strip_prefix("cScale").is_some_and(digits)
+                || k.strip_prefix("pie").is_some_and(digits)
+        };
+        let charts = match name {
+            Some(n) => Some(charts(n, &color, dark, p.node_fill)),
+            None if self.variables.iter().any(|(k, _)| chart_var(k)) => {
+                Some(charts("default", &color, dark, p.node_fill))
+            }
+            None => None,
         };
         let mut t = Theme {
             background: p.background,
@@ -92,6 +108,8 @@ impl ThemeConfig {
             edge_label_fill: p.edge_label_fill,
             cluster_fill: p.cluster_fill,
             cluster_stroke: p.cluster_stroke,
+            scale: charts.as_ref().map(|c| c.scale).or(base.scale),
+            pie: charts.as_ref().map(|c| c.pie).or(base.pie),
             ..*base
         };
         if let Some(size) = var("fontSize").and_then(font_size) {
@@ -356,6 +374,177 @@ fn resolve(name: &str, color: &dyn Fn(&str) -> Option<Color>, dark: bool) -> Pal
 
 const fn rgb(hex: u32) -> Color {
     Color::rgb(hex)
+}
+
+/// A theme's chart colors: `cScale0` to `cScale11` and `pie1` to `pie12`.
+struct Charts {
+    scale: [Color; 12],
+    pie: [Color; 12],
+}
+
+/// `primaryColor`, `secondaryColor`, and `tertiaryColor` as theme `name` sets them.
+fn primaries(name: &str, color: &dyn Fn(&str) -> Option<Color>) -> (Color, Color, Color) {
+    let rotate = |c: Color, h: f32| adjust(c, h, 0.0, 0.0);
+    let dark = rgb(0x1f2020);
+    let (p, s, t) = match name {
+        "default" => (
+            rgb(0xececff),
+            Some(rgb(0xffffde)),
+            Some(rotate(rgb(0xececff), -160.0)),
+        ),
+        "forest" => (
+            rgb(0xcde498),
+            Some(rgb(0xcdffb2)),
+            Some(lighten(rgb(0xcde498), 10.0)),
+        ),
+        "neutral" => {
+            let contrast = color("contrast").unwrap_or(rgb(0x707070));
+            (
+                rgb(0xeeeeee),
+                Some(lighten(contrast, 55.0)),
+                Some(rotate(rgb(0xeeeeee), -160.0)),
+            )
+        }
+        "dark" | "neo-dark" | "redux-dark" | "redux-dark-color" => {
+            (dark, Some(lighten(dark, 16.0)), Some(rotate(dark, -160.0)))
+        }
+        "neo" | "redux" | "redux-color" => (rgb(0xcccccc), None, Some(rgb(0xffffff))),
+        // `base`.
+        _ => (rgb(0xfff4dd), None, None),
+    };
+    let p = color("primaryColor").unwrap_or(p);
+    let s = color("secondaryColor")
+        .or(s)
+        .unwrap_or_else(|| rotate(p, -120.0));
+    let t = color("tertiaryColor")
+        .or(t)
+        .unwrap_or_else(|| adjust(p, 180.0, 0.0, 5.0));
+    (p, s, t)
+}
+
+/// The chart colors of theme `name`, as its `updateColors` derives them; `main_bkg` is the
+/// resolved `mainBkg`.
+fn charts(
+    name: &str,
+    color: &dyn Fn(&str) -> Option<Color>,
+    dark: bool,
+    main_bkg: Color,
+) -> Charts {
+    let (p, s, t) = primaries(name, color);
+    let a = |c: Color, h: f32, l: f32| adjust(c, h, 0.0, l);
+    // `cScale3` on: turns of the primary color; `l8` is `cScale8`'s lightness change.
+    let hues = |p: Color, s: Color, t: Color, l8: f32| {
+        [
+            p,
+            s,
+            t,
+            a(p, 30.0, 0.0),
+            a(p, 60.0, 0.0),
+            a(p, 90.0, 0.0),
+            a(p, 120.0, 0.0),
+            a(p, 150.0, 0.0),
+            a(p, 210.0, l8),
+            a(p, 270.0, 0.0),
+            a(p, 300.0, 0.0),
+            a(p, 330.0, 0.0),
+        ]
+    };
+    let darkened = |c: [Color; 12], by: f32| c.map(|c| lighten(c, -by));
+    let base_darken = if dark { 75.0 } else { 25.0 };
+    // `neo` and `redux` color charts from fixed colors rather than their `primaryColor`.
+    let fixed = (
+        rgb(0xececfe),
+        rgb(0xe9e9f1),
+        adjust(rgb(0xececfe), 180.0, 0.0, 5.0),
+    );
+    let mut scale = match name {
+        "default" | "forest" => darkened(hues(p, s, t, 0.0), 10.0),
+        "dark" => {
+            let mut c = [
+                0, 0x0b0000, 0x4d1037, 0x3f5258, 0x4f2f1b, 0x6e0a0a, 0x3b0048, 0x995a01, 0x154706,
+                0x161722, 0x00296f, 0x01629c,
+            ]
+            .map(rgb);
+            c[0] = p;
+            c
+        }
+        "neutral" => [
+            0x555555, 0xf4f4f4, 0x555555, 0xbbbbbb, 0x777777, 0x999999, 0xdddddd, 0xffffff,
+            0xdddddd, 0xbbbbbb, 0x999999, 0x777777,
+        ]
+        .map(rgb),
+        "neo" => darkened(hues(fixed.0, fixed.1, fixed.2, 150.0), base_darken),
+        "redux" => darkened([main_bkg; 12], base_darken),
+        "redux-color" | "redux-dark-color" => [
+            0xf4a8ff, 0x46ecd5, 0xffb86a, 0xdab2ff, 0x7bf1a8, 0xc4b4ff, 0xffa2a2, 0xffdf20,
+            0xa3b3ff, 0xbbf451, 0x74d4ff, 0xffa1ad,
+        ]
+        .map(rgb),
+        // `base`, `neo-dark`, and `redux-dark`.
+        _ => darkened(hues(p, s, t, 150.0), base_darken),
+    };
+    for (i, c) in scale.iter_mut().enumerate() {
+        if let Some(v) = color(&format!("cScale{i}")) {
+            *c = v;
+        }
+    }
+    let base_pie = |p: Color, s: Color, t: Color| {
+        [
+            p,
+            s,
+            t,
+            a(p, 0.0, -10.0),
+            a(s, 0.0, -10.0),
+            a(t, 0.0, -10.0),
+            a(p, 60.0, -10.0),
+            a(p, -60.0, -10.0),
+            a(p, 120.0, 0.0),
+            a(p, 60.0, -20.0),
+            a(p, -60.0, -20.0),
+            a(p, 120.0, -10.0),
+        ]
+    };
+    let mut pie = match name {
+        "default" => [
+            p,
+            s,
+            a(t, 0.0, -40.0),
+            a(p, 0.0, -10.0),
+            a(s, 0.0, -30.0),
+            a(t, 0.0, -20.0),
+            a(p, 60.0, -20.0),
+            a(p, -60.0, -40.0),
+            a(p, 120.0, -40.0),
+            a(p, 60.0, -40.0),
+            a(p, -90.0, -40.0),
+            a(p, 120.0, -30.0),
+        ],
+        "forest" => [
+            p,
+            s,
+            t,
+            a(p, 0.0, -30.0),
+            a(s, 0.0, -30.0),
+            a(t, 40.0, -40.0),
+            a(p, 60.0, -10.0),
+            a(p, -60.0, -10.0),
+            a(p, 120.0, 0.0),
+            a(p, 60.0, -50.0),
+            a(p, -60.0, -50.0),
+            a(p, 120.0, -50.0),
+        ],
+        // `pieN` is `cScaleN`, so `pie12`, which no `cScale` sets, falls back to the first.
+        "dark" | "neutral" => std::array::from_fn(|i| scale[(i + 1) % 12]),
+        "redux-color" | "redux-dark-color" => scale,
+        "neo" | "redux" => base_pie(fixed.0, fixed.1, fixed.2),
+        _ => base_pie(p, s, t),
+    };
+    for (i, c) in pie.iter_mut().enumerate() {
+        if let Some(v) = color(&format!("pie{}", i + 1)) {
+            *c = v;
+        }
+    }
+    Charts { scale, pie }
 }
 
 /// khroma's `invert`.
@@ -783,6 +972,57 @@ mod tests {
             let src = format!("%%{{init: {{'theme': '{name}'}}}}%%\nA\n");
             assert!(ThemeConfig::read(&src).diagnostics().is_empty(), "{name}");
         }
+    }
+
+    #[test]
+    fn chart_colors() {
+        let apply = |src: &str| ThemeConfig::read(src).apply(&Theme::LIGHT);
+        let named = |name: &str| apply(&format!("%%{{init: {{'theme': '{name}'}}}}%%\nA\n"));
+        // Forest's first slice is its primary color, and its sections are its turns, darkened.
+        let t = named("forest");
+        let (scale, pie) = (t.scale.unwrap(), t.pie.unwrap());
+        assert_eq!(hex(pie[0]), "#cde498");
+        assert_eq!(hex(pie[1]), "#cdffb2");
+        assert_eq!(scale[0], lighten(rgb(0xcde498), -10.0));
+        assert_eq!(
+            scale[3],
+            lighten(adjust(rgb(0xcde498), 30.0, 0.0, 0.0), -10.0)
+        );
+        // The dark theme's sections are fixed after the first, and its slices follow them.
+        let t = named("dark");
+        let (scale, pie) = (t.scale.unwrap(), t.pie.unwrap());
+        assert_eq!(hex(scale[0]), "#1f2020");
+        assert_eq!(hex(scale[1]), "#0b0000");
+        assert_eq!(pie[0], scale[1]);
+        assert_eq!(pie[11], scale[0]);
+        assert_eq!(hex(named("neutral").scale.unwrap()[0]), "#555555");
+        let t = named("redux-color");
+        assert_eq!(hex(t.scale.unwrap()[0]), "#f4a8ff");
+        assert_eq!(t.pie, t.scale);
+        // `redux` sections are its `mainBkg`, darkened.
+        assert_eq!(
+            named("redux").scale.unwrap()[5],
+            lighten(rgb(0xffffff), -25.0)
+        );
+        // `base` takes its colors from `primaryColor`.
+        let t = apply(
+            "%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#BB2528', \
+             'cScale2': '#00ff00', 'pie3': '#0000ff'}}}%%\nA\n",
+        );
+        assert_eq!(hex(t.pie.unwrap()[0]), "#bb2528");
+        assert_eq!(t.scale.unwrap()[0], lighten(rgb(0xbb2528), -25.0));
+        assert_eq!(hex(t.scale.unwrap()[2]), "#00ff00");
+        assert_eq!(hex(t.pie.unwrap()[2]), "#0000ff");
+        // Without a name, chart colors change only when the diagram sets one.
+        assert_eq!(
+            apply("%%{init: {'themeVariables': {'fontSize': 16}}}%%\nA\n").pie,
+            None
+        );
+        let t = apply("%%{init: {'themeVariables': {'pie2': '#123456'}}}%%\nA\n");
+        let pie = t.pie.unwrap();
+        assert_eq!(hex(pie[1]), "#123456");
+        assert_eq!(hex(pie[0]), "#ececff");
+        assert_eq!(t.node_fill, Theme::LIGHT.node_fill);
     }
 
     #[test]

@@ -2,7 +2,7 @@
 
 use std::f32::consts::{FRAC_PI_2, TAU};
 
-use super::git::{branch_color, ink};
+use super::git::{ink, pie_color};
 use super::shapes::{self, BoxF};
 use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
@@ -99,7 +99,7 @@ pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
         if percent(s.value, total) == 0 {
             continue;
         }
-        let fill = branch_color(theme, i);
+        let fill = pie_color(theme, i);
         let segments = if share >= 0.9999 {
             shapes::ellipse(c, RADIUS, RADIUS)
         } else {
@@ -148,7 +148,7 @@ pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
         };
         elements.push(path(
             shapes::rounded(b, 2.0),
-            Some(branch_color(theme, i)),
+            Some(pie_color(theme, i)),
             None,
         ));
         let w = metrics.width(&line, fs);

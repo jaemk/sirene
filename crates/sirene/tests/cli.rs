@@ -260,6 +260,14 @@ fn diagram_themes() {
         .assert()
         .success()
         .stderr(predicate::str::contains("not a Mermaid theme"));
+    // Chart colors follow the theme too (MTHEME-4).
+    sirene()
+        .args(["svg", "-"])
+        .write_stdin("%%{init: {'theme': 'forest'}}%%\npie\n\"a\" : 2\n\"b\" : 1\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fill=\"#cde498\""))
+        .stdout(predicate::str::contains("fill=\"#cdffb2\""));
 }
 
 /// The width and height in a PNG's header.
