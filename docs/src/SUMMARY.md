@@ -19,6 +19,7 @@
 
 - [Supported syntax](syntax.md)
 - [Shapes](shapes.md)
+- [Themes](themes.md)
 - [Examples](examples.md)
 
 # Other diagrams

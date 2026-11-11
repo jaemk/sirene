@@ -24,7 +24,8 @@ where mermaid silently ignores or guesses.
   means `RL`, `^` means `BT`. With no direction the diagram is `TB`.
 - `direction` outside a subgraph has no effect and is a warning.
 - A `title:` key at the top level of the frontmatter sets the diagram title. Other frontmatter
-  keys and `%%{init}%%` directives are ignored for now.
+  keys and `%%{init}%%` directives are ignored, except `theme` and `themeVariables`
+  (`mermaid-themes.md`).
 - `accTitle` and `accDescr` set the accessible title and description, trimmed. A later
   statement replaces an earlier one.
 
