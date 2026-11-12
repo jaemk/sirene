@@ -91,6 +91,7 @@ const NODE_ATTRS: &[&str] = &[
     "fontcolor",
     "penwidth",
     "ordering",
+    "group",
 ];
 const EDGE_ATTRS: &[&str] = &[
     "label",
@@ -891,7 +892,15 @@ impl Lowerer {
             get(&root, "compound").is_some_and(|a| boolean(&a.value.text) == Some(true));
         self.name_clusters();
         let graph_order = get(&root, "ordering").cloned();
+        let mut groups: HashMap<String, usize> = HashMap::new();
         for i in 0..self.ids.len() {
+            if let Some(name) = get_text(&self.node_attrs[i], "group").filter(|g| !g.is_empty()) {
+                let g = *groups.entry(name.to_owned()).or_insert_with(|| {
+                    chart.groups.push(Vec::new());
+                    chart.groups.len() - 1
+                });
+                chart.groups[g].push(self.ids[i].clone());
+            }
             // A node's own `ordering`, else the graph's.
             let own = get(&self.node_attrs[i], "ordering").cloned();
             if let Some(order) = own

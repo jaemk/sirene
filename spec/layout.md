@@ -62,7 +62,9 @@ the ranks swapped are not ordered. Layout is deterministic.
 
 Items in a rank do not overlap and are separated by the node gap (the edge gap between two edge
 dummies). Items are pulled toward the ports of their neighbors so edges run straight where
-possible. A rank is as tall as its tallest item, and shorter items are centered in it.
+possible; the edges between two nodes of one of `groups` pull a hundred times harder, so they
+run straight before others. A rank is as tall as its tallest item, and shorter items are
+centered in it.
 
 ## LAYOUT-7 Ports
 
