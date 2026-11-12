@@ -1,0 +1,24 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Shop\nleft to right direction\nactor Guest as G\nactor :Clerk: as C <<Human>>\nrectangle Checkout {\n  usecase (Browse items) as Browse\n  (Pay) #palegreen\n  (Pay by card) as Card\n}\nG --> Browse\nG --> (Pay)\nCard .> (Pay) : <<extend>>\nC -- (Pay)\nnote right of C : on shift\n@enduml\n"
+---
+
+                        Shop
+
+                  ┌─ Checkout ──────────────────────┐
+                  │               ╭──────────────╮  │
+                  │           ┌──►( Browse items )  │
+ ┌───────┐   ┌────┼───────────┘   ╰──────────────╯  │
+ │ Guest ├───┘    │                                 │
+ │       ├───┐    │                   ╭─────╮       │
+ └───────┘   └──┐ │           ┌──────►(     )       │
+                └─┼───────────┘┌──────┤ Pay )       │
+┌─────────┐     ┌─┼────────────┘┌┄┄┄┄►(     )       │
+│ «Human» │  ┌──┘ │             ┆     ╰─────╯       │
+│  Clerk  ├──┘    │             ┆                   │
+└─────────┘       │  «extend»┄┬┄┘ ╭─────────────╮   │
+     ┆            │           └┄┄┄┤ Pay by card )   │
+     ┆            │               ╰─────────────╯   │
+┌──────────╮      └─────────────────────────────────┘
+│ on shift │
+└──────────┘

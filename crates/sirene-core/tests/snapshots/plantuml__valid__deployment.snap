@@ -1,0 +1,43 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ncloud Internet\nnode Gateway #lightblue\nframe Cluster {\n  node Worker [\n    worker\n    x3\n  ]\n  queue Jobs\n  storage Cache\n}\ndatabase Db\nartifact \"app.jar\" as Jar\nfile Config\nInternet --> Gateway\nGateway --> Worker : routes\nWorker -right-> Jobs\nWorker --> Cache\nWorker --> Db\nJar ..> Worker : deploys\nConfig .. Jar\n@enduml\n"
+---
+
+┌──────────┐   ┌────────┐
+│ Internet │   │ Config │
+└─────┬────┘   └────┬───┘
+      │             ┆
+      ▼             ┆
+ ┌─────────┐   ┌────┴────┐
+ │ Gateway │   │ app.jar │
+ └────┬────┘   └────┬────┘
+      │             ┆
+      └──┐        ┌┄┘
+         │        ┆
+      routes   deploys
+         │        ┆
+         └─┐   ┌┄┄┘
+           │   ┆
+   ┌───────┼───┼─── Cluster ──┐
+   │       ▼   ▼              │
+   │    ┌────────┐   ╭──────╮ │
+   │    │ worker ├──►├──────┤ │
+   │    │   x3   │   │ Jobs │ │
+   │    └──┬───┬─┘   ╰──────╯ │
+   │       │   │              │
+   │      ┌┘   └─┐            │
+   │      │      │            │
+   │      │      │            │
+   │     ┌┘      │            │
+   │     ▼       │            │
+   │ ╭───────╮   │            │
+   │ │ Cache │   │            │
+   │ ╰───────╯   │            │
+   │             │            │
+   └─────────────┼────────────┘
+                 │
+                 ▼
+              ╭────╮
+              ├────┤
+              │ Db │
+              ╰────╯

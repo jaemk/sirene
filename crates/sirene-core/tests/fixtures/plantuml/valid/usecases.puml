@@ -1,0 +1,16 @@
+@startuml
+title Shop
+left to right direction
+actor Guest as G
+actor :Clerk: as C <<Human>>
+rectangle Checkout {
+  usecase (Browse items) as Browse
+  (Pay) #palegreen
+  (Pay by card) as Card
+}
+G --> Browse
+G --> (Pay)
+Card .> (Pay) : <<extend>>
+C -- (Pay)
+note right of C : on shift
+@enduml
