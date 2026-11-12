@@ -33,6 +33,11 @@ required-features = ["png"]
 name = "examples"
 required-features = ["png"]
 
+[[bench]]
+name = "scale"
+harness = false
+
 [dev-dependencies]
+criterion = { version = "0.8.2", default-features = false, features = ["cargo_bench_support"] }
 insta = "1.49.0"
 proptest = "1.11.0"

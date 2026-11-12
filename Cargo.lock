@@ -7146,6 +7146,7 @@ dependencies = [
 name = "sirene-core"
 version = "0.2.1-dev"
 dependencies = [
+ "criterion",
  "insta",
  "log",
  "proptest",
