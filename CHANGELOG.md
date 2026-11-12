@@ -267,6 +267,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Gantt `ends D+N` matches `ends DATE`, `saturday are open` reopens Saturday, ` and ` inside a
   task name is part of the name, an end before the start is an error, and errors point at the
   clause that caused them.
+- PlantUML sequence diagrams read `<style>` blocks, and kind detection skips their bodies;
+  `Style -up-> Page` and other directional links from a setting-named element are links.
+- PlantUML activity `elseif` after `else` is an error, and a malformed `elseif` or a `break`
+  outside a loop no longer cuts the flow.
 
 ## [0.2.0] - 2026-11-08
 

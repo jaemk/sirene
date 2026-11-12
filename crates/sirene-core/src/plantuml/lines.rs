@@ -466,8 +466,8 @@ pub(crate) fn common(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) 
         _ => {}
     }
     // `Set <|-- HashSet` and `Style --> Page` link elements named like a setting;
-    // `Set : +add()` is a member line.
-    let is_link = super::link::link(t).is_some_and(|l| l.from == word(t));
+    // `Set : +add()` is a member line. `-up->` swaps the ends, so the word may be either.
+    let is_link = super::link::link(t).is_some_and(|l| [l.from, l.to].contains(&word(t)));
     // `title`, `header`, `footer` and `caption` accept `word: text`.
     let is_member = !matches!(w.as_str(), "title" | "header" | "footer" | "caption")
         && t[word(t).len()..].trim_start().starts_with(':');
@@ -556,7 +556,10 @@ pub(crate) fn common(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) 
             ));
             Common::Done
         }
-        _ if t.starts_with("<style>") => {
+        _ if t
+            .get(..7)
+            .is_some_and(|p| p.eq_ignore_ascii_case("<style>")) =>
+        {
             if !t.to_ascii_lowercase().contains("</style>") {
                 let (_, end) = cursor.until(&["</style>"]);
                 if end.is_none() {
@@ -633,6 +636,8 @@ mod tests {
             "Style --> Page",
             "Footer --> [Api]",
             "Title --> X",
+            "Style -up-> Page",
+            "Set -left-> Page",
             "Set : +add()",
             "Page: +x",
         ] {
@@ -675,6 +680,14 @@ mod tests {
         let mut d = Vec::new();
         common(&ln("skinparam x {"), &mut cursor(&["a"]), &mut d);
         assert!(d.iter().any(|x| x.message.contains("unclosed")));
+        // Any case, as detection reads it.
+        let mut d = Vec::new();
+        let mut c = cursor(&["x", "</Style>", "A -> B"]);
+        assert!(matches!(
+            common(&ln("<STYLE>"), &mut c, &mut d),
+            Common::Done
+        ));
+        assert_eq!(c.next().map(|l| l.text), Some("A -> B".to_owned()));
     }
 
     #[test]

@@ -13,22 +13,25 @@ expression: "@startuml\nstart\n!include parts.puml\nskinparam ActivityBackground
 12:1: error: unclosed `while`: expected `endwhile`
 14:1: error: unclosed action: expected `;` at its end
 
-      ╭──────╮
- ●    │ Fine │
-      ╰───┬──╯
-          │
-        next
-          ▼
-      ╭──────╮
-      │ Next │
-      ╰───┬──╯
-          │
-          ▼
-        ╱───╲
-        │ x │
-        ╲─┬─╱
-          │
-          ▼
-      ╭──────╮
-      │ Loop │
-      ╰──────╯
+    ●
+    │
+    ▼
+╭──────╮
+│ Fine │
+╰───┬──╯
+    │
+  next
+    ▼
+╭──────╮
+│ Next │
+╰───┬──╯
+    │
+    ▼
+  ╱───╲
+  │ x │
+  ╲─┬─╱
+    │
+    ▼
+╭──────╮
+│ Loop │
+╰──────╯

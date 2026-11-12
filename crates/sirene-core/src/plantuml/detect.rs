@@ -321,8 +321,8 @@ enum Body {
 
 const POSITIONS: &[&str] = &["left", "right", "center", "top", "bottom"];
 
-/// The body a line opens: a block `note`, `legend`, `title`, `header`, `footer`, or
-/// `skinparam ... {`.
+/// The body a line opens: a block `note`, `legend`, `title`, `header`, `footer`,
+/// `skinparam ... {`, or `<style>`.
 fn opens_body(line: &str) -> Option<Body> {
     let word = line[..word_len(line)].to_ascii_lowercase();
     let rest = line[word.len()..].trim_start();
@@ -330,6 +330,13 @@ fn opens_body(line: &str) -> Option<Body> {
         s.split_whitespace()
             .all(|w| POSITIONS.contains(&w.to_ascii_lowercase().as_str()))
     };
+    if line
+        .get(..7)
+        .is_some_and(|p| p.eq_ignore_ascii_case("<style>"))
+    {
+        let one_line = line.to_ascii_lowercase().contains("</style>");
+        return (!one_line).then_some(Body::Until(&["</style>"]));
+    }
     match word.as_str() {
         // `floating note ...` opens the same body as `note ...`.
         "floating" if word_len(rest) == 4 && rest[..4].eq_ignore_ascii_case("note") => {
@@ -521,6 +528,11 @@ mod tests {
             Kind::Sequence
         );
         assert_eq!(k("skinparam x {\n}\nstart"), Kind::Activity);
+        assert_eq!(
+            k("<style>\nnode {\n  BackgroundColor red\n}\n</STYLE>\nAlice -> Bob"),
+            Kind::Sequence
+        );
+        assert_eq!(k("<style>x</style>\nnode N"), Kind::Description);
         // An unclosed body ends at `@end`.
         assert_eq!(
             kind("@startuml\nnote left\nstart\n@enduml\n@startuml\nstate A\n@enduml\n"),
