@@ -201,14 +201,16 @@ struct Cells;
 
 impl Measure for Cells {
     fn node(&self, node: &Node) -> Size {
-        let lines = lines(&node.label);
+        let lines = title_lines(node);
         let w = lines.iter().map(|l| width(l)).max().unwrap_or(0);
         let h = lines.len() as i32;
         if !node.sections.is_empty() {
             let rows: Vec<Vec<String>> = node.sections.iter().map(|s| section_lines(s)).collect();
             let rw = rows.iter().flatten().map(|l| width(l)).max().unwrap_or(0);
             let rh: i32 = rows.iter().map(|s| s.len() as i32 + 1).sum();
-            return Size::new(w.max(rw) + 4, h + 2 + rh);
+            // An untitled node's first section has no rule of its own: the top border.
+            let first = i32::from(node.untitled());
+            return Size::new(w.max(rw) + 4, h + 2 + rh - first);
         }
         match frame_of(node) {
             Frame::Glyph(_) => Size::new(1, 1),
@@ -245,11 +247,11 @@ impl Measure for Cells {
 
     /// The label's lines start below the top border; each section's rows below its rule.
     fn row(&self, node: &Node, row: usize) -> Option<i32> {
-        let title = lines(&node.label).len();
+        let title = title_lines(node).len();
         if row < title {
             return Some(1 + row as i32);
         }
-        let mut y = 1 + title as i32;
+        let mut y = if node.untitled() { 0 } else { 1 + title as i32 };
         let mut k = row - title;
         for section in &node.sections {
             if k < section.len() {
@@ -469,18 +471,38 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
         _ => {}
     }
     // A rule above each compartment, joining the sides.
-    let mut y = r.y + 1 + lines(&node.label).len() as i32;
-    for section in &node.sections {
-        canvas.hline(r.x, r.right(), y, Line::Light);
+    // An untitled node's first section starts at the top border.
+    let mut y = if node.untitled() {
+        r.y
+    } else {
+        r.y + 1 + lines(&node.label).len() as i32
+    };
+    for (i, section) in node.sections.iter().enumerate() {
+        if i > 0 || !node.untitled() {
+            canvas.hline(r.x, r.right(), y, Line::Light);
+        }
         y += 1 + section.len() as i32;
     }
 }
 
+/// The lines of a node's title: none for an untitled compartment node.
+fn title_lines(node: &Node) -> Vec<String> {
+    if node.untitled() {
+        Vec::new()
+    } else {
+        lines(&node.label)
+    }
+}
+
 fn draw_node_text(canvas: &mut Canvas, node: &Node, r: Rect) {
-    let lines = lines(&node.label);
+    let lines = title_lines(node);
     if !node.sections.is_empty() {
         draw_lines(canvas, &lines, r.x + 1, r.w - 2, r.y + 1);
-        let mut y = r.y + 2 + lines.len() as i32;
+        let mut y = if node.untitled() {
+            r.y + 1
+        } else {
+            r.y + 2 + lines.len() as i32
+        };
         for section in &node.sections {
             for row in section_lines(section) {
                 canvas.text(r.x + 2, y, &row);

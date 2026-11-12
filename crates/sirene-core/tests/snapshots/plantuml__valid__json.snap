@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startjson\n' A package manifest.\n{\n  \"name\": \"sirene\",\n  \"version\": \"0.4.0\",\n  \"private\": false,\n  \"keywords\": [\"diagrams\", \"mermaid\", \"plantuml\"],\n  \"author\": {\n    \"name\": \"J. K.\",\n    \"links\": {\"home\": \"https://example.com\", \"mail\": null}\n  },\n  \"files\": [],\n  \"scripts\": [\n    {\"run\": \"sirene ascii\", \"args\": 2},\n    \"check\"\n  ]\n}\n@endjson\n"
+---
+
+                          ┌──────────┐
+                          │ diagrams │
+                       ┌──┤ mermaid  │
+┌─────────────────┐    │  │ plantuml │
+│ name     sirene │ ┌──┘  └──────────┘
+│ version  0.4.0  │ │
+│ private  false  │ │    ┌─────────────┐     ┌──────────────────────────┐
+│ keywords        ├─┘    │ name  J. K. │     │ home https://example.com │
+│ author          ├──────┤ links       ├─────┤ mail null                │
+│ files    []     │      └─────────────┘     └──────────────────────────┘
+│ scripts         ├─┐
+└─────────────────┘ │       ┌───────┐           ┌───────────────────┐
+                    └──┐    │       ├──────┐    │ run  sirene ascii │
+                       └────┤ check │      └────┤ args 2            │
+                            └───────┘           └───────────────────┘

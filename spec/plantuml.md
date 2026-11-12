@@ -4,8 +4,8 @@ Status: research; sequence diagrams are specified in `plantuml-sequence-diagrams
 activity diagrams in `plantuml-activity-diagrams.md` (PACT), class diagrams in
 `plantuml-class-diagrams.md` (PCLS), state diagrams in `plantuml-state-diagrams.md` (PSTA), and
 use case, component, and deployment diagrams in `plantuml-description-diagrams.md` (PDSC), and
-mindmaps and WBS in `plantuml-mindmaps-and-wbs.md` (PMIND), and Gantt charts in
-`plantuml-gantt-charts.md` (PGANTT).
+mindmaps and WBS in `plantuml-mindmaps-and-wbs.md` (PMIND), Gantt charts in
+`plantuml-gantt-charts.md` (PGANTT), and JSON and YAML in `plantuml-json-and-yaml.md` (PDATA).
 PlantUML (<https://plantuml.com>) has a dozen diagram kinds and no formal grammar; its
 reference is the Java implementation and the language reference guide. Full compatibility is
 not the goal. The useful subset reuses the sequence and graph models.

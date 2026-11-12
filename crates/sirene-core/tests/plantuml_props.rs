@@ -366,8 +366,119 @@ fn gantt_statement() -> impl Strategy<Value = String> {
     ]
 }
 
+/// A JSON or YAML value: a scalar, an object, or an array.
+#[derive(Debug, Clone)]
+enum Tree {
+    Scalar(String),
+    Object(Vec<(String, Tree)>),
+    Array(Vec<Tree>),
+}
+
+fn data_tree() -> impl Strategy<Value = Tree> {
+    let scalar = prop::sample::select(vec!["1", "-2.5", "true", "null", "text", "a b", "x:y"])
+        .prop_map(|s| Tree::Scalar(s.to_owned()));
+    scalar.prop_recursive(4, 24, 4, |inner| {
+        prop_oneof![
+            prop::collection::vec(("[a-z]{1,4}", inner.clone()), 0..4).prop_map(Tree::Object),
+            prop::collection::vec(inner, 0..4).prop_map(Tree::Array),
+        ]
+    })
+}
+
+impl Tree {
+    fn json(&self) -> String {
+        match self {
+            Tree::Scalar(s) if matches!(s.as_str(), "1" | "-2.5" | "true" | "null") => s.clone(),
+            Tree::Scalar(s) => format!("{s:?}"),
+            Tree::Object(p) => {
+                let p: Vec<_> = p
+                    .iter()
+                    .map(|(k, v)| format!("{k:?}: {}", v.json()))
+                    .collect();
+                format!("{{{}}}", p.join(", "))
+            }
+            Tree::Array(a) => {
+                let a: Vec<_> = a.iter().map(Tree::json).collect();
+                format!("[{}]", a.join(",\n"))
+            }
+        }
+    }
+
+    /// Block YAML at `indent`; empty collections as `{}` and `[]`.
+    fn yaml(&self, indent: usize, out: &mut String) {
+        let pad = " ".repeat(indent);
+        let scalar = |s: &str| {
+            if s.contains(':') {
+                format!("{s:?}")
+            } else {
+                s.to_owned()
+            }
+        };
+        match self {
+            Tree::Scalar(s) => out.push_str(&format!("{pad}{}\n", scalar(s))),
+            Tree::Object(p) if p.is_empty() => out.push_str(&format!("{pad}{{}}\n")),
+            Tree::Array(a) if a.is_empty() => out.push_str(&format!("{pad}[]\n")),
+            Tree::Object(p) => {
+                for (k, v) in p {
+                    match v {
+                        Tree::Scalar(s) => out.push_str(&format!("{pad}{k}: {}\n", scalar(s))),
+                        Tree::Object(c) if c.is_empty() => {
+                            out.push_str(&format!("{pad}{k}: {{}}\n"))
+                        }
+                        Tree::Array(c) if c.is_empty() => out.push_str(&format!("{pad}{k}: []\n")),
+                        _ => {
+                            out.push_str(&format!("{pad}{k}:\n"));
+                            v.yaml(indent + 2, out);
+                        }
+                    }
+                }
+            }
+            Tree::Array(a) => {
+                for v in a {
+                    out.push_str(&format!("{pad}-\n"));
+                    v.yaml(indent + 2, out);
+                }
+            }
+        }
+    }
+
+    /// The tables it draws as: one per non-empty collection, or one for the whole value.
+    fn tables(&self) -> usize {
+        fn nested(t: &Tree) -> usize {
+            match t {
+                Tree::Object(p) if !p.is_empty() => {
+                    1 + p.iter().map(|(_, v)| nested(v)).sum::<usize>()
+                }
+                Tree::Array(a) if !a.is_empty() => 1 + a.iter().map(nested).sum::<usize>(),
+                _ => 0,
+            }
+        }
+        nested(self).max(1)
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2000))]
+
+    #[test]
+    fn generated_data_lowers_and_draws(tree in data_tree(), yaml in any::<bool>()) {
+        let src = if yaml {
+            let mut body = String::new();
+            tree.yaml(0, &mut body);
+            format!("@startyaml\n{body}@endyaml\n")
+        } else {
+            format!("@startjson\n{}\n@endjson\n", tree.json())
+        };
+        let parse = plantuml::parse(&src);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        let (diagram, diagnostics) = parse.lower();
+        prop_assert!(diagnostics.is_empty(), "{:?}\n{}", diagnostics, src);
+        let Diagram::Graph(g) = &diagram else {
+            return Err(TestCaseError::fail("not a graph"));
+        };
+        prop_assert_eq!(g.nodes.len(), tree.tables(), "{}", src);
+        check(&diagram)?;
+    }
 
     #[test]
     fn generated_gantts_lower_and_draw(

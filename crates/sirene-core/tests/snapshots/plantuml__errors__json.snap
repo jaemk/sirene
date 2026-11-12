@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startjson\n#highlight \"a\"\n<style>\njsonDiagram { node { BackGroundColor yellow } }\n</style>\n{\n  \"a\": 1,\n  \"b\": [1 2]\n}\n@endjson\n"
+---
+2:1: warning: `#highlight` is drawn without highlighting
+3:1: warning: `<style>` is not drawn
+8:11: error: expected `,` or `]`, found `2`
+
+┌─────┐
+│ a 1 │    ┌───┐
+│ b   ├────┤ 1 │
+└─────┘    └───┘

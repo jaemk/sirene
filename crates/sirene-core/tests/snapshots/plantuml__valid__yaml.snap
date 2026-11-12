@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startyaml\n# A deployment.\nservice: web\nreplicas: 3\nports: [80, 443]\nenv:\n  LOG: info\n  REGION: \"us-east\"\nsteps:\n- name: build\n  run: cargo build\n- name: test\n  run: |\n    cargo test\n- deploy\n@endyaml\n"
+---
+
+                           ┌─────┐
+                           │ 80  │
+                    ┌──────┤ 443 │
+                    │      └─────┘
+┌──────────────┐    │
+│ service  web │ ┌──┘ ┌────────────────┐
+│ replicas 3   │ │    │ LOG    info    │
+│ ports        ├─┘  ┌─┤ REGION us-east │
+│ env          ├────┘ └────────────────┘      ┌──────────────────┐
+│ steps        ├─┐                            │ name build       │
+└──────────────┘ │        ┌────────┐        ┌─┤ run  cargo build │
+                 └──┐     │        ├────────┘ └──────────────────┘
+                    └─────┤        ├─────┐
+                          │ deploy │     │    ┌─────────────────┐
+                          └────────┘     └──┐ │ name test       │
+                                            └─┤ run  cargo test │
+                                              └─────────────────┘

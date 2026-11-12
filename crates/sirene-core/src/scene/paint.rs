@@ -216,7 +216,11 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
     /// node; each section's rows follow its padding.
     fn row(&self, node: &Node, row: usize) -> Option<i32> {
         let lh = self.theme.line_height;
-        let title = node.label.spans().len();
+        let title = if node.untitled() {
+            0
+        } else {
+            node.label.spans().len()
+        };
         if row < title {
             let height = if node.sections.is_empty() {
                 (self.node(node).h - 1) as f32
@@ -276,7 +280,11 @@ impl Compartments {
                     .sum::<f32>()
             })
             .fold(0.0, f32::max);
-        let title = node.label.spans().len() as f32 * theme.line_height + 2.0 * shapes::PAD_Y;
+        let title = if node.untitled() {
+            0.0
+        } else {
+            node.label.spans().len() as f32 * theme.line_height + 2.0 * shapes::PAD_Y
+        };
         let mut width = title_w;
         let mut height = title;
         let mut columns = Vec::new();
@@ -909,16 +917,19 @@ impl Painter<'_> {
         self.lines(owner, title, center, color);
         let (lh, size) = (theme.line_height, theme.font_size);
         let mut y = b.y + c.title;
-        for (section, cols) in node.sections.iter().zip(&c.columns) {
-            self.path(
-                owner,
-                vec![
-                    Segment::Move(Pt::new(b.x, y)),
-                    Segment::Line(Pt::new(b.right(), y)),
-                ],
-                None,
-                Some(rule),
-            );
+        for (i, (section, cols)) in node.sections.iter().zip(&c.columns).enumerate() {
+            // An untitled node's first section starts at its top border.
+            if i > 0 || !node.untitled() {
+                self.path(
+                    owner,
+                    vec![
+                        Segment::Move(Pt::new(b.x, y)),
+                        Segment::Line(Pt::new(b.right(), y)),
+                    ],
+                    None,
+                    Some(rule),
+                );
+            }
             y += SECTION_PAD;
             for row in section {
                 let style = row_style(row);

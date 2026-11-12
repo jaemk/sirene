@@ -1,0 +1,16 @@
+@startyaml
+# A deployment.
+service: web
+replicas: 3
+ports: [80, 443]
+env:
+  LOG: info
+  REGION: "us-east"
+steps:
+- name: build
+  run: cargo build
+- name: test
+  run: |
+    cargo test
+- deploy
+@endyaml

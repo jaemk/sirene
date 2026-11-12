@@ -327,6 +327,12 @@ impl Node {
             mentions: Vec::new(),
         }
     }
+
+    /// Whether the node is compartments with no title area: an empty label over sections, as
+    /// PlantUML's JSON and YAML tables are drawn.
+    pub fn untitled(&self) -> bool {
+        !self.sections.is_empty() && self.label.text.is_empty()
+    }
 }
 
 impl Edge {

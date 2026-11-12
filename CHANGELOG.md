@@ -53,6 +53,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - PlantUML Gantt charts (`@startgantt`): tasks with durations, start and end dates, `then`,
   references to other tasks' starts and ends, `[A] -> [B]`, milestones, completion, sections,
   closed weekdays and dates, `printscale`, and `today is`.
+- PlantUML JSON and YAML (`@startjson`, `@startyaml`), drawn left to right as a table per object
+  or array with lines to nested tables.
+- Compartment nodes with an empty label have no title area.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

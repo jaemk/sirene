@@ -1,0 +1,10 @@
+@startjson
+#highlight "a"
+<style>
+jsonDiagram { node { BackGroundColor yellow } }
+</style>
+{
+  "a": 1,
+  "b": [1 2]
+}
+@endjson
