@@ -36,6 +36,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `stop`, `end`, `if`/`elseif`/`else`, `switch`, `while`, `repeat` with `backward`, `break`,
   `fork`, `split`, partitions and groups, swimlanes (`|Lane|`), arrow labels and styles, and
   notes. The diagram kind is detected from the first statement as PlantUML does.
+- PlantUML class and object diagrams, drawn with compartments: class kinds and stereotypes,
+  members with `{static}`/`{abstract}` and separators, `extends`/`implements`, links with every
+  head, multiplicities, direction words, and `-[#color,dashed]->` styles, packages, objects,
+  maps, `hide empty members`, and notes.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

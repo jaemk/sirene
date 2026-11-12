@@ -1,7 +1,8 @@
 # PlantUML
 
 Status: research; sequence diagrams are specified in `plantuml-sequence-diagrams.md` (PSEQ)
-and activity diagrams in `plantuml-activity-diagrams.md` (PACT).
+activity diagrams in `plantuml-activity-diagrams.md` (PACT), and class diagrams in
+`plantuml-class-diagrams.md` (PCLS).
 PlantUML (<https://plantuml.com>) has a dozen diagram kinds and no formal grammar; its
 reference is the Java implementation and the language reference guide. Full compatibility is
 not the goal. The useful subset reuses the sequence and graph models.

@@ -1,0 +1,51 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Shop\npackage shop {\n  abstract class Product {\n    -id : UUID\n    +price() : Money\n  }\n  class Book extends Product {\n    +isbn : String\n  }\n  interface Shippable <<capability>>\n  enum Status {\n    NEW\n    PAID\n    SHIPPED\n  }\n}\nclass Order #LightYellow {\n  +status : Status\n  --\n  +total() : Money\n  .. internal ..\n  -recalc()\n}\nBook ..|> Shippable\nOrder \"1\" *-- \"many\" Product : contains >\nOrder --> Status\nnote right of Order : one per checkout\n@enduml\n"
+---
+
+                              Shop
+
+                       ┌──────────────────┐
+                       │      Order       │
+                       ├──────────────────┤
+                       │ +status : Status │  ┌──────────────────╮
+                       ├──────────────────┤  │ one per checkout │
+                       │ +total() : Money │┄┄└──────────────────┘
+                       ├──────────────────┤
+                       │ internal         │
+                       │ -recalc()        │
+                       └─────────────┬────┘
+                            ◆1       │
+                      ┌─────┘        │
+                      │              │
+                 contains >          │
+                      │              │
+                ┌─────┘              │
+                │                    │
+┌───────────────┼────────────────────┼─── shop ─┐
+│               │many                ▼          │
+│     ┌─────────┴────────┐   ┌───────────────┐  │
+│     │    «abstract»    │   │ «enumeration» │  │
+│     │     Product      │   │    Status     │  │
+│     ├──────────────────┤   ├───────────────┤  │
+│     │ -id : UUID       │   │ NEW           │  │
+│     ├──────────────────┤   │ PAID          │  │
+│     │ +price() : Money │   │ SHIPPED       │  │
+│     └──────────────────┘   ├───────────────┤  │
+│               △            └───────────────┘  │
+│               │                               │
+│               │                               │
+│      ┌────────┴───────┐                       │
+│      │      Book      │                       │
+│      ├────────────────┤                       │
+│      │ +isbn : String │                       │
+│      ├────────────────┤                       │
+│      └────────┬───────┘                       │
+│               ┆                               │
+│               ▽                               │
+│ ┌──────────────────────────┐                  │
+│ │ «interface» «capability» │                  │
+│ │        Shippable         │                  │
+│ └──────────────────────────┘                  │
+│                                               │
+└───────────────────────────────────────────────┘

@@ -172,12 +172,12 @@ fn documents() {
     let d = diags("@startmindmap\n* a\n@endmindmap\n");
     assert_eq!(d[0].0, Severity::Error);
     assert!(d[0].1.contains("`@startmindmap`"), "{d:?}");
-    let d = diags("@startuml\nclass A\n@enduml\n");
+    let d = diags("@startuml\nrobust W\n@enduml\n");
     assert_eq!(
         d,
         [(
             Severity::Error,
-            "PlantUML class diagrams are not supported yet".to_owned()
+            "PlantUML timing diagrams are not supported yet".to_owned()
         )]
     );
     // Keywords match in any case; comments are skipped.
