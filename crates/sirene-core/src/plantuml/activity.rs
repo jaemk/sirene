@@ -675,18 +675,24 @@ impl Lower {
 
     /// `elseif (cond) then (yes)`, with `no` from a leading `(no)` on the edge to the new test.
     fn else_if(&mut self, line: &Line, rest: &str, no: Option<String>) {
-        if !matches!(self.stack.last(), Some(Open::If { .. })) {
-            return self.error(line.range, "`elseif` belongs in an `if`");
+        match self.stack.last() {
+            Some(Open::If {
+                otherwise: false, ..
+            }) => {}
+            Some(Open::If { .. }) => {
+                return self.error(line.range, "`elseif` after `else`; expected `endif`");
+            }
+            _ => return self.error(line.range, "`elseif` belongs in an `if`"),
         }
+        let Some((cond, rest)) = parens(rest) else {
+            return self.error(line.range, "expected `(condition)` after `elseif`");
+        };
         self.bake();
         let Some(Open::If { decision, ends, .. }) = self.stack.last_mut() else {
             unreachable!()
         };
         ends.append(&mut self.tails);
         let from = decision.clone();
-        let Some((cond, rest)) = parens(rest) else {
-            return self.error(line.range, "expected `(condition)` after `elseif`");
-        };
         let (yes, _) = label_after(rest, "then");
         let next = self.node(Shape::Diamond, &lines::text(cond.trim()), line.range);
         self.edge(&from, &next, no, line.range);
@@ -927,13 +933,13 @@ impl Lower {
     }
 
     fn brk(&mut self, line: &Line) {
-        let tails = std::mem::take(&mut self.tails);
         let target = self.stack.iter_mut().rev().find_map(|o| match o {
             Open::While { breaks, .. } | Open::Repeat { breaks, .. } => Some(breaks),
             _ => None,
         });
+        // Without a loop the flow goes on as if the `break` were not there.
         match target {
-            Some(breaks) => breaks.extend(tails),
+            Some(breaks) => breaks.append(&mut self.tails),
             None => self.error(line.range, "`break` belongs in a `while` or `repeat`"),
         }
     }
@@ -1159,6 +1165,28 @@ mod tests {
         );
         let (_, d) = lower_src("(*) --> \"a\"");
         assert!(d[0].contains("older activity syntax"), "{d:?}");
+    }
+
+    #[test]
+    fn elseif_after_else_is_an_error() {
+        let (c, d) = lower_src("if (x) then\n:a;\nelse\n:b;\nelseif (y) then\n:c;\nendif\n:d;");
+        assert_eq!(d, ["`elseif` after `else`; expected `endif`"]);
+        // The line is skipped; `:c` continues the `else` branch.
+        assert_eq!(edges(&c), ["x>a", "x>b", "b>c", "a>d", "c>d"]);
+    }
+
+    #[test]
+    fn malformed_elseif_keeps_the_flow() {
+        let (c, d) = lower_src("if (x) then\n:a;\nelseif y\n:b;\nendif\n:c;");
+        assert_eq!(d, ["expected `(condition)` after `elseif`"]);
+        assert_eq!(edges(&c), ["x>a", "a>b", "b>c", "x>c"]);
+    }
+
+    #[test]
+    fn break_outside_a_loop_keeps_the_flow() {
+        let (c, d) = lower_src(":a;\nbreak\n:b;");
+        assert_eq!(d, ["`break` belongs in a `while` or `repeat`"]);
+        assert_eq!(edges(&c), ["a>b"]);
     }
 
     #[test]

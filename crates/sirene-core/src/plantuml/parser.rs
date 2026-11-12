@@ -470,6 +470,11 @@ impl Parser<'_> {
             self.title();
         } else if let Some(kw) = keyword_in(r, &["legend", "header", "footer", "skinparam"]) {
             self.setting(kw);
+        } else if line
+            .get(..7)
+            .is_some_and(|p| p.eq_ignore_ascii_case("<style>"))
+        {
+            self.style();
         } else if let Some(kw) = keyword_in(r, KEYWORDS)
             && find_arrow(line).is_none()
         {
@@ -780,6 +785,21 @@ impl Parser<'_> {
         self.finish();
     }
 
+    /// `<style>` ... `</style>`, on one line or several: kept for the lowering to report.
+    fn style(&mut self) {
+        self.start(SEQ_STMT);
+        self.token(SEQ_KW, 7);
+        let r = self.rest();
+        let line = &r[..scan::line_len(r)];
+        let one_line = line.to_ascii_lowercase().contains("</style>");
+        self.rest_of_line(TEXT);
+        self.ws();
+        if !one_line {
+            self.body(&["</style>"], "<style>");
+        }
+        self.finish();
+    }
+
     /// Any other keyword statement: its keyword, then a participant name or text.
     fn keyword_stmt(&mut self, kw: &str) {
         self.start(SEQ_STMT);
@@ -1022,6 +1042,23 @@ mod tests {
         assert_eq!(t.matches("MESSAGE_STMT@").count(), 5);
         assert_eq!(t.matches("NOTE_STMT@").count(), 4);
         assert_eq!(t.matches("TITLE_STMT@").count(), 1);
+    }
+
+    #[test]
+    fn style_blocks() {
+        let src = doc(
+            "<style>\nparticipant {\n  BackgroundColor red\n}\n</Style>\nA -> B\n\
+                       <style>x</style>",
+        );
+        let (_, d) = tree(&src);
+        assert!(d.is_empty(), "{d:?}");
+        let (_, d) = super::super::parse(&src).lower();
+        let d: Vec<_> = d.iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(d, ["`<style>` is not drawn yet; ignoring it"; 2]);
+        assert_eq!(
+            tree(&doc("<style>\nx")).1,
+            ["unclosed `<style>`: expected `</style>`"]
+        );
     }
 
     #[test]
