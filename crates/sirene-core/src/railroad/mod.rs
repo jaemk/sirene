@@ -234,6 +234,25 @@ impl Parse {
                     min: u32::from(op == "+"),
                     max: None,
                 },
+                // `{ a }-`: one or more, when no element follows to except.
+                "-" if matches!(
+                    e,
+                    Expr::Repeat {
+                        min: 0,
+                        max: None,
+                        ..
+                    }
+                ) && parts.get(i).is_none_or(|p| p.kind() == RR_OP) =>
+                {
+                    let Expr::Repeat { expr, .. } = e else {
+                        unreachable!()
+                    };
+                    Expr::Repeat {
+                        expr,
+                        min: 1,
+                        max: None,
+                    }
+                }
                 "-" => {
                     let except = self.primary(parts.get(i)?)?;
                     i += 1;
@@ -443,6 +462,21 @@ mod tests {
         let (chart, _) = parse("railroad-ebnf-beta\ntitle \"A \\\"b\\\"\"\n").lower();
         assert_eq!(chart.title.as_deref(), Some("A \"b\""));
         assert_eq!(chart.notation, Notation::Ebnf);
+    }
+
+    #[test]
+    fn ebnf_one_or_more_braces() {
+        let r = rules("railroad-ebnf-beta\na = { b }-, c ;\nd = { e }- ;\nf = { g } - h ;\n");
+        assert_eq!(
+            r[0].definition,
+            Expr::Sequence(vec![rep(nt("b"), 1, None), nt("c")])
+        );
+        assert_eq!(r[1].definition, rep(nt("e"), 1, None));
+        // With a space, `-` is an exception.
+        assert_eq!(
+            r[2].definition,
+            Expr::Sequence(vec![rep(nt("g"), 0, None), t("-"), nt("h")])
+        );
     }
 
     #[test]
