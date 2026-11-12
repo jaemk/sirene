@@ -1,0 +1,13 @@
+@startuml
+object alice {
+  name = "Alice"
+  age = 30
+}
+object cart
+map Prices {
+  apple => 1.20
+  pear => 0.90
+}
+alice --> cart : owns
+cart o-- Prices
+@enduml

@@ -1,0 +1,14 @@
+@startuml
+class A {
+  +run()
+}
+}
+class B <<x>> ?
+A -[wavy]-> B
+A <|-- B
+what is this
+note left of Nowhere : lost
+(A, B) .. C
+class C {
+  open body
+@enduml

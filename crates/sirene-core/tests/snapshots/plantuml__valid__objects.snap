@@ -1,0 +1,25 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nobject alice {\n  name = \"Alice\"\n  age = 30\n}\nobject cart\nmap Prices {\n  apple => 1.20\n  pear => 0.90\n}\nalice --> cart : owns\ncart o-- Prices\n@enduml\n"
+---
+
+┌────────────────┐
+│     alice      │
+├────────────────┤
+│ name = "Alice" │
+│ age = 30       │
+└────────┬───────┘
+         │
+       owns
+         ▼
+     ┌──────┐
+     │ cart │
+     └──────┘
+         ◇
+         │
+  ┌──────┴─────┐
+  │   Prices   │
+  ├────────────┤
+  │ apple 1.20 │
+  │ pear  0.90 │
+  └────────────┘

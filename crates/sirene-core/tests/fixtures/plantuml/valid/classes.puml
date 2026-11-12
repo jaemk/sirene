@@ -1,0 +1,29 @@
+@startuml
+title Shop
+package shop {
+  abstract class Product {
+    -id : UUID
+    +price() : Money
+  }
+  class Book extends Product {
+    +isbn : String
+  }
+  interface Shippable <<capability>>
+  enum Status {
+    NEW
+    PAID
+    SHIPPED
+  }
+}
+class Order #LightYellow {
+  +status : Status
+  --
+  +total() : Money
+  .. internal ..
+  -recalc()
+}
+Book ..|> Shippable
+Order "1" *-- "many" Product : contains >
+Order --> Status
+note right of Order : one per checkout
+@enduml

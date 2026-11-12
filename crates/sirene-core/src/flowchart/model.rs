@@ -373,6 +373,23 @@ pub struct Subgraph {
     pub region: bool,
 }
 
+impl Subgraph {
+    /// An empty subgraph titled `title`.
+    pub fn new(id: impl Into<String>, title: Label, range: TextRange) -> Self {
+        Self {
+            id: id.into(),
+            title,
+            direction: None,
+            members: Vec::new(),
+            classes: Vec::new(),
+            styles: Vec::new(),
+            metadata: Vec::new(),
+            range,
+            region: false,
+        }
+    }
+}
+
 /// Which side of its target a note sits on (LANGS-3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NoteSide {

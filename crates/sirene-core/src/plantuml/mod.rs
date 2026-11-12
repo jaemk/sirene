@@ -2,8 +2,10 @@
 //! the other kinds lowered to the graph model, one module each.
 
 mod activity;
+mod class;
 mod detect;
 mod lines;
+mod link;
 mod lower;
 mod parser;
 
@@ -18,7 +20,7 @@ use crate::syntax::SyntaxNode;
 
 /// Whether sirene draws diagrams of `kind` yet (PUML-2).
 pub(crate) fn supported(kind: Kind) -> bool {
-    matches!(kind, Kind::Sequence | Kind::Activity)
+    matches!(kind, Kind::Sequence | Kind::Activity | Kind::Class)
 }
 
 /// The result of parsing PlantUML source: a lossless syntax tree plus diagnostics.
@@ -51,6 +53,10 @@ impl Parse {
         let (diagram, lowering) = match self.kind {
             Kind::Activity => {
                 let (chart, d) = activity::lower(&root);
+                (Diagram::Graph(chart), d)
+            }
+            Kind::Class => {
+                let (chart, d) = class::lower(&root);
                 (Diagram::Graph(chart), d)
             }
             Kind::Sequence => {

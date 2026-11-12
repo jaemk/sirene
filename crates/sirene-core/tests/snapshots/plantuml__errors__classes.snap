@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nclass A {\n  +run()\n}\n}\nclass B <<x>> ?\nA -[wavy]-> B\nA <|-- B\nwhat is this\nnote left of Nowhere : lost\n(A, B) .. C\nclass C {\n  open body\n@enduml\n"
+---
+5:1: error: `}` without a `{` to close
+6:15: warning: `?` is not drawn; ignoring it
+7:3: warning: `-[wavy]->`: style `wavy` is not drawn; ignoring it
+9:1: error: expected a class diagram statement such as `class A`, `A <|-- B`, or `A : member`
+11:1: warning: association classes (`(A, B) .. C`) are not drawn yet; ignoring it
+12:1: error: unclosed `class` body: expected `}`
+
+┌────────┐                           ┌───────────┐
+│   A    │   ┌──────╮  ┌─────────┐   │     C     │
+├────────┤   │ lost │┄┄│ Nowhere │   ├───────────┤
+├────────┤   └──────┘  └─────────┘   │ open body │
+│ +run() │                           ├───────────┤
+└──┬─────┘                           └───────────┘
+   │   △
+   └┐  │
+    │  │
+    │  │
+    │ ┌┘
+    ▼ │
+  ┌───┴─┐
+  │ «x» │
+  │  B  │
+  └─────┘

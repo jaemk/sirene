@@ -166,6 +166,65 @@ fn activity() -> impl Strategy<Value = String> {
         .prop_map(|stmts| format!("@startuml\nstart\n{}\n@enduml\n", stmts.join("\n")))
 }
 
+/// A well-formed class diagram statement (PCLS-*).
+fn class_statement() -> impl Strategy<Value = String> {
+    let names = || prop::sample::select(vec!["A", "B", "C", "\"Long name\"", "x.y.Z", "Box<T>"]);
+    let kinds = prop::sample::select(vec![
+        "class",
+        "abstract class",
+        "interface",
+        "enum",
+        "object",
+        "entity",
+        "struct",
+        "circle",
+        "diamond",
+    ]);
+    let arrows = prop::sample::select(vec![
+        "<|--",
+        "*--",
+        "o--",
+        "-->",
+        "..>",
+        "..|>",
+        "--",
+        "..",
+        "-up->",
+        "-left-",
+        "-[#red]->",
+        "-[hidden]-",
+        "}o--||",
+        "---",
+        "->",
+    ]);
+    let members = prop::sample::select(vec![
+        "",
+        " {\n  -id : int\n  +run()\n}",
+        " {\n  a\n  --\n  b()\n  .. t ..\n}",
+        " {}",
+        " <<S>> #pink",
+        " extends B",
+        " implements B, C",
+    ]);
+    let simple = prop_oneof![
+        (kinds, names(), members).prop_map(|(k, n, m)| format!("{k} {n}{m}")),
+        (names(), arrows, names()).prop_map(|(a, arrow, b)| format!("{a} {arrow} {b}")),
+        (names(), names()).prop_map(|(a, b)| format!("{a} \"1\" *-- \"n\" {b} : has >")),
+        names().prop_map(|n| format!("{n} : +field : int")),
+        names().prop_map(|n| format!("note right of {n} : n")),
+        Just("note \"free\" as N".to_owned()),
+        Just("hide empty members".to_owned()),
+        Just("left to right direction".to_owned()),
+    ];
+    simple.prop_recursive(2, 16, 4, |inner| {
+        (
+            prop::sample::select(vec!["package P", "namespace N", "together"]),
+            prop::collection::vec(inner, 0..4),
+        )
+            .prop_map(|(head, body)| format!("{head} {{\n{}\n}}", body.join("\n")))
+    })
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2000))]
 
@@ -183,6 +242,19 @@ proptest! {
     fn generated_activities_lower_and_draw(src in activity()) {
         let parse = plantuml::parse(&src);
         prop_assert_eq!(parse.kind(), plantuml::Kind::Activity);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        let (diagram, diagnostics) = parse.lower();
+        prop_assert!(diagnostics.is_empty(), "{:?}\n{}", diagnostics, src);
+        check(&diagram)?;
+    }
+
+    #[test]
+    fn generated_classes_lower_and_draw(
+        stmts in prop::collection::vec(class_statement(), 0..8),
+    ) {
+        let src = format!("@startuml\nclass Anchor\n{}\n@enduml\n", stmts.join("\n"));
+        let parse = plantuml::parse(&src);
+        prop_assert_eq!(parse.kind(), plantuml::Kind::Class);
         prop_assert_eq!(parse.syntax().to_string(), src.clone());
         let (diagram, diagnostics) = parse.lower();
         prop_assert!(diagnostics.is_empty(), "{:?}\n{}", diagnostics, src);

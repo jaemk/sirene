@@ -1,7 +1,8 @@
 //! Which PlantUML diagram kind a document is (PUML-1): the `@start...` word, then the first
 //! statement only one kind accepts.
 
-use crate::flowchart::scan;
+use super::link::Link;
+use crate::flowchart::{Arrow, Stroke, scan};
 
 /// A PlantUML diagram kind (PUML-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -181,6 +182,14 @@ fn description_link(line: &str) -> bool {
     })
 }
 
+/// Whether a link is one no sequence arrow looks like: dotted, headless, or with a class
+/// diagram head (`<|--`, `*--`, `o--`, `}o--`).
+fn class_link(l: &Link) -> bool {
+    let sequence_head = |a: Option<Arrow>| matches!(a, Some(Arrow::Point | Arrow::Cross));
+    l.stroke == Stroke::Dotted
+        || !(sequence_head(l.start) || sequence_head(l.end)) && l.unknown.is_empty()
+}
+
 /// The length of a word at the start of `s`.
 fn word_len(s: &str) -> usize {
     s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
@@ -254,6 +263,9 @@ fn classify(line: &str) -> (Option<Kind>, Option<Kind>) {
     }
     if description_link(line) {
         return strong(Kind::Description);
+    }
+    if super::link::link(line).is_some_and(|l| class_link(&l)) {
+        return (None, Some(Kind::Class));
     }
     let weak = WEAK
         .iter()
@@ -338,6 +350,10 @@ mod tests {
         assert_eq!(k("|Lane|\n:a;"), Kind::Activity);
         assert_eq!(k("class A\nA -> B"), Kind::Class);
         assert_eq!(k("A -> B\ninterface I"), Kind::Class);
+        assert_eq!(k("A <|-- B"), Kind::Class);
+        assert_eq!(k("A ..> B"), Kind::Class);
+        assert_eq!(k("A -- B"), Kind::Class);
+        assert_eq!(k("A --> B\nA ->x B\nA o-> B"), Kind::Sequence);
         assert_eq!(k("[*] --> A"), Kind::State);
         assert_eq!(k("state A"), Kind::State);
         assert_eq!(k("actor U\nU -> (Login)"), Kind::Description);
