@@ -256,10 +256,11 @@ impl Timing {
             let pulse = c.pulse.unwrap_or(c.period / 2.0).clamp(0.0, c.period);
             let mut out = Vec::new();
             let first = ((lo - c.offset) / c.period).floor();
-            let last = ((hi - c.offset) / c.period).ceil().min(first + MAX_PERIODS);
-            let mut k = first;
-            while k < last {
-                let start = c.offset + k * c.period;
+            let last = ((hi - c.offset) / c.period).ceil();
+            // A count, not a float step: `k += 1.0` stalls once `k` is past 2^53.
+            let n = (last - first).clamp(0.0, MAX_PERIODS) as usize;
+            for i in 0..n {
+                let start = c.offset + (first + i as f64) * c.period;
                 for (a, b, v) in [
                     (start, start + pulse, "high"),
                     (start + pulse, start + c.period, "low"),
@@ -274,7 +275,6 @@ impl Timing {
                         });
                     }
                 }
-                k += 1.0;
             }
             return out;
         }
@@ -385,6 +385,8 @@ mod tests {
         assert_eq!(spans, [(0.0, 3.0), (3.0, 10.0), (10.0, 13.0), (13.0, 20.0)]);
         // A huge range draws a bounded number of periods.
         assert!(t.segments(&s, (0.0, 1e12)).len() <= 2 * MAX_PERIODS as usize + 2);
+        // Far from zero, where a float step would stall, it still ends.
+        assert!(t.segments(&s, (1e17, 1e17 + 1e4)).len() <= 2 * MAX_PERIODS as usize + 2);
         assert_eq!(s.level(&s.levels(), "1"), Some(0));
     }
 

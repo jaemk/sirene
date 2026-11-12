@@ -22,6 +22,17 @@ const KINDS: &[(&str, SignalKind)] = &[
     ("analog", SignalKind::Analog),
 ];
 
+/// The largest moment, period, or value read; past it, float steps lose whole units.
+const LIMIT: f64 = 1e15;
+
+/// `s` as a number within +-LIMIT (no `inf` or `NaN`).
+fn real(s: &str) -> Option<f64> {
+    s.trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite() && v.abs() <= LIMIT)
+}
+
 /// Days from 1970-01-01 to a civil date (Howard Hinnant's algorithm).
 fn days(y: i64, m: i64, d: i64) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
@@ -77,6 +88,18 @@ impl Lower {
     /// A moment: `100`, `+50`, `-5`, `:name`, `:name+5`, `clk*2`, `2019/07/02`, or `1:15:00`.
     /// Relative moments count from `base`.
     fn moment(&mut self, s: &str, base: f64, range: TextRange) -> Option<f64> {
+        let at = self.moment_of(s, base, range)?;
+        if at.abs() > LIMIT {
+            self.d.push(Diagnostic::new(
+                range,
+                format!("the moment `{}` is out of range", s.trim()),
+            ));
+            return None;
+        }
+        Some(at)
+    }
+
+    fn moment_of(&mut self, s: &str, base: f64, range: TextRange) -> Option<f64> {
         let s = s.trim();
         if let Some(rest) = s.strip_prefix(':') {
             let end = rest.find(['+', '-']).unwrap_or(rest.len());
@@ -115,9 +138,9 @@ impl Lower {
     }
 
     fn number(&mut self, s: &str, range: TextRange) -> Option<f64> {
-        match s.trim().parse::<f64>() {
-            Ok(v) if v.is_finite() => Some(v),
-            _ => {
+        match real(s) {
+            Some(v) => Some(v),
+            None => {
                 self.d.push(Diagnostic::new(
                     range,
                     format!(
@@ -151,7 +174,7 @@ impl Lower {
         };
         while i < words.len() {
             let w = words[i].to_ascii_lowercase();
-            let arg = words.get(i + 1).and_then(|v| v.parse::<f64>().ok());
+            let arg = words.get(i + 1).and_then(|v| real(v));
             match (w.as_str(), arg) {
                 ("with", _) => i += 1,
                 ("period", Some(v)) if v > 0.0 => {
@@ -169,7 +192,7 @@ impl Lower {
                 ("between", Some(lo)) => {
                     let hi = (words.get(i + 2).map(|w| w.eq_ignore_ascii_case("and"))
                         == Some(true))
-                    .then(|| words.get(i + 3).and_then(|v| v.parse::<f64>().ok()))
+                    .then(|| words.get(i + 3).and_then(|v| real(v)))
                     .flatten();
                     match hi {
                         Some(hi) if hi > lo => s.scale = Some((lo, hi)),
@@ -247,7 +270,7 @@ impl Lower {
         }
         if sig.kind == SignalKind::Analog
             && let Value::State(s) = &v
-            && s.parse::<f64>().is_err()
+            && real(s).is_none()
         {
             return self.d.push(Diagnostic::new(
                 range,
@@ -509,7 +532,7 @@ impl Lower {
         if w == "note" {
             return self.note(line, cursor);
         }
-        if self.constraint(t, line.range) || self.message(t, line.range) {
+        if self.message(t, line.range) {
             return;
         }
         // `ID is VALUE`, `ID has ...`, or in an `@ID` block `TIME is VALUE`.
@@ -581,5 +604,13 @@ mod tests {
         assert_eq!(clock_time("1:75"), None);
         assert_eq!(clock_time("2019/13/01"), None);
         assert_eq!(clock_time("100"), None);
+    }
+
+    #[test]
+    fn reals() {
+        assert_eq!(real(" 2.5 "), Some(2.5));
+        assert_eq!(real("inf"), None);
+        assert_eq!(real("NaN"), None);
+        assert_eq!(real("1e300"), None);
     }
 }
