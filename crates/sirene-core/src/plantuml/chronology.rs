@@ -1,6 +1,8 @@
 //! PlantUML chronology diagrams (PCHRON-*): `[Event] happens on DATE` lines, drawn as a timeline
 //! (TIMELI-2) in date order, one period per moment.
 
+use std::collections::BTreeMap;
+
 use super::lines::{self, Common, Cursor};
 use crate::diagnostic::Diagnostic;
 use crate::syntax::SyntaxNode;
@@ -44,8 +46,8 @@ fn moment(s: &str) -> Option<[u32; 6]> {
 pub(crate) fn lower(root: &SyntaxNode) -> (Timeline, Vec<Diagnostic>) {
     let mut d = Vec::new();
     let mut timeline = Timeline::default();
-    // (moment, the date as written, event names)
-    let mut moments: Vec<([u32; 6], String, Vec<String>)> = Vec::new();
+    // moment -> (the date as first written, event names), in date order
+    let mut moments: BTreeMap<[u32; 6], (String, Vec<String>)> = BTreeMap::new();
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
         match lines::common(&line, &mut cursor, &mut d) {
@@ -82,17 +84,17 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timeline, Vec<Diagnostic>) {
             ));
             continue;
         };
-        match moments.iter_mut().find(|(m, _, _)| *m == at) {
-            Some((_, _, names)) => names.push(name),
-            None => moments.push((at, date.to_owned(), vec![name])),
-        }
+        moments
+            .entry(at)
+            .or_insert_with(|| (date.to_owned(), Vec::new()))
+            .1
+            .push(name);
     }
-    moments.sort_by_key(|(m, _, _)| *m);
     timeline.sections.push(Section {
         name: None,
         periods: moments
-            .into_iter()
-            .map(|(_, date, names)| Period {
+            .into_values()
+            .map(|(date, names)| Period {
                 label: vec![date],
                 events: names
                     .into_iter()

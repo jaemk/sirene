@@ -1,6 +1,8 @@
 //! PlantUML Chen entity-relationship diagrams (PCHEN-*): `@startchen` entities, relationships,
 //! and their attributes, lowered to the graph model as boxes, diamonds, and ellipses.
 
+use std::collections::HashSet;
+
 use rowan::TextRange;
 
 use super::lines::{self, Common, Cursor, Line};
@@ -36,7 +38,7 @@ struct Lower {
     chart: Flowchart,
     d: Vec<Diagnostic>,
     /// Entity and relationship ids, for links.
-    named: Vec<String>,
+    named: HashSet<String>,
     attributes: usize,
 }
 
@@ -87,7 +89,7 @@ impl Lower {
                     n.styles.push(style("stroke-width", "3px"));
                 }
             }
-            self.named.push(id.clone());
+            self.named.insert(id.clone());
         }
         for k in kinds
             .iter()
@@ -250,7 +252,7 @@ impl Lower {
     }
 
     fn known(&mut self, id: &str, line: &Line) -> bool {
-        let ok = self.named.iter().any(|n| n == id);
+        let ok = self.named.contains(id);
         if !ok {
             self.d.push(Diagnostic::new(
                 line.range,
@@ -265,7 +267,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
     let mut l = Lower {
         chart: Flowchart::default(),
         d: Vec::new(),
-        named: Vec::new(),
+        named: HashSet::new(),
         attributes: 0,
     };
     let mut cursor = Cursor::new(lines::read(root));

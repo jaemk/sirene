@@ -8,7 +8,9 @@ PlantUML `@startregex` documents (PUML-2), drawn as railroad diagrams (MRAIL-2)
 ## PREGEX-1 Documents
 
 Each line is a regular expression, drawn as an unnamed rule: no `name =`, its track starting
-at the left. `title` and the shared settings apply (PSEQ-6). `'` starts no PlantUML comment.
+at the left. `title TEXT` and `skinparam` lines are settings (PSEQ-6); every other line is a
+regex, even one starting with another setting's word (`set|get`, `page\d+`, `<style>`). `'`
+starts no PlantUML comment.
 
 ## PREGEX-2 Expressions
 
@@ -17,8 +19,9 @@ at the left. `title` and the shared settings apply (PSEQ-6). `'` starts no Plant
 - `.`, `^`, `$`, and the escapes `\d`, `\w`, `\s`, `\b` (and their capitals), `\n`, `\r`,
   `\t`, `\A`, `\z` are boxes naming them ("any character", "digit", ...).
 - `[...]` is a box "one of ..." and `[^...]` "none of ...", the class as written.
-- `|` is a choice, `( )`, `(?: )`, and `(?<name> )` group, and a lookaround (`(?= )`,
-  `(?! )`, `(?<= )`, `(?<! )`) is drawn as a group, with a warning.
+- `|` is a choice, `( )`, `(?: )`, `(?> )`, `(?<name> )`, and `(?P<name> )` group, and a
+  lookaround (`(?= )`, `(?! )`, `(?<= )`, `(?<! )`) is drawn as a group, with a warning.
+  Inline flags (`(?i)`, `(?i: )`) are not drawn, with a warning; an empty group draws nothing.
 - `?` is an option; `*`, `+`, `{n}`, `{n,}`, and `{n,m}` repeat, drawn with a bypass when
   the minimum is 0. A lazy or possessive suffix draws the same. A `{` that is not a repeat is
   a literal.

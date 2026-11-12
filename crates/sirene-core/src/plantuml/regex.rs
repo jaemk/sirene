@@ -11,6 +11,8 @@ use crate::syntax::SyntaxNode;
 
 /// A problem between two byte offsets of a line.
 type Error = (usize, usize, String);
+/// A warning between two byte offsets of a line.
+type Warning = (usize, usize, &'static str);
 
 /// A regex reader. At the first error it records it and stops, keeping what it read.
 struct Reader<'a> {
@@ -18,8 +20,8 @@ struct Reader<'a> {
     i: usize,
     depth: usize,
     error: Option<Error>,
-    /// Lookarounds read, which are drawn as groups.
-    lookarounds: Vec<(usize, usize)>,
+    /// Spans read but not drawn as written: lookarounds and inline flags.
+    warnings: Vec<Warning>,
 }
 
 /// The drawn name of an escape such as `\d`; `None` for an escaped literal.
@@ -87,6 +89,8 @@ impl Reader<'_> {
             let Some(atom) = self.atom() else { break };
             let item = self.quantifier(atom, start);
             match (items.last_mut(), &item) {
+                // An empty group, such as `(?i)`, draws nothing.
+                (_, Expr::Sequence(v)) if v.is_empty() => {}
                 (Some(Expr::Terminal(prev)), Expr::Terminal(t)) => prev.push_str(t),
                 _ => items.push(item),
             }
@@ -110,20 +114,36 @@ impl Reader<'_> {
                     return None;
                 }
                 let rest = &self.s[self.i..];
-                if let Some(r) = rest.strip_prefix("?:") {
+                if let Some(r) = rest.strip_prefix("?:").or_else(|| rest.strip_prefix("?>")) {
+                    // Non-capturing and atomic groups.
                     self.i += rest.len() - r.len();
-                } else if let Some(r) = rest.strip_prefix("?<")
+                } else if let Some(r) = rest.strip_prefix("?<").or_else(|| rest.strip_prefix("?P<"))
                     && !r.starts_with(['=', '!'])
                     && let Some(end) = r.find('>')
                 {
                     // A named group.
-                    self.i += 2 + end + 1;
+                    self.i += rest.len() - r.len() + end + 1;
+                } else if let Some(r) = rest.strip_prefix('?') {
+                    // Inline flags: `(?i)` or `(?i:...)`.
+                    let n = r
+                        .find(|c: char| !(c.is_ascii_alphabetic() || c == '-'))
+                        .unwrap_or(r.len());
+                    if n > 0 && r[n..].starts_with([')', ':']) {
+                        let colon = usize::from(r[n..].starts_with(':'));
+                        self.warnings
+                            .push((start, self.i + 1 + n, "inline flags are not drawn"));
+                        self.i += 1 + n + colon;
+                    }
                 }
                 let look = ["?=", "?!", "?<=", "?<!"]
                     .into_iter()
                     .find(|p| self.s[self.i..].starts_with(p));
                 if let Some(look) = look {
-                    self.lookarounds.push((start, self.i + look.len()));
+                    self.warnings.push((
+                        start,
+                        self.i + look.len(),
+                        "a lookaround is drawn as a group",
+                    ));
                     self.i += look.len();
                 }
                 let mut inner = self.choice();
@@ -268,14 +288,14 @@ impl Reader<'_> {
     }
 }
 
-/// One regex line: its drawing, the first error, and the lookarounds' spans.
-fn regex(s: &str) -> (Expr, Option<Error>, Vec<(usize, usize)>) {
+/// One regex line: its drawing, the first error, and its warnings.
+fn regex(s: &str) -> (Expr, Option<Error>, Vec<Warning>) {
     let mut r = Reader {
         s,
         i: 0,
         depth: 0,
         error: None,
-        lookarounds: Vec::new(),
+        warnings: Vec::new(),
     };
     let e = r.choice();
     if r.i < s.len() {
@@ -283,7 +303,7 @@ fn regex(s: &str) -> (Expr, Option<Error>, Vec<(usize, usize)>) {
         let at = r.i;
         r.fail(at, at + 1, "`)` closes no group");
     }
-    (e, r.error, r.lookarounds)
+    (e, r.error, r.warnings)
 }
 
 fn range(line: &Line, start: usize, end: usize) -> TextRange {
@@ -296,20 +316,25 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Railroad, Vec<Diagnostic>) {
     let mut chart = Railroad::default();
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
-        match lines::common(&line, &mut cursor, &mut d) {
-            Common::No => {}
-            Common::Title(t) => {
-                chart.title = Some(t);
-                continue;
+        // Only `title TEXT` and `skinparam ...` are settings; any other line is a regex, even
+        // one starting `set`, `page`, `<style>`, or `!`.
+        let word = line.word();
+        let setting = matches!(word.as_str(), "title" | "skinparam")
+            && line.text[word.len()..].starts_with(char::is_whitespace)
+            && !line.text[word.len()..].trim().is_empty();
+        if setting {
+            match lines::common(&line, &mut cursor, &mut d) {
+                Common::No => {}
+                Common::Title(t) => {
+                    chart.title = Some(t);
+                    continue;
+                }
+                Common::Done | Common::Direction(_) => continue,
             }
-            Common::Done | Common::Direction(_) => continue,
         }
-        let (definition, error, looks) = regex(&line.text);
-        for (s, e) in looks {
-            d.push(Diagnostic::warning(
-                range(&line, s, e),
-                "a lookaround is drawn as a group",
-            ));
+        let (definition, error, warnings) = regex(&line.text);
+        for (s, e, message) in warnings {
+            d.push(Diagnostic::warning(range(&line, s, e), message));
         }
         if let Some((s, e, message)) = error {
             d.push(Diagnostic::new(range(&line, s, e), message));
@@ -404,8 +429,27 @@ mod tests {
         );
         assert_eq!(ok("(?<year>\\d)"), nt("digit"));
         let (_, _, looks) = regex("a(?=b)");
-        assert_eq!(looks, [(1, 4)]);
+        assert_eq!(looks, [(1, 4, "a lookaround is drawn as a group")]);
+        assert_eq!(ok("(?P<y>a)"), t("a"));
+        assert_eq!(ok("(?>ab)"), t("ab"));
+        let (e, err, w) = regex("(?i)ab(?s:c)");
+        assert_eq!(err, None);
+        assert_eq!(w.len(), 2);
+        assert_eq!(w[0], (0, 3, "inline flags are not drawn"));
+        assert_eq!(e, t("abc"));
         assert_eq!(ok("a|"), Expr::Choice(vec![t("a"), Expr::Sequence(vec![])]));
+    }
+
+    #[test]
+    fn setting_words_are_regexes() {
+        let src = "@startregex\ntitle Words\nset|get\npage\\d+\n<style>\ntitle\n@endregex\n";
+        let (diagram, d) = super::super::parse(src).lower();
+        let crate::diagram::Diagram::Railroad(r) = diagram else {
+            panic!("not a railroad")
+        };
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(r.title.as_deref(), Some("Words"));
+        assert_eq!(r.rules.len(), 4);
     }
 
     #[test]
