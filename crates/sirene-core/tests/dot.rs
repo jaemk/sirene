@@ -7,7 +7,7 @@ use std::path::Path;
 
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::diagram::{self, Kind, Lowered};
-use sirene_core::flowchart::{Arrow, Direction, Flowchart, RankEnd, Shape, Stroke};
+use sirene_core::flowchart::{Arrow, Direction, EdgeOrder, Flowchart, RankEnd, Shape, Stroke};
 use sirene_core::scene::{Approx, Color, Theme};
 use sirene_core::{Severity, dot};
 
@@ -464,6 +464,43 @@ fn compound_edges() {
     assert_eq!(
         messages(&src("compound=false;", "lhead=cluster_q")),
         ["`lhead` needs `compound=true` on the graph; ignored"]
+    );
+}
+
+/// DOT-3: `ordering=out` keeps a node's out-edges in source order along the rank below it, and
+/// `ordering=in` its in-edges along the rank above.
+#[test]
+fn ordering() {
+    let c = chart("digraph { ordering=out; a; b [ordering=in]; c [ordering=\"\"] }");
+    assert_eq!(
+        c.ordering,
+        [
+            ("a".to_owned(), EdgeOrder::Out),
+            ("b".to_owned(), EdgeOrder::In)
+        ]
+    );
+    let draw = |src: &str| ascii::render(&chart(src), &Options::default());
+    let before = |out: &str, x: &str, y: &str| {
+        out.find(&format!("( {x} )")).unwrap() < out.find(&format!("( {y} )")).unwrap()
+    };
+    // Without `ordering`, c and b swap to untangle; with it, they keep source order.
+    let src = "x -> b; a -> c; a -> b; y -> c";
+    let out = draw(&format!("digraph {{ {src} }}"));
+    assert!(before(&out, "b", "c"), "{out}");
+    let out = draw(&format!("digraph {{ a [ordering=out]; {src} }}"));
+    assert!(before(&out, "c", "b"), "{out}");
+    // c -> a enters a left of b -> a, crossing it, since b and c keep their places.
+    let src = "b -> x; c -> a; b -> a; c -> y";
+    let out = draw(&format!("digraph {{ {src} }}"));
+    assert!(before(&out, "b", "c") && !out.contains('┼'), "{out}");
+    let out = draw(&format!("digraph {{ ordering=in; {src} }}"));
+    assert!(before(&out, "b", "c") && out.contains('┼'), "{out}");
+    assert_eq!(
+        lowered("digraph { ordering=up; a; b }").1,
+        [(
+            Severity::Warning,
+            "unknown `ordering` `up`: expected out or in".to_owned()
+        )]
     );
 }
 

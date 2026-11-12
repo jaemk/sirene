@@ -7,7 +7,7 @@ mod route;
 
 use std::collections::{HashMap, HashSet};
 
-use crate::flowchart::{Direction, RankEnd};
+use crate::flowchart::{Direction, EdgeOrder, RankEnd};
 use position::{Link, Span};
 use rank::RankEdge;
 use route::Jog;
@@ -136,6 +136,8 @@ pub struct Graph {
     /// Groups of nodes ranked first or last (LAYOUT-4), per container as `same_rank` groups
     /// are.
     pub end_ranks: Vec<(RankEnd, Vec<usize>)>,
+    /// Nodes whose edges of one direction keep their input order along the rank (LAYOUT-5).
+    pub ordering: Vec<(usize, EdgeOrder)>,
 }
 
 /// Spacing for one orientation, in canonical terms: the cross axis runs along a rank and the
@@ -1074,6 +1076,53 @@ impl<'a, 'b> Placer<'a, 'b> {
             .collect()
     }
 
+    /// For each node with an `ordering`, the elements next to it on its edges of that direction,
+    /// in edge input order (LAYOUT-5).
+    fn ordered(&self, segments: &[(usize, usize, usize)]) -> Vec<Vec<usize>> {
+        let graph = &self.b.graph;
+        if graph.ordering.is_empty() {
+            return Vec::new();
+        }
+        let mut order = vec![None; graph.nodes.len()];
+        for &(n, o) in &graph.ordering {
+            if let Some(slot) = order.get_mut(n) {
+                *slot = Some(o);
+            }
+        }
+        let mut groups: HashMap<usize, Vec<(usize, usize)>> = HashMap::new();
+        for &(u, v, c) in segments {
+            let edge = self.chains[c].edge;
+            let spec = &graph.edges[edge];
+            for (at, next, end, dir) in [
+                (u, v, spec.from, EdgeOrder::Out),
+                (v, u, spec.to, EdgeOrder::In),
+            ] {
+                if let Kind::Item(item @ Item::Node(n)) = self.elems[at].kind
+                    && item == end
+                    && spec.from != spec.to
+                    && order[n] == Some(dir)
+                {
+                    groups.entry(at).or_default().push((edge, next));
+                }
+            }
+        }
+        let mut keys: Vec<usize> = groups.keys().copied().collect();
+        keys.sort_unstable();
+        keys.into_iter()
+            .map(|at| {
+                let mut g = groups.remove(&at).unwrap_or_default();
+                g.sort_unstable();
+                let mut out: Vec<usize> = Vec::new();
+                for (_, e) in g {
+                    if !out.contains(&e) {
+                        out.push(e);
+                    }
+                }
+                out
+            })
+            .collect()
+    }
+
     /// Initial order: a depth-first search from each element by layer.
     fn init_layers(&mut self, count: usize, segments: &[(usize, usize, usize)]) {
         let mut down = vec![Vec::new(); self.elems.len()];
@@ -1242,7 +1291,8 @@ impl<'a, 'b> Placer<'a, 'b> {
         let segments = self.segments();
         self.init_layers(count, &segments);
         let pairs: Vec<(usize, usize)> = segments.iter().map(|&(u, v, _)| (u, v)).collect();
-        order::order(&mut self.layers, &pairs, self.elems.len());
+        let fixed = self.ordered(&segments);
+        order::order(&mut self.layers, &pairs, self.elems.len(), &fixed);
         let keys = if self.has_lanes() {
             let keys = self.lane_keys();
             for layer in &mut self.layers {

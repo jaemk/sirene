@@ -9,7 +9,8 @@ use super::x11::X11;
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text::decode_html_entities;
 use crate::flowchart::{
-    Arrow, Direction, Edge, Flowchart, Label, Node, RankEnd, Row, Shape, Stroke, Style, Subgraph,
+    Arrow, Direction, Edge, EdgeOrder, Flowchart, Label, Node, RankEnd, Row, Shape, Stroke, Style,
+    Subgraph,
 };
 use crate::scene::{Color, parse_color};
 use crate::syntax::SyntaxKind::*;
@@ -79,6 +80,7 @@ const GRAPH_ATTRS: &[&str] = &[
     "fontcolor",
     "style",
     "compound",
+    "ordering",
 ];
 const NODE_ATTRS: &[&str] = &[
     "label",
@@ -88,6 +90,7 @@ const NODE_ATTRS: &[&str] = &[
     "fillcolor",
     "fontcolor",
     "penwidth",
+    "ordering",
 ];
 const EDGE_ATTRS: &[&str] = &[
     "label",
@@ -887,7 +890,16 @@ impl Lowerer {
         self.compound =
             get(&root, "compound").is_some_and(|a| boolean(&a.value.text) == Some(true));
         self.name_clusters();
+        let graph_order = get(&root, "ordering").cloned();
         for i in 0..self.ids.len() {
+            // A node's own `ordering`, else the graph's.
+            let own = get(&self.node_attrs[i], "ordering").cloned();
+            if let Some(order) = own
+                .or_else(|| graph_order.clone())
+                .and_then(|a| self.ordering(&a))
+            {
+                chart.ordering.push((self.ids[i].clone(), order));
+            }
             let node = self.lower_node(i, &graph);
             chart.nodes.push(node);
         }
@@ -1187,6 +1199,24 @@ impl Lowerer {
                     format!("unknown arrow `{name}`; drawn as `normal`"),
                 );
                 Some(Arrow::Point)
+            }
+        }
+    }
+
+    /// An `ordering` value: `out`, `in`, or empty for none (DOT-3).
+    fn ordering(&mut self, a: &Attr) -> Option<EdgeOrder> {
+        let v = a.value.text.trim().to_ascii_lowercase();
+        match v.as_str() {
+            "out" => Some(EdgeOrder::Out),
+            "in" => Some(EdgeOrder::In),
+            "" => None,
+            _ => {
+                self.warn_once(
+                    &format!("ordering@{:?}", a.range),
+                    a.range,
+                    format!("unknown `ordering` `{v}`: expected out or in"),
+                );
+                None
             }
         }
     }

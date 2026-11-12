@@ -53,8 +53,10 @@ the side it leaves or enters by. Tests: `flat_edges` and `rank.rs` in `src/layou
 ## LAYOUT-5 Order
 
 Long edges get a dummy per intermediate rank. Items in each rank are ordered by barycenter
-sweeps, keeping the order with the fewest crossings, counted in O(E log V) per gap. Layout is
-deterministic.
+sweeps, keeping the order with the fewest crossings, counted in O(E log V) per gap. A node with
+an `ordering` keeps the first elements of its edges leaving downward (`Out`), or the last of
+its edges entering from above (`In`), in edge input order along their rank; edges whose ends
+the ranks swapped are not ordered. Layout is deterministic.
 
 ## LAYOUT-6 Positions
 
