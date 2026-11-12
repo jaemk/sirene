@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startgantt\ntitle Release plan\nProject starts 2026-01-05\nsaturday are closed\nsunday are closed\n2026-01-19 is closed\n-- Build --\n[Design] as [D] lasts 3 days\nthen [Code] lasts 5 days and is 40% complete\n[Tests] starts at [Code]'s start and lasts 1 week\n-- Ship --\n[Notes] starts 2026-01-12 and ends 2026-01-16\n[Docs] lasts 4 days\n[Release] happens at [Tests]'s end\n[D] -> [Docs]\n@endgantt\n"
+---
+                                  Release plan
+
+Build
+  Design   ###############          ..........
+  Code                    ===================================
+  Tests                   #############################################
+Ship
+  Notes                             ..........#########################
+  Docs                    ##############################
+  Release                           ..........                        *
+           +----+----+----+----+----+----+----+----+----+----+----+----+
+           2026-01-05     2026-01-08     2026-01-11     2026-01-14     2026-01-17

@@ -50,6 +50,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - PlantUML mindmaps (`@startmindmap`) and work breakdown structures (`@startwbs`): `*`, `+`,
   and `-` node lines or indented `*` lines, boxless nodes, multi-line `:text;`, WBS colors,
   aliases, and `(A) -> (B)` arrows.
+- PlantUML Gantt charts (`@startgantt`): tasks with durations, start and end dates, `then`,
+  references to other tasks' starts and ends, `[A] -> [B]`, milestones, completion, sections,
+  closed weekdays and dates, `printscale`, and `today is`.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

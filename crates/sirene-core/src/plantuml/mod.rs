@@ -5,6 +5,7 @@ mod activity;
 mod class;
 mod description;
 mod detect;
+mod gantt;
 mod lines;
 mod link;
 mod lower;
@@ -32,6 +33,7 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Description
             | Kind::Mindmap
             | Kind::Wbs
+            | Kind::Gantt
     )
 }
 
@@ -82,6 +84,10 @@ impl Parse {
             Kind::Mindmap => {
                 let (map, d) = mindmap::lower_mindmap(&root);
                 (Diagram::Mindmap(map), d)
+            }
+            Kind::Gantt => {
+                let (g, d) = gantt::lower(&root);
+                (Diagram::Gantt(g), d)
             }
             Kind::Wbs => {
                 let (chart, d) = mindmap::lower_wbs(&root);
