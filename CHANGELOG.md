@@ -189,6 +189,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - An `init` directive that cannot be read, malformed or nested too deep, is a warning; it was
   ignored without one.
 - A graph's title stays centered when an edge's end label widens the drawing on one side.
+- A Mermaid source with lone `\r` line endings reads line by line, as in Mermaid, and diagnostics
+  count a lone `\r` as a line break.
 
 ## [0.2.0] - 2026-11-08
 
