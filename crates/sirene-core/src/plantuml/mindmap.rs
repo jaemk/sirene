@@ -220,6 +220,9 @@ fn parents(items: &[Item], d: &mut Vec<Diagnostic>) -> Vec<Option<Option<usize>>
                 ),
             ));
             out.push(None);
+            // Mark the dropped line open so its children are dropped too.
+            open.truncate(under);
+            open.push((item.depth, i));
             continue;
         }
         if under > MAX_DEPTH {
@@ -231,6 +234,8 @@ fn parents(items: &[Item], d: &mut Vec<Diagnostic>) -> Vec<Option<Option<usize>>
                 ));
             }
             out.push(None);
+            open.truncate(under);
+            open.push((item.depth, i));
             continue;
         }
         out.push(Some(parent));
@@ -318,6 +323,8 @@ pub(crate) fn lower_wbs(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
         ..Flowchart::default()
     };
     let mut ids: Vec<Option<String>> = Vec::with_capacity(r.items.len());
+    // Every node id taken, for duplicate aliases and arrow lookups.
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     for (i, (item, parent)) in r.items.iter().zip(parents).enumerate() {
         let parent = match parent {
             Some(Some(p)) => match &ids[p] {
@@ -333,7 +340,19 @@ pub(crate) fn lower_wbs(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
                 continue;
             }
         };
-        let id = item.alias.clone().unwrap_or_else(|| format!("wbs:{i}"));
+        let mut id = item.alias.clone().unwrap_or_else(|| format!("wbs:{i}"));
+        if item.alias.is_some() && seen.contains(&id) {
+            r.d.push(Diagnostic::new(
+                item.range,
+                format!("alias `({id})` is already used; keeping the first"),
+            ));
+            id = format!("wbs:{i}");
+        }
+        // A fallback id may collide with an alias written like it, e.g. `(wbs:2)`.
+        while seen.contains(&id) {
+            id.push('_');
+        }
+        seen.insert(id.clone());
         let shape = if item.boxless {
             flowchart::Shape::Text
         } else {
@@ -354,7 +373,7 @@ pub(crate) fn lower_wbs(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
         ids.push(Some(id));
     }
     for (from, to, range) in std::mem::take(&mut r.arrows) {
-        let known = |a: &str| chart.nodes.iter().any(|n| n.id == a);
+        let known = |a: &str| seen.contains(a);
         if let Some(missing) = [&from, &to].into_iter().find(|a| !known(a)) {
             r.d.push(Diagnostic::new(
                 range,
@@ -455,5 +474,121 @@ mod tests {
         );
         let (_, d) = lower("@startwbs\n* a\n(X) -> (Y)\n@endwbs\n");
         assert_eq!(d, ["no node has the alias `(X)`"]);
+    }
+
+    #[test]
+    fn dropped_line_drops_its_children() {
+        let (diagram, d) = lower("@startmindmap\n* r\n** a\n* b\n** c\n@endmindmap\n");
+        assert_eq!(d.len(), 1, "{d:?}");
+        let Diagram::Mindmap(m) = diagram else {
+            panic!("not a mindmap")
+        };
+        let labels: Vec<_> = m.nodes.iter().map(|n| n.label.text.as_str()).collect();
+        assert_eq!(labels, ["r", "a"]);
+        assert_eq!(m.nodes[0].children, [1]);
+    }
+
+    #[test]
+    fn duplicate_alias() {
+        let (diagram, d) = lower("@startwbs\n* P\n**(A) x\n**(A) y\n***(B) z\n@endwbs\n");
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert!(d[0].contains("already used"), "{d:?}");
+        let g = diagram.into_graph();
+        let ids: Vec<_> = g.nodes.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(ids, ["wbs:0", "A", "wbs:2", "B"]);
+    }
+
+    #[test]
+    fn too_deep_subtree_is_dropped() {
+        let mut src = String::from("@startmindmap\n");
+        for depth in 1..=70 {
+            src.push_str(&format!("{} n{depth}\n", "*".repeat(depth)));
+        }
+        src.push_str("** back\n@enduml\n@endmindmap\n");
+        let (diagram, d) = lower(&src);
+        let too_deep = d.iter().filter(|m| m.contains("deep")).count();
+        assert_eq!(too_deep, 1, "{d:?}");
+        let Diagram::Mindmap(m) = diagram else {
+            panic!("not a mindmap")
+        };
+        // Depths 1..=65 are kept, the rest drop, and a shallow line after them attaches to the root.
+        assert_eq!(m.nodes.len(), 66);
+        assert_eq!(m.nodes[65].label.text, "back");
+        assert_eq!(m.nodes[65].parent, Some(0));
+        assert!(m.nodes.iter().all(|n| n.label.text != "n70"));
+    }
+
+    #[test]
+    fn orphan_subtree_does_not_reattach() {
+        let (diagram, d) = lower("@startmindmap\n* r\n** a\n* b\n** c\n*** d\n** e\n@endmindmap\n");
+        assert_eq!(d.len(), 1, "{d:?}");
+        let Diagram::Mindmap(m) = diagram else {
+            panic!("not a mindmap")
+        };
+        let labels: Vec<_> = m.nodes.iter().map(|n| n.label.text.as_str()).collect();
+        assert_eq!(labels, ["r", "a"]);
+        // The same in WBS.
+        let (diagram, d) = lower("@startwbs\n* r\n** a\n* b\n** c\n@endwbs\n");
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert_eq!(diagram.into_graph().nodes.len(), 2);
+    }
+
+    #[test]
+    fn alias_colliding_with_fallback_id() {
+        // `(wbs:2)` is taken before the unaliased third line asks for `wbs:2`.
+        let (diagram, d) = lower("@startwbs\n* P\n**(wbs:2) x\n** y\n** z\n@endwbs\n");
+        let g = diagram.into_graph();
+        let mut ids: Vec<_> = g.nodes.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(ids.len(), 4, "{d:?}");
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), 4, "node ids must be unique: {d:?}");
+        // The edges still reach distinct children.
+        assert_eq!(g.edges.len(), 3);
+        // Alias after the fallback that used the id: reported as a duplicate.
+        let (diagram, d) = lower("@startwbs\n* P\n** y\n**(wbs:1) x\n@endwbs\n");
+        let g = diagram.into_graph();
+        assert_eq!(d.len(), 1, "{d:?}");
+        let mut ids: Vec<_> = g.nodes.iter().map(|n| n.id.as_str()).collect();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), 3);
+    }
+
+    #[test]
+    fn duplicate_alias_fallback_collides_with_alias() {
+        // The duplicate `(A)` on line 3 falls back to `wbs:3`, which an alias already holds.
+        let (diagram, _) = lower("@startwbs\n* P\n**(wbs:3) x\n**(A) y\n**(A) z\n@endwbs\n");
+        let g = diagram.into_graph();
+        let mut ids: Vec<_> = g.nodes.iter().map(|n| n.id.as_str()).collect();
+        let n = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), n);
+    }
+
+    #[test]
+    fn arrows_to_duplicate_aliases_hit_the_first() {
+        let (diagram, d) = lower("@startwbs\n* P\n**(A) x\n**(A) y\n(A) -> (A)\n@endwbs\n");
+        assert_eq!(d.len(), 1, "{d:?}");
+        let g = diagram.into_graph();
+        let last = g.edges.last().unwrap();
+        assert_eq!((last.from.as_str(), last.to.as_str()), ("A", "A"));
+    }
+
+    #[test]
+    fn many_arrows_are_bounded() {
+        let mut src = String::from("@startwbs\n* P\n");
+        for i in 0..3000 {
+            src.push_str(&format!("**({i}) n\n"));
+        }
+        for i in 0..3000 {
+            src.push_str(&format!("({i}) -> (0)\n"));
+        }
+        src.push_str("@endwbs\n");
+        let start = std::time::Instant::now();
+        let (_, d) = lower(&src);
+        assert!(d.is_empty(), "{d:?}");
+        assert!(start.elapsed().as_secs() < 20);
     }
 }

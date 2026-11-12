@@ -1,16 +1,15 @@
 ---
 source: crates/sirene-core/tests/plantuml.rs
-expression: "@startmindmap\ntop to bottom direction\n* Root\n** One\n* Second root\nnot a node\n**[#nope] Two\n**[#red] Three\n** :Four\n@endmindmap\n"
+expression: "@startmindmap\ntop to bottom direction\n* Root\n** One\n**[#nope] Two\n**[#red] Three\n* Second root\n** Under the second root\nnot a node\n** :Four\n@endmindmap\n"
 ---
 2:1: warning: a mindmap's direction is the layout's; ignoring it
-5:1: error: `Second root` has no parent: a mindmap has one root, so give this line more `*` than the root
-6:1: error: expected a node line such as `* root` or `** child`
-7:4: warning: unknown color `#nope`; drawing the default
-8:1: warning: node colors are not drawn in mindmaps; ignoring it
-9:1: error: unclosed `:` text: expected a line ending in `;`
+5:4: warning: unknown color `#nope`; drawing the default
+6:1: warning: node colors are not drawn in mindmaps; ignoring it
+7:1: error: `Second root` has no parent: a mindmap has one root, so give this line more `*` than the root
+9:1: error: expected a node line such as `* root` or `** child`
+10:1: error: unclosed `:` text: expected a line ending in `;`
 
 (Root)
 ├── (One)
 ├── (Two)
-├── (Three)
-└── (Four)
+└── (Three)

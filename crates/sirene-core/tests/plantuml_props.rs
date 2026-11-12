@@ -491,10 +491,13 @@ proptest! {
         let parse = plantuml::parse(&src);
         prop_assert_eq!(parse.syntax().to_string(), src.clone());
         let (diagram, diagnostics) = parse.lower();
-        // Tasks may refer to each other in a cycle, which is reported; nothing else is.
+        // Tasks may refer to each other in a cycle, or end before they start, which are
+        // reported; nothing else is.
         let others: Vec<_> = diagnostics
             .iter()
-            .filter(|d| !d.message.contains("depends on itself"))
+            .filter(|d| {
+                !d.message.contains("depends on itself") && !d.message.contains("ends before")
+            })
             .collect();
         prop_assert!(others.is_empty(), "{:?}\n{}", others, src);
         check(&diagram)?;

@@ -433,9 +433,10 @@ impl Yaml {
         let Some(first) = self.lines.first() else {
             return (None, None);
         };
-        let v = self.node(first.indent);
+        let (first_is_item, indent) = (first.is_item(), first.indent);
+        let v = self.node(indent);
         if let Some(l) = self.lines.get(self.i) {
-            let what = if self.lines[0].is_item() {
+            let what = if first_is_item {
                 "`- item`"
             } else {
                 "`key: value`"
@@ -659,7 +660,7 @@ fn inline(v: &Value) -> Option<String> {
 }
 
 /// Adds `v`'s table and its nested tables to `chart`, returning the table's id.
-fn table(chart: &mut Flowchart, v: &Value) -> String {
+fn table<'a>(chart: &mut Flowchart, v: &'a Value) -> String {
     let id = format!("data:{}", chart.nodes.len());
     let mut node = Node::new(&id, Label::plain(""), Shape::Rect);
     node.mentions.push(v.range);
@@ -667,9 +668,9 @@ fn table(chart: &mut Flowchart, v: &Value) -> String {
     let at = chart.nodes.len() - 1;
     let mut rows = Vec::new();
     let mut nested = Vec::new();
-    let mut row = |cells: Vec<String>, child: Option<&Value>| {
+    let mut row = |cells: Vec<String>, child: Option<&'a Value>| {
         if let Some(c) = child {
-            nested.push((rows.len(), c.clone()));
+            nested.push((rows.len(), c));
         }
         rows.push(Row {
             cells,
@@ -700,7 +701,7 @@ fn table(chart: &mut Flowchart, v: &Value) -> String {
     }
     chart.nodes[at].sections = vec![rows];
     for (k, child) in nested {
-        let to = table(chart, &child);
+        let to = table(chart, child);
         let mut edge = Edge::new(&id, to, child.range);
         edge.end = None;
         edge.rows = [Some(k), None];
@@ -868,11 +869,75 @@ mod tests {
             "expected `key: value` at this indentation"
         );
         assert_eq!(err("- a\nb: 1\n"), "expected `- item` at this indentation");
+        assert_eq!(
+            err("- a: 1\nb: 2\n"),
+            "expected `- item` at this indentation"
+        );
         assert_eq!(err("a: [1, 2\n"), "the flow collection has no closing `]`");
         assert_eq!(Yaml::new("# only\n---\n").document(), (None, None));
         // What was read before the error is kept.
         let (v, _) = Yaml::new("a: 1\nb: 2\n    c: 3\n").document();
         assert_eq!(pairs(v.as_ref().unwrap()).len(), 2);
+    }
+
+    #[test]
+    fn yaml_indented_first_item_reports_item_error() {
+        let err = |s: &str| Yaml::new(s).document().1.unwrap().1;
+        // The first line is an item at indent 2, so a shallower line expects `- item`.
+        assert_eq!(
+            err("  - a\nb: 1\n"),
+            "expected `- item` at this indentation"
+        );
+        assert_eq!(err("  - a\n- b\n"), "expected `- item` at this indentation");
+        // An indented first mapping key keeps the mapping wording.
+        assert_eq!(
+            err("  a: 1\n- b\n"),
+            "expected `key: value` at this indentation"
+        );
+        // A well-formed indented sequence is clean.
+        let v = yaml("  - a\n  - b\n");
+        assert_eq!(items(&v).len(), 2);
+    }
+
+    #[test]
+    fn mixed_nested_tables_render() {
+        let v = json(r#"{"a": [[1, 2], {"k": [3]}, "s"], "b": {"c": [], "d": {"e": [{"f": 1}]}}}"#)
+            .0
+            .unwrap();
+        let mut chart = Flowchart::default();
+        table(&mut chart, &v);
+        assert!(!chart.nodes.is_empty());
+        // Every edge joins two nodes that exist.
+        for e in &chart.edges {
+            assert!(chart.nodes.iter().any(|n| n.id == e.from), "{}", e.from);
+            assert!(chart.nodes.iter().any(|n| n.id == e.to), "{}", e.to);
+        }
+        // The root table lists both keys.
+        let root: Vec<_> = chart.nodes[0].sections[0]
+            .iter()
+            .map(|r| r.cells[0].clone())
+            .collect();
+        assert_eq!(root, ["a", "b"]);
+        // Rendering the same value again gives the same shape.
+        let mut again = Flowchart::default();
+        table(&mut again, &v);
+        assert_eq!(again.nodes.len(), chart.nodes.len());
+        assert_eq!(again.edges.len(), chart.edges.len());
+    }
+
+    #[test]
+    fn deep_table_with_large_leaf_completes() {
+        let depth = 30;
+        let leaf = "x".repeat(200_000);
+        let src = format!(
+            "{}\"{leaf}\"{}",
+            "{\"a\":[".repeat(depth / 2),
+            "]}".repeat(depth / 2)
+        );
+        let v = json(&src).0.unwrap();
+        let mut chart = Flowchart::default();
+        table(&mut chart, &v);
+        assert_eq!(chart.nodes.len(), depth);
     }
 
     #[test]

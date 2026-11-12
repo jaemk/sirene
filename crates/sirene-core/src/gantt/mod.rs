@@ -4,6 +4,8 @@ mod lower;
 mod parser;
 pub mod time;
 
+use std::collections::HashSet;
+
 use rowan::GreenNode;
 
 pub(crate) use parser::HEADERS;
@@ -11,6 +13,9 @@ pub use time::{Interval, Time, Unit};
 
 use crate::diagnostic::Diagnostic;
 use crate::syntax::SyntaxNode;
+
+/// The most days [`Gantt::excluded_days`] looks at.
+pub const MAX_EXCLUDED_SCAN: usize = 100_000;
 
 /// A task's tags (MGANTT-1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -78,6 +83,10 @@ pub struct Gantt {
     pub excludes: Vec<String>,
     /// Lowercase.
     pub includes: Vec<String>,
+    /// Days closed one by one, as day numbers (`t.div_euclid(DAY)`); ahead of `excludes`.
+    pub closed_days: HashSet<i64>,
+    /// Days opened one by one, as day numbers; ahead of everything else.
+    pub open_days: HashSet<i64>,
     pub inclusive_end_dates: bool,
     pub today_marker: TodayMarker,
     /// The time the chart was read, for the today marker.
@@ -100,6 +109,8 @@ impl Default for Gantt {
             weekend: 6,
             excludes: Vec::new(),
             includes: Vec::new(),
+            closed_days: HashSet::new(),
+            open_days: HashSet::new(),
             inclusive_end_dates: false,
             today_marker: TodayMarker::Default,
             now: 0,
@@ -123,8 +134,28 @@ impl Gantt {
 
     /// Whether `t`'s day is excluded (Mermaid's `isInvalidDate`, MGANTT-3).
     pub fn is_excluded(&self, t: Time) -> bool {
-        let written = time::format_dayjs(t, &self.date_format).to_lowercase();
-        if self.includes.contains(&written) {
+        let n = t.div_euclid(time::DAY);
+        if self.open_days.contains(&n) {
+            return false;
+        }
+        if self.closed_days.contains(&n) {
+            return true;
+        }
+        if self.excludes.is_empty() {
+            return false;
+        }
+        // Only lists naming dates need the day written out.
+        let dated = !self.includes.is_empty()
+            || self
+                .excludes
+                .iter()
+                .any(|e| e != "weekends" && time::weekday_of(e).is_none());
+        let written = if dated {
+            time::format_dayjs(t, &self.date_format).to_lowercase()
+        } else {
+            String::new()
+        };
+        if dated && self.includes.contains(&written) {
             return false;
         }
         // ISO weekday: Monday 1 to Sunday 7.
@@ -138,7 +169,7 @@ impl Gantt {
             return true;
         }
         let day = time::weekday_name(time::weekday(t)).to_lowercase();
-        self.excludes.contains(&day) || self.excludes.contains(&written)
+        self.excludes.contains(&day) || dated && self.excludes.contains(&written)
     }
 
     /// The axis ticks (MGANTT-4).
@@ -157,21 +188,28 @@ impl Gantt {
         time::format_d3(t, &self.axis_format)
     }
 
-    /// The days to grey out: the start of each excluded day from the axis start (MGANTT-5).
+    /// The days to grey out: the start of each excluded day from the axis start (MGANTT-5),
+    /// looking at no more than [`MAX_EXCLUDED_SCAN`] days.
     pub fn excluded_days(&self) -> Vec<Time> {
         let Some((start, end)) = self.range() else {
             return Vec::new();
         };
-        if self.excludes.is_empty() {
+        if self.excludes.is_empty() && self.closed_days.is_empty() {
             return Vec::new();
         }
         let mut out = Vec::new();
         let mut d = start;
-        while d <= end && out.len() < 100_000 {
+        for _ in 0..MAX_EXCLUDED_SCAN {
+            if d > end {
+                break;
+            }
             if self.is_excluded(d) {
                 out.push(d);
             }
-            d += time::DAY;
+            let Some(next) = d.checked_add(time::DAY) else {
+                break;
+            };
+            d = next;
         }
         out
     }
@@ -253,4 +291,84 @@ impl Parse {
 pub fn parse(src: &str) -> Parse {
     let (green, diagnostics) = parser::parse(src);
     Parse { green, diagnostics }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn chart(days: i64, excludes: &[&str]) -> Gantt {
+        Gantt {
+            excludes: excludes.iter().map(|s| (*s).to_owned()).collect(),
+            sections: vec![Section {
+                name: None,
+                tasks: vec![Task {
+                    name: "x".into(),
+                    id: None,
+                    tags: Tags::default(),
+                    start: 0,
+                    end: days.saturating_mul(time::DAY),
+                    drawn_end: 0,
+                }],
+            }],
+            ..Gantt::default()
+        }
+    }
+
+    #[test]
+    fn excluded_days_scan_is_capped() {
+        // A date that never comes up: the scan stops after its cap, not after a match cap.
+        let g = chart(100_000_000_000, &["1960-01-01"]);
+        assert!(g.excluded_days().is_empty());
+        let g = chart(i64::MAX / time::DAY, &["thursday"]);
+        let days = g.excluded_days();
+        // 1970-01-01 is a Thursday.
+        assert_eq!(days[0], 0);
+        assert_eq!(days.len(), MAX_EXCLUDED_SCAN.div_ceil(7));
+    }
+
+    #[test]
+    fn excluded_days_near_the_end_of_time() {
+        let mut g = chart(1, &["thursday"]);
+        let last = (i64::MAX / time::DAY) * time::DAY;
+        g.sections[0].tasks[0].start = last;
+        g.sections[0].tasks[0].end = i64::MAX;
+        assert!(g.excluded_days().len() <= 1);
+    }
+
+    #[test]
+    fn includes_without_excludes_exclude_nothing() {
+        // Mermaid: an include only lifts an exclude; with none, every day is valid.
+        let mut g = chart(14, &[]);
+        g.includes = vec!["1970-01-02".to_owned()];
+        assert!(!g.is_excluded(time::DAY));
+        assert!(!g.is_excluded(2 * time::DAY));
+        assert!(g.excluded_days().is_empty());
+        // An include lifts a matching exclude only.
+        let mut g = chart(14, &["saturday", "sunday"]);
+        g.includes = vec!["1970-01-03".to_owned()];
+        assert!(!g.is_excluded(2 * time::DAY));
+        assert!(g.is_excluded(3 * time::DAY));
+    }
+
+    #[test]
+    fn single_days() {
+        let mut g = chart(14, &["saturday", "sunday"]);
+        // Day 0 is Thursday 1970-01-01.
+        g.closed_days.insert(1);
+        g.open_days.insert(2);
+        assert!(!g.is_excluded(0));
+        assert!(g.is_excluded(time::DAY));
+        // Saturday the 3rd is open; Sunday the 4th is not.
+        assert!(!g.is_excluded(2 * time::DAY));
+        assert!(g.is_excluded(3 * time::DAY));
+        assert_eq!(
+            g.excluded_days(),
+            [1, 3, 9, 10].map(|d| d * time::DAY).to_vec()
+        );
+        // Closed days alone grey out days.
+        let mut g = chart(3, &[]);
+        g.closed_days.insert(2);
+        assert_eq!(g.excluded_days(), [2 * time::DAY]);
+    }
 }

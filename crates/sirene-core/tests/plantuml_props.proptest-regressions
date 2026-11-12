@@ -10,3 +10,5 @@ cc 7666d0e131df3a9702c3bf1bc27c9194b8d7daf1e15156fadaac14de3919b3bb # shrinks to
 cc e46f3a32e27904b269b8f943624965f3578e1d53aa060e52696e2baeeaaf61e9 # shrinks to src = "<->é"
 cc 70eec07ad38a9b52271c4d1dcf697b45d8f48fc0909a806f1517b4c1379be4c8 # shrinks to src = "@startuml\ngroup g [x]\n\nelse\n\nend\n@enduml\n"
 cc bf774ba54e1acce5a92cc47a19a80e790b4a877d050a242e859d1a89dcdab692 # shrinks to stmts = ["x.y.Z <|-- A"]
+cc 9e36364fac02f502b9904df6c6b715cffdcec43f35f81dbde248d7f56c096a91 # shrinks to dated = false, stmts = ["then [A] ends 2026-01-20"]
+cc 1bc17592a255535d84f986f5d1d7f0b7089b06bbf38cbde016e8a6a87319925d # shrinks to stmts = ["package P {\nclass x.y.Z {\n  -id : int\n  +run()\n}\n}"]

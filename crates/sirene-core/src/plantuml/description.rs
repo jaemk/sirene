@@ -79,12 +79,34 @@ fn element(s: &str) -> Option<(Option<Shape>, String, String, &str)> {
     let rest = rest.strip_prefix('/').unwrap_or(rest).trim_start();
     let label = lines::text(inner);
     if let Some(after) = keyword(rest, "as") {
-        let (alias, _, rest) = element(after)
-            .map(|(_, id, l, r)| (id, l, r))
-            .or_else(|| name(after))?;
+        let (alias, rest) = alias(after)?;
         return Some((Some(shape), alias, label, rest));
     }
     Some((Some(shape), inner.to_owned(), label, rest))
+}
+
+/// The alias after `as`: a bracketed element's inner text, or a name. Does not recurse, so a
+/// chain of `as` stays flat (the rest is left for the caller).
+fn alias(s: &str) -> Option<(String, &str)> {
+    let s = s.trim_start();
+    let close = match s.as_bytes().first()? {
+        b':' => ':',
+        b'(' if !s.starts_with("()") => ')',
+        b'[' => ']',
+        _ => {
+            let r = s.strip_prefix("()").unwrap_or(s);
+            let (id, _, rest) = name(r)?;
+            return Some((id, rest));
+        }
+    };
+    let end = s[1..].find(close)? + 1;
+    let inner = s[1..end].trim();
+    if inner.is_empty() {
+        return None;
+    }
+    let rest = s[end + 1..].trim_start();
+    let rest = rest.strip_prefix('/').unwrap_or(rest).trim_start();
+    Some((inner.to_owned(), rest))
 }
 
 /// What follows an element's name: stereotypes, a color, a `[description]`, and a `{`.
@@ -143,13 +165,20 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
     } else {
         Shape::Circle
     };
-    for (node, implicit) in l.chart.nodes.iter_mut().zip(&l.implicit) {
-        if *implicit {
+    // A name only links mention that a container later takes is the container, not a node.
+    let implicit = std::mem::take(&mut l.implicit);
+    let nodes = std::mem::take(&mut l.chart.nodes);
+    for (mut node, implicit) in nodes.into_iter().zip(implicit) {
+        if implicit && l.containers.contains_key(&node.id) {
+            continue;
+        }
+        if implicit {
             node.shape = bare;
         }
         if node.shape == Shape::Actor {
             node.shape = l.actor;
         }
+        l.chart.nodes.push(node);
     }
     (l.chart, l.d)
 }
@@ -240,10 +269,14 @@ impl Lower {
             return self.open(None, line.range);
         }
         let link = link::link(t);
-        // `Card --> X` links an element named like a keyword.
+        // `Card --> X` links an element named like a keyword. The arrow (or a multiplicity)
+        // must follow the word directly: in `node x.y` the `x.` is part of a name.
+        let after = t[lines::word(t).len()..].trim_start();
+        // `-up->` swaps the ends, so the word may be either.
         let named_like_keyword = link
             .as_ref()
-            .is_some_and(|l| [l.from, l.to].contains(&lines::word(t)));
+            .is_some_and(|l| [l.from, l.to].contains(&lines::word(t)))
+            && after.starts_with(['-', '.', '<', '*', '}', '|', '"', '+', '#']);
         if let Some(&(kw, shape)) = ELEMENTS.iter().find(|(k, _)| *k == w)
             && !named_like_keyword
         {
@@ -314,6 +347,12 @@ impl Lower {
                 Some(&i) => i,
                 None => {
                     let i = self.chart.subgraphs.len();
+                    // Drop the membership of a link-only node this container replaces.
+                    if self.index.get(&id).is_some_and(|&n| self.implicit[n]) {
+                        for s in &mut self.chart.subgraphs {
+                            s.members.retain(|m| *m != id);
+                        }
+                    }
                     self.chart
                         .subgraphs
                         .push(Subgraph::new(&id, Label::plain(title), line.range));
@@ -535,6 +574,133 @@ mod tests {
         );
         assert_eq!(e("()"), None);
         assert_eq!(e("[]"), None);
+    }
+
+    #[test]
+    fn container_replaces_link_only_node() {
+        let (g, d) = lower_src("[Api] --> N\nnode N {\n  [Db]\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("N").is_none(), "loose node N");
+        assert_eq!(g.subgraphs.len(), 1);
+        assert_eq!(g.subgraphs[0].id, "N");
+        assert_eq!(g.subgraphs[0].members, ["Db"]);
+        assert_eq!(g.edges[0].to, "N");
+        assert!(g.node("Api").is_some());
+    }
+
+    #[test]
+    fn container_replaces_link_only_node_variants() {
+        // Implicit member of an outer container that later becomes a nested container.
+        let (g, d) = lower_src("node Outer {\n  [A] --> N\n  node N {\n    [Db]\n  }\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("N").is_none());
+        let outer = g.subgraphs.iter().find(|s| s.id == "Outer").unwrap();
+        assert_eq!(outer.members, ["A", "N"]);
+        let n = g.subgraphs.iter().find(|s| s.id == "N").unwrap();
+        assert_eq!(n.members, ["Db"]);
+        // Implicit in one container, the container declared at top level later.
+        let (g, _) = lower_src("node Outer {\n  [A] --> N\n}\nnode N {\n  [Db]\n}");
+        assert!(g.node("N").is_none());
+        let outer = g.subgraphs.iter().find(|s| s.id == "Outer").unwrap();
+        assert_eq!(outer.members, ["A"]);
+        // A link to the container after it is declared adds no node.
+        let (g, d) = lower_src("node N {\n  [Db]\n}\n[Api] --> N\nN --> [Api]");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("N").is_none());
+        assert_eq!(g.edges.len(), 2);
+        assert!(g.edges.iter().all(|e| e.from == "N" || e.to == "N"));
+        // Reopening a container reuses it.
+        let (g, _) = lower_src("node N {\n  [A]\n}\nnode N {\n  [B]\n}");
+        assert_eq!(g.subgraphs.len(), 1);
+        assert_eq!(g.subgraphs[0].members, ["A", "B"]);
+        // An explicit element is not dropped by a same-id container later? It stays a node.
+        let (g, _) = lower_src("[N]\n[A] --> N\nnode N {\n  [Db]\n}");
+        assert!(g.node("N").is_some());
+    }
+
+    #[test]
+    fn alias_forms() {
+        let e = |s| element(s).map(|(sh, id, label, rest)| (sh, id, label, rest.to_owned()));
+        assert_eq!(
+            e("(a) as (b)"),
+            Some((Some(Shape::UseCase), "b".into(), "a".into(), "".into()))
+        );
+        assert_eq!(
+            e("() a as b"),
+            Some((Some(Shape::Circle), "b".into(), "a".into(), "".into()))
+        );
+        assert_eq!(
+            e("[a] as () b"),
+            Some((Some(Shape::Rect), "b".into(), "a".into(), "".into()))
+        );
+        assert_eq!(e("[a] as"), None);
+        assert_eq!(e("[a] as []"), None);
+        assert_eq!(e("[a] as [b"), None);
+        // `as` with no space is not an alias.
+        let (_, id, _, rest) = e("[a] ask").unwrap();
+        assert_eq!((id.as_str(), rest.as_str()), ("a", "ask"));
+        let (g, d) = lower_src("actor A as \"B\"\n(Use)");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(g.node("A").unwrap().label.text, "B");
+        assert_eq!(shape(&g, "A"), Shape::Actor);
+        let (g, d) = lower_src("(a) as (b)\n() c as d\n[x] as y\nb --> d");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(g.node("b").unwrap().label.text, "a");
+        assert_eq!(shape(&g, "d"), Shape::Circle);
+        assert_eq!(g.node("y").unwrap().label.text, "x");
+        // A chained alias leaves the rest to the decor path as a warning.
+        let (_, d) = lower_src("[a] as [b] as [c]");
+        assert_eq!(d, ["cannot read `as [c]`"]);
+        // `[a] as` alone is a statement error, not a panic.
+        let (_, d) = lower_src("[a] as");
+        assert_eq!(d, [STATEMENT]);
+    }
+
+    #[test]
+    fn dotted_name_after_keyword_is_a_declaration() {
+        // `x.` reads as an arrow head, but `component x.y.Z` declares an element.
+        let (g, d) = lower_src("component x.y.Z\nnode x.n {\n  [Db]\n}\n[Api] --> x.y.Z");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("x.y.Z").is_some() && g.node("component").is_none());
+        assert_eq!(g.edges.len(), 1);
+    }
+
+    #[test]
+    fn alias_on_link_end() {
+        let (g, d) = lower_src("component Z\n[a] as [b] --> [c] as [d]\nb --> d");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("b").is_some() && g.node("d").is_some());
+        assert!(g.node("a").is_none() && g.node("c").is_none());
+        assert_eq!(g.node("b").unwrap().label.text, "a");
+        assert_eq!(g.edges.len(), 2);
+    }
+
+    #[test]
+    fn actor_style_skinparam() {
+        for (style, expect) in [
+            ("awesome", Shape::AwesomeActor),
+            ("hollow", Shape::HollowActor),
+            ("default", Shape::Actor),
+            ("stickman", Shape::Actor),
+        ] {
+            let (g, d) = lower_src(&format!("skinparam actorStyle {style}\nactor A\n:B:"));
+            assert!(d.is_empty(), "{d:?}");
+            assert_eq!(shape(&g, "A"), expect);
+            assert_eq!(shape(&g, "B"), expect);
+        }
+    }
+
+    #[test]
+    fn alias_chain_does_not_recurse() {
+        let e = |s| element(s).map(|(_, id, label, rest)| (id, label, rest.to_owned()));
+        assert_eq!(e("[a] as [b]"), Some(("b".into(), "a".into(), "".into())));
+        let chain = format!("[a]{}", " as [a]".repeat(10_000));
+        let (id, _, rest) = e(&chain).unwrap();
+        assert_eq!(id, "a");
+        assert!(rest.starts_with("as"));
+        // Through a link end and a declaration.
+        let (_, _) = lower_src(&format!("{chain} --> X"));
+        let (_, _) = lower_src(&chain);
     }
 
     #[test]

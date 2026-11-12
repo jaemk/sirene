@@ -64,7 +64,7 @@ pub struct Parse {
 }
 
 impl Parse {
-    /// Root of the syntax tree. Its text is always identical to the parsed source.
+    /// Root of the syntax tree. Its text is the parsed source, with each lone `\r` read as `\n`.
     pub fn syntax(&self) -> SyntaxNode {
         SyntaxNode::new_root(self.green.clone())
     }
@@ -172,8 +172,10 @@ impl Parse {
 
 /// Parses PlantUML source. Never fails; problems are reported as diagnostics.
 pub fn parse(src: &str) -> Parse {
-    let kind = kind(src);
-    let (green, diagnostics) = parser::parse(src, kind);
+    // A lone `\r` is a line break; offsets are unchanged.
+    let src = crate::lines::lone_cr_as_lf(src);
+    let kind = kind(&src);
+    let (green, diagnostics) = parser::parse(&src, kind);
     Parse {
         green,
         diagnostics,
@@ -187,4 +189,60 @@ pub fn is_plantuml(src: &str) -> bool {
     src[scan::bom_len(src)..]
         .lines()
         .any(|l| l.trim_start().starts_with("@start"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lone_cr_is_a_line_break() {
+        let (d, _) = parse("@startuml\r:a;\r@enduml\r").lower();
+        let Diagram::Graph(g) = d else {
+            panic!("expected a graph");
+        };
+        assert!(!g.nodes.is_empty());
+        let labels: Vec<_> = g.nodes.iter().map(|n| n.label.clone()).collect();
+        assert!(labels.iter().any(|l| l.text.contains('a')), "{labels:?}");
+    }
+
+    #[test]
+    fn lone_cr_keeps_text_and_diagnostic_ranges() {
+        let lf = "@startuml\nA -> B\nB -> C\n";
+        let cr = lf.replace('\n', "\r");
+        let crlf = lf.replace('\n', "\r\n");
+        let (p_lf, p_cr, p_crlf) = (parse(lf), parse(&cr), parse(&crlf));
+        // A lone `\r` reads as `\n`; `\r\n` stays as written.
+        assert_eq!(p_cr.syntax().to_string(), lf);
+        assert_eq!(p_crlf.syntax().to_string(), crlf);
+        let msg = "missing `@enduml`; the diagram runs to the end of the file";
+        for p in [&p_lf, &p_cr, &p_crlf] {
+            assert_eq!(p.diagnostics().len(), 1);
+            assert_eq!(p.diagnostics()[0].message, msg);
+        }
+        assert_eq!(p_lf.diagnostics()[0].range, p_cr.diagnostics()[0].range);
+    }
+
+    #[test]
+    fn lone_cr_diagnostic_points_at_its_line() {
+        // The bad value is on the third line; its range must slice to it.
+        let src = "@startjson\r{\r\"a\" 1\r}\r@endjson\r";
+        let p = parse(src);
+        let (_, d) = p.lower();
+        assert_eq!(d.len(), 1, "{d:?}");
+        let text = p.syntax().to_string();
+        let r = d[0].range;
+        assert_eq!(&text[usize::from(r.start())..usize::from(r.end())], "1");
+        let lf = parse(&src.replace('\r', "\n"));
+        assert_eq!(lf.lower().1[0].range, r);
+    }
+
+    #[test]
+    fn lone_cr_sequence_lowers_like_lf() {
+        let lf = "@startuml\nA -> B: hi\nB --> A: ok\n@enduml\n";
+        let (a, da) = parse(lf).lower();
+        let (b, db) = parse(&lf.replace('\n', "\r")).lower();
+        assert_eq!(format!("{a:?}"), format!("{b:?}"));
+        assert_eq!(da.len(), db.len());
+    }
 }

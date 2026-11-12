@@ -22,8 +22,16 @@ const ROOT: &str = "";
 struct Scope {
     id: String,
     scope: String,
-    regions: usize,
     range: TextRange,
+    /// A composite opened past `MAX_DEPTH`: not drawn, its statements go in the parent.
+    skipped: bool,
+}
+
+/// The members of a container, in order, with a set for O(1) dedupe.
+#[derive(Default)]
+struct Members {
+    list: Vec<String>,
+    set: HashSet<String>,
 }
 
 struct Lower {
@@ -35,10 +43,12 @@ struct Lower {
     subgraphs: Vec<Subgraph>,
     subgraph_index: HashMap<String, usize>,
     /// Members of each container, by container id.
-    members: HashMap<String, Vec<String>>,
+    members: HashMap<String, Members>,
     /// The container of each node and subgraph.
     parent: HashMap<String, String>,
     regions: HashSet<String>,
+    /// The number of regions of each composite state split by `--`.
+    region_count: HashMap<String, usize>,
     /// Description lines of each state, drawn below its name.
     descriptions: HashMap<String, Vec<String>>,
     stack: Vec<Scope>,
@@ -63,6 +73,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
         members: HashMap::new(),
         parent: HashMap::new(),
         regions: HashSet::new(),
+        region_count: HashMap::new(),
         descriptions: HashMap::new(),
         stack: Vec::new(),
         last: None,
@@ -112,9 +123,9 @@ impl Lower {
     }
 
     fn add_member(&mut self, container: &str, id: &str) {
-        let list = self.members.entry(container.to_owned()).or_default();
-        if !list.iter().any(|m| m == id) {
-            list.push(id.to_owned());
+        let m = self.members.entry(container.to_owned()).or_default();
+        if m.set.insert(id.to_owned()) {
+            m.list.push(id.to_owned());
         }
         self.parent
             .entry(id.to_owned())
@@ -242,25 +253,29 @@ impl Lower {
                 ),
             );
         };
-        let (composite, regions, range) = (open.id.clone(), open.regions, open.range);
+        if open.skipped {
+            // Already reported as too deep.
+            return;
+        }
+        let (composite, range) = (open.id.clone(), open.range);
+        let regions = self.region_count.get(&composite).copied().unwrap_or(0);
         if regions == 0 {
             // The statements so far are the first region.
             let first = format!("{composite}:0");
             let mut region = Subgraph::new(&first, Label::default(), range);
             region.region = true;
             let moved = self.members.remove(&composite).unwrap_or_default();
-            for m in &moved {
+            for m in &moved.list {
                 self.parent.insert(m.clone(), first.clone());
             }
             self.members.insert(first.clone(), moved);
             self.subgraph(region, &composite);
             self.regions.insert(first);
         }
-        let open = self.stack.last_mut().expect("checked above");
-        open.regions = open.regions.max(1);
-        let id = format!("{composite}:{}", open.regions);
-        open.regions += 1;
-        open.scope = id.clone();
+        let n = regions.max(1);
+        self.region_count.insert(composite.clone(), n + 1);
+        let id = format!("{composite}:{n}");
+        self.stack.last_mut().expect("checked above").scope = id.clone();
         let mut region = Subgraph::new(&id, Label::default(), line.range);
         region.region = true;
         self.subgraph(region, &composite);
@@ -277,18 +292,36 @@ impl Lower {
         self.last = Some(id.clone());
         let composite = line.text.ends_with('{');
         if composite {
-            if self.stack.len() >= MAX_DEPTH {
-                return self.error(line.range, crate::lines::too_deep("states", MAX_DEPTH));
+            // A composite state opened again adds to it, keeping its place; a new one nests
+            // in the current scope, whose real depth counts re-opened ancestors too.
+            let new = !self.subgraph_index.contains_key(&id);
+            if self.stack.len() >= MAX_DEPTH || (new && self.depth(&scope) >= MAX_DEPTH) {
+                // One error per too-deep run, not one per level inside it.
+                if !self.stack.last().is_some_and(|s| s.skipped) {
+                    self.error(line.range, crate::lines::too_deep("states", MAX_DEPTH));
+                }
+                // Pushed so its `}` closes it and not the parent.
+                self.stack.push(Scope {
+                    id,
+                    scope,
+                    range: line.range,
+                    skipped: true,
+                });
+                return;
             }
-            // A composite state opened again adds to it.
-            if !self.subgraph_index.contains_key(&id) {
+            if new {
                 self.subgraph(Subgraph::new(&id, Label::plain(&label), line.range), &scope);
             }
+            // Statements resume in the last region of a composite already split.
+            let inner = match self.region_count.get(&id) {
+                Some(&n) if n > 0 => format!("{id}:{}", n - 1),
+                _ => id.clone(),
+            };
             self.stack.push(Scope {
                 id: id.clone(),
-                scope: id.clone(),
-                regions: 0,
+                scope: inner,
                 range: line.range,
+                skipped: false,
             });
         } else if !self.composites.contains(&id) {
             let i = self.node(&id, &scope, Shape::Rounded, Label::plain(&label));
@@ -369,12 +402,7 @@ impl Lower {
         if text.is_empty() {
             return;
         }
-        if let Some(&i) = self.subgraph_index.get(id) {
-            let title = &mut self.subgraphs[i].title.text;
-            title.push('\n');
-            title.push_str(&text);
-            return;
-        }
+        // Applied in `finish`, as a composite state may be opened after its description.
         self.descriptions
             .entry(id.to_owned())
             .or_default()
@@ -453,12 +481,30 @@ impl Lower {
         });
     }
 
+    /// The number of composite states (not regions) from `container` out to the diagram.
+    fn depth(&self, container: &str) -> usize {
+        let mut depth = 0;
+        let mut seen = HashSet::new();
+        let mut at = Some(container);
+        while let Some(c) = at {
+            if c == ROOT || !seen.insert(c) {
+                break;
+            }
+            if !self.regions.contains(c) {
+                depth += 1;
+            }
+            at = self.parent.get(c).map(String::as_str);
+        }
+        depth
+    }
+
     /// The containers holding `id`, outermost first.
     fn chain(&self, id: &str) -> Vec<String> {
         let mut out = Vec::new();
+        let mut seen = HashSet::new();
         let mut at = self.parent.get(id);
         while let Some(c) = at {
-            if c == ROOT || out.contains(c) {
+            if c == ROOT || !seen.insert(c.as_str()) {
                 break;
             }
             out.push(c.clone());
@@ -479,6 +525,12 @@ impl Lower {
                         })
                         .collect(),
                 ];
+            } else if let Some(&i) = self.subgraph_index.get(&id) {
+                let title = &mut self.subgraphs[i].title.text;
+                for r in rows {
+                    title.push('\n');
+                    title.push_str(&r);
+                }
             }
         }
         // PSTA-5: a transition between two regions of one composite state is not drawn.
@@ -504,7 +556,7 @@ impl Lower {
         }
         // A composite state named only in transitions, never opened, is an empty box.
         for s in &mut self.subgraphs {
-            s.members = self.members.remove(&s.id).unwrap_or_default();
+            s.members = self.members.remove(&s.id).unwrap_or_default().list;
         }
         self.chart.subgraphs = self.subgraphs;
         (self.chart, self.d)
@@ -606,5 +658,202 @@ mod tests {
                 "unclosed state `C`: expected `}`",
             ]
         );
+    }
+
+    #[test]
+    fn reopened_composite_resumes_regions() {
+        let (g, d) = lower_src(
+            "state X {\n  A --> B\n  --\n  C --> D\n}\nstate X {\n  E --> F\n  --\n  G --> H\n}",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        let ids: Vec<_> = g.subgraphs.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids, ["X", "X:0", "X:1", "X:2"]);
+        let s = |id: &str| g.subgraphs.iter().find(|s| s.id == id).unwrap();
+        assert_eq!(s("X").members, ["X:0", "X:1", "X:2"]);
+        assert_eq!(s("X:0").members, ["A", "B"]);
+        assert_eq!(s("X:1").members, ["C", "D", "E", "F"]);
+        assert_eq!(s("X:2").members, ["G", "H"]);
+    }
+
+    #[test]
+    fn description_before_composite_is_its_title() {
+        let (g, d) = lower_src(
+            "X : described before\nstate Y : also before\n[*] --> X\nstate X {\n  A --> B\n}\n\
+             X : after\nstate Y {\n  C --> D\n}",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        let s = |id: &str| g.subgraphs.iter().find(|s| s.id == id).unwrap();
+        assert_eq!(s("X").title.text, "X\ndescribed before\nafter");
+        assert_eq!(s("Y").title.text, "Y\nalso before");
+        assert!(g.node("X").is_none() && g.node("Y").is_none());
+    }
+
+    #[test]
+    fn too_deep_composite_closes_itself() {
+        let n = MAX_DEPTH + 2;
+        let mut body = String::new();
+        for i in 0..n {
+            body.push_str(&format!("state s{i} {{\n"));
+        }
+        body.push_str("--\n");
+        for _ in 0..n {
+            body.push_str("}\n");
+        }
+        body.push_str("A --> B");
+        let (g, d) = lower_src(&body);
+        let deep = crate::lines::too_deep("states", MAX_DEPTH);
+        assert_eq!(d, [deep]);
+        assert_eq!(g.subgraphs.len(), MAX_DEPTH);
+        assert!(g.subgraphs.iter().all(|s| !s.region));
+        assert!(
+            g.subgraphs
+                .iter()
+                .all(|s| !s.members.iter().any(|m| m == "A"))
+        );
+    }
+
+    #[test]
+    fn reopened_chain_counts_real_depth() {
+        // Each `state sK {` is re-opened at the top level and nests the next one: the stack
+        // stays at two, but the composites chain without bound.
+        let mut body = String::new();
+        for i in 0..MAX_DEPTH + 5 {
+            body.push_str(&format!("state s{i} {{\nstate s{} {{\n}}\n}}\n", i + 1));
+        }
+        let (g, d) = lower_src(&body);
+        assert_eq!(d, [crate::lines::too_deep("states", MAX_DEPTH)]);
+        let parent: HashMap<&str, &str> = g
+            .subgraphs
+            .iter()
+            .flat_map(|s| s.members.iter().map(|m| (m.as_str(), s.id.as_str())))
+            .collect();
+        let depth = |id: &str| {
+            let (mut n, mut at) = (1, id);
+            while let Some(p) = parent.get(at) {
+                n += 1;
+                at = p;
+            }
+            n
+        };
+        let deepest = g.subgraphs.iter().map(|s| depth(&s.id)).max();
+        assert_eq!(deepest, Some(MAX_DEPTH));
+    }
+
+    fn sub<'a>(g: &'a Flowchart, id: &str) -> &'a Subgraph {
+        g.subgraphs.iter().find(|s| s.id == id).unwrap()
+    }
+
+    #[test]
+    fn reopened_unsplit_composite_splits_with_earlier_members() {
+        let (g, d) = lower_src("state X {\n  A --> B\n}\nstate X {\n  C --> D\n  --\n  E --> F\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(sub(&g, "X").members, ["X:0", "X:1"]);
+        assert_eq!(sub(&g, "X:0").members, ["A", "B", "C", "D"]);
+        assert_eq!(sub(&g, "X:1").members, ["E", "F"]);
+    }
+
+    #[test]
+    fn reopened_composite_in_deeper_scope_keeps_place() {
+        let (g, d) = lower_src(
+            "state P {\n  state X {\n    A --> B\n    --\n    C --> D\n  }\n}\n\
+             state P {\n  state X {\n    E --> F\n  }\n}",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(sub(&g, "P").members, ["X"]);
+        assert_eq!(sub(&g, "X").members, ["X:0", "X:1"]);
+        assert_eq!(sub(&g, "X:1").members, ["C", "D", "E", "F"]);
+        assert_eq!(g.subgraphs.len(), 4);
+    }
+
+    #[test]
+    fn start_in_resumed_region_is_shared() {
+        let (g, d) = lower_src(
+            "state X {\n  A --> B\n  --\n  [*] --> C\n}\nstate X {\n  [*] --> D\n  D --> [*]\n}",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(
+            sub(&g, "X:1").members,
+            ["X:1:[*]start", "C", "D", "X:1:[*]end"]
+        );
+        assert!(g.node("X:[*]start").is_none());
+        let from_start = edges(&g)
+            .iter()
+            .filter(|e| e.starts_with("X:1:[*]start>"))
+            .count();
+        assert_eq!(from_start, 2);
+    }
+
+    fn too_deep_body(extra: &str) -> String {
+        let mut body = String::new();
+        for i in 0..=MAX_DEPTH {
+            body.push_str(&format!("state s{i} {{\n"));
+        }
+        body.push_str(extra);
+        body
+    }
+
+    #[test]
+    fn description_of_skipped_composite_is_dropped() {
+        let last = format!("s{MAX_DEPTH}");
+        let mut body = too_deep_body(&format!("{last} : text\nA --> B\n"));
+        for _ in 0..=MAX_DEPTH {
+            body.push_str("}\n");
+        }
+        let (g, d) = lower_src(&body);
+        assert_eq!(d, [crate::lines::too_deep("states", MAX_DEPTH)]);
+        assert!(g.node(&last).is_none());
+        assert!(g.subgraphs.iter().all(|s| s.id != last));
+        // The placeholder's statements land in its parent.
+        let parent = format!("s{}", MAX_DEPTH - 1);
+        assert_eq!(sub(&g, &parent).members, ["A", "B"]);
+    }
+
+    #[test]
+    fn unclosed_placeholder_reports_both() {
+        let (g, d) = lower_src(&too_deep_body("A --> B\n"));
+        let unclosed: Vec<_> = d
+            .iter()
+            .filter(|m| m.starts_with("unclosed state"))
+            .collect();
+        assert_eq!(unclosed.len(), MAX_DEPTH + 1);
+        assert_eq!(
+            unclosed[MAX_DEPTH],
+            &format!("unclosed state `s{MAX_DEPTH}`: expected `}}`")
+        );
+        assert_eq!(d.len(), MAX_DEPTH + 2);
+        assert!(d.contains(&crate::lines::too_deep("states", MAX_DEPTH)));
+        assert_eq!(g.subgraphs.len(), MAX_DEPTH);
+    }
+
+    #[test]
+    fn placeholder_on_stack_closes_in_order() {
+        // After the placeholder's `}`, statements return to the real parent.
+        let mut body = too_deep_body("}\nA --> B\n");
+        for _ in 0..MAX_DEPTH {
+            body.push_str("}\n");
+        }
+        let (g, d) = lower_src(&body);
+        assert_eq!(d, [crate::lines::too_deep("states", MAX_DEPTH)]);
+        let parent = format!("s{}", MAX_DEPTH - 1);
+        assert_eq!(sub(&g, &parent).members, ["A", "B"]);
+    }
+
+    #[test]
+    fn long_chain_reports_too_deep_once() {
+        let mut body = String::new();
+        for i in 0..10_000 {
+            body.push_str(&format!("state s{i} {{\n"));
+        }
+        let (g, d) = lower_src(&body);
+        let deep = crate::lines::too_deep("states", MAX_DEPTH);
+        assert_eq!(d.iter().filter(|m| **m == deep).count(), 1);
+        assert_eq!(g.subgraphs.len(), MAX_DEPTH);
+    }
+
+    #[test]
+    fn members_are_not_repeated() {
+        let (g, _) = lower_src("state P {\n  state X {\n  }\n  note \"n\" as X\n  X --> X\n}");
+        let p = g.subgraphs.iter().find(|s| s.id == "P").unwrap();
+        assert_eq!(p.members, ["X"]);
     }
 }
