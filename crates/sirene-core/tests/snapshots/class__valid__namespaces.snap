@@ -8,12 +8,11 @@ expression: "---\ntitle: Shapes\n---\nclassDiagram\n    direction LR\n    accTit
                     ┌─ BaseShapes ────────┐
                     │    ┌──────────┐     │
                   ┌─┼────┤ Triangle │     │
-               ┌──┘ │    └──────────┘     │
-┌────────────┐ │    │                     │
-│ «abstract» │◁┘    │                     │
-│  Polygon   │◁┐    │  ┌───────────────┐  │
-└────────────┘ └──┐ │  │   Rectangle   │  │
-                  │ │  ├───────────────┤  │
+                  │ │    └──────────┘     │
+┌────────────┐ ┌──┘ │                     │
+│ «abstract» │◁┘    │  ┌───────────────┐  │
+│  Polygon   │◁┐    │  │   Rectangle   │  │
+└────────────┘ └──┐ │  ├───────────────┤  │
                   └─┼──┤ double width  │  │
                     │  │ double height │  │
                     │  ├───────────────┤  │
