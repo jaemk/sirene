@@ -119,6 +119,92 @@ pub(crate) fn parens(s: &str) -> Option<(&str, &str)> {
     None
 }
 
+/// Where an unquoted name ends: at whitespace, a body, a color, a stereotype or generics, a
+/// link, or a single `:` (`a::B` is one name).
+pub(crate) fn name_end(s: &str) -> usize {
+    let b = s.as_bytes();
+    s.char_indices()
+        .find(|&(i, c)| {
+            c.is_whitespace()
+                || matches!(c, '{' | '#' | '<' | '[')
+                || (c == ':' && b.get(i + 1) != Some(&b':') && (i == 0 || b[i - 1] != b':'))
+        })
+        .map_or(s.len(), |(i, _)| i)
+}
+
+/// A name with an optional display string: `A`, `"Long name"`, `"Long name" as A`,
+/// `A as "Long name"`, `Box<T>`. Returns the id, the label, and the rest of the line.
+pub(crate) fn name(s: &str) -> Option<(String, String, &str)> {
+    let s = s.trim_start();
+    let (first, rest) = if let Some(body) = s.strip_prefix('"') {
+        let close = body.find('"')?;
+        (&s[..close + 2], body[close + 1..].trim_start())
+    } else {
+        let mut end = name_end(s);
+        // Generics: `Box<T>` but not a stereotype `<<s>>`.
+        if s[end..].starts_with('<') && !s[end..].starts_with("<<") {
+            let mut depth = 0;
+            for (i, c) in s[end..].char_indices() {
+                match c {
+                    '<' => depth += 1,
+                    '>' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            end += i + 1;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        (&s[..end], s[end..].trim_start())
+    };
+    if first.is_empty() {
+        return None;
+    }
+    let display = unquote(first);
+    if let Some(after) = keyword(rest, "as") {
+        let (alias, rest) = match after.strip_prefix('"') {
+            Some(body) => {
+                let close = body.find('"')?;
+                (&after[..close + 2], body[close + 1..].trim_start())
+            }
+            None => {
+                let end = name_end(after);
+                (&after[..end], after[end..].trim_start())
+            }
+        };
+        // `"Display" as Id` or `Id as "Display"`.
+        let (id, label) = if first.starts_with('"') || !alias.starts_with('"') {
+            (unquote(alias), display)
+        } else {
+            (display, unquote(alias))
+        };
+        return Some((id.to_owned(), text(label), rest));
+    }
+    Some((id_of(display), text(display), rest))
+}
+
+/// The id a name refers to: the text without quotes or generics.
+pub(crate) fn id_of(s: &str) -> String {
+    let s = unquote(s.trim());
+    match s.find('<') {
+        Some(at) if at > 0 => s[..at].to_owned(),
+        _ => s.to_owned(),
+    }
+}
+
+/// A stereotype's name, without a `(S,#color)` spot.
+pub(crate) fn stereotype(s: &str) -> String {
+    let s = s.trim();
+    let s = match s.strip_prefix('(') {
+        Some(r) => r.find(')').map_or(s, |i| r[i + 1..].trim()),
+        None => s,
+    };
+    s.to_owned()
+}
+
 /// Reads a statement's lines one at a time.
 pub(crate) struct Cursor {
     lines: Vec<Line>,

@@ -1,0 +1,17 @@
+@startuml
+[*] --> Running
+state Running {
+  [*] --> Playing
+  Playing --> Paused : pause
+  Paused --> Playing : resume
+  --
+  [*] --> Muted
+  Muted --> Loud : unmute
+}
+state fork1 <<fork>>
+Running --> fork1
+fork1 --> Saved
+fork1 --> Closed
+Saved --> [*]
+Closed --> [*]
+@enduml

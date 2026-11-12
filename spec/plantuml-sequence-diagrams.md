@@ -20,8 +20,9 @@ are ignored. Keywords match in any case; participant names match exactly.
 
 A document is a sequence diagram unless a statement only another kind accepts comes first
 (PUML-1): `start` or `:action;` is an activity diagram (PACT), `class`, `enum`, or `object` a
-class diagram (PCLS), and `usecase`, `component`, `state`, `[*]`, and the like are kinds that
-are not drawn yet, an error naming the kind ("PlantUML state diagrams are not supported yet").
+class diagram (PCLS), `state` or `[*]` a state diagram (PSTA), and `usecase`, `component`,
+`robust`, and the like are kinds that are not drawn yet, an error naming the kind ("PlantUML
+timing diagrams are not supported yet").
 
 ## PSEQ-2 Participants
 

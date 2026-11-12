@@ -65,6 +65,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | PlantUML Sequence Diagrams | done | [plantuml-sequence-diagrams.md](plantuml-sequence-diagrams.md) |
 | PlantUML Activity Diagrams | done | [plantuml-activity-diagrams.md](plantuml-activity-diagrams.md) |
 | PlantUML Class Diagrams | done | [plantuml-class-diagrams.md](plantuml-class-diagrams.md) |
+| PlantUML State Diagrams | done | [plantuml-state-diagrams.md](plantuml-state-diagrams.md) |
 
 ## Conventions
 

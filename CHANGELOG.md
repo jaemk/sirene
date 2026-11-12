@@ -40,6 +40,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   members with `{static}`/`{abstract}` and separators, `extends`/`implements`, links with every
   head, multiplicities, direction words, and `-[#color,dashed]->` styles, packages, objects,
   maps, `hide empty members`, and notes.
+- PlantUML state diagrams: start and end states, descriptions below the name, colors,
+  `<<choice>>`, `<<fork>>`, `<<join>>`, history states, composite states with concurrent
+  regions (`--`, `||`), styled transitions, and notes.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

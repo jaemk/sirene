@@ -1,0 +1,51 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\n[*] --> Running\nstate Running {\n  [*] --> Playing\n  Playing --> Paused : pause\n  Paused --> Playing : resume\n  --\n  [*] --> Muted\n  Muted --> Loud : unmute\n}\nstate fork1 <<fork>>\nRunning --> fork1\nfork1 --> Saved\nfork1 --> Closed\nSaved --> [*]\nClosed --> [*]\n@enduml\n"
+---
+
+              ●
+              │
+              ▼
+┌────────────────── Running ─────────┐
+│                                    │
+│ ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┐                 │
+│ ┆                ┆                 │
+│ ┆       ●        ┆   ┌┄┄┄┄┄┄┄┄┄┄┄┐ │
+│ ┆       │        ┆   ┆           ┆ │
+│ ┆       ▼        ┆   ┆     ●     ┆ │
+│ ┆  ╭─────────╮   ┆   ┆     │     ┆ │
+│ ┆  │ Playing │   ┆   ┆     ▼     ┆ │
+│ ┆  ╰──┬──────╯   ┆   ┆ ╭───────╮ ┆ │
+│ ┆     │   ▲      ┆   ┆ │ Muted │ ┆ │
+│ ┆   ┌─┘   └──┐   ┆   ┆ ╰───┬───╯ ┆ │
+│ ┆   │        │   ┆   ┆     │     ┆ │
+│ ┆ pause   resume ┆   ┆  unmute   ┆ │
+│ ┆   │        │   ┆   ┆     ▼     ┆ │
+│ ┆   └─┐   ┌──┘   ┆   ┆ ╭──────╮  ┆ │
+│ ┆     ▼   │      ┆   ┆ │ Loud │  ┆ │
+│ ┆  ╭──────┴─╮    ┆   ┆ ╰──────╯  ┆ │
+│ ┆  │ Paused │    ┆   ┆           ┆ │
+│ ┆  ╰────────╯    ┆   └┄┄┄┄┄┄┄┄┄┄┄┘ │
+│ ┆                ┆                 │
+│ └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘                 │
+│                                    │
+└──────────────────┬─────────────────┘
+                   │
+                   ▼
+                 ━┬━┬━
+                  │ │
+               ┌──┘ └──┐
+               │       │
+               │       │
+             ┌─┘       └──┐
+             ▼            ▼
+         ╭───────╮   ╭────────╮
+         │ Saved │   │ Closed │
+         ╰───┬───╯   ╰────┬───╯
+             │            │
+             └──┐      ┌──┘
+                │      │
+                │      │
+                └──┐┌──┘
+                   ▼▼
+                    ◉

@@ -8,6 +8,7 @@ mod lines;
 mod link;
 mod lower;
 mod parser;
+mod state;
 
 use rowan::GreenNode;
 
@@ -20,7 +21,10 @@ use crate::syntax::SyntaxNode;
 
 /// Whether sirene draws diagrams of `kind` yet (PUML-2).
 pub(crate) fn supported(kind: Kind) -> bool {
-    matches!(kind, Kind::Sequence | Kind::Activity | Kind::Class)
+    matches!(
+        kind,
+        Kind::Sequence | Kind::Activity | Kind::Class | Kind::State
+    )
 }
 
 /// The result of parsing PlantUML source: a lossless syntax tree plus diagnostics.
@@ -57,6 +61,10 @@ impl Parse {
             }
             Kind::Class => {
                 let (chart, d) = class::lower(&root);
+                (Diagram::Graph(chart), d)
+            }
+            Kind::State => {
+                let (chart, d) = state::lower(&root);
                 (Diagram::Graph(chart), d)
             }
             Kind::Sequence => {

@@ -1,0 +1,53 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Door\n[*] --> Closed\nstate Closed : bolt in\nstate \"Open wide\" as Open #LightGreen\nClosed --> Open : open\nOpen --> Closed : close\nClosed --> Locked : lock\nstate Locked {\n  [*] --> Armed\n  Armed --> Alarm : force\n  Alarm --> [*]\n}\nLocked --> Closed : unlock\nstate check <<choice>>\nOpen --> check : wind\ncheck --> Closed : strong\ncheck --> Open : calm\nnote right of Locked : keyed from outside\n@enduml\n"
+---
+
+                               Door
+
+                      ●
+                      │
+                      ▼
+                 ╭─────────╮
+                 │ Closed  │
+                 ├─────────┤
+                 │ bolt in │
+                 ╰┬───┬────╯
+                  │ ▲ │ ▲ ▲
+       ┌──────────┘ │ │ │ └────────────────────┐
+       │      ┌─────┘ │ └─────┐                │
+       │      │       │       │                │
+     open   close   lock   unlock              │
+       │      │       │       │                │
+   ┌───┘ ┌────┘    ┌──┘       │                └────────────────┐
+   │     │         │┌─────────┘                                 │
+   │     │         ▼│                                           │
+   │     │      ┌───┴─── Locked ─┐                              │
+   │     │      │                │                              │
+   │     │      │     ●          │                              │
+   │     │      │     │          │                              │
+   │     │      │     ▼          │                              │
+   │     │      │ ╭───────╮      │                              │
+   │     │      │ │ Armed │      │                              │
+   ▼     │      │ ╰───┬───╯      │                              │
+╭────────┴──╮   │     │          │  ┌────────────────────╮      │
+│ Open wide │   │   force        │┄┄│ keyed from outside │   strong
+╰──┬────────╯   │     ▼          │  └────────────────────┘      │
+   │     ▲      │ ╭───────╮      │                              │
+   │     │      │ │ Alarm │      │                              │
+   │     │      │ ╰───┬───╯      │                              │
+   │     │      │     │          │                              │
+   │     │      │     ▼          │                              │
+   │     │      │     ◉          │                              │
+   │     │      │                │                              │
+   │     │      └────────────────┘                              │
+   │     │                                                      │
+   │     └───────────────┐                         ┌────────────┘
+   └──────────────┐      │                         │
+                  │      │                         │
+                wind   calm                        │
+                  │      │                         │
+                  │      └────────────┐┌───────────┘
+                  └──────────────────┐││
+                                     ▼││
+                                      ◇
