@@ -1,0 +1,20 @@
+@startuml
+title Checkout
+actor Customer
+participant "Web Shop" as Shop
+participant Payments
+database Orders
+
+Customer -> Shop : place order
+activate Shop
+Shop -> Payments : charge card
+alt approved
+  Payments --> Shop : receipt
+  Shop -> Orders : save order
+  Shop --> Customer : confirmation
+else declined
+  Payments --> Shop : declined
+  Shop --> Customer : ask for another card
+end
+deactivate Shop
+@enduml

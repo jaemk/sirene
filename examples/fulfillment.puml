@@ -1,0 +1,21 @@
+@startuml
+title Fulfillment
+start
+:Receive order;
+if (In stock?) then (yes)
+  :Pick items;
+else (no)
+  :Order from supplier;
+endif
+fork
+  :Charge card;
+fork again
+  :Pack box;
+end fork
+while (More boxes?) is (yes)
+  :Label box;
+endwhile (no)
+:Ship;
+note right: tracked
+stop
+@enduml
