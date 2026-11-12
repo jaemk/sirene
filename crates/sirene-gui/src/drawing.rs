@@ -6,6 +6,7 @@ use gpui::{
     AppContext, Context, Entity, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point,
     Subscription, Window, point, px,
 };
+use sirene_core::diagram::Lang;
 use sirene_core::flowchart::edit::{self, Line, TextEdit};
 use sirene_core::flowchart::{self, Flowchart, Shape};
 use sirene_core::scene::{Owner, Pt};
@@ -52,9 +53,11 @@ pub struct LabelEdit {
     _subscription: Subscription,
 }
 
-/// The flowchart `src` describes.
-fn chart(src: &str) -> Flowchart {
-    sirene_core::diagram::lower(src).diagram.into_graph()
+/// The flowchart `src` describes, read as `lang` when given.
+fn chart(src: &str, lang: Option<Lang>) -> Flowchart {
+    sirene_core::diagram::lower_as(src, lang)
+        .diagram
+        .into_graph()
 }
 
 /// How far, in screen pixels, a click may miss a stroke.
@@ -545,6 +548,7 @@ impl Viewer {
     pub(crate) fn move_to(&mut self, a: &MoveTo, window: &mut Window, cx: &mut Context<Self>) {
         let nodes = self.selected_nodes();
         let target = a.subgraph.clone();
+        let lang = self.doc.lang();
         let mut stuck = false;
         self.change(window, cx, |src| {
             for id in &nodes {
@@ -552,7 +556,7 @@ impl Viewer {
                     Some(e) => *src = e.apply(src),
                     // Already there is not a refusal.
                     None => {
-                        let now = chart(src)
+                        let now = chart(src, lang)
                             .subgraphs
                             .iter()
                             .find(|s| s.members.iter().any(|m| m == id))
@@ -665,9 +669,10 @@ impl Viewer {
         f: impl Fn(Line) -> Line,
     ) {
         let edges = self.selected_edges();
+        let lang = self.doc.lang();
         self.change(window, cx, |out| {
             for i in edges {
-                let Some(e) = chart(out).edges.get(i).map(Line::of) else {
+                let Some(e) = chart(out, lang).edges.get(i).map(Line::of) else {
                     continue;
                 };
                 if let Some(edit) = edit::set_edge_line(out, i, f(e)) {

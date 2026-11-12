@@ -180,6 +180,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   linear in their size; 10,000 sankey flows took tens of seconds.
 - A chain of subgraphs draws straight down; each subgraph sat a little right of the one before,
   so a long chain drew a very wide, slow image.
+- The editor draws a DOT graph on its `bgcolor`, as the other commands do.
 
 ## [0.2.0] - 2026-11-08
 
