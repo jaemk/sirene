@@ -149,7 +149,9 @@ A gantt chart dates each task once, in dependency order; `excludes` that leaves 
 an error and is ignored (MGANTT-3). An ASCII drawing is cut off at 2^22 cells (ASCIIR-1).
 
 Tests: `crates/sirene-core/tests/limits.rs` draws a source at each limit and 2,000-statement
-chains, and checks the diagnostics; `skipped_blocks_keep_their_text` checks the trees.
+chains, and checks the diagnostics; `skipped_blocks_keep_their_text` checks the trees. The
+`scale` bench in `crates/sirene-core/benches/scale.rs` times reading, scene building, and text
+drawing of large inputs at two sizes ten times apart.
 
 ## LANGS-9 Source text
 
