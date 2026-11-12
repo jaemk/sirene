@@ -25,7 +25,9 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
 - Nodes are nodes in first-mention order, with their `label` (default `\N`, the ID). `\n`, `\l`,
   and `\r` break lines; `\N`, `\G`, `\E`, `\T`, and `\H` are the node, graph, edge, tail, and head
   names, whose own escapes are read too (the node `"a\nb"` is labeled on two lines); `\\` is a
-  backslash.
+  backslash. HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`, `&nbsp;`, `&#NNN;`, and
+  `&#xHH;`) are decoded after the names are put in and before the line breaks are read; an
+  unknown one is text.
 - Edges are edges; a `digraph` edge has an arrow at its head, a `graph` edge none, and `dir`,
   `arrowhead`, and `arrowtail` change that. An edge to a subgraph joins every node in it.
 - A subgraph whose name starts with `cluster` (any case) is a cluster titled by its `label`,
@@ -64,8 +66,8 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
   and the first color of a list such as `red:blue`. An unknown color is a warning, once for the
   attribute however many nodes or edges it applies to.
 - HTML labels are drawn as their text: tags are dropped, `<br/>` and each table row start a
-  line, a row's cells are a space apart, and `&lt;`, `&gt;`, `&amp;`, `&quot;`, `&apos;`, and
-  `&nbsp;` are decoded.
+  line, a row's cells are a space apart, and entities are decoded as in other labels (DOT-2).
+  `&nbsp;` padding is kept; source indentation is not.
 
 Any other attribute is a warning, once per name and kind per file (LANGS-6); layout attributes
 from other engines (`pos`, `overlap`, `splines`), font attributes, and `width` and `height` are

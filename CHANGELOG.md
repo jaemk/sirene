@@ -178,6 +178,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   size; a 2,000-node chain took several seconds.
 - Long state diagrams, mindmaps, pie charts, and sankey diagrams read and draw in time near
   linear in their size; 10,000 sankey flows took tens of seconds.
+- DOT labels decode HTML entities, including `&#NNN;` and `&#xHH;`, in plain labels as well as
+  HTML ones. An unclosed string or HTML string keeps its last character.
+- Mermaid labels decode hex entities such as `&#x2665;`, and `&9829;` without its `#` is text.
 
 ## [0.2.0] - 2026-11-08
 

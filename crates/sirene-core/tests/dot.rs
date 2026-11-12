@@ -479,3 +479,18 @@ fn syntax_errors() {
     assert_eq!(errors("digraph {"), ["unclosed block: expected `}`"]);
     assert!(errors("digraph {}").is_empty());
 }
+
+/// An unclosed string or HTML string runs to the end of the source and keeps all its text.
+#[test]
+fn unclosed_labels_keep_their_text() {
+    for (src, text) in [
+        ("digraph { a [label=<x é", "x é"),
+        ("digraph { a [label=<x<b>é", "xé"),
+        ("digraph { a [label=\"é", "é"),
+        ("digraph { a [label=\"q\\\"", "q\""),
+    ] {
+        let (c, d) = lowered(src);
+        assert!(!d.is_empty(), "{src}");
+        assert_eq!(c.nodes[0].label.text, text, "{src}");
+    }
+}

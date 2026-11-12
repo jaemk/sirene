@@ -4,8 +4,10 @@ use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
+use super::parser;
 use super::x11::X11;
 use crate::diagnostic::Diagnostic;
+use crate::flowchart::text::decode_html_entities;
 use crate::flowchart::{
     Arrow, Direction, Edge, Flowchart, Label, Node, Row, Shape, Stroke, Style, Subgraph,
 };
@@ -160,10 +162,12 @@ fn ids(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> {
 /// The text of a quoted string: without its quotes, `\"` as `"`, and a backslash before a
 /// line break joining the lines. Other escapes stay for the label (DOT-2).
 fn unquote(s: &str) -> String {
-    let inner = s
-        .strip_prefix('"')
-        .map(|s| s.strip_suffix('"').unwrap_or(s))
-        .unwrap_or(s);
+    let inner = s.strip_prefix('"').unwrap_or(s);
+    // An unclosed string runs to the end of the source, which may end in an escaped quote.
+    let inner = match parser::string_len(s) {
+        Some(n) if n == s.len() => inner.strip_suffix('"').unwrap_or(inner),
+        _ => inner,
+    };
     inner
         .replace("\\\r\n", "")
         .replace("\\\n", "")
@@ -179,7 +183,13 @@ fn value(id: &SyntaxNode) -> Value {
             HTML_STRING => {
                 html = true;
                 let s = t.text();
-                text.push_str(s.get(1..s.len().saturating_sub(1)).unwrap_or(""));
+                let inner = s.strip_prefix('<').unwrap_or(s);
+                // An unclosed HTML string keeps its last character.
+                let inner = match parser::html_len(s) {
+                    Some(n) if n == s.len() => inner.strip_suffix('>').unwrap_or(inner),
+                    _ => inner,
+                };
+                text.push_str(inner);
             }
             IDENT | NUMBER => text.push_str(t.text()),
             _ => {}
@@ -190,7 +200,8 @@ fn value(id: &SyntaxNode) -> Value {
 
 /// A label's escapes: `\n`, `\l`, and `\r` break lines, `\N` is the node's name, `\G` the
 /// graph's, `\E` the edge's, `\T` and `\H` its tail and head, and `\x` is `x`. A name's own
-/// escapes are read too, as Graphviz does: the node `"a\nb"` is labeled on two lines.
+/// escapes are read too, as Graphviz does: the node `"a\nb"` is labeled on two lines. HTML
+/// entities are decoded after the names are put in and before the line breaks are read.
 fn escape(text: &str, names: &Names) -> String {
     let mut named = String::new();
     let mut chars = text.chars();
@@ -212,6 +223,7 @@ fn escape(text: &str, names: &Names) -> String {
             None => named.push('\\'),
         }
     }
+    let named = decode_html_entities(&named);
     let mut out = String::new();
     let mut chars = named.chars();
     while let Some(c) = chars.next() {
@@ -272,19 +284,14 @@ fn html_text(s: &str) -> String {
         rest = &rest[after..];
     }
     out.extend(rest.chars().filter(|c| !c.is_control()));
+    // Source indentation is not text, but `&nbsp;` padding is.
+    let blank = |c: char| c.is_ascii_whitespace();
     let out = out
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&nbsp;", " ")
-        .replace("&amp;", "&");
-    out.lines()
-        .map(str::trim)
+        .lines()
+        .map(|l| l.trim_matches(blank))
         .collect::<Vec<_>>()
-        .join("\n")
-        .trim()
-        .to_owned()
+        .join("\n");
+    decode_html_entities(out.trim_matches(blank))
 }
 
 /// A field of a record label: text, or a group of fields in braces (DOT-3).
@@ -1252,6 +1259,19 @@ mod tests {
         };
         assert_eq!(escape("\\N", &named), "a\nb");
         assert_eq!(escape("\\G", &named), "g\\N");
+        // Entities: named, decimal, and hex, decoded once; `#` codes are text.
+        assert_eq!(e("a &amp; b &lt;&#169;&#xA9;"), "a & b <\u{a9}\u{a9}");
+        assert_eq!(e("&amp;lt; #amp; & x;"), "&lt; #amp; & x;");
+        // Decoded after names are put in, before line breaks are read.
+        let amp = Names {
+            node: "x&amp;y",
+            ..names()
+        };
+        assert_eq!(escape("\\N", &amp), "x&y");
+        assert_eq!(e("a&#92;nb"), "a\nb");
+        // An unclosed string keeps an escaped quote at its end.
+        assert_eq!(unquote("\"a\\\""), "a\"");
+        assert_eq!(unquote("\"a"), "a");
     }
 
     #[test]
@@ -1276,6 +1296,9 @@ mod tests {
         assert_eq!(html_text("é<"), "é");
         assert_eq!(html_text("<>é</>"), "é");
         assert_eq!(html_text(""), "");
+        // Numeric entities, and `&nbsp;` padding kept while source indentation is not.
+        assert_eq!(html_text("&#9829; &#x2665;"), "\u{2665} \u{2665}");
+        assert_eq!(html_text("\n  &nbsp;a&nbsp;\n"), "\u{a0}a\u{a0}");
     }
 
     #[test]

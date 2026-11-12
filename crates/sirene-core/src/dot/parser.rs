@@ -176,7 +176,7 @@ fn punct(c: char) -> Option<SyntaxKind> {
 
 /// The length of the double-quoted string at the start of `s`, quotes included; `None` when
 /// unclosed. `\"` does not close it.
-fn string_len(s: &str) -> Option<usize> {
+pub(super) fn string_len(s: &str) -> Option<usize> {
     let mut escaped = false;
     for (i, c) in s.char_indices().skip(1) {
         match c {
@@ -190,7 +190,7 @@ fn string_len(s: &str) -> Option<usize> {
 
 /// The length of the HTML string `<...>` at the start of `s`, with its nested `<` and `>`
 /// balanced; `None` when unclosed.
-fn html_len(s: &str) -> Option<usize> {
+pub(super) fn html_len(s: &str) -> Option<usize> {
     let mut depth = 0usize;
     for (i, c) in s.char_indices() {
         match c {
