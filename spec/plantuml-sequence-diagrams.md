@@ -19,9 +19,9 @@ kind. Comments are a line starting with `'` and `/' ... '/`, which may span line
 are ignored. Keywords match in any case; participant names match exactly.
 
 A document is a sequence diagram unless a statement only another kind accepts comes first
-(`class`, `interface`, `enum`, `abstract`, `usecase`, `component`, `state`, `object`, `node`,
-`package`, `start`, `:action;`, `[*]`, and the like), which is an error naming the kind
-("PlantUML class diagrams are not supported yet").
+(PUML-1): `start` or `:action;` is an activity diagram (PACT), and `class`, `interface`, `enum`,
+`usecase`, `component`, `state`, `object`, `[*]`, and the like are kinds that are not drawn yet,
+an error naming the kind ("PlantUML class diagrams are not supported yet").
 
 ## PSEQ-2 Participants
 

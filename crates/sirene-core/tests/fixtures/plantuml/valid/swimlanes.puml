@@ -1,0 +1,23 @@
+@startuml
+|Customer|
+start
+:Place order;
+|Shop|
+:Check payment;
+repeat :Try charge;
+  :Wait;
+repeat while (Declined?) is (yes) not (no)
+partition Shipping {
+  :Pack;
+  :Send;
+}
+switch (Region)
+case (EU)
+  :Use DHL;
+case (US)
+  :Use UPS;
+endswitch
+|Customer|
+:Receive;
+end
+@enduml

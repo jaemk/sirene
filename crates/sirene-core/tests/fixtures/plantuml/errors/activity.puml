@@ -1,0 +1,16 @@
+@startuml
+start
+!include parts.puml
+skinparam ActivityBackgroundColor red
+else
+endwhile
+break
+:Fine;
+-[#nosuchcolor,wavy]-> next;
+:Next;
+what is this
+while (x)
+  :Loop;
+:Unclosed action
+on two lines
+@enduml

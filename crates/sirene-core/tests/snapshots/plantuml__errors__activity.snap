@@ -1,0 +1,34 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nstart\n!include parts.puml\nskinparam ActivityBackgroundColor red\nelse\nendwhile\nbreak\n:Fine;\n-[#nosuchcolor,wavy]-> next;\n:Next;\nwhat is this\nwhile (x)\n  :Loop;\n:Unclosed action\non two lines\n@enduml\n"
+---
+3:1: error: `!include` reads other files and is not supported
+4:1: warning: `skinparam` is not drawn yet; ignoring it
+5:1: error: `else` belongs in an `if`
+6:1: error: `endwhile` without a `while` to close
+7:1: error: `break` belongs in a `while` or `repeat`
+9:3: warning: unknown color `#nosuchcolor`; drawing the default
+9:16: warning: arrow style `wavy` is not drawn; ignoring it
+11:1: error: expected an activity statement such as `:action;`, `start`, `if (...) then`, or `while (...)`
+12:1: error: unclosed `while`: expected `endwhile`
+14:1: error: unclosed action: expected `;` at its end
+
+      ╭──────╮
+ ●    │ Fine │
+      ╰───┬──╯
+          │
+        next
+          ▼
+      ╭──────╮
+      │ Next │
+      ╰───┬──╯
+          │
+          ▼
+        ╱───╲
+        │ x │
+        ╲─┬─╱
+          │
+          ▼
+      ╭──────╮
+      │ Loop │
+      ╰──────╯

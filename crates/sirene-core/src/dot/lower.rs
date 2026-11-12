@@ -512,7 +512,7 @@ fn leaves(field: &Field, out: &mut Vec<(String, Option<String>)>) {
 
 /// A Graphviz color: an X11 name, `#rrggbb`, `#rrggbbaa`, an `H,S,V` triple of fractions, or
 /// the first color of a list such as `red:blue` (DOT-3).
-fn color(value: &str) -> Option<Color> {
+pub(crate) fn color(value: &str) -> Option<Color> {
     let first = value.split(':').next().unwrap_or("");
     let first = first.split(';').next().unwrap_or("").trim();
     let v = first.to_ascii_lowercase();
@@ -569,7 +569,7 @@ fn hsv_color(h: f32, s: f32, v: f32) -> Color {
     }
 }
 
-fn hex(c: Color) -> String {
+pub(crate) fn hex(c: Color) -> String {
     if c.a == 255 {
         format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b)
     } else {

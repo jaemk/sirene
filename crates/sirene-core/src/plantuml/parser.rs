@@ -11,12 +11,17 @@ use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
-pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
-    let mut p = Parser(Base::new(src));
+use super::Kind;
+
+pub(crate) fn parse(src: &str, kind: Kind) -> (GreenNode, Vec<Diagnostic>) {
+    let mut p = Parser {
+        base: Base::new(src),
+        kind,
+    };
     p.start(ROOT);
     p.document();
     p.finish();
-    p.0.finish_tree()
+    p.base.finish_tree()
 }
 
 pub(crate) const STATEMENT: &str = "expected a message such as `A -> B : text`, or a statement \
@@ -59,46 +64,22 @@ const KEYWORDS: &[&str] = &[
     "mainframe",
 ];
 
-/// The first statement's keyword in the other PlantUML kinds, and the kind it names (PSEQ-1).
-const OTHER_KINDS: &[(&str, &str)] = &[
-    ("class", "class"),
-    ("interface", "class"),
-    ("enum", "class"),
-    ("abstract", "class"),
-    ("annotation", "class"),
-    ("object", "object"),
-    ("usecase", "use case"),
-    ("component", "component"),
-    ("state", "state"),
-    ("node", "deployment"),
-    ("package", "deployment"),
-    ("artifact", "deployment"),
-    ("cloud", "deployment"),
-    ("folder", "deployment"),
-    ("frame", "deployment"),
-    ("rectangle", "deployment"),
-    ("storage", "deployment"),
-    ("card", "deployment"),
-    ("start", "activity"),
-    ("stop", "activity"),
-    ("robust", "timing"),
-    ("concise", "timing"),
-    ("clock", "timing"),
-    ("binary", "timing"),
-];
-
-struct Parser<'a>(Base<'a>);
+struct Parser<'a> {
+    base: Base<'a>,
+    /// The document's kind (PUML-1); every kind but sequence is read a line at a time.
+    kind: Kind,
+}
 
 impl<'a> Deref for Parser<'a> {
     type Target = Base<'a>;
     fn deref(&self) -> &Base<'a> {
-        &self.0
+        &self.base
     }
 }
 
 impl DerefMut for Parser<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.base
     }
 }
 
@@ -257,10 +238,8 @@ impl Parser<'_> {
         let r = self.rest();
         let n = 1 + word_len(&r[1..]);
         let kw = &r[..n];
-        if !kw.eq_ignore_ascii_case("@startuml") {
-            let message = format!(
-                "`{kw}` diagrams are not supported yet; sirene reads `@startuml` sequence diagrams"
-            );
+        if !super::supported(self.kind) && !kw.eq_ignore_ascii_case("@startuml") {
+            let message = format!("`{kw}` diagrams are not supported yet");
             let start = self.pos;
             self.start(HEADER);
             self.token(GRAPH_KW, n);
@@ -279,24 +258,75 @@ impl Parser<'_> {
         self.diagram(true);
     }
 
-    /// The statements, unless the first is one only another diagram kind accepts (PSEQ-1).
+    /// The statements of the document's kind, or an error for a kind not drawn yet (PUML-2).
     fn diagram(&mut self, started: bool) {
         self.trivia();
-        if let Some(kind) = other_kind(self.rest()) {
+        if !super::supported(self.kind) {
             let start = self.pos;
             let len = scan::line_len(self.rest());
-            self.error(
-                start,
-                start + len,
-                format!("PlantUML {kind} diagrams are not supported yet"),
+            let message = format!(
+                "PlantUML {} diagrams are not supported yet",
+                self.kind.name()
             );
+            self.error(start, start + len, message);
             let rest = self.rest().len();
             self.start(ERROR);
             self.token(ERROR_TOKEN, rest);
             self.finish();
             return;
         }
-        self.statements(started);
+        if self.kind == Kind::Sequence {
+            self.statements(started);
+        } else {
+            self.lines(started);
+        }
+    }
+
+    /// Whether the line here is an `@end...` line, and its length.
+    fn end_len(&self) -> Option<usize> {
+        let r = self.rest();
+        r.get(..4)
+            .is_some_and(|p| p.eq_ignore_ascii_case("@end"))
+            .then(|| 4 + word_len(&r[4..]))
+    }
+
+    /// The end of the statements: the missing `@enduml` warning, or the `@end...` line and the
+    /// text after it. Returns whether the statements end here.
+    fn at_end(&mut self, started: bool) -> bool {
+        if self.at_eof() {
+            if started {
+                let at = self.pos;
+                self.warn(
+                    at,
+                    at,
+                    "missing `@enduml`; the diagram runs to the end of the file",
+                );
+            }
+            return true;
+        }
+        let Some(n) = self.end_len() else {
+            return false;
+        };
+        self.start(HEADER);
+        self.token(END_KW, n);
+        self.finish();
+        self.after_end();
+        true
+    }
+
+    /// One `TEXT_STMT` per line up to `@end...`, for the kinds whose lowering reads lines.
+    fn lines(&mut self, started: bool) {
+        loop {
+            self.trivia();
+            if self.at_end(started) {
+                return;
+            }
+            let r = self.rest();
+            let len = scan::trim_end_len(r, scan::line_len(r));
+            self.start(TEXT_STMT);
+            self.token(TEXT, len);
+            self.finish();
+        }
     }
 
     /// Statements up to `@enduml` or the end of input, where a missing `@enduml` is a warning
@@ -304,26 +334,7 @@ impl Parser<'_> {
     fn statements(&mut self, started: bool) {
         loop {
             self.trivia();
-            if self.at_eof() {
-                if started {
-                    let at = self.pos;
-                    self.warn(
-                        at,
-                        at,
-                        "missing `@enduml`; the diagram runs to the end of the file",
-                    );
-                }
-                return;
-            }
-            if self
-                .rest()
-                .get(..7)
-                .is_some_and(|p| p.eq_ignore_ascii_case("@enduml"))
-            {
-                self.start(HEADER);
-                self.token(END_KW, 7);
-                self.finish();
-                self.after_end();
+            if self.at_end(started) {
                 return;
             }
             let before = self.pos;
@@ -680,9 +691,7 @@ impl Parser<'_> {
             self.ws();
             let r = self.rest();
             let len = scan::trim_end_len(r, scan::line_len(r));
-            if r.get(..7)
-                .is_some_and(|p| p.eq_ignore_ascii_case("@enduml"))
-            {
+            if self.end_len().is_some() {
                 self.unclosed(format!("unclosed `{what}`: expected `{}`", closers[0]));
                 return;
             }
@@ -838,34 +847,13 @@ impl Parser<'_> {
     }
 }
 
-/// The kind other than sequence that `rest`'s first statement names, if any (PSEQ-1).
-fn other_kind(rest: &str) -> Option<&'static str> {
-    let line = rest[..scan::line_len(rest)].trim();
-    if line.starts_with("[*]") {
-        return Some("state");
-    }
-    if line.starts_with(':') && line.ends_with(';')
-        || keyword_in(line, &["if"]).is_some() && line[2..].trim_start().starts_with('(')
-    {
-        return Some("activity");
-    }
-    if line.starts_with('(') && find_arrow(line).is_none() {
-        return Some("use case");
-    }
-    let word = &line[..word_len(line)];
-    OTHER_KINDS
-        .iter()
-        .find(|(k, _)| k.eq_ignore_ascii_case(word))
-        .map(|(_, kind)| *kind)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::syntax::SyntaxNode;
 
     fn tree(src: &str) -> (String, Vec<String>) {
-        let (green, d) = parse(src);
+        let (green, d) = parse(src, super::super::kind(src));
         let root = SyntaxNode::new_root(green);
         assert_eq!(root.to_string(), src);
         (
@@ -915,8 +903,8 @@ mod tests {
         // Without `@startuml`, the whole source is the diagram.
         assert!(tree("A -> B\n").1.is_empty());
         assert_eq!(
-            tree("class A\n").1,
-            ["PlantUML class diagrams are not supported yet"]
+            tree("robust W\n").1,
+            ["PlantUML timing diagrams are not supported yet"]
         );
         assert_eq!(
             tree("@startuml\nA -> B\n").1,
@@ -927,19 +915,13 @@ mod tests {
             ["only the first diagram in a file is drawn"]
         );
         assert_eq!(
-            tree("@startmindmap\n* a\n@endmindmap\n").1,
-            [
-                "`@startmindmap` diagrams are not supported yet; sirene reads `@startuml` sequence diagrams"
-            ]
+            tree("@startsalt\n{}\n@endsalt\n").1,
+            ["`@startsalt` diagrams are not supported yet"]
         );
-        assert_eq!(
-            tree(&doc("class A")).1,
-            ["PlantUML class diagrams are not supported yet"]
-        );
-        assert_eq!(
-            tree(&doc("start\n:a;")).1,
-            ["PlantUML activity diagrams are not supported yet"]
-        );
+        // Line-read kinds hold one statement per line and end at any `@end...` line.
+        let (t, d) = tree("@startuml\nstart\n:a;\n@enduml\n");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(t.matches("TEXT_STMT@").count(), 2);
         assert_eq!(
             tree(&doc("' c\n/' a\nb '/\nA -> B")).1,
             Vec::<String>::new()
@@ -1015,9 +997,5 @@ mod tests {
         assert_eq!(name_len("\"A b\" -> c"), 5);
         assert_eq!(name_len("B++"), 1);
         assert_eq!(squeeze("End   Note"), "end note");
-        assert_eq!(other_kind("usecase U"), Some("use case"));
-        assert_eq!(other_kind("(U) -> A"), None);
-        assert_eq!(other_kind("[*] --> S"), Some("state"));
-        assert_eq!(other_kind("A -> B"), None);
     }
 }
