@@ -343,6 +343,92 @@ fn html_text(s: &str) -> String {
     decode_html_entities(out.trim_matches(blank))
 }
 
+/// A cell of an HTML table: its text and its `PORT`.
+type Cell = (String, Option<String>);
+
+/// The value of attribute `key` in a tag's text (`td port="p"`), in any case.
+fn tag_attr(tag: &str, key: &str) -> Option<String> {
+    let lower = tag.to_ascii_lowercase();
+    let mut from = 0;
+    while let Some(k) = lower[from..].find(key) {
+        let at = from + k;
+        from = at + key.len();
+        let before = lower[..at].chars().next_back();
+        if before.is_some_and(|c| !c.is_whitespace()) {
+            continue;
+        }
+        let rest = tag[from..].trim_start();
+        let Some(rest) = rest.strip_prefix('=') else {
+            continue;
+        };
+        let rest = rest.trim_start();
+        let value = match rest.chars().next() {
+            Some(q @ ('"' | '\'')) => rest[1..].split(q).next().unwrap_or(""),
+            _ => rest.split(char::is_whitespace).next().unwrap_or(""),
+        };
+        return Some(value.trim_end_matches('/').to_owned());
+    }
+    None
+}
+
+/// The outermost table of an HTML label as sections of rows of cells: each `<TR>` a row,
+/// each `<TD>` a cell whose content is drawn as text (a nested table too), and `<HR/>` between
+/// rows a new section (DOT-3). `None` when the label is not one table.
+fn html_table(s: &str) -> Option<Vec<Vec<Vec<Cell>>>> {
+    let mut sections: Vec<Vec<Vec<Cell>>> = vec![Vec::new()];
+    let mut outside = String::new();
+    let mut depth = 0usize;
+    let mut tables = 0;
+    let mut cell: Option<(usize, Option<String>)> = None;
+    let mut at = 0;
+    while let Some(i) = s[at..].find('<') {
+        let start = at + i;
+        if depth == 0 {
+            outside.push_str(&s[at..start]);
+        }
+        let j = s[start..].find('>')?;
+        let (tag, end) = (&s[start + 1..start + j], start + j + 1);
+        let name = tag
+            .trim()
+            .trim_end_matches('/')
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        match name.as_str() {
+            "table" => {
+                depth += 1;
+                if depth == 1 {
+                    tables += 1;
+                }
+            }
+            "/table" => depth = depth.checked_sub(1)?,
+            "tr" if depth == 1 => sections.last_mut()?.push(Vec::new()),
+            "hr" if depth == 1 => sections.push(Vec::new()),
+            "td" if depth == 1 => cell = Some((end, tag_attr(tag, "port"))),
+            "/td" if depth == 1 => {
+                if let Some((from, port)) = cell.take() {
+                    let text = html_text(&s[from..start]);
+                    let row = sections.last_mut()?;
+                    if row.is_empty() {
+                        row.push(Vec::new());
+                    }
+                    row.last_mut()?.push((text, port.filter(|p| !p.is_empty())));
+                }
+            }
+            _ => {}
+        }
+        at = end;
+    }
+    outside.push_str(&s[at..]);
+    sections.retain_mut(|rows| {
+        rows.retain(|r| !r.is_empty());
+        !rows.is_empty()
+    });
+    let text = html_text(&outside);
+    (tables == 1 && depth == 0 && text.is_empty() && !sections.is_empty()).then_some(sections)
+}
+
 /// A field of a record label: text and its `<port>` name, or a group of fields in braces
 /// (DOT-3).
 #[derive(Debug, Clone, PartialEq)]
@@ -626,7 +712,11 @@ impl Lowerer {
             Target::Edge => EDGE_ATTRS,
         };
         if known.contains(&attr.key.as_str()) {
-            if attr.value.html && attr.key.ends_with("label") {
+            // A node's table label is drawn as compartments.
+            let table = target == Target::Node
+                && attr.key == "label"
+                && html_table(&attr.value.text).is_some();
+            if attr.value.html && attr.key.ends_with("label") && !table {
                 self.warn_once("<html>", attr.range, "HTML labels are drawn as their text");
             }
             return;
@@ -1223,6 +1313,49 @@ impl Lowerer {
                 .map(|(t, _)| t)
                 .collect::<Vec<_>>()
                 .join("\n")
+        } else if raw.html
+            && let Some(mut table) = html_table(&raw.text)
+        {
+            // The first row is the title, its cells a space apart; the other rows are
+            // compartment rows, one cell per column (LANGS-3).
+            if shape == Shape::Text {
+                shape = Shape::Rect;
+            }
+            let first = table[0].remove(0);
+            let mut ports = HashMap::new();
+            let title = first
+                .iter()
+                .map(|(t, _)| t.as_str())
+                .filter(|t| !t.is_empty())
+                .collect::<Vec<_>>()
+                .join(" ");
+            for (_, port) in first {
+                if let Some(p) = port {
+                    ports.entry(p).or_insert(0);
+                }
+            }
+            let mut row = title.split('\n').count();
+            for rows in table.into_iter().filter(|rows| !rows.is_empty()) {
+                let mut lines = Vec::new();
+                for cells in rows {
+                    for (_, port) in &cells {
+                        if let Some(p) = port {
+                            ports.entry(p.clone()).or_insert(row);
+                        }
+                    }
+                    lines.push(Row {
+                        cells: cells
+                            .into_iter()
+                            .map(|(t, _)| t.replace('\n', " "))
+                            .collect(),
+                        ..Row::default()
+                    });
+                    row += 1;
+                }
+                sections.push(lines);
+            }
+            self.record_ports[i] = ports;
+            title
         } else {
             self.label_text(&raw, graph, &id)
         };
@@ -1633,6 +1766,35 @@ mod tests {
         // Numeric entities, and `&nbsp;` padding kept while source indentation is not.
         assert_eq!(html_text("&#9829; &#x2665;"), "\u{2665} \u{2665}");
         assert_eq!(html_text("\n  &nbsp;a&nbsp;\n"), "\u{a0}a\u{a0}");
+    }
+
+    #[test]
+    fn html_tables() {
+        assert_eq!(tag_attr("TD PORT=\"a b\"", "port").as_deref(), Some("a b"));
+        assert_eq!(
+            tag_attr("td port='x' bgcolor=red", "port").as_deref(),
+            Some("x")
+        );
+        assert_eq!(tag_attr("td port=x/", "port").as_deref(), Some("x"));
+        assert_eq!(tag_attr("td import=x", "port"), None);
+        assert_eq!(tag_attr("td port", "port"), None);
+        let cell = |t: &str| (t.to_owned(), None);
+        assert_eq!(
+            html_table("<table><tr><td>a</td><td>b</td></tr><hr/><tr><td>c</td></tr></table>"),
+            Some(vec![
+                vec![vec![cell("a"), cell("b")]],
+                vec![vec![cell("c")]]
+            ])
+        );
+        // Wrapping tags are fine; text beside the table, two tables, or an unclosed one are
+        // not a table.
+        assert!(html_table("<b><table><tr><td>a</td></tr></table></b>").is_some());
+        assert_eq!(html_table("x<table><tr><td>a</td></tr></table>"), None);
+        assert_eq!(html_table("<table></table><table></table>"), None);
+        assert_eq!(html_table("<table><tr><td>a</td></tr>"), None);
+        assert_eq!(html_table("<table><tr><td>a"), None);
+        assert_eq!(html_table("<table></table>"), None);
+        assert_eq!(html_table("</table><table>"), None);
     }
 
     #[test]

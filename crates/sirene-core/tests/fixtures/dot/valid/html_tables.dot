@@ -1,0 +1,17 @@
+digraph schema {
+  rankdir=LR
+  node [shape=plaintext]
+  users [label=<<TABLE BORDER="0" CELLBORDER="1">
+    <TR><TD><B>users</B></TD></TR>
+    <TR><TD PORT="id">id</TD><TD>int</TD></TR>
+    <TR><TD PORT="name">name</TD><TD>text</TD></TR>
+  </TABLE>>]
+  posts [label=<<TABLE>
+    <TR><TD><B>posts</B></TD></TR>
+    <TR><TD PORT="id">id</TD><TD>int</TD></TR>
+    <TR><TD PORT="author">author</TD><TD>int</TD></TR>
+    <HR/>
+    <TR><TD>body</TD><TD>text</TD></TR>
+  </TABLE>>]
+  posts:author -> users:id
+}

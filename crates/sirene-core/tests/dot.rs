@@ -8,7 +8,7 @@ use std::path::Path;
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::diagram::{self, Kind, Lowered};
 use sirene_core::flowchart::{
-    Arrow, Compass, Direction, EdgeOrder, Flowchart, RankEnd, Shape, Stroke,
+    Arrow, Compass, Direction, EdgeOrder, Flowchart, RankEnd, Row, Shape, Stroke,
 };
 use sirene_core::scene::{Approx, Color, Owner, Primitive, Segment, Theme};
 use sirene_core::{Severity, dot};
@@ -334,9 +334,55 @@ fn html_labels() {
             "HTML labels are drawn as their text".to_owned()
         )]
     );
-    assert_eq!(c.nodes[0].label.text, "x y & z\nw");
+    // A table is compartments: the first row the title, the others rows of cells.
+    assert_eq!(c.nodes[0].label.text, "x y & z");
+    assert_eq!(c.nodes[0].sections, [vec![Row::plain("w")]]);
     assert_eq!(c.nodes[1].label.text, "one\ntwo");
     assert_eq!(c.edges[0].label.as_ref().unwrap().text, "e");
+}
+
+/// DOT-3: an HTML table label is compartments: `<HR/>` starts a section, a row's cells are
+/// columns, a nested table is text, and a cell's `PORT` is a record port (DOT-2).
+#[test]
+fn html_tables() {
+    let src = "digraph { rankdir=LR
+      t [shape=plaintext, label=<<TABLE BORDER=\"0\">
+        <TR><TD COLSPAN=\"2\"><B>users</B></TD></TR>
+        <TR><TD PORT=\"id\">id</TD><TD>int</TD></TR>
+        <TR><TD port='name'>name</TD><TD>text</TD></TR>
+        <HR/>
+        <TR><TD PORT=pk><TABLE><TR><TD>pk</TD></TR><TR><TD>id</TD></TR></TABLE></TD></TR>
+      </TABLE>>]
+      a -> t:name; b -> t:pk; t:id -> c }";
+    let c = chart(src);
+    let t = &c.nodes[0];
+    assert_eq!(t.shape, Shape::Rect);
+    assert_eq!(t.label.text, "users");
+    let row = |cells: &[&str]| Row {
+        cells: cells.iter().map(|c| (*c).to_owned()).collect(),
+        ..Row::default()
+    };
+    assert_eq!(
+        t.sections,
+        [
+            vec![row(&["id", "int"]), row(&["name", "text"])],
+            vec![row(&["pk id"])],
+        ]
+    );
+    let rows: Vec<_> = c.edges.iter().map(|e| e.rows).collect();
+    assert_eq!(rows, [[None, Some(2)], [None, Some(3)], [Some(1), None]]);
+    let out = ascii::render(&c, &Options::default());
+    let line = |text: &str| out.lines().find(|l| l.contains(text)).unwrap();
+    for field in ["name", "pk id"] {
+        assert!(line(field).contains('►'), "{field}\n{out}");
+    }
+    // Text around a table, or two tables, is drawn as text.
+    let (c, d) = lowered("digraph { a [label=<x<table><tr><td>y</td></tr></table>>] }");
+    assert_eq!(
+        (c.nodes[0].label.text.as_str(), c.nodes[0].sections.len()),
+        ("xy", 0)
+    );
+    assert_eq!(d.len(), 1);
 }
 
 /// DOT-3: a blank graph label is no title; `minlen` is a whole number of ranks from 1 to 10.

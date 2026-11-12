@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/dot.rs
+expression: "digraph schema {\n  rankdir=LR\n  node [shape=plaintext]\n  users [label=<<TABLE BORDER=\"0\" CELLBORDER=\"1\">\n    <TR><TD><B>users</B></TD></TR>\n    <TR><TD PORT=\"id\">id</TD><TD>int</TD></TR>\n    <TR><TD PORT=\"name\">name</TD><TD>text</TD></TR>\n  </TABLE>>]\n  posts [label=<<TABLE>\n    <TR><TD><B>posts</B></TD></TR>\n    <TR><TD PORT=\"id\">id</TD><TD>int</TD></TR>\n    <TR><TD PORT=\"author\">author</TD><TD>int</TD></TR>\n    <HR/>\n    <TR><TD>body</TD><TD>text</TD></TR>\n  </TABLE>>]\n  posts:author -> users:id\n}\n"
+---
++------------+
+|   posts    |    +-----------+
++------------+    |   users   |
+| id     int |    +-----------+
+| author int +--->| id   int  |
++------------+    | name text |
+| body text  |    +-----------+
++------------+
