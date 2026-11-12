@@ -15,8 +15,9 @@ declare states in order and their labels.
 
 ## PTIM-2 Moments
 
-`@100` sets the current moment; `@+50` adds to it; `@100 as :name` names it, and `:name`,
-`:name+5`, and `:name-5` refer to it. `@clk*2` is two periods of the clock `clk`. Dates
+`@100` sets the current moment; `@+50` adds to it; `@100 as :name` names it (a later name
+replaces an earlier one), and `:name`, `:name+5`, and `:name-5` refer to it; the offset follows
+the last `+` or `-`, so a name may hold `-`. Moments and numbers are within 1e15. `@clk*2` is two periods of the clock `clk`. Dates
 (`@2019/07/02`) and times of day (`@1:15:00`) are moments in seconds, labeled on the axis as
 written. `@ID` starts lines of `TIME is VALUE` for that signal, up to the next `@` line.
 
@@ -40,5 +41,5 @@ number.
 
 A redeclared signal, a clock with no period, a bad `between`, an unknown word in a
 declaration, an unknown signal or anchor, an unreadable moment, an analog value that is not a
-number, and an unknown line are errors. A change to a clock and `manual time-axis` are
-warnings.
+number, and an unknown line are errors. A change to a clock, a clock spanning more than 1000
+periods, and `manual time-axis` are warnings.
