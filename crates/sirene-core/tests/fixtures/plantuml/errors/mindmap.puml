@@ -1,0 +1,10 @@
+@startmindmap
+top to bottom direction
+* Root
+** One
+* Second root
+not a node
+**[#nope] Two
+**[#red] Three
+** :Four
+@endmindmap

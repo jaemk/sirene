@@ -47,6 +47,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   interfaces, and the deployment element shapes (`node`, `database`, `cloud`, `queue`,
   `artifact`, ...), the `:x:`, `(x)`, `[x]`, and `() x` short forms, stereotypes, colors,
   descriptions, nested containers, styled links, notes, and `skinparam actorStyle`.
+- PlantUML mindmaps (`@startmindmap`) and work breakdown structures (`@startwbs`): `*`, `+`,
+  and `-` node lines or indented `*` lines, boxless nodes, multi-line `:text;`, WBS colors,
+  aliases, and `(A) -> (B)` arrows.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its
