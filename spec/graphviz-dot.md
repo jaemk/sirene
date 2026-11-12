@@ -109,11 +109,12 @@ from other engines (`pos`, `overlap`, `splines`), font attributes, and `width` a
 among them. So is an unknown shape (drawn as an ellipse), arrow (drawn as `normal`), or style
 word.
 
-## DOT-4 Not drawn yet
+## DOT-4 Not drawn
 
 These are parsed and warned about, then ignored: record ports in top-down graphs (the edge
-joins the node), HTML labels other than node tables (drawn as their text), HTML table and font
-styles, and images.
+joins the node, since sirene stacks record fields where Graphviz lays them across), HTML labels
+other than node tables (drawn as their text), HTML table and font styles, and images (`image`,
+`<IMG>`), since the core reads no files.
 
 ## DOT-5 Choosing the language
 
