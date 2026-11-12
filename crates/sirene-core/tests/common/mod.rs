@@ -59,7 +59,12 @@ pub fn check_model(c: &Flowchart) -> Result<(), TestCaseError> {
     let known = |id: &str| ids.binary_search(&id).is_ok();
     for e in &c.edges {
         prop_assert!(known(&e.from) && known(&e.to), "dangling edge {:?}", e);
-        prop_assert!((1..=10).contains(&e.length));
+        prop_assert!(e.length <= 10);
+    }
+    for group in &c.same_rank {
+        for id in group {
+            prop_assert!(known(id), "rank group names a missing node {:?}", id);
+        }
     }
     let mut members = Vec::new();
     for s in &c.subgraphs {

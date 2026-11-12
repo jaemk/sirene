@@ -7,6 +7,9 @@ use std::collections::{BTreeSet, HashMap};
 pub(super) struct Jog {
     pub top: i32,
     pub bottom: i32,
+    /// A flat edge's: it enters and leaves through the top of the gap, `bottom` being where it
+    /// goes back up.
+    pub flat: bool,
 }
 
 impl Jog {
@@ -77,15 +80,25 @@ pub(super) fn tracks(jogs: &[Jog]) -> (Vec<Option<usize>>, usize) {
 const PREFER_LIMIT: usize = 1_000;
 
 /// For each moving jog, the ones that must take a higher track: those whose lower part shares
-/// its upper part's column.
+/// a column with one of its upper parts. A flat jog has two upper parts and no lower part.
 fn same_column(jogs: &[Jog], moving: &[usize]) -> Vec<Vec<usize>> {
     let mut by_bottom: HashMap<i32, Vec<usize>> = HashMap::new();
     for (b, &i) in moving.iter().enumerate() {
-        by_bottom.entry(jogs[i].bottom).or_default().push(b);
+        if !jogs[i].flat {
+            by_bottom.entry(jogs[i].bottom).or_default().push(b);
+        }
     }
+    let below = |x: i32| by_bottom.get(&x).into_iter().flatten().copied();
     moving
         .iter()
-        .map(|&i| by_bottom.get(&jogs[i].top).cloned().unwrap_or_default())
+        .map(|&i| {
+            let j = jogs[i];
+            let mut next: Vec<usize> = below(j.top).collect();
+            if j.flat {
+                next.extend(below(j.bottom));
+            }
+            next
+        })
         .collect()
 }
 
@@ -103,6 +116,8 @@ fn preferred(jogs: &[Jog], moving: &[usize]) -> Vec<Vec<usize>> {
         for b in 0..m {
             let (ja, jb) = (jogs[moving[a]], jogs[moving[b]]);
             let prefer = a != b
+                && !ja.flat
+                && !jb.flat
                 && (jb.strictly_inside(ja.top) || ja.strictly_inside(jb.bottom))
                 && !(ja.strictly_inside(jb.top) || jb.strictly_inside(ja.bottom));
             if prefer && !before[b][a] {
@@ -140,7 +155,25 @@ mod tests {
     use super::*;
 
     fn jog(top: i32, bottom: i32) -> Jog {
-        Jog { top, bottom }
+        Jog {
+            top,
+            bottom,
+            flat: false,
+        }
+    }
+
+    #[test]
+    fn flat_jogs_turn_above_lower_parts_in_their_columns() {
+        let flat = Jog {
+            top: 0,
+            bottom: 6,
+            flat: true,
+        };
+        // Jog 1 comes down in the flat jog's second column, so the flat jog turns first.
+        let (t, _) = tracks(&[jog(9, 6), flat]);
+        assert!(t[1] < t[0], "{t:?}");
+        let (t, _) = tracks(&[jog(3, 0), flat]);
+        assert!(t[1] < t[0], "{t:?}");
     }
 
     #[test]

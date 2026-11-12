@@ -39,6 +39,13 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
 - `node [...]` and `edge [...]` defaults apply to later statements in their scope, as Graphviz
   does; a node takes the defaults in effect where it is first mentioned.
 - `strict` merges repeated edges (either direction in a `graph`), combining their attributes.
+- A subgraph's `rank=same`, set anywhere in it, puts every node mentioned in it, edges and nested
+  subgraphs included, in one rank (LAYOUT-4). As in Graphviz, nodes in different clusters do
+  not share a rank, which is a warning. `min`, `max`, `source`, and `sink` group the nodes the
+  same way, with a warning that they are not yet put first or last; another value is a warning.
+  `rank` on the root graph is a warning.
+- An edge with `constraint=false` does not rank its ends; it runs up or along a rank when the
+  other edges put its ends that way. `minlen=0` lets an edge's ends share a rank.
 
 ## DOT-3 Attributes
 
@@ -59,7 +66,8 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
   field; `<port>` names are dropped, and braces nest 16 deep (a deeper one is text).
 - Edge: `label`, `headlabel`, `taillabel` (end labels), `style` (`dashed` and `dotted` dashed,
   `bold` thick, `invis`), `color`, `fontcolor`, `penwidth` (drawn up to 32px, DISPLA-6), `dir`,
-  `minlen` (rounded, 1 to 10), and
+  `minlen` (rounded, 0 to 10), `constraint` (`true`, `yes`, `false`, `no` in any case, or an
+  integer, nonzero for true; another value is a warning and reads as true), and
   `arrowhead` and `arrowtail`: `normal`, `inv`, `vee`, `curve` an arrow; `empty`, `onormal` a
   hollow triangle; `diamond` and `odiamond`; `dot` and `odot` a circle; `box` and `tee` a bar;
   `crow` and `ocrow` crow's feet; `none`. The first shape of a stacked name such as `invdot` is
@@ -78,10 +86,9 @@ word.
 
 ## DOT-4 Not drawn yet
 
-These are parsed and warned about, then ignored: `rank=same|min|max|source|sink` subgraphs (they
-need a constraint in LAYOUT-4), `constraint=false`, ports (`a:p:n`; the edge joins the node),
-HTML labels (drawn as their text), `group`, `compound` with `lhead` and `ltail`, `ordering`, and
-images.
+These are parsed and warned about, then ignored: the first and last ranks of `rank=min`,
+`max`, `source`, and `sink` (DOT-2), ports (`a:p:n`; the edge joins the node), HTML labels
+(drawn as their text), `group`, `compound` with `lhead` and `ltail`, `ordering`, and images.
 
 ## DOT-5 Choosing the language
 

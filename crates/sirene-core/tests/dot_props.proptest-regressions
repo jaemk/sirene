@@ -8,3 +8,4 @@ cc 12cfc7894eab8da31ca67a1c666a5ef0b7310464bee5e6eab1b8c5e4bbe6ae82 # shrinks to
 cc 892117fdb7e260a5bc0ee5a8bf424cc9b8326a3dfc3c479850b360f1f13ebb5c # shrinks to src = "graph G {\n  subgraph cluster_a { b -- a -- a [taillabel=plaintext]; a }\n}\n"
 cc c36b1a59c9d57bb0df58615132baba9736561436a4c8a62ca6ff620888e04506 # shrinks to src = "graph G {\n  subgraph cluster_a {  }\n  label=\"\"\n}\n"
 cc 916268444399162abcbd7fbcf708c9b8f10e125f9dcc672b3a9299f6fcdc3863 # shrinks to src = "digraph G {\n  subgraph cluster_a { subgraph cluster_a { a -> { a } [penwidth=99] } }\n}\n"
+cc a91e297dc05e14c553c0e90c59e0bbb74d671126a0eddfa3bdd62f993d72bd80 # shrinks to src = "graph G {\n  subgraph cluster_a { a -- { a } [minlen=0] }\n}\n"

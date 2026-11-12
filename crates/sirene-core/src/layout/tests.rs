@@ -30,6 +30,7 @@ fn edge(from: usize, to: usize) -> EdgeSpec {
         to: Item::Node(to),
         min_len: 1,
         label: None,
+        constraint: true,
     }
 }
 
@@ -100,6 +101,47 @@ fn bad_cluster_parents_are_top_level() {
     for c in [2, 3] {
         assert!(!inside(l.clusters[c], l.clusters[0]));
     }
+}
+
+#[test]
+fn simplify_keeps_turns_back() {
+    assert_eq!(
+        simplify(pts(&[(0, 5), (0, 3), (0, 0), (0, 4), (4, 4)])),
+        pts(&[(0, 5), (0, 0), (0, 4), (4, 4)])
+    );
+    assert_eq!(
+        simplify(pts(&[(0, 0), (2, 0), (2, 0), (5, 0)])),
+        pts(&[(0, 0), (5, 0)])
+    );
+}
+
+/// LAYOUT-4: grouped nodes share a rank; an edge between neighbors there is straight, and
+/// others run through the gap below.
+#[test]
+fn flat_edges() {
+    let g = Graph {
+        nodes: vec![node(5, 3), node(5, 3), node(5, 3)],
+        edges: vec![edge(0, 1), edge(0, 2)],
+        same_rank: vec![vec![0, 1, 2]],
+        ..Graph::default()
+    };
+    let l = layout(&g, &CONFIG);
+    assert!(l.nodes.iter().all(|r| r.y == 0), "{:?}", l.nodes);
+    let (a, b) = (l.nodes[0], l.nodes[1]);
+    let straight = &l.edges[0].as_ref().unwrap().points;
+    assert_eq!(*straight, pts(&[(a.right(), 1), (b.x, 1)]));
+    let below = &l.edges[1].as_ref().unwrap().points;
+    assert_eq!(below.len(), 4, "{below:?}");
+    assert_eq!(below[0].y, a.bottom());
+    assert!(below[1].y > a.bottom());
+    // Unconstrained, the same edges leave the nodes in one rank too.
+    let mut g = g;
+    g.same_rank.clear();
+    for e in &mut g.edges {
+        e.constraint = false;
+    }
+    let l = layout(&g, &CONFIG);
+    assert!(l.nodes.iter().all(|r| r.y == 0), "{:?}", l.nodes);
 }
 
 #[test]

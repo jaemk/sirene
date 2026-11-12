@@ -284,6 +284,7 @@ impl Lowerer {
             start: None,
             end: Some(Arrow::Point),
             length: 1,
+            constraint: true,
             label,
             start_label: None,
             end_label: None,

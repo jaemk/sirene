@@ -287,8 +287,10 @@ pub struct Edge {
     pub stroke: Stroke,
     pub start: Option<Arrow>,
     pub end: Option<Arrow>,
-    /// Minimum rank span, 1 to 10.
+    /// Minimum rank span, 0 to 10; DOT's `minlen=0` lets the ends share a rank.
     pub length: u8,
+    /// Whether the edge ranks its ends; DOT's `constraint=false` clears it.
+    pub constraint: bool,
     pub label: Option<Label>,
     /// Labels beside the source and target ends, such as multiplicities (LANGS-3).
     pub start_label: Option<Label>,
@@ -369,6 +371,8 @@ pub struct Flowchart {
     pub lanes: bool,
     /// An agentflow diagram (MAGF-1): subgraphs are `flow` containers, drawn unfilled.
     pub agentflow: bool,
+    /// Ids of nodes that share a rank, one list per group (DOT's `rank=same`).
+    pub same_rank: Vec<Vec<String>>,
 }
 
 impl Flowchart {

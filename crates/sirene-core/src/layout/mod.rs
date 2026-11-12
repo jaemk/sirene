@@ -5,7 +5,7 @@ mod position;
 mod rank;
 mod route;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::flowchart::Direction;
 use position::{Link, Span};
@@ -104,9 +104,12 @@ pub struct ClusterSpec {
 pub struct EdgeSpec {
     pub from: Item,
     pub to: Item,
-    /// Minimum length in ranks; 0 counts as 1.
+    /// Minimum length in ranks; 0 lets the ends share a rank.
     pub min_len: u32,
     pub label: Option<Size>,
+    /// Whether the edge ranks its ends (LAYOUT-4); when false they are ranked as if it were
+    /// absent, and it may run up or along a rank.
+    pub constraint: bool,
 }
 
 /// A box placed beside a node or a cluster, in the same rank (LANGS-3).
@@ -127,6 +130,9 @@ pub struct Graph {
     pub clusters: Vec<ClusterSpec>,
     pub edges: Vec<EdgeSpec>,
     pub notes: Vec<NoteSpec>,
+    /// Groups of nodes that share a rank (LAYOUT-4). Only the nodes directly in one container
+    /// are grouped: a group's nodes in different containers form a group per container.
+    pub same_rank: Vec<Vec<usize>>,
 }
 
 /// Spacing for one orientation, in canonical terms: the cross axis runs along a rank and the
@@ -307,6 +313,8 @@ struct Builder<'a> {
     classes: Vec<Class>,
     directions: Vec<Direction>,
     reversed: Vec<bool>,
+    /// Edges whose ends share a rank: they run along it rather than across.
+    flat: Vec<bool>,
     /// Lane clusters in input order.
     lanes: Vec<usize>,
     /// The position in `lanes` of each diagram-scope item that is in a lane.
@@ -365,6 +373,7 @@ impl<'a> Builder<'a> {
             classes: Vec::new(),
             directions: vec![graph.direction; nc + 1],
             reversed: vec![false; graph.edges.len()],
+            flat: vec![false; graph.edges.len()],
             lanes,
             item_lane,
         }
@@ -479,6 +488,7 @@ impl<'a> Builder<'a> {
     }
 
     fn rank_scopes(&mut self) {
+        let nodes = self.graph.nodes.len();
         for s in 0..self.scopes.len() {
             let scope = &self.scopes[s];
             let index: HashMap<Item, usize> = scope
@@ -490,15 +500,31 @@ impl<'a> Builder<'a> {
             let edges: Vec<RankEdge> = scope
                 .edges
                 .iter()
+                .filter(|&&(e, _, _)| self.graph.edges[e].constraint)
                 .map(|&(e, from, to)| RankEdge {
                     from: index[&from],
                     to: index[&to],
-                    len: 2 * self.graph.edges[e].min_len.max(1) as i32,
+                    len: 2 * self.graph.edges[e].min_len as i32,
                 })
                 .collect();
-            let (reversed, ranks) = rank::rank(scope.items.len(), &edges);
-            for (&(e, _, _), r) in scope.edges.iter().zip(reversed) {
-                self.reversed[e] = r;
+            // Each group's nodes directly in this scope.
+            let same: Vec<Vec<usize>> = self
+                .graph
+                .same_rank
+                .iter()
+                .map(|group| {
+                    group
+                        .iter()
+                        .filter(|&&n| n < nodes)
+                        .filter_map(|&n| index.get(&Item::Node(n)).copied())
+                        .collect()
+                })
+                .collect();
+            let ranks = rank::rank(scope.items.len(), &edges, &same);
+            for &(e, from, to) in &scope.edges {
+                let (a, b) = (ranks[index[&from]], ranks[index[&to]]);
+                self.reversed[e] = b < a;
+                self.flat[e] = a == b;
             }
             self.scopes[s].ranks = scope.items.iter().copied().zip(ranks).collect();
         }
@@ -521,11 +547,17 @@ impl<'a> Builder<'a> {
             } else {
                 (spec.from, spec.to, from_chain.clone(), to_chain.clone())
             };
-            for (side, end, chain) in [
-                (Side::Bottom, upper, upper_chain),
-                (Side::Top, lower, lower_chain),
+            // A flat edge leaves and enters the clusters around its ends through their tops
+            // when it goes up to its label, and through their bottoms otherwise.
+            let (upper_side, lower_side) = match (self.flat[e], spec.label.is_some()) {
+                (false, _) => (Side::Bottom, Side::Top),
+                (true, true) => (Side::Top, Side::Top),
+                (true, false) => (Side::Bottom, Side::Bottom),
+            };
+            for (sign, side, end, chain) in [
+                (-1, upper_side, upper, upper_chain),
+                (1, lower_side, lower, lower_chain),
             ] {
-                let sign = if side == Side::Bottom { -1 } else { 1 };
                 for (i, &c) in chain.iter().enumerate() {
                     let inner = chain.get(i + 1).map_or(end, |&d| Item::Cluster(d));
                     self.scopes[c + 1].proxies.push(Proxy {
@@ -639,7 +671,8 @@ impl<'a> Builder<'a> {
     }
 }
 
-/// Drops repeated points and the middle of straight runs.
+/// Drops repeated points and the middle of straight runs. A run that turns back, as a flat
+/// edge's does at a narrow label, keeps its turn.
 fn simplify(points: Vec<Point>) -> Vec<Point> {
     let mut out: Vec<Point> = Vec::with_capacity(points.len());
     for p in points {
@@ -649,7 +682,10 @@ fn simplify(points: Vec<Point>) -> Vec<Point> {
         if out.len() >= 2 {
             let a = out[out.len() - 2];
             let b = out[out.len() - 1];
-            if (a.x == b.x && b.x == p.x) || (a.y == b.y && b.y == p.y) {
+            let between = |a: i32, b: i32, c: i32| a.min(c) <= b && b <= a.max(c);
+            if (a.x == b.x && b.x == p.x && between(a.y, b.y, p.y))
+                || (a.y == b.y && b.y == p.y && between(a.x, b.x, p.x))
+            {
                 out.pop();
             }
         }
@@ -691,6 +727,24 @@ struct Chain {
     edge: usize,
     key: i32,
     elems: Vec<usize>,
+    /// The route runs from the lower end up: a flat edge's way to its label, or its way out
+    /// of a cluster through the top or in through the bottom.
+    flip: bool,
+}
+
+/// Port offsets from the anchors of a route's two ends.
+type PortPair = (i32, i32);
+
+/// An edge between two elements of one layer.
+#[derive(Debug, Clone, Copy)]
+struct Flat {
+    edge: usize,
+    /// The elements of its source and target ends.
+    u: usize,
+    v: usize,
+    /// Drawn as a straight line between neighbors; otherwise it runs from the bottom of one end
+    /// through the gap below to the bottom of the other.
+    straight: bool,
 }
 
 /// Lays out one scope in its canonical frame.
@@ -702,6 +756,7 @@ struct Placer<'a, 'b> {
     sp: Spacing,
     elems: Vec<Elem>,
     chains: Vec<Chain>,
+    flats: Vec<Flat>,
     item_elem: HashMap<Item, usize>,
     /// Edge of each label element.
     label_edge: HashMap<usize, usize>,
@@ -726,6 +781,7 @@ impl<'a, 'b> Placer<'a, 'b> {
             sp,
             elems: Vec::new(),
             chains: Vec::new(),
+            flats: Vec::new(),
             item_elem: HashMap::new(),
             label_edge: HashMap::new(),
             proxy_of: HashMap::new(),
@@ -777,7 +833,15 @@ impl<'a, 'b> Placer<'a, 'b> {
     fn build(&mut self) -> usize {
         let b = self.b;
         let scope = &b.scopes[self.s];
-        let base = usize::from(self.bordered());
+        // Ranks are even, so the layer above a flat edge holds no items and takes its label;
+        // a label above the first rank needs a layer of its own.
+        let labeled_flat =
+            |&(e, _, _): &(usize, Item, Item)| b.flat[e] && b.graph.edges[e].label.is_some();
+        let lifted = scope
+            .edges
+            .iter()
+            .any(|edge| labeled_flat(edge) && scope.ranks[&edge.1] == 0);
+        let base = usize::from(self.bordered()) + usize::from(lifted);
         let max_rank = scope.ranks.values().copied().max().unwrap_or(-1);
         let item_layers = (max_rank + 1) as usize;
         let last = base + item_layers;
@@ -788,6 +852,31 @@ impl<'a, 'b> Placer<'a, 'b> {
             self.item_elem.insert(item, el);
         }
         for &(e, from, to) in &scope.edges {
+            let (eu, ev) = (self.item_elem[&from], self.item_elem[&to]);
+            if let Some(size) = self.label_size(e).filter(|_| b.flat[e]) {
+                // Up from the source to the label, then down to the target.
+                let layer = self.elems[eu].layer - 1;
+                let el = self.elem(Kind::Label, layer, size);
+                self.label_edge.insert(el, e);
+                for (end, flip) in [(eu, true), (ev, false)] {
+                    self.chains.push(Chain {
+                        edge: e,
+                        key: 0,
+                        elems: vec![el, end],
+                        flip,
+                    });
+                }
+                continue;
+            }
+            if b.flat[e] {
+                self.flats.push(Flat {
+                    edge: e,
+                    u: eu,
+                    v: ev,
+                    straight: false,
+                });
+                continue;
+            }
             let (u, v) = if self.b.reversed[e] {
                 (to, from)
             } else {
@@ -813,6 +902,7 @@ impl<'a, 'b> Placer<'a, 'b> {
                 edge: e,
                 key: 0,
                 elems,
+                flip: false,
             });
         }
         for &p in &scope.proxies {
@@ -834,10 +924,13 @@ impl<'a, 'b> Placer<'a, 'b> {
                 elems.push(self.elem(Kind::Dummy, layer, Size::new(1, 0)));
             }
             elems.push(end);
+            // The source's pieces run out of its clusters and the target's in.
+            let outward = p.side == Side::Bottom;
             self.chains.push(Chain {
                 edge: p.edge,
                 key: p.key,
                 elems,
+                flip: (p.key < 0) != outward,
             });
         }
         for &(e, item) in &scope.loops {
@@ -1009,15 +1102,69 @@ impl<'a, 'b> Placer<'a, 'b> {
         Incident { down, up }
     }
 
-    /// Port offsets from the anchor for each segment's upper and lower end.
-    fn ports(&self, segments: &[(usize, usize, usize)], inc: &Incident) -> Vec<(i32, i32)> {
+    /// Each element's position in its layer.
+    fn positions(&self) -> Vec<usize> {
         let mut pos = vec![0usize; self.elems.len()];
         for layer in &self.layers {
             for (i, &e) in layer.iter().enumerate() {
                 pos[e] = i;
             }
         }
+        pos
+    }
+
+    /// Draws a flat edge straight when it joins two nodes side by side with nothing on the
+    /// sides between them, at most one per pair.
+    fn mark_straight(&mut self) {
+        let pos = self.positions();
+        let mut pairs = HashSet::new();
+        for f in &mut self.flats {
+            let (a, b) = if pos[f.u] < pos[f.v] {
+                (f.u, f.v)
+            } else {
+                (f.v, f.u)
+            };
+            let node = |e: usize| matches!(self.elems[e].kind, Kind::Item(Item::Node(_)));
+            let (left, right) = (self.elems[a], self.elems[b]);
+            f.straight = node(a)
+                && node(b)
+                && pos[b] == pos[a] + 1
+                && left.extra == 0
+                && left.after == 0
+                && right.before == 0
+                && pairs.insert((a, b));
+        }
+    }
+
+    /// For each element, the flat edges leaving its bottom: `(flat, whether it is the source)`.
+    fn flat_ends(&self) -> Vec<Vec<(usize, bool)>> {
+        let mut ends = vec![Vec::new(); self.elems.len()];
+        for (i, f) in self.flats.iter().enumerate() {
+            if !f.straight {
+                ends[f.u].push((i, true));
+                ends[f.v].push((i, false));
+            }
+        }
+        ends
+    }
+
+    /// Port offsets from the anchor for each segment's upper and lower end, and for each flat
+    /// edge's source and target end. A flat edge leaves a bottom on the side toward its other
+    /// end.
+    fn ports(
+        &self,
+        segments: &[(usize, usize, usize)],
+        inc: &Incident,
+        flat_ends: &[Vec<(usize, bool)>],
+    ) -> (Vec<PortPair>, Vec<PortPair>) {
+        #[derive(Clone, Copy)]
+        enum End {
+            Segment(usize),
+            Flat(usize, bool),
+        }
+        let pos = self.positions();
         let mut offsets = vec![(0, 0); segments.len()];
+        let mut flat_offsets = vec![(0, 0); self.flats.len()];
         for (e, el) in self.elems.iter().enumerate() {
             let ports = match el.kind {
                 Kind::Item(Item::Node(_)) => None,
@@ -1027,38 +1174,51 @@ impl<'a, 'b> Placer<'a, 'b> {
                 _ => continue,
             };
             for (downward, side) in [(true, Side::Bottom), (false, Side::Top)] {
-                let mut list = if downward {
-                    inc.down[e].clone()
-                } else {
-                    inc.up[e].clone()
-                };
-                list.sort_by_key(|&i| {
-                    let (u, v, c) = segments[i];
-                    (pos[if downward { v } else { u }], self.chains[c].edge)
-                });
+                let segs = if downward { &inc.down[e] } else { &inc.up[e] };
+                let mut list: Vec<((u8, usize, usize), End)> = segs
+                    .iter()
+                    .map(|&i| {
+                        let (u, v, c) = segments[i];
+                        let other = if downward { v } else { u };
+                        ((1, pos[other], self.chains[c].edge), End::Segment(i))
+                    })
+                    .collect();
+                if downward {
+                    list.extend(flat_ends[e].iter().map(|&(i, source)| {
+                        let f = self.flats[i];
+                        let other = if source { f.v } else { f.u };
+                        let group = if pos[other] < pos[e] { 0 } else { 2 };
+                        ((group, pos[other], f.edge), End::Flat(i, source))
+                    }));
+                }
+                list.sort_by_key(|&(key, _)| key);
                 let n = list.len() as i32;
-                for (k, &i) in list.iter().enumerate() {
-                    let edge = self.chains[segments[i].2].edge;
+                for (k, &(_, end)) in list.iter().enumerate() {
+                    let edge = match end {
+                        End::Segment(i) => self.chains[segments[i].2].edge,
+                        End::Flat(i, _) => self.flats[i].edge,
+                    };
                     let off = ports
                         .and_then(|p| p.get(&(edge, side)).copied())
                         .unwrap_or_else(|| self.spread(el.cross, k as i32, n));
-                    if downward {
-                        offsets[i].0 = off;
-                    } else {
-                        offsets[i].1 = off;
+                    match end {
+                        End::Segment(i) if downward => offsets[i].0 = off,
+                        End::Segment(i) => offsets[i].1 = off,
+                        End::Flat(i, true) => flat_offsets[i].0 = off,
+                        End::Flat(i, false) => flat_offsets[i].1 = off,
                     }
                 }
             }
         }
-        offsets
+        (offsets, flat_offsets)
     }
 
     /// Grows nodes along the cross axis until the ports on each side fit inside the corners
     /// (LAYOUT-7).
-    fn fit_ports(&mut self, inc: &Incident) {
+    fn fit_ports(&mut self, inc: &Incident, flat_ends: &[Vec<(usize, bool)>]) {
         for (e, el) in self.elems.iter_mut().enumerate() {
             if let Kind::Item(Item::Node(_)) = el.kind {
-                let ports = inc.down[e].len().max(inc.up[e].len());
+                let ports = (inc.down[e].len() + flat_ends[e].len()).max(inc.up[e].len());
                 let need = ports.max(1) as i32 + 2 * self.sp.port_inset;
                 el.cross = el.cross.max(need);
             }
@@ -1087,9 +1247,20 @@ impl<'a, 'b> Placer<'a, 'b> {
         } else {
             Vec::new()
         };
+        self.mark_straight();
+        // A straight flat edge is as long as an edge between ranks.
+        let room = (2 * self.sp.rank_gap - self.sp.node_gap).max(0);
+        let pos = self.positions();
+        for f in self.flats.clone() {
+            if f.straight {
+                let left = if pos[f.u] < pos[f.v] { f.u } else { f.v };
+                self.elems[left].after = self.elems[left].after.max(room);
+            }
+        }
         let inc = self.incident(&segments);
-        self.fit_ports(&inc);
-        let offsets = self.ports(&segments, &inc);
+        let flat_ends = self.flat_ends();
+        self.fit_ports(&inc, &flat_ends);
+        let (offsets, flat_offsets) = self.ports(&segments, &inc, &flat_ends);
         let spans: Vec<Span> = (0..self.elems.len())
             .map(|e| {
                 let el = self.elems[e];
@@ -1205,27 +1376,56 @@ impl<'a, 'b> Placer<'a, 'b> {
                 x[v] + offsets[i].1
             }
         };
+        let flat_port = |i: usize, source: bool| {
+            let f = self.flats[i];
+            if source {
+                x[f.u] + flat_offsets[i].0
+            } else {
+                x[f.v] + flat_offsets[i].1
+            }
+        };
+        let routed: Vec<usize> = (0..self.flats.len())
+            .filter(|&i| !self.flats[i].straight)
+            .collect();
         let mut track_of = vec![None; segments.len()];
-        let mut gaps = vec![0; layers.saturating_sub(1)];
-        let mut by_gap = vec![Vec::new(); gaps.len()];
+        let mut flat_track = vec![0; self.flats.len()];
+        // A flat edge in the last layer runs through a gap below it.
+        let below_last = routed
+            .iter()
+            .any(|&i| self.elems[self.flats[i].u].layer + 1 == layers);
+        let mut gaps = vec![0; layers.saturating_sub(1) + usize::from(below_last)];
+        let mut by_gap = vec![(Vec::new(), Vec::new()); gaps.len()];
         for (i, &(u, _, _)) in segments.iter().enumerate() {
             if let Some(g) = by_gap.get_mut(self.elems[u].layer) {
-                g.push(i);
+                g.0.push(i);
             }
         }
-        for ((g, gap), in_gap) in gaps.iter_mut().enumerate().zip(by_gap) {
-            let jogs: Vec<Jog> = in_gap
+        for &i in &routed {
+            let g = self.elems[self.flats[i].u].layer;
+            by_gap[g].1.push(i);
+        }
+        for ((g, gap), (segs, flats)) in gaps.iter_mut().enumerate().zip(by_gap) {
+            let jogs: Vec<Jog> = segs
                 .iter()
                 .map(|&i| Jog {
                     top: port(i, true),
                     bottom: port(i, false),
+                    flat: false,
                 })
+                .chain(flats.iter().map(|&i| Jog {
+                    top: flat_port(i, true),
+                    bottom: flat_port(i, false),
+                    flat: true,
+                }))
                 .collect();
             let (tracks, k) = route::tracks(&jogs);
-            for (&i, t) in in_gap.iter().zip(tracks) {
-                track_of[i] = t;
+            for (&i, t) in segs.iter().zip(&tracks) {
+                track_of[i] = *t;
             }
-            let mut min = self.sp.rank_gap;
+            for (&i, t) in flats.iter().zip(&tracks[segs.len()..]) {
+                flat_track[i] = t.expect("a flat edge changes position");
+            }
+            let mut min = if g + 1 < layers { self.sp.rank_gap } else { 0 };
             if self.bordered() && (g == 0 || g + 2 == layers) {
                 min = min.max(self.sp.cluster_main_pad);
             }
@@ -1325,15 +1525,42 @@ impl<'a, 'b> Placer<'a, 'b> {
             let (xu, xv) = (port(i, true), port(i, false));
             points.push(real(Point::new(xu, rows[u].1)));
             if let Some(t) = track_of[i] {
-                let gap_start = tops[self.elems[u].layer] + heights[self.elems[u].layer];
-                let row = gap_start + self.sp.track_gap * (t as i32 + 1);
+                let l = self.elems[u].layer;
+                let row = tops[l] + heights[l] + self.sp.track_gap * (t as i32 + 1);
                 points.push(real(Point::new(xu, row)));
                 points.push(real(Point::new(xv, row)));
             }
             points.push(real(Point::new(xv, rows[v].0)));
         }
-        for (chain, points) in self.chains.iter().zip(points_of) {
+        for (chain, mut points) in self.chains.iter().zip(points_of) {
+            if chain.flip {
+                points.reverse();
+            }
             placed.pieces.push((chain.edge, chain.key, points));
+        }
+        for (i, f) in self.flats.iter().enumerate() {
+            let l = self.elems[f.u].layer;
+            let (ru, rv) = (rect(f.u), rect(f.v));
+            let points = if f.straight {
+                let row = tops[l] + (heights[l] - 1) / 2;
+                if ru.x < rv.x {
+                    vec![Point::new(ru.right(), row), Point::new(rv.x, row)]
+                } else {
+                    vec![Point::new(ru.x, row), Point::new(rv.right(), row)]
+                }
+            } else {
+                let (xu, xv) = (flat_port(i, true), flat_port(i, false));
+                let row = tops[l] + heights[l] + self.sp.track_gap * (flat_track[i] as i32 + 1);
+                vec![
+                    Point::new(xu, rows[f.u].1),
+                    Point::new(xu, row),
+                    Point::new(xv, row),
+                    Point::new(xv, rows[f.v].1),
+                ]
+            };
+            placed
+                .pieces
+                .push((f.edge, 0, points.into_iter().map(real).collect()));
         }
 
         for &(e, item) in &self.b.scopes[self.s].loops {

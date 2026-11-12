@@ -506,6 +506,7 @@ impl Lowerer {
                     start,
                     end,
                     length,
+                    constraint: true,
                     label: label.clone(),
                     start_label: None,
                     end_label: None,

@@ -244,6 +244,7 @@ impl Lowerer {
             start: contains.then_some(Arrow::Circle),
             end: (!contains).then_some(Arrow::Point),
             length: 1,
+            constraint: true,
             label: Some(Label::plain(format!("«{kind}»"))),
             start_label: None,
             end_label: None,

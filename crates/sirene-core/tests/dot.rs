@@ -355,7 +355,102 @@ fn blank_labels_and_lengths() {
         "digraph { a -> b [minlen=nan]; a -> c [minlen=99]; a -> d [minlen=\"-inf\"]; a -> e [minlen=2.6] }",
     );
     let lengths: Vec<u8> = c.edges.iter().map(|e| e.length).collect();
-    assert_eq!(lengths, [1, 10, 1, 3]);
+    assert_eq!(lengths, [1, 10, 0, 3]);
+}
+
+/// DOT-2: `rank=same` puts a subgraph's nodes in one rank, `constraint=false` leaves an edge
+/// out of the ranking, and `minlen=0` lets an edge's ends share a rank.
+#[test]
+fn ranks() {
+    let c = chart("digraph { a -> b; a -> c; { rank=same; b; c } b -> c }");
+    assert_eq!(c.same_rank, [vec!["b".to_owned(), "c".to_owned()]]);
+    let draw = |src: &str| ascii::render(&chart(src), &Options::default());
+    // b and c side by side, the edge between them straight.
+    let out = draw("digraph { a -> b; a -> c; { rank=same; b; c } b -> c }");
+    assert!(out.contains("( b ├──►( c )"), "{out}");
+    // Every node mentioned in the subgraph, edges included, and rank set after them.
+    let c = chart("digraph { subgraph s { x -> y; z; rank=same } }");
+    assert_eq!(c.same_rank, [vec!["x", "y", "z"]]);
+    let out = draw("digraph { subgraph s { x -> y; rank=same } }");
+    assert!(out.contains("( x ├──►( y )"), "{out}");
+    // An edge left out of the ranking, and one of length 0.
+    for attr in [
+        "constraint=false",
+        "constraint=no",
+        "constraint=0",
+        "minlen=0",
+    ] {
+        let out = draw(&format!("digraph {{ x -> y [{attr}] }}"));
+        assert!(out.contains("( x ├──►( y )"), "{attr}\n{out}");
+    }
+    let c = chart("digraph { x -> y [constraint=yes]; x -> z [constraint=false] }");
+    let constraint: Vec<bool> = c.edges.iter().map(|e| e.constraint).collect();
+    assert_eq!(constraint, [true, false]);
+    // An edge against the ranks of the others runs upward.
+    let out = draw("digraph { a -> b -> c; c -> a [constraint=false] }");
+    let (a, c) = (out.find("( a )").unwrap(), out.find("( c )").unwrap());
+    assert!(a < c, "{out}");
+}
+
+#[test]
+fn rank_warnings() {
+    let messages =
+        |src: &str| -> Vec<String> { lowered(src).1.into_iter().map(|(_, m)| m).collect() };
+    assert_eq!(
+        messages("digraph { rank=same; a }"),
+        ["`rank` applies to subgraphs; ignored on the graph"]
+    );
+    assert_eq!(
+        messages("digraph { { rank=min; a; b } }"),
+        ["`rank=min` puts the nodes in one rank, not yet the first or last"]
+    );
+    assert_eq!(
+        messages("digraph { { rank=up; a; b } }"),
+        ["unknown `rank` `up`: expected same, min, max, source, or sink"]
+    );
+    assert_eq!(
+        messages("digraph { a -> b [constraint=maybe] }"),
+        ["`constraint` `maybe` is not a boolean; read as true"]
+    );
+    assert!(
+        lowered("digraph { { rank=up; a; b } }")
+            .0
+            .same_rank
+            .is_empty()
+    );
+    assert_eq!(
+        messages("digraph { subgraph cluster_p { a } { rank=same; a; b; c } }"),
+        ["`rank=same` nodes in different clusters do not share a rank"]
+    );
+}
+
+/// LAYOUT-4: a flat edge between nodes that are not neighbors runs below the rank, and a
+/// labeled one goes up to its label above the rank; between clusters it passes their borders.
+#[test]
+fn flat_edges() {
+    let draw = |src: &str| ascii::render(&chart(src), &Options::default());
+    let out = draw("digraph { {rank=same; a; b; c} a -> c }");
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines[1], "( a )   ( b )   ( c )", "{out}");
+    assert_eq!(lines[3], "  │               ▲", "{out}");
+    assert_eq!(lines[4], "  └───────────────┘", "{out}");
+    // The label above the rank, the route reaching it.
+    let out = draw("digraph { {rank=same; a; b} a -> b [label=go] }");
+    let lines: Vec<&str> = out.lines().collect();
+    assert_eq!(lines[0].trim(), "go", "{out}");
+    assert_eq!(lines[1].trim(), "│", "{out}");
+    assert!(lines.last().unwrap().contains("╰───╯   ╰───╯"), "{out}");
+    // Out of a cluster's bottom and into the other's.
+    let out = draw(
+        "digraph { subgraph cluster_p { a } subgraph cluster_q { b } a -> b [constraint=false] }",
+    );
+    assert!(out.contains("└───┼───┘   └───┼───┘"), "{out}");
+    assert!(out.contains("    └───────────┘"), "{out}");
+    let out = draw(
+        "digraph { subgraph cluster_p { a } subgraph cluster_q { b } a -> b [constraint=false, label=x] }",
+    );
+    assert!(out.starts_with("          x\n          │\n"), "{out}");
+    assert!(out.contains("┌───┼───┐   ┌───┼───┐"), "{out}");
 }
 
 /// DOT-3: an attribute that many nodes or edges share is reported once.
@@ -480,7 +575,6 @@ fn warnings() {
         d,
         [
             w("the graph attribute `splines` is not supported; ignored"),
-            w("`rank` is not supported yet; the nodes are ranked as usual"),
             w("ports are not supported yet; the edge joins the node"),
             w("HTML labels are drawn as their text"),
             w("the shape `star2` is not supported; drawn as an ellipse"),

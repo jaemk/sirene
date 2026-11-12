@@ -119,6 +119,7 @@ impl Flowchart {
                     to: item(&e.to),
                     min_len: u32::from(e.length),
                     label: e.label.as_ref().and_then(|l| measure.edge_label(l)),
+                    constraint: e.constraint,
                 })
                 .collect(),
             notes: self
@@ -127,6 +128,16 @@ impl Flowchart {
                     target,
                     size: measure.note(&n.label),
                     after: n.side == NoteSide::After,
+                })
+                .collect(),
+            same_rank: self
+                .same_rank
+                .iter()
+                .map(|group| {
+                    group
+                        .iter()
+                        .filter_map(|id| nodes.get(id.as_str()).copied())
+                        .collect()
                 })
                 .collect(),
         }

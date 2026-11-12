@@ -4,7 +4,6 @@ expression: "digraph u {\n  splines=ortho\n  fontname=\"Helvetica\"\n  { rank=sa
 ---
 2:3: warning: the graph attribute `splines` is not supported; ignored
 3:3: warning: the graph attribute `fontname` is not supported; ignored
-4:5: warning: `rank` is not supported yet; the nodes are ranked as usual
 5:3: warning: ports are not supported yet; the edge joins the node
 6:6: warning: HTML labels are drawn as their text
 6:32: warning: the node attribute `width` is not supported; ignored
@@ -12,14 +11,8 @@ expression: "digraph u {\n  splines=ortho\n  fontname=\"Helvetica\"\n  { rank=sa
 7:6: warning: unknown color `nosuchcolor`; ignored
 7:25: warning: the style `wedged` is not supported; ignored
 8:11: warning: unknown arrow `bogus`; drawn as `normal`
-8:28: warning: the edge attribute `constraint` is not supported; ignored
 10:1: warning: only the first graph in a file is drawn
 
-╭───╮   ╭───────────╮
-( a )   ( bold text )
-╰─┬─╯   ╰─────┬─────╯
-  │           │
-  ▼           ▼
-╭───╮       ╭───╮
-( b )       ( d )
-╰───╯       ╰───╯
+╭───╮   ╭───╮   ╭───────────╮   ╭───╮
+( a ├──►( b )   ( bold text ├──►( d )
+╰───╯   ╰───╯   ╰───────────╯   ╰───╯

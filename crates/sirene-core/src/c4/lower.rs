@@ -442,6 +442,7 @@ impl Lowerer {
             start,
             end: Some(Arrow::Point),
             length: 1,
+            constraint: true,
             label: c.get(params, "label").map(|t| label(&t)),
             start_label: None,
             end_label: None,
