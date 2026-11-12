@@ -87,6 +87,20 @@ fn title_is_centered_above() {
     );
 }
 
+/// A scene that grows on one side to hold an edge's end label keeps its title centered.
+#[test]
+fn title_stays_centered_when_the_scene_grows() {
+    let mut c = chart("---\ntitle: T\n---\nflowchart LR\nA --> B\n");
+    c.edges[0].end_label = Some(crate::flowchart::Label::plain(
+        "a very long label at the head end of the edge",
+    ));
+    let s = flowchart(&c, &Approx, &Theme::LIGHT);
+    let Some(Primitive::Text { center, .. }) = owned(&s, Owner::Diagram).first().copied() else {
+        panic!("no title")
+    };
+    assert_eq!(center.x, s.width / 2.0);
+}
+
 /// Every edge's arrow tip lands on its target's outline, for every shape (DISPLA-7).
 #[test]
 fn edges_end_on_every_outline() {
