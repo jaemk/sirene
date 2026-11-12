@@ -341,8 +341,53 @@ fn tree_line() -> impl Strategy<Value = String> {
         .prop_map(|(depth, c, decor, text)| format!("{}{decor} {text}", c.repeat(depth)))
 }
 
+/// Gantt statements naming tasks `A` to `D`.
+fn gantt_statement() -> impl Strategy<Value = String> {
+    let task = || prop::sample::select(vec!["A", "B", "C", "D"]);
+    let clause = prop::sample::select(vec![
+        "lasts 3 days",
+        "lasts 1 week",
+        "requires 0 days",
+        "starts 2026-01-07",
+        "ends 2026-01-20",
+        "starts D+2",
+        "is 50% complete",
+        "is 100% completed",
+    ]);
+    prop_oneof![
+        (task(), clause.clone()).prop_map(|(t, c)| format!("[{t}] {c}")),
+        (task(), clause).prop_map(|(t, c)| format!("then [{t}] {c}")),
+        (task(), task()).prop_map(|(a, b)| format!("[{b}] starts at [{a}]'s end")),
+        (task(), task()).prop_map(|(a, b)| format!("[{b}] happens 1 day after [{a}]'s start")),
+        Just("-- Section --".to_owned()),
+        Just("saturday are closed".to_owned()),
+        Just("2026-01-08 to 2026-01-09 are closed".to_owned()),
+        Just("printscale weekly".to_owned()),
+    ]
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2000))]
+
+    #[test]
+    fn generated_gantts_lower_and_draw(
+        dated in any::<bool>(),
+        stmts in prop::collection::vec(gantt_statement(), 0..10),
+    ) {
+        let start = if dated { "Project starts 2026-01-05\n" } else { "" };
+        let tasks = "[A] lasts 1 day\n[B] lasts 2 days\n[C] lasts 1 day\n[D] lasts 1 day";
+        let src = format!("@startgantt\n{start}{tasks}\n{}\n@endgantt\n", stmts.join("\n"));
+        let parse = plantuml::parse(&src);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        let (diagram, diagnostics) = parse.lower();
+        // Tasks may refer to each other in a cycle, which is reported; nothing else is.
+        let others: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| !d.message.contains("depends on itself"))
+            .collect();
+        prop_assert!(others.is_empty(), "{:?}\n{}", others, src);
+        check(&diagram)?;
+    }
 
     #[test]
     fn generated_trees_lower_and_draw(

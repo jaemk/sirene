@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startgantt\n[A] lasts forever\n[B] starts at [Nope]'s end\n[C] starts at [D]'s end\n[D] starts at [C]'s end\nwhat is this\n[E] lasts 2 days and is colored in red\nProject starts soon\n@endgantt\n"
+---
+2:5: error: cannot read `lasts forever`
+3:1: error: no task is named `[Nope]`
+4:1: error: `[C]` depends on itself and cannot be placed
+5:1: error: `[D]` depends on itself and cannot be placed
+6:1: error: expected a Gantt statement such as `[Task] lasts 3 days` or `Project starts 2026-01-05`
+7:22: warning: task colors are not drawn yet; ignoring it
+8:1: error: expected a date such as `2026-01-05`
+
+A  ██████████████████████████████
+E  ████████████████████████████████████████████████████████████
+   ┬─────────────────────────────┬─────────────────────────────┬
+   1                             2                             3

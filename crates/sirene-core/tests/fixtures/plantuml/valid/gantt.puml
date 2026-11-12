@@ -1,0 +1,16 @@
+@startgantt
+title Release plan
+Project starts 2026-01-05
+saturday are closed
+sunday are closed
+2026-01-19 is closed
+-- Build --
+[Design] as [D] lasts 3 days
+then [Code] lasts 5 days and is 40% complete
+[Tests] starts at [Code]'s start and lasts 1 week
+-- Ship --
+[Notes] starts 2026-01-12 and ends 2026-01-16
+[Docs] lasts 4 days
+[Release] happens at [Tests]'s end
+[D] -> [Docs]
+@endgantt

@@ -68,6 +68,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | PlantUML State Diagrams | done | [plantuml-state-diagrams.md](plantuml-state-diagrams.md) |
 | PlantUML Description Diagrams | done | [plantuml-description-diagrams.md](plantuml-description-diagrams.md) |
 | PlantUML Mindmaps and WBS | done | [plantuml-mindmaps-and-wbs.md](plantuml-mindmaps-and-wbs.md) |
+| PlantUML Gantt Charts | done | [plantuml-gantt-charts.md](plantuml-gantt-charts.md) |
 
 ## Conventions
 

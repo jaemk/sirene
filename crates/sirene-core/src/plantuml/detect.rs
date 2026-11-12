@@ -236,12 +236,24 @@ fn classify(line: &str) -> (Option<Kind>, Option<Kind>) {
         {
             return strong(Kind::Sequence);
         }
-        if inner.contains(']') {
+        if let Some(close) = inner.find(']') {
+            // `[Task] lasts 3 days` and the like are Gantt tasks.
+            let after = inner[close + 1..].trim_start();
+            let verb = after[..word_len(after)].to_ascii_lowercase();
+            if ["lasts", "requires", "starts", "ends", "happens"].contains(&verb.as_str())
+                || (verb == "as" && after[2..].trim_start().starts_with('['))
+            {
+                return strong(Kind::Gantt);
+            }
             return strong(Kind::Description);
         }
     }
     if line.starts_with('@') && line[1..].starts_with(|c: char| c.is_ascii_digit() || c == '+') {
         return strong(Kind::Timing);
+    }
+    if word.eq_ignore_ascii_case("project") && rest[..word_len(rest)].eq_ignore_ascii_case("starts")
+    {
+        return strong(Kind::Gantt);
     }
     if word.eq_ignore_ascii_case("if") && rest.starts_with('(') {
         return strong(Kind::Activity);
@@ -360,6 +372,10 @@ mod tests {
         assert_eq!(k(":User: --> (Use)"), Kind::Description);
         assert_eq!(k("[Web] --> [Db]"), Kind::Description);
         assert_eq!(k("node N"), Kind::Description);
+        assert_eq!(k("[Design] lasts 3 days"), Kind::Gantt);
+        assert_eq!(k("Project starts 2026-01-05"), Kind::Gantt);
+        assert_eq!(k("[A] as [X] lasts 1 day"), Kind::Gantt);
+        assert_eq!(k("[A] -> [B]"), Kind::Description);
         // Sequence diagrams accept `database`, and PlantUML tries them first.
         assert_eq!(k("database D\nD -> E"), Kind::Sequence);
         assert_eq!(k("robust \"W\" as W\n@0\nW is On"), Kind::Timing);

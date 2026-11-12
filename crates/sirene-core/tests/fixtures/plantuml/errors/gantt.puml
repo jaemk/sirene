@@ -1,0 +1,9 @@
+@startgantt
+[A] lasts forever
+[B] starts at [Nope]'s end
+[C] starts at [D]'s end
+[D] starts at [C]'s end
+what is this
+[E] lasts 2 days and is colored in red
+Project starts soon
+@endgantt
