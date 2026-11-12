@@ -1,0 +1,23 @@
+digraph build {
+  rankdir=LR;
+  node [shape=box, style=rounded];
+
+  subgraph cluster_sources {
+    label = "sources";
+    style = dashed;
+    parser; layout; render;
+  }
+
+  subgraph cluster_outputs {
+    label = "outputs";
+    color = blue;
+    svg; png; ascii [label="ASCII"];
+  }
+
+  parser -> layout -> render;
+  render -> svg;
+  render -> png;
+  render -> ascii;
+  tests [shape=note];
+  tests -> parser [style=dotted];
+}

@@ -103,8 +103,8 @@ elsewhere). The full key table is in `spec/gui-shell.md` (GUISHE-5).
   window and source pane sizes are kept in `~/.config/sirene/settings`
   (`~/Library/Application Support/sirene/settings` on macOS).
 
-`examples/` has diagrams to try (`sirene examples/architecture.mmd`, or
-`cargo run -p sirene -- examples/shapes.mmd` from a checkout); a test keeps them free of
+`examples/` has Mermaid, PlantUML, and DOT diagrams to try (`sirene examples/architecture.mmd`,
+or `cargo run -p sirene -- examples/checkout.puml` from a checkout); a test keeps them free of
 diagnostics.
 
 ### Agents
