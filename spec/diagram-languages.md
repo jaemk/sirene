@@ -5,7 +5,7 @@ Mermaid state (`mermaid-state-diagrams.md`), class (`mermaid-class-diagrams.md`)
 (`mermaid-er-diagrams.md`), sequence (`mermaid-sequence-diagrams.md`), pie
 (`mermaid-pie-charts.md`), gantt (`mermaid-gantt-charts.md`), mindmap
 (`mermaid-mindmaps.md`), journey (`mermaid-journeys.md`), quadrant chart (`mermaid-quadrant-charts.md`), XY chart (`mermaid-xy-charts.md`), requirement (`mermaid-requirement-diagrams.md`), kanban (`mermaid-kanban-boards.md`), packet (`mermaid-packet-diagrams.md`), radar chart (`mermaid-radar-charts.md`), sankey (`mermaid-sankey-diagrams.md`), treemap (`mermaid-treemaps.md`), block (`mermaid-block-diagrams.md`), and the remaining Mermaid types (`mermaid-charts.md`); Graphviz DOT (`graphviz-dot.md`); D2 (`d2.md`); PlantUML
-(`plantuml.md`).
+(`plantuml.md`), with its sequence diagrams in `plantuml-sequence-diagrams.md`.
 
 ## LANGS-1 Detecting the language
 
