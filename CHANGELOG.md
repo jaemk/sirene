@@ -18,6 +18,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   or a rank of their own above or below every other node.
 - DOT `compound=true` with `lhead` and `ltail`: edges end at a cluster's border.
 - DOT `ordering=out` and `ordering=in` on the graph or a node keep its edges in source order.
+- DOT node `group`: edges between nodes of one group run straight.
 - `--lang mermaid|dot` reads every diagram as that language. Without it, a file's extension
   (`.dot`, `.gv`, `.mmd`, `.mermaid`) or a Markdown block's name picks the language in the CLI
   and the editor, and other sources are detected from their first line.

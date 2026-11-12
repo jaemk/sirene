@@ -26,7 +26,12 @@ pub(super) struct Link {
     pub lower: usize,
     pub upper_off: i32,
     pub lower_off: i32,
+    /// Part of an edge kept straight before others, between two nodes of one group.
+    pub heavy: bool,
 }
+
+/// How much harder a heavy link pulls, as in Graphviz.
+const HEAVY: f64 = 100.0;
 
 #[derive(Clone, Copy)]
 enum Toward {
@@ -118,11 +123,12 @@ impl Placer<'_> {
     }
 
     fn weight(&self, l: &Link) -> f64 {
-        match (self.spans[l.upper].line, self.spans[l.lower].line) {
+        let w = match (self.spans[l.upper].line, self.spans[l.lower].line) {
             (true, true) => 8.0,
             (false, false) => 1.0,
             _ => 2.0,
-        }
+        };
+        if l.heavy { w * HEAVY } else { w }
     }
 
     /// Midpoint of the extent of all non-floating elements.
@@ -277,7 +283,23 @@ mod tests {
             lower,
             upper_off: 0,
             lower_off: 0,
+            heavy: false,
         }
+    }
+
+    #[test]
+    fn heavy_links_win() {
+        // 0 and 1 above 2: 2 sits under the middle, or under 1 when its link is heavy.
+        let layers = vec![vec![0, 1], vec![2]];
+        let spans = [node(5), node(5), node(5)];
+        let x = position(&layers, &spans, &[link(0, 2), link(1, 2)], 3, 1);
+        assert_eq!(x[2] * 2, x[0] + x[1]);
+        let heavy = Link {
+            heavy: true,
+            ..link(1, 2)
+        };
+        let x = position(&layers, &spans, &[link(0, 2), heavy], 3, 1);
+        assert_eq!(x[2], x[1]);
     }
 
     #[test]
@@ -318,6 +340,7 @@ mod tests {
             lower: 1,
             upper_off: 2,
             lower_off: -1,
+            heavy: false,
         };
         let x = position(&layers, &spans, &[l], 3, 1);
         assert_eq!(x[0] + 2, x[1] - 1);

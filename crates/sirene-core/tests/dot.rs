@@ -504,6 +504,40 @@ fn ordering() {
     );
 }
 
+/// DOT-3: the edges between nodes of one `group` are kept straight before others.
+#[test]
+fn groups() {
+    let c = chart("digraph { a [group=g]; b [group=h]; c [group=g]; d [group=\"\"] }");
+    assert_eq!(c.groups, [vec!["a", "c"], vec!["b"]]);
+    let draw = |src: &str| ascii::render(&chart(src), &Options::default());
+    // Whether the column through the middle of `lower` runs straight up to `upper`'s box.
+    let straight = |out: &str, upper: &str, lower: &str| {
+        let lines: Vec<Vec<char>> = out.lines().map(|l| l.chars().collect()).collect();
+        let find = |node: &str| {
+            let label: Vec<char> = format!("( {node} )").chars().collect();
+            let row = lines
+                .iter()
+                .position(|l| l.windows(label.len()).any(|w| w == label.as_slice()))
+                .unwrap();
+            let col = lines[row]
+                .windows(label.len())
+                .position(|w| w == label.as_slice())
+                .unwrap();
+            (row, col + 2)
+        };
+        let ((top, _), (bottom, col)) = (find(upper), find(lower));
+        (top + 1..bottom - 1).all(|r| lines[r].get(col).is_some_and(|c| "┬│▼".contains(*c)))
+    };
+    // A diamond centers a over b and c; grouped, the edges through b run straight.
+    let src = "a -> b; a -> c; b -> d; c -> d";
+    let out = draw(&format!("digraph {{ {src} }}"));
+    assert!(!straight(&out, "a", "b"), "{out}");
+    let out = draw(&format!(
+        "digraph {{ node [group=g]; a; b; d; node [group=\"\"]; {src} }}"
+    ));
+    assert!(straight(&out, "a", "b"), "{out}");
+}
+
 /// DOT-2: `rank=min` and `max` put a subgraph's nodes in the first or last rank, and `source`
 /// and `sink` in a rank of their own above or below every other node.
 #[test]

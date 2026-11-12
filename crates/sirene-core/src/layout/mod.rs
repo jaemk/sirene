@@ -138,6 +138,9 @@ pub struct Graph {
     pub end_ranks: Vec<(RankEnd, Vec<usize>)>,
     /// Nodes whose edges of one direction keep their input order along the rank (LAYOUT-5).
     pub ordering: Vec<(usize, EdgeOrder)>,
+    /// Groups of nodes whose edges to each other are kept straight before others (LAYOUT-6).
+    /// A node in two groups is in the last.
+    pub groups: Vec<Vec<usize>>,
 }
 
 /// Spacing for one orientation, in canonical terms: the cross axis runs along a rank and the
@@ -1076,6 +1079,32 @@ impl<'a, 'b> Placer<'a, 'b> {
             .collect()
     }
 
+    /// For each edge, whether it joins two nodes of one group (LAYOUT-6).
+    fn grouped_edges(&self) -> Vec<bool> {
+        let graph = &self.b.graph;
+        if graph.groups.is_empty() {
+            return Vec::new();
+        }
+        let mut group = vec![None; graph.nodes.len()];
+        for (g, nodes) in graph.groups.iter().enumerate() {
+            for &n in nodes {
+                if let Some(slot) = group.get_mut(n) {
+                    *slot = Some(g);
+                }
+            }
+        }
+        graph
+            .edges
+            .iter()
+            .map(|e| match (e.from, e.to) {
+                (Item::Node(a), Item::Node(b)) => {
+                    a != b && group[a].is_some() && group[a] == group[b]
+                }
+                _ => false,
+            })
+            .collect()
+    }
+
     /// For each node with an `ordering`, the elements next to it on its edges of that direction,
     /// in edge input order (LAYOUT-5).
     fn ordered(&self, segments: &[(usize, usize, usize)]) -> Vec<Vec<usize>> {
@@ -1330,14 +1359,16 @@ impl<'a, 'b> Placer<'a, 'b> {
                 }
             })
             .collect();
+        let heavy = self.grouped_edges();
         let links: Vec<Link> = segments
             .iter()
             .zip(&offsets)
-            .map(|(&(u, v, _), &(uo, vo))| Link {
+            .map(|(&(u, v, c), &(uo, vo))| Link {
                 upper: u,
                 lower: v,
                 upper_off: uo,
                 lower_off: vo,
+                heavy: heavy.get(self.chains[c].edge).copied().unwrap_or(false),
             })
             .collect();
         let cluster = self.cluster_spec();

@@ -56,7 +56,8 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
   node without its own).
 - Node: `ordering`: `out` keeps the node's edges leaving downward in source order along the
   rank below it, and `in` its edges entering from above along the rank above (LAYOUT-5);
-  empty is none, and another value is a warning.
+  empty is none, and another value is a warning. `group`: the edges between nodes of one
+  nonempty group are kept straight before others (LAYOUT-6).
 - Cluster: `label`, `color` and `pencolor` (border), `bgcolor` (fill), `style=filled` (fills
   with `fillcolor`, else `color`, else `bgcolor`, else light gray), `fontcolor`, and `style`.
 - Node: `shape`, `style` (`filled`, `rounded`, `dashed`, `dotted`, `bold`, `invis`, `solid`),
@@ -96,7 +97,7 @@ word.
 ## DOT-4 Not drawn yet
 
 These are parsed and warned about, then ignored: ports (`a:p:n`; the edge joins the node), HTML labels
-(drawn as their text), `group`, and images.
+(drawn as their text), and images.
 
 ## DOT-5 Choosing the language
 

@@ -128,9 +128,14 @@ fn graph() -> impl Strategy<Value = Graph> {
             let order = prop::sample::select(vec![EdgeOrder::Out, EdgeOrder::In]);
             prop::collection::vec((0..n, order), 0..3).boxed()
         };
-        let ranks = (same_rank, end_ranks, ordering);
+        let groups = if n == 0 {
+            Just(Vec::new()).boxed()
+        } else {
+            prop::collection::vec(prop::collection::vec(0..n, 0..4), 0..2).boxed()
+        };
+        let ranks = (same_rank, end_ranks, ordering, groups);
         (direction(), clusters, nodes, edges, ranks).prop_map(
-            |(direction, clusters, nodes, edges, (same_rank, end_ranks, ordering))| Graph {
+            |(direction, clusters, nodes, edges, (same_rank, end_ranks, ordering, groups))| Graph {
                 direction,
                 nodes,
                 clusters,
@@ -139,6 +144,7 @@ fn graph() -> impl Strategy<Value = Graph> {
                 same_rank,
                 end_ranks,
                 ordering,
+                groups,
             },
         )
     })

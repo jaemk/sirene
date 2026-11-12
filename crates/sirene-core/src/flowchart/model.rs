@@ -379,6 +379,9 @@ pub struct Flowchart {
     /// Nodes whose edges of one direction keep their source order across the rank (DOT's
     /// `ordering`).
     pub ordering: Vec<(String, EdgeOrder)>,
+    /// Ids of nodes whose edges to each other are kept straight, one list per group (DOT's
+    /// `group`).
+    pub groups: Vec<Vec<String>>,
 }
 
 /// Which of a node's edges keep their source order along the rank (LAYOUT-5).

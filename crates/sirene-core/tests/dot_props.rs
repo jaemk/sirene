@@ -53,7 +53,7 @@ fn attr() -> impl Strategy<Value = String> {
     let keys = prop::sample::select(vec![
         "label", "headlabel", "taillabel", "shape", "style", "color", "fillcolor", "pencolor",
         "bgcolor", "fontcolor", "penwidth", "dir", "arrowhead", "arrowtail", "minlen", "rankdir",
-        "rank", "width", "constraint", "compound", "lhead", "ltail", "ordering",
+        "rank", "width", "constraint", "compound", "lhead", "ltail", "ordering", "group",
     ]);
     #[rustfmt::skip]
     let values = prop::sample::select(vec![
