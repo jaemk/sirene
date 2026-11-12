@@ -25,7 +25,11 @@ fn moment(s: &str) -> Option<[u32; 6]> {
     };
     let mut d = date.split('-');
     let (y, mo, da) = (num(d.next()?, 4)?, num(d.next()?, 2)?, num(d.next()?, 2)?);
-    if d.next().is_some() || !(1..=12).contains(&mo) || !(1..=31).contains(&da) {
+    if d.next().is_some()
+        || !(1..=12).contains(&mo)
+        || da < 1
+        || i64::from(da) > crate::gantt::time::days_in_month(i64::from(y), i64::from(mo))
+    {
         return None;
     }
     let (mut h, mut mi, mut se) = (0, 0, 0);
@@ -116,6 +120,10 @@ mod tests {
         assert_eq!(moment("2024-01-15 01:08:12"), Some([2024, 1, 15, 1, 8, 12]));
         assert_eq!(moment("2024-01-15 01:08"), Some([2024, 1, 15, 1, 8, 0]));
         assert_eq!(moment("2024-13-01"), None);
+        assert_eq!(moment("2024-02-29"), Some([2024, 2, 29, 0, 0, 0]));
+        assert_eq!(moment("2023-02-29"), None);
+        assert_eq!(moment("2024-04-31"), None);
+        assert_eq!(moment("2024-01-00"), None);
         assert_eq!(moment("2024-1-01"), None);
         assert_eq!(moment("2024-01-15 25:00"), None);
         assert_eq!(moment("soon"), None);

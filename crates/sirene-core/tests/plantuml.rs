@@ -332,7 +332,7 @@ fn notes() {
 fn errors() {
     let (s, d) = lowered(
         "@startuml\n!include x.puml\n!include_many y.puml\n!include_once z.puml\n!define X\n\
-         skinparam a b\nparticipant A #red\n\
+         !$a = 1\nskinparam a b\nparticipant A #red\n\
          A -[#blue]> B\nA ->o B\nreturn x\nnewpage\nhello there\n@enduml\n",
     );
     let messages: Vec<&str> = d.iter().map(|(_, m)| m.as_str()).collect();
@@ -343,6 +343,7 @@ fn errors() {
             "`!include_many` reads other files and is not supported",
             "`!include_once` reads other files and is not supported",
             "`!define` is not supported; ignoring the line",
+            "`!$a` is not supported; ignoring the line",
             "`skinparam` is not drawn yet; ignoring it",
             "participant colors are not drawn; ignoring `#red`",
             "arrow styles are not drawn; drawing a plain arrow",

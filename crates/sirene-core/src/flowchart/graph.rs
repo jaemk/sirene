@@ -26,10 +26,21 @@ impl Flowchart {
     /// Each note whose target is a node or a subgraph, with that item, in the order of the
     /// layout graph's notes.
     pub fn placed_notes(&self) -> impl Iterator<Item = (Item, &Note)> {
-        self.notes.iter().filter_map(|n| {
-            let item = match self.nodes.iter().position(|node| node.id == n.target) {
-                Some(i) => Item::Node(i),
-                None => Item::Cluster(self.subgraphs.iter().position(|s| s.id == n.target)?),
+        // Indexed only when there are notes; the first node or subgraph with an id wins.
+        let mut nodes = HashMap::new();
+        let mut clusters = HashMap::new();
+        if !self.notes.is_empty() {
+            for (i, node) in self.nodes.iter().enumerate().rev() {
+                nodes.insert(node.id.as_str(), i);
+            }
+            for (i, s) in self.subgraphs.iter().enumerate().rev() {
+                clusters.insert(s.id.as_str(), i);
+            }
+        }
+        self.notes.iter().filter_map(move |n| {
+            let item = match nodes.get(n.target.as_str()) {
+                Some(&i) => Item::Node(i),
+                None => Item::Cluster(*clusters.get(n.target.as_str())?),
             };
             Some((item, n))
         })

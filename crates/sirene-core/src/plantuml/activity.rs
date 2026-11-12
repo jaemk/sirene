@@ -150,6 +150,10 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
         l.statement(&line, &mut cursor);
+        // The rest of an older-syntax diagram would only add errors after the first one.
+        if line.text.starts_with("(*)") {
+            break;
+        }
     }
     for open in std::mem::take(&mut l.stack) {
         l.d.push(unclosed(&open));
@@ -1163,7 +1167,8 @@ mod tests {
                 "unclosed action: expected `;` at its end"
             ]
         );
-        let (_, d) = lower_src("(*) --> \"a\"");
+        let (_, d) = lower_src("(*) --> \"a\"\nif \"c\" then\n-->[y] \"d\"\nelse\nendif");
+        assert_eq!(d.len(), 1, "{d:?}");
         assert!(d[0].contains("older activity syntax"), "{d:?}");
     }
 

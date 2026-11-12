@@ -275,6 +275,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `has` lines, and JSON or YAML tables with many nested rows no longer take quadratic time.
 - A PlantUML element named `note` can be linked (`note --> A`), and repeated `<note>` bodies on
   one file-tree entry are joined in place.
+- PlantUML JSON reads surrogate-pair escapes as one character, stops a short `\u` escape at
+  the closing quote, and accepts numbers beyond `f64` range.
+- PlantUML chronology dates past the end of their month (`2023-02-29`) are errors, a timing
+  clock's bad `period` or `pulse` gets its own error, and the older activity syntax reports
+  one error instead of one per line.
+- Notes on charts with many nodes are placed in linear time.
+- PlantUML sequence diagrams ignore `scale`, `skin`, and `set` with a warning instead of an
+  error, and preprocessor lines such as `!$a = 1` are named in full in their warning.
 
 ## [0.2.0] - 2026-11-08
 
