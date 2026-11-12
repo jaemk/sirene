@@ -75,9 +75,14 @@ A document is a sequence diagram unless a statement only another kind accepts co
 ## PSEQ-5 Model additions
 
 The sequence model gains the events PSEQ-4 needs, drawn by MSEQ-3 and MSEQ-4 as described
-there: `Event::Separator(text)`, `Event::Delay(Option<text>)`, `Event::Space(pixels)`, and
-`Event::Ref { participants, text }`; `BlockKind::Group` for `group`; and
-`Sequence::footbox`, false after `hide footbox`. Mermaid never produces them.
+there: `Event::Separator(text)`, `Event::Delay(Option<text>)`, `Event::Space(Option<pixels>)`
+(`None` for `|||`), and `Event::Ref { participants, text }`; `BlockKind::Group` for `group`,
+whose tab holds its label (`BlockKind::tab`); and `Sequence::hide_footbox`. Mermaid never
+produces them. A separator and a delay take a row across the whole diagram and widen it to fit
+their text; a separator is a double rule with its text in a box (`══ text ══` in ASCII), and a
+delay dashes the lifelines (`┆`). A space is `N` pixels, or a text line for `|||`; in ASCII it
+is one row per 20 pixels, at least one. A `ref` is placed as a note over its participants, with
+a `ref` tab. Done: tests `plantuml_events` in `crates/sirene-core/tests/sequence.rs`.
 
 ## PSEQ-6 Not drawn yet
 

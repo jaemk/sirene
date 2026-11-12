@@ -302,6 +302,104 @@ fn drawing() {
     assert!(center(&wide, "Bob").x - center(&wide, "Alice").x > bob.x - alice.x);
 }
 
+/// A Mermaid sequence with the PlantUML-only events (PSEQ-5) added after its first message.
+fn with_plantuml_events() -> Sequence {
+    let mut s = sequence("sequenceDiagram\n  A->>B: hi\n  B->>C: on\n");
+    let rest = s.events.split_off(1);
+    s.events.extend([
+        Event::Separator("Phase two".to_owned()),
+        Event::Delay(Some("later".to_owned())),
+        Event::Delay(None),
+        Event::Space(None),
+        Event::Space(Some(45)),
+        Event::Start(BlockKind::Group, "retry [3 times]".to_owned()),
+        Event::Ref {
+            participants: vec![0, 1],
+            text: vec!["init".to_owned()],
+        },
+        Event::End,
+        Event::Ref {
+            participants: vec![2],
+            text: vec!["a longer ref".to_owned(), "two".to_owned()],
+        },
+    ]);
+    s.events.extend(rest);
+    s.hide_footbox = true;
+    s
+}
+
+/// PSEQ-5: separators, delays, spaces, `ref` frames, `group` tabs, and a hidden footbox.
+#[test]
+fn plantuml_events() {
+    assert_eq!(
+        BlockKind::Group.tab("retry [3 times]"),
+        ("retry".to_owned(), "[3 times]".to_owned())
+    );
+    assert_eq!(
+        BlockKind::Group.tab(""),
+        ("group".to_owned(), String::new())
+    );
+    assert_eq!(
+        BlockKind::Group.tab("[x]"),
+        ("[x]".to_owned(), String::new())
+    );
+    assert_eq!(
+        BlockKind::Alt.tab("ok"),
+        ("alt".to_owned(), "[ok]".to_owned())
+    );
+    let d = Diagram::Sequence(with_plantuml_events());
+    for charset in [Charset::Unicode, Charset::Ascii] {
+        insta::assert_snapshot!(
+            format!("plantuml_events_{charset:?}"),
+            d.ascii(&Options { charset })
+        );
+    }
+    let s = d.scene(&Approx, &Theme::LIGHT);
+    // Bands come in order, between the first and the second message.
+    let ys: Vec<f32> = [
+        "hi",
+        "Phase two",
+        "later",
+        "retry",
+        "[3 times]",
+        "ref",
+        "on",
+    ]
+    .iter()
+    .map(|t| center(&s, t).y)
+    .collect();
+    assert!(ys.windows(2).all(|w| w[0] <= w[1]), "{ys:?}");
+    // No footers: each name is drawn once.
+    let names = s
+        .elements
+        .iter()
+        .filter(|e| matches!(&e.primitive, Primitive::Text { text, .. } if text == "A"))
+        .count();
+    assert_eq!(names, 1);
+    // The separator's rule spans the diagram.
+    let spans = s.elements.iter().any(|e| match &e.primitive {
+        Primitive::Path { segments, .. } => {
+            let xs: Vec<f32> = segments
+                .iter()
+                .filter_map(|g| match g {
+                    sirene_core::scene::Segment::Move(p) | sirene_core::scene::Segment::Line(p) => {
+                        Some(p.x)
+                    }
+                    _ => None,
+                })
+                .collect();
+            xs.len() == 2 && (xs[1] - xs[0]).abs() >= s.width - 2.0 * 16.0 - 0.5
+        }
+        _ => false,
+    });
+    assert!(spans);
+    // A wide separator label widens the diagram.
+    let mut wide = with_plantuml_events();
+    wide.events[1] = Event::Separator("a separator label much wider than the columns".to_owned());
+    let w = Diagram::Sequence(wide).scene(&Approx, &Theme::LIGHT);
+    assert!(w.width > s.width);
+}
+
 #[test]
 fn ascii_drawing() {
     let out = diagram::lower("sequenceDiagram\n  A->>B: hi\n  B-->>A: yo\n")

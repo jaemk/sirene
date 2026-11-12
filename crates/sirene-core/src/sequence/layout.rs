@@ -58,10 +58,16 @@ pub(crate) enum Placed {
         y: f32,
         label_y: f32,
     },
+    /// A note's box, or a `ref` frame's.
     Note {
         x: f32,
         y: f32,
         w: f32,
+        h: f32,
+    },
+    /// A separator, delay, or space: a row across the whole diagram, from `y` to `y + h`.
+    Band {
+        y: f32,
         h: f32,
     },
 }
@@ -263,6 +269,10 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
                     NoteSide::Over => {}
                 }
             }
+            Event::Ref { participants, .. } if participants.len() == 1 => {
+                beside(participants[0], false, w / 2.0 + s.note_gap);
+                beside(participants[0], true, w / 2.0 + s.note_gap);
+            }
             _ => {}
         }
     }
@@ -303,6 +313,8 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
     let mut y = top + header_h + s.row_gap;
     // The arrow of the event just before, where an `activate` after it begins.
     let mut last_arrow: Option<f32> = None;
+    // The widest separator or delay label, which the diagram must fit.
+    let mut band_w: f32 = 0.0;
     for (k, e) in seq.events.iter().enumerate() {
         let (w, h) = sizes.events[k];
         let mut arrow = None;
@@ -373,6 +385,33 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
                 place = Placed::Note { x: nx, y, w: nw, h };
                 y += h + s.row_gap;
             }
+            Event::Ref { participants, .. } => {
+                let (Some(lo), Some(hi)) = (
+                    participants.iter().map(|&p| x[p]).reduce(f32::min),
+                    participants.iter().map(|&p| x[p]).reduce(f32::max),
+                ) else {
+                    placed.push(place);
+                    continue;
+                };
+                let nw = if lo == hi {
+                    w
+                } else {
+                    w.max(hi - lo + 2.0 * s.note_gap)
+                };
+                let nx = (lo + hi) / 2.0 - nw / 2.0;
+                rows.extend(nx, nx + nw);
+                place = Placed::Note { x: nx, y, w: nw, h };
+                y += h + s.row_gap;
+            }
+            Event::Separator(_) | Event::Delay(_) => {
+                band_w = band_w.max(w);
+                place = Placed::Band { y, h };
+                y += h + s.row_gap;
+            }
+            Event::Space(_) => {
+                place = Placed::Band { y, h };
+                y += h;
+            }
             Event::Activate(p) => {
                 rows.activate(*p, last_arrow.unwrap_or(y));
                 placed.push(place);
@@ -436,7 +475,8 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
             life_end[p] = footer_y;
         }
     }
-    let mut bottom = footer_y + header_h;
+    let footbox_h = if seq.hide_footbox { 0.0 } else { header_h };
+    let mut bottom = footer_y + footbox_h;
 
     let mut groups = Vec::new();
     for g in 0..seq.groups.len() {
@@ -458,7 +498,7 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
             x0: x0 - s.group_pad,
             x1: (x1 + s.group_pad).max(x0 - s.group_pad + min_w),
             y0: groups_top,
-            y1: footer_y + header_h + s.group_pad,
+            y1: footer_y + footbox_h + s.group_pad,
         });
     }
     if !groups.is_empty() {
@@ -481,6 +521,7 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
         min_x = min_x.min(g.x0);
         max_x = max_x.max(g.x1);
     }
+    max_x = max_x.max(min_x.min(s.margin) + band_w);
     let dx = (s.margin - min_x).max(0.0);
     let mut layout = Layout {
         width: max_x + dx + s.margin,
@@ -504,7 +545,7 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
                     *x1 += dx;
                 }
                 Placed::Note { x, .. } => *x += dx,
-                Placed::None => {}
+                Placed::None | Placed::Band { .. } => {}
             }
         }
         for b in &mut layout.bars {
