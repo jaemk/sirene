@@ -254,40 +254,54 @@ fn markdown_and_wide_labels() {
     );
 }
 
+/// A chain through titled subgraphs runs straight down: the titles give way to the border
+/// ports, so the subgraphs do not drift sideways one after another.
+#[test]
+fn subgraph_chain_stays_straight() {
+    let mut src = String::from("flowchart TD\n");
+    for i in 0..20 {
+        src.push_str(&format!(
+            "subgraph s{i}\na{i} --> b{i}\nend\nb{i} --> a{}\n",
+            i + 1
+        ));
+    }
+    let out = draw(&src);
+    let widest = out.lines().map(|l| l.chars().count()).max().unwrap_or(0);
+    assert!(widest <= 16, "{out}");
+    // No jogs: every edge is a straight run down.
+    assert!(!out.contains("└┐") && !out.contains("┌┘"), "{out}");
+}
+
 #[test]
 fn clusters_and_crossing_edges() {
     // The title keeps clear of the edge crossing the top border.
     assert_eq!(
         draw("flowchart TD\nA --> B\nsubgraph S [Group]\nB --> C\nend\nC --> D\nA --> S\n"),
         rows(&[
-            " ┌───┐",
-            " │ A │",
-            " └┬─┬┘",
-            "  │ │",
-            "  │ │",
-            "  └┐│",
-            "   │▼",
-            "┌──┼──── Group ─┐",
-            "│  │            │",
-            "│  └┐           │",
-            "│   ▼           │",
-            "│ ┌───┐         │",
-            "│ │ B │         │",
-            "│ └─┬─┘         │",
-            "│   │           │",
-            "│   └┐          │",
-            "│    │          │",
-            "│    ▼          │",
-            "│  ┌───┐        │",
-            "│  │ C │        │",
-            "│  └─┬─┘        │",
-            "│    │          │",
-            "└────┼──────────┘",
-            "     │",
-            "     ▼",
-            "   ┌───┐",
-            "   │ D │",
-            "   └───┘",
+            "  ┌───┐",
+            "  │ A │",
+            "  └┬─┬┘",
+            "   │ │",
+            "   │ │",
+            "   └┐│",
+            "    │▼",
+            "┌───┼──── Group ─┐",
+            "│   ▼            │",
+            "│ ┌───┐          │",
+            "│ │ B │          │",
+            "│ └─┬─┘          │",
+            "│   │            │",
+            "│   ▼            │",
+            "│ ┌───┐          │",
+            "│ │ C │          │",
+            "│ └─┬─┘          │",
+            "│   │            │",
+            "└───┼────────────┘",
+            "    │",
+            "    ▼",
+            "  ┌───┐",
+            "  │ D │",
+            "  └───┘",
         ])
     );
 }
@@ -303,23 +317,23 @@ fn clusters_with_edges_inherit_direction() {
             "└─┬─┘",
             "  │",
             "  ▼",
-            "┌────── S ─┐",
-            "│          │",
-            "│  ┌───┐   │",
-            "│  │ A │   │",
-            "│  └─┬─┘   │",
-            "│    │     │",
-            "│    ▼     │",
-            "│  ┌───┐   │",
-            "│  │ B │   │",
-            "│  └───┘   │",
-            "│          │",
-            "└────┬─────┘",
-            "     │",
-            "     ▼",
-            "   ┌───┐",
-            "   │ Y │",
-            "   └───┘",
+            "┌───── S ─┐",
+            "│         │",
+            "│ ┌───┐   │",
+            "│ │ A │   │",
+            "│ └─┬─┘   │",
+            "│   │     │",
+            "│   ▼     │",
+            "│ ┌───┐   │",
+            "│ │ B │   │",
+            "│ └───┘   │",
+            "│         │",
+            "└───┬─────┘",
+            "    │",
+            "    ▼",
+            "  ┌───┐",
+            "  │ Y │",
+            "  └───┘",
         ])
     );
 }
