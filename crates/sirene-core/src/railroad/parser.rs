@@ -461,11 +461,16 @@ impl<'a> Parser<'a> {
                 _ => None,
             };
             let Some(op) = op else { return };
+            // ISO EBNF's `{ a }-` is one or more `a`, with nothing to except after it.
+            let one_or_more = op == '-' && !spaced && self.src[..before].ends_with('}');
             self.trivia(false);
             self.token(RR_OP, 1);
             count += 1;
             if op == '-' {
                 self.trivia(false);
+                if one_or_more && !self.at_term() {
+                    continue;
+                }
                 if !self.primary() {
                     return;
                 }

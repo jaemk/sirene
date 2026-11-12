@@ -283,6 +283,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Notes on charts with many nodes are placed in linear time.
 - PlantUML sequence diagrams ignore `scale`, `skin`, and `set` with a warning instead of an
   error, and preprocessor lines such as `!$a = 1` are named in full in their warning.
+- PlantUML links read bold `==>` and dotted `~~>` shafts, and EBNF reads ISO `{ a }-` as one
+  or more `a`.
+- PlantUML analog `between` errors say whether the bounds are out of order or out of range.
 
 ## [0.2.0] - 2026-11-08
 

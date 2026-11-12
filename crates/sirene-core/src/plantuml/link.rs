@@ -82,6 +82,16 @@ fn shaft_starts(b: &[u8], i: usize) -> bool {
             matches!(next, Some(b'.' | b'[' | b'>' | b'|'))
                 || prev.is_some_and(|p| p.is_ascii_whitespace() || head(p))
         }
+        // A bold `==` or dotted `~~` shaft, doubled so `a = 1` is not a link.
+        // `=up=>` puts a direction word between the two.
+        c @ (b'=' | b'~') => {
+            let word = b[i + 1..]
+                .iter()
+                .take_while(|b| b.is_ascii_alphabetic())
+                .count();
+            next.is_some_and(|n| n == c || n == b'[')
+                || (word > 0 && b.get(i + 1 + word) == Some(&c))
+        }
         _ => false,
     }
 }
@@ -201,15 +211,19 @@ pub(crate) fn link(s: &str) -> Option<Link<'_>> {
     }
     // The shaft: dashes or dots, one `[options]`, and direction words between them.
     let mut q = p;
-    let (mut dashes, mut dots) = (0u8, false);
+    let (mut dashes, mut dots, mut bold) = (0u8, false, false);
     let mut options = None;
     let mut direction = None;
     while q < b.len() {
         match b[q] {
             b'-' => dashes = dashes.saturating_add(1),
-            b'.' => {
+            b'.' | b'~' => {
                 dashes = dashes.saturating_add(1);
                 dots = true;
+            }
+            b'=' => {
+                dashes = dashes.saturating_add(1);
+                bold = true;
             }
             b'[' => {
                 let close = q + s[q..].find(']')?;
@@ -223,7 +237,9 @@ pub(crate) fn link(s: &str) -> Option<Link<'_>> {
                 let known = [
                     "up", "u", "down", "d", "do", "left", "l", "le", "right", "r", "ri",
                 ];
-                if !known.contains(&dir.as_str()) || !matches!(after, Some(b'-' | b'.' | b'[')) {
+                if !known.contains(&dir.as_str())
+                    || !matches!(after, Some(b'-' | b'.' | b'=' | b'~' | b'['))
+                {
                     break;
                 }
                 direction = Some(dir);
@@ -275,7 +291,13 @@ pub(crate) fn link(s: &str) -> Option<Link<'_>> {
         label: label.filter(|l| !l.is_empty()),
         start,
         end,
-        stroke: if dots { Stroke::Dotted } else { Stroke::Normal },
+        stroke: if bold {
+            Stroke::Thick
+        } else if dots {
+            Stroke::Dotted
+        } else {
+            Stroke::Normal
+        },
         length: dashes.saturating_sub(1).min(10),
         constraint: true,
         styles: Vec::new(),
@@ -408,5 +430,24 @@ mod tests {
         let l = link("A ::: B").map(|l| l.from);
         assert_eq!(l, None);
         assert_eq!(link("A::x --> B").map(|l| l.from), Some("A::x"));
+    }
+
+    #[test]
+    fn bold_and_dotted_shafts() {
+        let l = link("A ==> B").unwrap();
+        assert_eq!(
+            (l.from, l.to, l.stroke, l.length),
+            ("A", "B", Stroke::Thick, 1)
+        );
+        let l = link("A ~~> B").unwrap();
+        assert_eq!((l.from, l.to, l.stroke), ("A", "B", Stroke::Dotted));
+        let l = link("A =up=> B").unwrap();
+        assert_eq!((l.from, l.to, l.stroke), ("B", "A", Stroke::Thick));
+        let l = link("A =[#red]=> B").unwrap();
+        assert_eq!(l.stroke, Stroke::Thick);
+        assert_eq!(link("A <|== B").map(|l| l.stroke), Some(Stroke::Thick));
+        // A single `=` is not a shaft.
+        assert_eq!(link("a = 1").map(|l| l.from), None);
+        assert_eq!(link("== title ==").map(|l| l.from), None);
     }
 }

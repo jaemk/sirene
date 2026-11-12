@@ -4,10 +4,10 @@ expression: "@startuml\nrobust \"A\" as A\nrobust \"Again\" as A\nclock \"C\" as
 ---
 3:1: error: `A` is already declared
 4:1: error: a clock needs `with period N`
-5:1: error: expected `between LOW and HIGH`
+5:1: error: `between LOW and HIGH` needs LOW below HIGH
 6:23: error: unexpected `speed`
 9:1: error: no signal is named `Nope`
-10:1: error: an analog signal's value is a number, not `high`
+10:1: error: an analog signal's value is a number within +-1e15, not `high`
 11:1: error: expected a moment such as `100` or `+50`, not `soon`
 12:1: error: no moment is named `:missing`
 13:1: error: no signal is named `Nope`

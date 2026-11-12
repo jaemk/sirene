@@ -214,16 +214,20 @@ impl Lower {
                     clock.offset = v;
                     i += 2;
                 }
-                ("between", Some(lo)) => {
+                ("between", lo) => {
                     let hi = (words.get(i + 2).map(|w| w.eq_ignore_ascii_case("and"))
                         == Some(true))
                     .then(|| words.get(i + 3).and_then(|v| real(v)))
                     .flatten();
-                    match hi {
-                        Some(hi) if hi > lo => s.scale = Some((lo, hi)),
+                    match (lo, hi) {
+                        (Some(lo), Some(hi)) if hi > lo => s.scale = Some((lo, hi)),
+                        (Some(_), Some(_)) => self.d.push(Diagnostic::new(
+                            line.range,
+                            "`between LOW and HIGH` needs LOW below HIGH",
+                        )),
                         _ => self.d.push(Diagnostic::new(
                             line.range,
-                            "expected `between LOW and HIGH`",
+                            "expected `between LOW and HIGH`, numbers within +-1e15",
                         )),
                     }
                     i += 4;
@@ -308,7 +312,7 @@ impl Lower {
         {
             return self.d.push(Diagnostic::new(
                 range,
-                format!("an analog signal's value is a number, not `{s}`"),
+                format!("an analog signal's value is a number within +-1e15, not `{s}`"),
             ));
         }
         sig.changes.push(Change {
@@ -698,6 +702,20 @@ mod tests {
         assert!(t.signals[0].clock.is_some());
         let (_, d) = lower_src("clock C");
         assert_eq!(d, ["a clock needs `with period N`"]);
+    }
+
+    #[test]
+    fn analog_ranges() {
+        let (t, d) = lower_src("analog a between -1e3 and 1e3");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(t.signals[0].scale, Some((-1e3, 1e3)));
+        let (_, d) = lower_src("analog a between 5 and 1");
+        assert_eq!(d, ["`between LOW and HIGH` needs LOW below HIGH"]);
+        let (_, d) = lower_src("analog a between -1e300 and 1");
+        assert_eq!(
+            d,
+            ["expected `between LOW and HIGH`, numbers within +-1e15"]
+        );
     }
 
     #[test]
