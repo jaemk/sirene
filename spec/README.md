@@ -29,7 +29,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid ER Diagrams | done | [mermaid-er-diagrams.md](mermaid-er-diagrams.md) |
 | Mermaid Sequence Diagrams | done | [mermaid-sequence-diagrams.md](mermaid-sequence-diagrams.md) |
 | Mermaid Charts | done | [mermaid-charts.md](mermaid-charts.md) |
-| Graphviz DOT | pending | [graphviz-dot.md](graphviz-dot.md) |
+| Graphviz DOT | done | [graphviz-dot.md](graphviz-dot.md) |
 | D2 | research | [d2.md](d2.md) |
 | PlantUML | research | [plantuml.md](plantuml.md) |
 | Mermaid Git Graphs | done | [mermaid-git-graphs.md](mermaid-git-graphs.md) |
