@@ -9,11 +9,11 @@ mindmaps and WBS in `plantuml-mindmaps-and-wbs.md` (PMIND), Gantt charts in
 DOT and EBNF in `plantuml-embedded-languages.md` (PEMB), file trees in
 `plantuml-file-trees.md` (PFILES), regexes in `plantuml-regex-diagrams.md` (PREGEX),
 Chen diagrams in `plantuml-chen-diagrams.md` (PCHEN), network diagrams in
-`plantuml-network-diagrams.md` (PNW), and chronologies in `plantuml-chronology-diagrams.md`
-(PCHRON).
+`plantuml-network-diagrams.md` (PNW), chronologies in `plantuml-chronology-diagrams.md`
+(PCHRON), and timing diagrams in `plantuml-timing-diagrams.md` (PTIM).
 PlantUML (<https://plantuml.com>) has a dozen diagram kinds and no formal grammar; its
 reference is the Java implementation and the language reference guide. Full compatibility is
-not the goal. The useful subset reuses the sequence and graph models.
+not the goal. The useful subset reuses sirene's models.
 
 ## PUML-1 Documents
 
@@ -36,8 +36,18 @@ accepts (`start` or `:action;` for activity, `class` for class, `[*]` or `state`
 | State | graph, state shapes (MSTATE-2) | 3 |
 | Use case | graph, actor and ellipse shapes | 4 |
 | Component and deployment | graph, component, node, and database shapes | 4 |
-| Timing | own model | later |
 | Activity swimlanes (`\|Lane\|`) | graph with lane clusters (PACT-7) | 2 |
+| Mindmap (`@startmindmap`) | mindmap | 5 |
+| WBS (`@startwbs`) | graph | 5 |
+| Gantt (`@startgantt`) | gantt (MGANTT-2) | 5 |
+| JSON and YAML (`@startjson`, `@startyaml`) | graph, untitled compartments | 5 |
+| DOT (`@startdot`) | graph, via the DOT reader | 5 |
+| EBNF (`@startebnf`) and regex (`@startregex`) | railroad (MRAIL-2) | 5 |
+| Files (`@startfiles`) | tree view (MTREEV-2) | 5 |
+| Chen (`@startchen`) and network (`nwdiag`) | graph | 5 |
+| Chronology (`@startchronology`) | timeline (TIMELI-2) | 5 |
+| Timing (`robust`, `concise`, `@0`, ...) | timing (TIMING-1) | 5 |
+| Salt, ditaa, math, LaTeX, wire, board, creole, def | not drawn: an error naming the kind | - |
 
 ## PUML-3 Sequence
 

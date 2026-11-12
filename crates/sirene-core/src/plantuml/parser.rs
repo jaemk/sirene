@@ -927,10 +927,7 @@ mod tests {
         );
         // Without `@startuml`, the whole source is the diagram.
         assert!(tree("A -> B\n").1.is_empty());
-        assert_eq!(
-            tree("robust W\n").1,
-            ["PlantUML timing diagrams are not supported yet"]
-        );
+        assert!(tree("robust W\n").1.is_empty());
         assert_eq!(
             tree("@startuml\nA -> B\n").1,
             ["missing `@enduml`; the diagram runs to the end of the file"]

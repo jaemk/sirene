@@ -65,6 +65,45 @@ pub(crate) fn keyword<'a>(s: &'a str, kw: &str) -> Option<&'a str> {
         .then(|| s[w.len()..].trim_start())
 }
 
+/// `s` split around its first standalone word `kw` (in any case, outside quotes, not at the
+/// start): the text before it and the text after it, trimmed.
+pub(crate) fn keyword_split<'a>(s: &'a str, kw: &str) -> Option<(&'a str, &'a str)> {
+    let lower = s.to_ascii_lowercase();
+    let b = lower.as_bytes();
+    let mut quoted = false;
+    for (at, c) in lower.char_indices() {
+        if c == '"' {
+            quoted = !quoted;
+        }
+        let end = at + kw.len();
+        if !quoted
+            && at > 0
+            && b[at - 1].is_ascii_whitespace()
+            && lower[at..].starts_with(kw)
+            && (end == b.len() || b[end].is_ascii_whitespace())
+        {
+            return Some((s[..at].trim(), s[end..].trim()));
+        }
+    }
+    None
+}
+
+/// `s` split at a caption's `:` (one not followed by a letter, digit, or `_`, so `:name`
+/// anchors and `1:15` times stay): the text before it, and the caption.
+pub(crate) fn caption(s: &str) -> (&str, Option<String>) {
+    let b = s.as_bytes();
+    for (i, c) in s.char_indices() {
+        if c == ':'
+            && !b
+                .get(i + 1)
+                .is_some_and(|n| n.is_ascii_alphanumeric() || *n == b'_')
+        {
+            return (s[..i].trim(), Some(text(s[i + 1..].trim())));
+        }
+    }
+    (s.trim(), None)
+}
+
 /// The statement lines of a line-read document.
 pub(crate) fn read(root: &SyntaxNode) -> Vec<Line> {
     root.descendants()
@@ -503,6 +542,17 @@ mod tests {
         assert_eq!(keyword("iffy", "if"), None);
         assert_eq!(unquote("\"x y\""), "x y");
         assert_eq!(text("a\\nb"), "a\nb");
+        assert_eq!(keyword_split("W is Idle", "is"), Some(("W", "Idle")));
+        assert_eq!(
+            keyword_split("\"a is\" IS b", "is"),
+            Some(("\"a is\"", "b"))
+        );
+        assert_eq!(keyword_split("island", "is"), None);
+        assert_eq!(
+            caption("A@:s+5 -> B : hi"),
+            ("A@:s+5 -> B", Some("hi".into()))
+        );
+        assert_eq!(caption("@1:15 to @2:00"), ("@1:15 to @2:00", None));
         let line = Line {
             text: "note left".into(),
             range: TextRange::at(10.into(), 9.into()),

@@ -25,6 +25,7 @@ use crate::scene::{self, Scene, TextMetrics, Theme};
 use crate::sequence::{self, Sequence};
 use crate::theme::ThemeConfig;
 use crate::timeline::{self, Timeline};
+use crate::timing::Timing;
 use crate::treemap::{self, Treemap};
 use crate::treeview::{self, TreeView};
 use crate::venn::{self, Venn};
@@ -244,6 +245,7 @@ pub enum Diagram {
     Railroad(Railroad),
     Cynefin(Cynefin),
     EventModel(EventModel),
+    Timing(Timing),
 }
 
 impl Default for Diagram {
@@ -298,6 +300,7 @@ impl Diagram {
             Diagram::Railroad(r) => scene::railroad(r, metrics, theme),
             Diagram::Cynefin(c) => scene::cynefin(c, metrics, theme),
             Diagram::EventModel(c) => scene::eventmodel(c, metrics, theme),
+            Diagram::Timing(t) => scene::timing(t, metrics, theme),
         }
     }
 
@@ -330,6 +333,7 @@ impl Diagram {
             Diagram::Railroad(r) => ascii::railroad(r, options),
             Diagram::Cynefin(c) => ascii::cynefin(c, options),
             Diagram::EventModel(c) => ascii::eventmodel(c, options),
+            Diagram::Timing(t) => ascii::timing(t, options),
         }
     }
 }
