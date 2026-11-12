@@ -76,6 +76,24 @@ pub(crate) fn read(root: &SyntaxNode) -> Vec<Line> {
         .collect()
 }
 
+/// The document's statement lines that `keep` accepts, at their source offsets, with everything
+/// else (the `@start` and `@end` lines, comments, the lines not kept) blanked, so offsets and
+/// columns stay the source's. For the kinds read by another language's reader.
+pub(crate) fn body(root: &SyntaxNode, mut keep: impl FnMut(&Line) -> bool) -> String {
+    let src = root.text().to_string();
+    let mut buf: Vec<u8> = src
+        .bytes()
+        .map(|b| if b == b'\n' { b'\n' } else { b' ' })
+        .collect();
+    for line in read(root) {
+        if keep(&line) {
+            let start = usize::from(line.range.start());
+            buf[start..start + line.text.len()].copy_from_slice(line.text.as_bytes());
+        }
+    }
+    String::from_utf8(buf).expect("statements are whole characters")
+}
+
 /// A PlantUML color (`#red`, `#LightBlue`, `#ff8800`, `red`) as `#rrggbb`; a gradient such as
 /// `#red/blue` or `#red|blue` gives its first color.
 pub(crate) fn color(s: &str) -> Option<String> {

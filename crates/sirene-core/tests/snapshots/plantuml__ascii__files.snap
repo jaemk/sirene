@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startfiles\n' The repository's layout.\n/sirene/Cargo.toml\n/sirene/crates/sirene-core/src/lib.rs\n<note>\nthe parsers and renderers\n</note>\n/sirene/crates/sirene/src/main.rs\n/sirene/examples/\n@endfiles\n"
+---
+/
+`-- sirene/
+    |-- Cargo.toml
+    |-- crates/
+    |   |-- sirene-core/
+    |   |   `-- src/
+    |   |       `-- lib.rs   the parsers and renderers
+    |   `-- sirene/
+    |       `-- src/
+    |           `-- main.rs
+    `-- examples/

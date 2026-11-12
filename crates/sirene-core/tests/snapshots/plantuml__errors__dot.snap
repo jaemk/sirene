@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startdot\ndigraph {\n  bgcolor=red;\n  a -> ;\n  b;\n}\n@enddot\n"
+---
+3:3: warning: `bgcolor` is not drawn in a PlantUML document
+4:8: error: expected a node or subgraph after the edge operator
+
+╭───╮   ╭───╮
+( a )   ( b )
+╰───╯   ╰───╯

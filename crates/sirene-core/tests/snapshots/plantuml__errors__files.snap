@@ -1,0 +1,11 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startfiles\n<note>\ntoo early\n</note>\n/a/b.txt\nnot a path\n<note>\nnever closed\n@endfiles\n"
+---
+2:1: error: a note follows the path it describes
+6:1: error: expected a path such as `/docs/readme.md`
+7:1: error: `<note>` has no `</note>`
+
+/
+└── a/
+    └── b.txt  never closed

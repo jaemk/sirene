@@ -1,0 +1,4 @@
+@startebnf
+ok = "x";
+bad = ( "y" ;
+@endebnf

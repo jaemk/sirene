@@ -56,6 +56,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - PlantUML JSON and YAML (`@startjson`, `@startyaml`), drawn left to right as a table per object
   or array with lines to nested tables.
 - Compartment nodes with an empty label have no title area.
+- PlantUML `@startdot` (a Graphviz graph), `@startebnf` (drawn as a railroad diagram), and
+  `@startfiles` (paths drawn as a tree view, with `<note>` descriptions).
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

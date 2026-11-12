@@ -1,0 +1,10 @@
+@startfiles
+' The repository's layout.
+/sirene/Cargo.toml
+/sirene/crates/sirene-core/src/lib.rs
+<note>
+the parsers and renderers
+</note>
+/sirene/crates/sirene/src/main.rs
+/sirene/examples/
+@endfiles

@@ -1,0 +1,9 @@
+@startfiles
+<note>
+too early
+</note>
+/a/b.txt
+not a path
+<note>
+never closed
+@endfiles

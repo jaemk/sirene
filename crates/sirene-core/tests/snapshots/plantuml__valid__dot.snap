@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startdot\ndigraph build {\n  rankdir=LR;\n  node [shape=box];\n  \"source\" -> compile -> link;\n  compile -> test [label=\"unit\"];\n}\n@enddot\n"
+---
+
+              ┌─────────┐          ┌──────┐
+┌────────┐    │ compile ├─────────►│ link │
+│ source ├───►│         ├─┐        └──────┘
+└────────┘    └─────────┘ │
+                          └─unit─┐ ┌──────┐
+                                 └►│ test │
+                                   └──────┘

@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startebnf\nok = \"x\";\nbad = ( \"y\" ;\n@endebnf\n"
+---
+3:13: error: expected `)`
+
+       ╭───╮
+ok = ●─┤ x ├─●
+       ╰───╯
+
+        ╭───╮
+bad = ●─┤ y ├─●
+        ╰───╯
