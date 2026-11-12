@@ -2,6 +2,10 @@
 
 const ROUNDS: usize = 4;
 
+/// How hard a floating element pulls toward the center, against the elements with edges in
+/// its layer: next to nothing, so a cluster title gives way to the border ports beside it.
+const FLOATING: f64 = 1e-3;
+
 /// Cross-axis extent of an element around its anchor.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Span {
@@ -89,7 +93,8 @@ pub(super) fn position(
     let mut anchors = vec![0; n];
     for layer in layers {
         for (i, &e) in layer.iter().enumerate() {
-            let mut a = p.x[e].round() as i32;
+            // Half up, so positions an integer apart round the same way on either side of 0.
+            let mut a = (p.x[e] + 0.5).floor() as i32;
             if i > 0 {
                 let prev = layer[i - 1];
                 a = a.max(anchors[prev] + p.sep(prev, e));
@@ -163,7 +168,7 @@ impl Placer<'_> {
                 }
             }
             let (d, w) = if self.spans[e].floating {
-                (center, 1.0)
+                (center, FLOATING)
             } else if values.is_empty() {
                 (self.x[e], 0.01)
             } else {

@@ -6,11 +6,10 @@ expression: "usecase-beta\nactor Reviewer(\"`*Reviewer*`\")\nLiteral(\"**Literal
                                      (      Formatted label       )
                                  +-->( with a physical line break )
                                  |   '----------------------------'
-                                 |
-             +-----opens form----+       .---------------------.
-+----------+ |                   +------>( **Literal markers** )
-|          +-++------------------+       '---------------------'
-| Reviewer +--+
+             +-----opens form----+
++----------+ |                           .---------------------.
+|          +-++------------------------->( **Literal markers** )
+| Reviewer +--+                          '---------------------'
 |          +--+
 |          +-++------------------+       .--------------------.
 +----------+ |                   +------>( Show "quoted" text )

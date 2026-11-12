@@ -5,8 +5,8 @@ expression: "usecase-beta\ndirection LR\naccTitle: Online ordering use cases\nac
                                       +- Ordering System -------------------------------------------------------+
                                       |              .----------.                                               |
                                       |              (  «Core»  )                          .-----------------.  |
-                                  +---+------------->( Checkout +...............«include».>( Process payment )  |
-                +--places order---+   |              '----------'                          '-----------------'  |
+                                    +-+------------->( Checkout +...............«include».>( Process payment )  |
+                +--places order-----+ |              '----------'                          '-----------------'  |
              +--+                     |                    :                                                    |
 +----------+ |                        |                    :                                                    |
 | Customer +-+                        |  +-----------------------------------.                                  |

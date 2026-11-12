@@ -11,10 +11,10 @@ expression: "flowchart TD\n    A@{ shape: manual-file, label: \"File {Handling}\
        | B |
        ++-++
         | |
-      +-+ +-+
-      |     |
-      |     |
-     ++     ++
+       ++ +-+
+       |    |
+       |    |
+     +-+    ++
      v       v
    /---\   +---+
    < x >   | D |

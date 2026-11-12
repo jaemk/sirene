@@ -178,6 +178,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   size; a 2,000-node chain took several seconds.
 - Long state diagrams, mindmaps, pie charts, and sankey diagrams read and draw in time near
   linear in their size; 10,000 sankey flows took tens of seconds.
+- A chain of subgraphs draws straight down; each subgraph sat a little right of the one before,
+  so a long chain drew a very wide, slow image.
 
 ## [0.2.0] - 2026-11-08
 
