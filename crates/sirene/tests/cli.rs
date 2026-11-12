@@ -501,7 +501,7 @@ fn directories() {
         .assert()
         .failure()
         .stderr(format!(
-            "error: no .mmd, .mermaid, .dot, or .gv files in {}\n",
+            "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, or .iuml files in {}\n",
             empty.display()
         ));
     sirene()
@@ -746,7 +746,7 @@ fn check() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "error: no .mmd, .mermaid, .dot, or .gv files in",
+            "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, or .iuml files in",
         ));
     // Stdin.
     sirene()
@@ -1030,6 +1030,45 @@ fn forced_languages() {
         std::fs::read_to_string(&svg).unwrap(),
         std::fs::read_to_string(&detected).unwrap()
     );
+}
+
+/// PlantUML sequence diagrams are found by extension, `@startuml`, Markdown block name, and
+/// `--lang plantuml` (PSEQ-7).
+#[test]
+fn plantuml_sequences() {
+    let src = "@startuml\nAlice -> Bob : hello\n@enduml\n";
+    sirene()
+        .args(["ascii", "-"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("hello"))
+        .stdout(predicate::str::contains("Alice"));
+    // Without `@startuml`, `--lang` reads the whole source as the diagram.
+    sirene()
+        .args(["--lang", "plantuml", "check", "-"])
+        .write_stdin("Alice -> Bob : hello\n")
+        .assert()
+        .success()
+        .stderr("");
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(tmp.path().join("a.puml"), src).unwrap();
+    std::fs::write(tmp.path().join("b.pu"), "@startuml\nclass A\n@enduml\n").unwrap();
+    sirene()
+        .arg("check")
+        .arg(tmp.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "b.pu:2:1: error: PlantUML class diagrams are not supported yet",
+        ));
+    let md = tmp.path().join("doc.md");
+    std::fs::write(
+        &md,
+        format!("# Doc\n\n```plantuml\n{src}```\n\n```puml\nA -> B\n```\n"),
+    )
+    .unwrap();
+    sirene().arg("check").arg(&md).assert().success().stderr("");
 }
 
 /// An agentflow diagram draws in text (MAGF-1).

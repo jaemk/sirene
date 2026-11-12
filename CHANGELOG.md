@@ -23,9 +23,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of the node side.
 - DOT record ports (`a:p`, `<p>` fields) join the field's line in `rankdir=LR` and `RL` graphs.
 - DOT HTML table node labels draw as compartments, with `<HR/>` sections and `PORT` cells.
-- `--lang mermaid|dot` reads every diagram as that language. Without it, a file's extension
-  (`.dot`, `.gv`, `.mmd`, `.mermaid`) or a Markdown block's name picks the language in the CLI
-  and the editor, and other sources are detected from their first line.
+- `--lang mermaid|dot|plantuml` reads every diagram as that language. Without it, a file's
+  extension (`.dot`, `.gv`, `.mmd`, `.mermaid`, `.puml`, `.plantuml`, `.pu`, `.iuml`) or a
+  Markdown block's name picks the language in the CLI and the editor, and other sources are
+  detected from their first line.
+- PlantUML sequence diagrams (`@startuml`), drawn by the sequence layout and read-only in the
+  editor: participant kinds, aliases, `order`, boxes, arrows with crosses, edges (`[->`, `->]`),
+  `++`/`--`/`**`/`!!`, `return`, `autonumber`, notes, frames, `group`, separators (`== x ==`),
+  delays (`...`), spaces (`|||`), `ref over`, and `hide footbox`. Constructs that are not drawn
+  are warnings, and other PlantUML diagram kinds are errors.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

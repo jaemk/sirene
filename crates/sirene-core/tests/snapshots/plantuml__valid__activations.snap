@@ -1,0 +1,44 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nparticipant Client\nparticipant Server\nparticipant Cache\nautonumber\nClient -> Server ++ : request\nServer -> Cache ++ : lookup\nreturn miss\nServer -> Server : compute\nactivate Server\ndeactivate Server\nreturn response\nautonumber stop\nClient -> Server : unnumbered\nautonumber resume\nClient -> Server : numbered again\ncreate Worker\nServer -> Worker : start\nServer -> Worker !! : stop\n@enduml\n"
+---
+
+┌─────────┐        ┌─────────┐   ┌───────┐
+│ Client  │        │ Server  │   │ Cache │
+└────┬────┘        └────┬────┘   └───┬───┘
+     │                  │            │
+     │    1. request    │            │
+     ├─────────────────►┃            │
+     │                  ┃            │
+     │                  ┃ 2. lookup  │
+     │                  ├───────────►┃
+     │                  ┃            ┃
+     │                  ┃  3. miss   ┃
+     │                  ┃◄┄┄┄┄┄┄┄┄┄┄┄┤
+     │                  ┃            │
+     │                  ┃ 4. compute │
+     │                  ├──┐         │
+     │                  ├◄─┘         │
+     │                  ┃            │
+     │   5. response    ┃            │
+     │◄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤            │
+     │                  │            │
+     │    unnumbered    │            │
+     ├─────────────────►│            │
+     │                  │            │
+     │6. numbered again │            │
+     ├─────────────────►│            │
+     │                  │            │
+     │                  │            │       ┌─────────┐
+     │                  │            │       │ Worker  │
+     │                  │            │       └────┬────┘
+     │                  │            │            │
+     │                  │        7. start         │
+     │                  ├────────────┼───────────►│
+     │                  │            │            │
+     │                  │         8. stop         │
+     │                  ├────────────┼───────────►×
+     │                  │            │
+┌────┴────┐        ┌────┴────┐   ┌───┴───┐
+│ Client  │        │ Server  │   │ Cache │
+└─────────┘        └─────────┘   └───────┘

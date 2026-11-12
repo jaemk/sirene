@@ -1,0 +1,22 @@
+@startuml
+hide footbox
+box "Front" #LightBlue
+participant A
+participant B
+end box
+participant C
+A -> B : hello
+note left : about hello
+note right of C : beside C
+note over A, B : over both
+hnote over C : hexagon
+note across : everyone
+rnote over B
+  several
+  lines
+end note
+/' a block
+comment '/
+[-> A : from outside
+C ->] : to outside
+@enduml

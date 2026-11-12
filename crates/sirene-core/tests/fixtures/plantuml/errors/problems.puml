@@ -1,0 +1,20 @@
+@startuml
+!include common.puml
+skinparam monochrome true
+participant A #red
+participant B <<service>>
+A -[#blue]> B : styled
+A ->o B : circle
+return nothing
+else stray
+end
+deactivate A
+autonumber "<b>[000]"
+newpage
+hide unlinked
+alt open
+A -> B
+hello there
+@enduml
+@startuml
+@enduml

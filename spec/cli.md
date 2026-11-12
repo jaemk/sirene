@@ -82,8 +82,8 @@ fail the run without stopping the others. When two diagrams would write the same
 (`a.mmd` beside `a.mermaid`), the first in path order is rendered and each later one is
 skipped with `error: skipping LATER; FIRST also writes OUTPUT`, which fails the run (in a watch,
 the line is printed again only when the set of skipped files changes). These are errors that
-render nothing: a DIR with no diagrams (`error: no .mmd, .mermaid, .dot, or .gv files in DIR`),
-a DIR that
+render nothing: a DIR with no diagrams (`error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml,
+.pu, or .iuml files in DIR`), a DIR that
 cannot be listed (`error: cannot read DIR: REASON`), an OUTDIR that exists and is not a directory
 (`error: OUTDIR is not a directory; a DIR renders into one`), and a directory given to
 `sirene ascii` (`error: DIR is a directory; ascii reads one file`). Tests: `directories`,
@@ -103,8 +103,8 @@ diagnostics and read or write errors; none of these stop the watch. Watching std
 
 `sirene check FILE...` (at least one) reads each FILE, draws nothing, writes nothing to stdout,
 and prints diagnostics as in CLI-3. A FILE may be a diagram, `-` for stdin, a directory (each
-diagram file under it, as in CLI-9; none is `error: no .mmd, .mermaid, .dot, or .gv files in
-DIR`), or a Markdown file (`.md` or `.markdown`), whose diagram blocks (MARKDO-1) are checked with
+diagram file under it, as in CLI-9; none is `error: no .mmd, .mermaid, .dot, .gv, .puml,
+.plantuml, .pu, or .iuml files in DIR`), or a Markdown file (`.md` or `.markdown`), whose diagram blocks (MARKDO-1) are checked with
 positions in the Markdown file. Every FILE is checked. The exit status is 1 when any FILE cannot be read or has an error, else 0. A mistyped
 `check` is suggested as in CLI-1. Tests: `check` in `crates/sirene/tests/cli.rs`.
 

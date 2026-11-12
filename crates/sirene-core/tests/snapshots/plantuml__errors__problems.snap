@@ -1,0 +1,39 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\n!include common.puml\nskinparam monochrome true\nparticipant A #red\nparticipant B <<service>>\nA -[#blue]> B : styled\nA ->o B : circle\nreturn nothing\nelse stray\nend\ndeactivate A\nautonumber \"<b>[000]\"\nnewpage\nhide unlinked\nalt open\nA -> B\nhello there\n@enduml\n@startuml\n@enduml\n"
+---
+2:1: error: `!include` reads other files and is not supported
+3:1: warning: `skinparam` is not drawn yet; ignoring it
+4:15: warning: participant colors are not drawn; ignoring `#red`
+5:15: warning: stereotypes are not drawn; ignoring `<<service>>`
+6:3: warning: arrow styles are not drawn; drawing a plain arrow
+7:3: warning: `o` arrow ends are drawn as filled heads
+8:1: error: `return` needs a participant activated by a message
+9:1: error: `else` belongs in a frame such as `alt`
+10:1: error: `end` without a frame to close
+11:1: error: `A` is not active
+12:1: warning: `autonumber` formats are not drawn; numbering plainly
+13:1: warning: `newpage` is not drawn yet; ignoring it
+14:1: warning: `hide unlinked` is not supported; ignoring it
+15:1: error: unclosed `alt`: expected `end`
+17:1: error: expected a message such as `A -> B : text`, or a statement such as `participant`, `note`, or `alt`
+19:1: warning: only the first diagram in a file is drawn
+
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+  │styled │
+  ├──────►│
+  │       │
+  │circle │
+  ├──────►│
+  │       │
+┌─alt [open]──┐
+│ │  1.   │   │
+│ ├──────►│   │
+│ │       │   │
+└─┼───────┼───┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

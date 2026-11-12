@@ -250,6 +250,11 @@ mod tests {
             opening("~~~ graphviz {.x}"),
             Some((0, '~', 3, Some(Lang::Dot)))
         );
+        assert_eq!(
+            opening("```plantuml"),
+            Some((0, '`', 3, Some(Lang::PlantUml)))
+        );
+        assert_eq!(opening("```puml"), Some((0, '`', 3, Some(Lang::PlantUml))));
         assert_eq!(opening("```dotnet"), Some((0, '`', 3, None)));
         assert_eq!(opening("   ~~~ js"), Some((3, '~', 3, None)));
         assert_eq!(opening("    ```mermaid"), None);

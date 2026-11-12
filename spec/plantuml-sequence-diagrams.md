@@ -12,7 +12,8 @@ fixture corpus in `crates/sirene-core/tests/fixtures/plantuml/` with
 
 The diagram is the first `@startuml` ... `@enduml` document (PUML-1); text before it is
 ignored, a missing `@enduml` is a warning and the document runs to the end, and a second
-document is a warning ("only the first diagram in a file is drawn"). `@startuml` may name the
+document is a warning ("only the first diagram in a file is drawn"). A source with no `@start`
+line (a Markdown block, or `--lang plantuml`) is the diagram's statements without them. `@startuml` may name the
 diagram (`@startuml name`), which is ignored. Other `@start...` kinds are an error naming the
 kind. Comments are a line starting with `'` and `/' ... '/`, which may span lines. Blank lines
 are ignored. Keywords match in any case; participant names match exactly.

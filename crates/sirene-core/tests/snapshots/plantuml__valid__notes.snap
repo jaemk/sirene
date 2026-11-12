@@ -1,0 +1,47 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nhide footbox\nbox \"Front\" #LightBlue\nparticipant A\nparticipant B\nend box\nparticipant C\nA -> B : hello\nnote left : about hello\nnote right of C : beside C\nnote over A, B : over both\nhnote over C : hexagon\nnote across : everyone\nrnote over B\n  several\n  lines\nend note\n/' a block\ncomment '/\n[-> A : from outside\nC ->] : to outside\n@enduml\n"
+---
+
+              ┌┄┄┄┄ Front ┄┄┄┄┐
+              ┆               ┆
+              ┆ ┌───┐   ┌───┐ ┆   ┌───┐
+              ┆ │ A │   │ B │ ┆   │ C │
+              ┆ └─┬─┘   └─┬─┘ ┆   └─┬─┘
+              ┆   │       │   ┆     │
+              ┆   │ hello │   ┆     │
+              ┆   ├──────►│   ┆     │
+              ┆   │       │   ┆     │
+  ┌─────────────┐ │       │   ┆     │
+  │ about hello │ │       │   ┆     │
+  └─────────────┘ │       │   ┆     │
+              ┆   │       │   ┆     │
+              ┆   │       │   ┆     │ ┌──────────┐
+              ┆   │       │   ┆     │ │ beside C │
+              ┆   │       │   ┆     │ └──────────┘
+              ┆   │       │   ┆     │
+              ┆ ┌───────────┐ ┆     │
+              ┆ │ over both │ ┆     │
+              ┆ └───────────┘ ┆     │
+              ┆   │       │   ┆     │
+              ┆   │       │   ┆┌─────────┐
+              ┆   │       │   ┆│ hexagon │
+              ┆   │       │   ┆└─────────┘
+              ┆   │       │   ┆     │
+              ┆ ┌─────────────────────┐
+              ┆ │      everyone       │
+              ┆ └─────────────────────┘
+              ┆   │       │   ┆     │
+              ┆   │  ┌─────────┐    │
+              ┆   │  │ several │    │
+              ┆   │  │  lines  │    │
+              ┆   │  └─────────┘    │
+              ┆   │       │   ┆     │
+   from outside   │       │   ┆     │
+──────────────┼──►│       │   ┆     │
+              ┆   │       │   ┆     │
+              ┆   │       │   ┆     │  to outside
+              ┆   │       │   ┆     ├─────────────►
+              ┆   │       │   ┆     │
+              ┆   │       │   ┆     │
+              └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘

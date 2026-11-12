@@ -1,0 +1,26 @@
+@startuml
+participant A
+participant B
+participant C
+A -> B : start
+alt success
+  B -> C : forward
+else failure
+  B --> A : error
+end
+loop 3 times
+  group retry [with backoff]
+    A -> B : again
+  end
+end
+== Phase two ==
+...
+... 5 minutes later ...
+|||
+||40||
+ref over A, B : handshake
+ref over C
+  cleanup
+  and close
+end ref
+@enduml
