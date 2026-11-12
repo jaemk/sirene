@@ -373,6 +373,22 @@ pub struct Flowchart {
     pub agentflow: bool,
     /// Ids of nodes that share a rank, one list per group (DOT's `rank=same`).
     pub same_rank: Vec<Vec<String>>,
+    /// Ids of nodes that share the first or last rank, one list per group (DOT's `rank=min`,
+    /// `max`, `source`, and `sink`).
+    pub end_ranks: Vec<(RankEnd, Vec<String>)>,
+}
+
+/// Where a group of nodes is ranked (LAYOUT-4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RankEnd {
+    /// In the first rank, which other nodes may share.
+    Min,
+    /// In a rank of its own above every other node.
+    Source,
+    /// In the last rank, which other nodes may share.
+    Max,
+    /// In a rank of its own below every other node.
+    Sink,
 }
 
 impl Flowchart {

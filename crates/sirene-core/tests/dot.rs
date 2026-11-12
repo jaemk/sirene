@@ -7,7 +7,7 @@ use std::path::Path;
 
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::diagram::{self, Kind, Lowered};
-use sirene_core::flowchart::{Arrow, Direction, Flowchart, Shape, Stroke};
+use sirene_core::flowchart::{Arrow, Direction, Flowchart, RankEnd, Shape, Stroke};
 use sirene_core::scene::{Approx, Color, Theme};
 use sirene_core::{Severity, dot};
 
@@ -400,10 +400,7 @@ fn rank_warnings() {
         messages("digraph { rank=same; a }"),
         ["`rank` applies to subgraphs; ignored on the graph"]
     );
-    assert_eq!(
-        messages("digraph { { rank=min; a; b } }"),
-        ["`rank=min` puts the nodes in one rank, not yet the first or last"]
-    );
+    assert!(messages("digraph { { rank=min; a; b } }").is_empty());
     assert_eq!(
         messages("digraph { { rank=up; a; b } }"),
         ["unknown `rank` `up`: expected same, min, max, source, or sink"]
@@ -422,6 +419,41 @@ fn rank_warnings() {
         messages("digraph { subgraph cluster_p { a } { rank=same; a; b; c } }"),
         ["`rank=same` nodes in different clusters do not share a rank"]
     );
+    assert_eq!(
+        messages("digraph { subgraph cluster_p { a } { rank=sink; a; b } }"),
+        ["`rank=sink` nodes in different clusters do not share a rank"]
+    );
+}
+
+/// DOT-2: `rank=min` and `max` put a subgraph's nodes in the first or last rank, and `source`
+/// and `sink` in a rank of their own above or below every other node.
+#[test]
+fn end_ranks() {
+    let c = chart("digraph { a -> b; { rank=min; c } { rank=SINK; d; e } }");
+    assert_eq!(c.end_ranks.len(), 2);
+    assert_eq!(c.end_ranks[0], (RankEnd::Min, vec!["c".to_owned()]));
+    assert_eq!(
+        c.end_ranks[1],
+        (RankEnd::Sink, vec!["d".into(), "e".into()])
+    );
+    let draw = |src: &str| ascii::render(&chart(src), &Options::default());
+    let row = |out: &str, node: &str| {
+        let i = out.find(&format!("( {node} )")).unwrap();
+        out[..i].matches('\n').count()
+    };
+    // b joins a's rank as the first; the edge into it runs up from c.
+    let out = draw("digraph { a -> b -> c; { rank=min; c } }");
+    assert_eq!(row(&out, "a"), row(&out, "c"), "{out}");
+    assert!(row(&out, "b") > row(&out, "c"), "{out}");
+    // A source is alone above, a sink alone below.
+    let out = draw("digraph { a -> b; x; { rank=source; b } }");
+    assert!(row(&out, "b") < row(&out, "a"), "{out}");
+    assert!(row(&out, "b") < row(&out, "x"), "{out}");
+    let out = draw("digraph { a -> b; x -> y -> z; { rank=max; b } }");
+    assert_eq!(row(&out, "b"), row(&out, "z"), "{out}");
+    let out = draw("digraph { a -> b; x -> y -> z; { rank=sink; a } }");
+    assert!(row(&out, "a") > row(&out, "z"), "{out}");
+    assert!(row(&out, "b") < row(&out, "a"), "{out}");
 }
 
 /// LAYOUT-4: a flat edge between nodes that are not neighbors runs below the rank, and a

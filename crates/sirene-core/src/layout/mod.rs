@@ -7,7 +7,7 @@ mod route;
 
 use std::collections::{HashMap, HashSet};
 
-use crate::flowchart::Direction;
+use crate::flowchart::{Direction, RankEnd};
 use position::{Link, Span};
 use rank::RankEdge;
 use route::Jog;
@@ -133,6 +133,9 @@ pub struct Graph {
     /// Groups of nodes that share a rank (LAYOUT-4). Only the nodes directly in one container
     /// are grouped: a group's nodes in different containers form a group per container.
     pub same_rank: Vec<Vec<usize>>,
+    /// Groups of nodes ranked first or last (LAYOUT-4), per container as `same_rank` groups
+    /// are.
+    pub end_ranks: Vec<(RankEnd, Vec<usize>)>,
 }
 
 /// Spacing for one orientation, in canonical terms: the cross axis runs along a rank and the
@@ -508,19 +511,21 @@ impl<'a> Builder<'a> {
                 })
                 .collect();
             // Each group's nodes directly in this scope.
-            let same: Vec<Vec<usize>> = self
+            let local = |group: &[usize]| -> Vec<usize> {
+                group
+                    .iter()
+                    .filter(|&&n| n < nodes)
+                    .filter_map(|&n| index.get(&Item::Node(n)).copied())
+                    .collect()
+            };
+            let same: Vec<Vec<usize>> = self.graph.same_rank.iter().map(|g| local(g)).collect();
+            let ends: Vec<(RankEnd, Vec<usize>)> = self
                 .graph
-                .same_rank
+                .end_ranks
                 .iter()
-                .map(|group| {
-                    group
-                        .iter()
-                        .filter(|&&n| n < nodes)
-                        .filter_map(|&n| index.get(&Item::Node(n)).copied())
-                        .collect()
-                })
+                .map(|(end, g)| (*end, local(g)))
                 .collect();
-            let ranks = rank::rank(scope.items.len(), &edges, &same);
+            let ranks = rank::rank(scope.items.len(), &edges, &same, &ends);
             for &(e, from, to) in &scope.edges {
                 let (a, b) = (ranks[index[&from]], ranks[index[&to]]);
                 self.reversed[e] = b < a;

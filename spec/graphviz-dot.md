@@ -41,9 +41,11 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
 - `strict` merges repeated edges (either direction in a `graph`), combining their attributes.
 - A subgraph's `rank=same`, set anywhere in it, puts every node mentioned in it, edges and nested
   subgraphs included, in one rank (LAYOUT-4). As in Graphviz, nodes in different clusters do
-  not share a rank, which is a warning. `min`, `max`, `source`, and `sink` group the nodes the
-  same way, with a warning that they are not yet put first or last; another value is a warning.
-  `rank` on the root graph is a warning.
+  not share a rank, which is a warning. `min` and `max` put the nodes in the first or last rank
+  of their container, which other nodes may share, and `source` and `sink` in a rank of their
+  own above or below every other node; all the subgraphs of one value share that rank, and an
+  edge into a `min` or `source` node, or out of a `max` or `sink` node, runs up. Another value
+  is a warning. `rank` on the root graph is a warning.
 - An edge with `constraint=false` does not rank its ends; it runs up or along a rank when the
   other edges put its ends that way. `minlen=0` lets an edge's ends share a rank.
 
@@ -86,8 +88,7 @@ word.
 
 ## DOT-4 Not drawn yet
 
-These are parsed and warned about, then ignored: the first and last ranks of `rank=min`,
-`max`, `source`, and `sink` (DOT-2), ports (`a:p:n`; the edge joins the node), HTML labels
+These are parsed and warned about, then ignored: ports (`a:p:n`; the edge joins the node), HTML labels
 (drawn as their text), `group`, `compound` with `lhead` and `ltail`, `ordering`, and images.
 
 ## DOT-5 Choosing the language

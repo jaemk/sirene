@@ -2,6 +2,8 @@
 
 use std::collections::VecDeque;
 
+use crate::flowchart::RankEnd;
+
 /// An edge `from -> to` that must span at least `len` ranks.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RankEdge {
@@ -10,32 +12,81 @@ pub(super) struct RankEdge {
     pub len: i32,
 }
 
-/// Ranks `n` items, the items of each group in `same` sharing a rank. Returns each item's rank
+/// The order of ranked places: sources, then mins, other items, maxes, and sinks.
+const ENDS: [(RankEnd, u8); 4] = [
+    (RankEnd::Source, 0),
+    (RankEnd::Min, 1),
+    (RankEnd::Max, 3),
+    (RankEnd::Sink, 4),
+];
+const MIDDLE: u8 = 2;
+
+/// Ranks `n` items, the items of each group in `same` sharing a rank. The items of `ends` groups
+/// share a rank per kind: the `Min` items the first rank and the `Max` items the last, and the
+/// `Source` items a rank above every other item and the `Sink` items one below. An item in
+/// groups of two kinds takes the first of source, min, max, and sink. Returns each item's rank
 /// (the smallest is 0). An edge's ends may end up in either order, or in one rank when the edge
 /// is within a group or its length is 0.
-pub(super) fn rank(n: usize, edges: &[RankEdge], same: &[Vec<usize>]) -> Vec<i32> {
+pub(super) fn rank(
+    n: usize,
+    edges: &[RankEdge],
+    same: &[Vec<usize>],
+    ends: &[(RankEnd, Vec<usize>)],
+) -> Vec<i32> {
     // Each group is ranked as its first item.
     let mut rep: Vec<usize> = (0..n).collect();
-    for group in same {
-        let Some(&first) = group.first() else {
-            continue;
+    let join = |rep: &mut Vec<usize>, group: &mut dyn Iterator<Item = usize>| {
+        let Some(first) = group.next() else {
+            return;
         };
-        let root = find(&mut rep, first);
-        for &i in group {
-            let r = find(&mut rep, i);
+        let root = find(rep, first);
+        for i in group {
+            let r = find(rep, i);
             rep[r] = root;
         }
+    };
+    for group in same {
+        join(&mut rep, &mut group.iter().copied());
+    }
+    let of_end = |end: RankEnd| {
+        ends.iter()
+            .filter(move |(e, _)| *e == end)
+            .flat_map(|(_, g)| g.iter().copied())
+    };
+    for (end, _) in ENDS {
+        join(&mut rep, &mut of_end(end));
     }
     for i in 0..n {
         rep[i] = find(&mut rep, i);
     }
+    // Each group's place, and the group at each end.
+    let mut place = vec![MIDDLE; n];
+    let mut at_end = [None; 5];
+    for (end, p) in ENDS {
+        for i in of_end(end) {
+            let r = rep[i];
+            if place[r] == MIDDLE {
+                place[r] = p;
+                at_end[usize::from(p)] = Some(r);
+            }
+        }
+    }
+    // An edge runs from the earlier place to the later one, whichever way it points.
     let edges: Vec<RankEdge> = edges
         .iter()
         .filter(|e| rep[e.from] != rep[e.to])
-        .map(|e| RankEdge {
-            from: rep[e.from],
-            to: rep[e.to],
-            len: e.len,
+        .map(|e| {
+            let (from, to) = (rep[e.from], rep[e.to]);
+            let (from, to) = if place[from] > place[to] {
+                (to, from)
+            } else {
+                (from, to)
+            };
+            RankEdge {
+                from,
+                to,
+                len: e.len,
+            }
         })
         .collect();
     let reversed = break_cycles(n, &edges);
@@ -56,6 +107,7 @@ pub(super) fn rank(n: usize, edges: &[RankEdge], same: &[Vec<usize>]) -> Vec<i32
         .collect();
     let mut ranks = longest_path(n, &dag);
     tighten(&mut ranks, &dag);
+    place_ends(&mut ranks, &dag, &rep, &place, at_end);
     let mut ranks: Vec<i32> = (0..n).map(|i| ranks[rep[i]]).collect();
     if let Some(&min) = ranks.iter().min() {
         for r in &mut ranks {
@@ -63,6 +115,52 @@ pub(super) fn rank(n: usize, edges: &[RankEdge], same: &[Vec<usize>]) -> Vec<i32
         }
     }
     ranks
+}
+
+/// Moves the min group up to the highest other rank and the max group down to the lowest, then
+/// the source group above all and the sink group below all. Edges at an end group only leave a
+/// source or min and only enter a max or sink, so these moves only lengthen them, except the
+/// edges from a source and to a sink, which the last moves keep long enough.
+fn place_ends(
+    ranks: &mut [i32],
+    dag: &[RankEdge],
+    rep: &[usize],
+    place: &[u8],
+    at_end: [Option<usize>; 5],
+) {
+    let groups = |keep: fn(u8) -> bool| {
+        (0..rep.len())
+            .filter(move |&v| rep[v] == v && keep(place[v]))
+            .collect::<Vec<_>>()
+    };
+    if let Some(m) = at_end[1] {
+        let others = groups(|p| p != 0);
+        ranks[m] = others.iter().map(|&v| ranks[v]).min().unwrap_or(ranks[m]);
+    }
+    if let Some(x) = at_end[3] {
+        let others = groups(|p| p != 4);
+        ranks[x] = others.iter().map(|&v| ranks[v]).max().unwrap_or(ranks[x]);
+    }
+    if let Some(s) = at_end[0] {
+        let above = groups(|p| p != 0).iter().map(|&v| ranks[v] - 2).min();
+        let edges = dag
+            .iter()
+            .filter(|e| e.from == s)
+            .map(|e| ranks[e.to] - e.len);
+        if let Some(r) = above.into_iter().chain(edges).min() {
+            ranks[s] = r;
+        }
+    }
+    if let Some(k) = at_end[4] {
+        let below = groups(|p| p != 4).iter().map(|&v| ranks[v] + 2).max();
+        let edges = dag
+            .iter()
+            .filter(|e| e.to == k)
+            .map(|e| ranks[e.from] + e.len);
+        if let Some(r) = below.into_iter().chain(edges).max() {
+            ranks[k] = r;
+        }
+    }
 }
 
 /// The representative of `i`'s group, shortening the path to it.
@@ -178,6 +276,10 @@ fn tighten(ranks: &mut [i32], dag: &[RankEdge]) {
 mod tests {
     use super::*;
 
+    fn rank(n: usize, edges: &[RankEdge], same: &[Vec<usize>]) -> Vec<i32> {
+        super::rank(n, edges, same, &[])
+    }
+
     fn edges(list: &[(usize, usize)]) -> Vec<RankEdge> {
         list.iter()
             .map(|&(from, to)| RankEdge { from, to, len: 2 })
@@ -252,5 +354,47 @@ mod tests {
         let ranks = rank(3, &edges(&[(0, 1), (1, 2)]), &[vec![0, 2]]);
         assert_eq!(ranks[0], ranks[2]);
         assert_eq!((ranks[1] - ranks[0]).abs(), 2);
+    }
+
+    #[test]
+    fn ends() {
+        use RankEnd::*;
+        let chain = edges(&[(0, 1), (1, 2), (3, 4)]);
+        let end = |groups: &[(RankEnd, &[usize])]| {
+            let groups: Vec<_> = groups.iter().map(|(e, g)| (*e, g.to_vec())).collect();
+            super::rank(5, &chain, &[], &groups)
+        };
+        assert_eq!(end(&[]), [0, 2, 4, 0, 2]);
+        assert_eq!(end(&[(Min, &[3])]), [0, 2, 4, 0, 2]);
+        // 3 -> 4 out of a max item runs up.
+        assert_eq!(end(&[(Max, &[3])]), [0, 2, 4, 4, 0]);
+        // A source is above every other item, a sink below.
+        assert_eq!(end(&[(Source, &[3])]), [2, 4, 6, 0, 4]);
+        assert_eq!(end(&[(Sink, &[4])]), [0, 2, 4, 0, 6]);
+        // Min groups share one rank, as do max groups.
+        assert_eq!(end(&[(Min, &[2]), (Min, &[4])]), [0, 2, 0, 2, 0]);
+        assert_eq!(end(&[(Max, &[0]), (Max, &[3])]), [2, 0, 2, 2, 0]);
+        // 0 -> 1 into a min item runs up.
+        assert_eq!(end(&[(Min, &[1])]), [2, 0, 2, 0, 2]);
+        // A source and a sink, with a min and a max between them.
+        assert_eq!(
+            end(&[(Sink, &[3]), (Max, &[0]), (Source, &[2]), (Min, &[1])]),
+            [6, 2, 0, 8, 2]
+        );
+        // An item in two kinds of group takes the first of source, min, max, and sink.
+        assert_eq!(end(&[(Sink, &[0]), (Source, &[0])])[0], 0);
+    }
+
+    #[test]
+    fn ends_keep_minimum_lengths() {
+        let e = [RankEdge {
+            from: 0,
+            to: 1,
+            len: 6,
+        }];
+        let ranks = super::rank(3, &e, &[], &[(RankEnd::Source, vec![0])]);
+        assert_eq!(ranks, [0, 8, 2]);
+        let ranks = super::rank(3, &e, &[], &[(RankEnd::Sink, vec![1])]);
+        assert_eq!(ranks, [0, 6, 0]);
     }
 }

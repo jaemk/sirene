@@ -9,7 +9,7 @@ use super::x11::X11;
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text::decode_html_entities;
 use crate::flowchart::{
-    Arrow, Direction, Edge, Flowchart, Label, Node, Row, Shape, Stroke, Style, Subgraph,
+    Arrow, Direction, Edge, Flowchart, Label, Node, RankEnd, Row, Shape, Stroke, Style, Subgraph,
 };
 use crate::scene::{Color, parse_color};
 use crate::syntax::SyntaxKind::*;
@@ -157,8 +157,9 @@ struct Lowerer {
     edges: Vec<PendingEdge>,
     clusters: Vec<Cluster>,
     cluster_index: HashMap<String, usize>,
-    /// Nodes of each `rank=same` subgraph, and the range of its `rank`.
-    same_rank: Vec<(Vec<usize>, TextRange)>,
+    /// Nodes of each subgraph with a `rank`, its end (none for `same`), and the range of its
+    /// `rank`.
+    rank_groups: Vec<(Option<RankEnd>, Vec<usize>, TextRange)>,
     /// Names already warned about, so each is reported once per file.
     warned: HashSet<String>,
 }
@@ -824,16 +825,16 @@ impl Lowerer {
         nodes
     }
 
-    /// A subgraph's `rank`: `same` puts its nodes in one rank (DOT-2).
+    /// A subgraph's `rank`: `same` puts its nodes in one rank, and `min`, `max`, `source`, and
+    /// `sink` in the first or last (DOT-2).
     fn rank(&mut self, attr: &Attr, nodes: &[usize]) {
         let value = attr.value.text.trim().to_ascii_lowercase();
-        match value.as_str() {
-            "same" => {}
-            "min" | "max" | "source" | "sink" => self.warn_once(
-                &format!("rank={value}"),
-                attr.range,
-                format!("`rank={value}` puts the nodes in one rank, not yet the first or last"),
-            ),
+        let end = match value.as_str() {
+            "same" => None,
+            "min" => Some(RankEnd::Min),
+            "max" => Some(RankEnd::Max),
+            "source" => Some(RankEnd::Source),
+            "sink" => Some(RankEnd::Sink),
             _ => {
                 self.warn_once(
                     &format!("rank@{:?}", attr.range),
@@ -842,12 +843,12 @@ impl Lowerer {
                 );
                 return;
             }
-        }
+        };
         let mut group = nodes.to_vec();
         group.sort_unstable();
         group.dedup();
-        if group.len() > 1 {
-            self.same_rank.push((group, attr.range));
+        if group.len() > 1 || end.is_some() && !group.is_empty() {
+            self.rank_groups.push((end, group, attr.range));
         }
     }
 
@@ -904,19 +905,28 @@ impl Lowerer {
             let sub = self.lower_cluster(c, &graph, members);
             chart.subgraphs.push(sub);
         }
-        for (group, range) in std::mem::take(&mut self.same_rank) {
+        for (end, group, range) in std::mem::take(&mut self.rank_groups) {
             // Only the nodes in one cluster share a rank, as in Graphviz.
             let cluster = self.node_cluster[group[0]];
             if group.iter().any(|&i| self.node_cluster[i] != cluster) {
+                let value = match end {
+                    None => "same",
+                    Some(RankEnd::Min) => "min",
+                    Some(RankEnd::Max) => "max",
+                    Some(RankEnd::Source) => "source",
+                    Some(RankEnd::Sink) => "sink",
+                };
                 self.warn_once(
                     &format!("rank-clusters@{range:?}"),
                     range,
-                    "`rank=same` nodes in different clusters do not share a rank",
+                    format!("`rank={value}` nodes in different clusters do not share a rank"),
                 );
             }
-            chart
-                .same_rank
-                .push(group.into_iter().map(|i| self.ids[i].clone()).collect());
+            let ids = group.into_iter().map(|i| self.ids[i].clone()).collect();
+            match end {
+                None => chart.same_rank.push(ids),
+                Some(end) => chart.end_ranks.push((end, ids)),
+            }
         }
         Output {
             flowchart: chart,
