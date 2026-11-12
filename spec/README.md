@@ -70,6 +70,8 @@ can be built). Keep each row's status current with `spec.py set`.
 | PlantUML Mindmaps and WBS | done | [plantuml-mindmaps-and-wbs.md](plantuml-mindmaps-and-wbs.md) |
 | PlantUML Gantt Charts | done | [plantuml-gantt-charts.md](plantuml-gantt-charts.md) |
 | PlantUML JSON and YAML | done | [plantuml-json-and-yaml.md](plantuml-json-and-yaml.md) |
+| PlantUML Embedded Languages | done | [plantuml-embedded-languages.md](plantuml-embedded-languages.md) |
+| PlantUML File Trees | done | [plantuml-file-trees.md](plantuml-file-trees.md) |
 
 ## Conventions
 

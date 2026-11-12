@@ -1,0 +1,7 @@
+@startdot
+digraph {
+  bgcolor=red;
+  a -> ;
+  b;
+}
+@enddot

@@ -278,7 +278,7 @@ impl Parser<'_> {
         if self.kind == Kind::Sequence {
             self.statements(started);
         } else {
-            self.lines(started);
+            self.lines(started, super::raw(self.kind));
         }
     }
 
@@ -314,10 +314,15 @@ impl Parser<'_> {
         true
     }
 
-    /// One `TEXT_STMT` per line up to `@end...`, for the kinds whose lowering reads lines.
-    fn lines(&mut self, started: bool) {
+    /// One `TEXT_STMT` per line up to `@end...`, for the kinds whose lowering reads lines. In
+    /// `raw` kinds, another language (DOT, EBNF, ...), `'` starts no comment.
+    fn lines(&mut self, started: bool, raw: bool) {
         loop {
-            self.trivia();
+            if raw {
+                self.blank();
+            } else {
+                self.trivia();
+            }
             if self.at_end(started) {
                 return;
             }
@@ -367,6 +372,22 @@ impl Parser<'_> {
         }
         let n = rest.len();
         self.token(COMMENT, n);
+    }
+
+    /// Whitespace and newlines.
+    fn blank(&mut self) {
+        loop {
+            let r = self.rest();
+            let ws = scan::ws_len(r);
+            let nl = scan::newline_len(r);
+            if ws > 0 {
+                self.token(WHITESPACE, ws);
+            } else if nl > 0 {
+                self.token(NEWLINE, nl);
+            } else {
+                return;
+            }
+        }
     }
 
     /// Whitespace, newlines, `'` comments, and `/' ... '/` comments.

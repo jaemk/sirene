@@ -6,6 +6,8 @@ mod class;
 mod data;
 mod description;
 mod detect;
+mod embedded;
+mod files;
 mod gantt;
 mod lines;
 mod link;
@@ -37,7 +39,14 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Gantt
             | Kind::Json
             | Kind::Yaml
+            | Kind::Other("dot" | "ebnf" | "files")
     )
+}
+
+/// Whether `kind`'s documents are written in another language, whose lines PlantUML's `'`
+/// comments do not apply to.
+pub(crate) fn raw(kind: Kind) -> bool {
+    matches!(kind, Kind::Other("dot" | "ebnf"))
 }
 
 /// The result of parsing PlantUML source: a lossless syntax tree plus diagnostics.
@@ -99,6 +108,18 @@ impl Parse {
             Kind::Yaml => {
                 let (chart, d) = data::lower_yaml(&root);
                 (Diagram::Graph(chart), d)
+            }
+            Kind::Other("dot") => {
+                let (chart, d) = embedded::lower_dot(&root);
+                (Diagram::Graph(chart), d)
+            }
+            Kind::Other("ebnf") => {
+                let (chart, d) = embedded::lower_ebnf(&root);
+                (Diagram::Railroad(chart), d)
+            }
+            Kind::Other("files") => {
+                let (view, d) = files::lower(&root);
+                (Diagram::TreeView(view), d)
             }
             Kind::Wbs => {
                 let (chart, d) = mindmap::lower_wbs(&root);

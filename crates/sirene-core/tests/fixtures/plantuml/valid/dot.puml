@@ -1,0 +1,8 @@
+@startdot
+digraph build {
+  rankdir=LR;
+  node [shape=box];
+  "source" -> compile -> link;
+  compile -> test [label="unit"];
+}
+@enddot

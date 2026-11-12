@@ -40,17 +40,11 @@ fn too_deep(start: usize) -> Error {
     )
 }
 
-/// The document's statements at their source offsets, with everything else (the `@start` and
-/// `@end` lines, comments) blanked, so offsets and columns stay the source's. `<style>` blocks
-/// and `#highlight` lines are blanked too, with a warning.
+/// The document's data at its source offsets (`lines::body`). `<style>` blocks and `#highlight`
+/// lines are blanked, with a warning.
 fn body(root: &SyntaxNode, d: &mut Vec<Diagnostic>) -> String {
-    let src = root.text().to_string();
-    let mut buf: Vec<u8> = src
-        .bytes()
-        .map(|b| if b == b'\n' { b'\n' } else { b' ' })
-        .collect();
     let mut style: Option<TextRange> = None;
-    for line in lines::read(root) {
+    let body = lines::body(root, |line| {
         let t = line.text.trim();
         if let Some(open) = style {
             if t.eq_ignore_ascii_case("</style>") {
@@ -60,26 +54,25 @@ fn body(root: &SyntaxNode, d: &mut Vec<Diagnostic>) -> String {
                 ));
                 style = None;
             }
-            continue;
+            return false;
         }
         if t.eq_ignore_ascii_case("<style>") {
             style = Some(line.range);
-            continue;
+            return false;
         }
         if lines::keyword(t.strip_prefix('#').unwrap_or(""), "highlight").is_some() {
             d.push(Diagnostic::warning(
                 line.range,
                 "`#highlight` is drawn without highlighting",
             ));
-            continue;
+            return false;
         }
-        let start = usize::from(line.range.start());
-        buf[start..start + line.text.len()].copy_from_slice(line.text.as_bytes());
-    }
+        true
+    });
     if let Some(open) = style {
         d.push(Diagnostic::new(open, "`<style>` has no `</style>`"));
     }
-    String::from_utf8(buf).expect("statements are whole characters")
+    body
 }
 
 // ---- JSON ----
