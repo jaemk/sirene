@@ -330,8 +330,48 @@ fn description_statement() -> impl Strategy<Value = String> {
     })
 }
 
+/// A mindmap or WBS node line under the root, at depth 2 to 5.
+fn tree_line() -> impl Strategy<Value = String> {
+    (
+        2..6usize,
+        prop::sample::select(vec!["*", "+", "-"]),
+        prop::sample::select(vec!["", "_", "[#pink]", "[#pink]_"]),
+        prop::sample::select(vec!["a", "long text", ":multi\nline;", "x <<style>>"]),
+    )
+        .prop_map(|(depth, c, decor, text)| format!("{}{decor} {text}", c.repeat(depth)))
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2000))]
+
+    #[test]
+    fn generated_trees_lower_and_draw(
+        wbs in any::<bool>(),
+        // Each line is at most one deeper than the one before, so every line has a parent.
+        lines in prop::collection::vec(tree_line(), 0..10),
+    ) {
+        let mut depth = 1;
+        let mut body = vec!["* root".to_owned()];
+        for line in lines {
+            let stars = line.chars().take_while(|c| matches!(c, '*' | '+' | '-')).count();
+            let cut = stars.min(depth + 1);
+            depth = cut;
+            let c = &line[..1];
+            body.push(format!("{}{}", c.repeat(cut), &line[stars..]));
+        }
+        let word = if wbs { "wbs" } else { "mindmap" };
+        let src = format!("@start{word}\n{}\n@end{word}\n", body.join("\n"));
+        let parse = plantuml::parse(&src);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        let (diagram, diagnostics) = parse.lower();
+        // Mindmaps warn that colors are not drawn; nothing else is reported.
+        let others: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| !d.message.starts_with("node colors are not drawn"))
+            .collect();
+        prop_assert!(others.is_empty(), "{:?}\n{}", others, src);
+        check(&diagram)?;
+    }
 
     #[test]
     fn generated_diagrams_lower_and_draw(src in document()) {

@@ -8,6 +8,7 @@ mod detect;
 mod lines;
 mod link;
 mod lower;
+mod mindmap;
 mod parser;
 mod state;
 
@@ -24,7 +25,13 @@ use crate::syntax::SyntaxNode;
 pub(crate) fn supported(kind: Kind) -> bool {
     matches!(
         kind,
-        Kind::Sequence | Kind::Activity | Kind::Class | Kind::State | Kind::Description
+        Kind::Sequence
+            | Kind::Activity
+            | Kind::Class
+            | Kind::State
+            | Kind::Description
+            | Kind::Mindmap
+            | Kind::Wbs
     )
 }
 
@@ -70,6 +77,14 @@ impl Parse {
             }
             Kind::Description => {
                 let (chart, d) = description::lower(&root);
+                (Diagram::Graph(chart), d)
+            }
+            Kind::Mindmap => {
+                let (map, d) = mindmap::lower_mindmap(&root);
+                (Diagram::Mindmap(map), d)
+            }
+            Kind::Wbs => {
+                let (chart, d) = mindmap::lower_wbs(&root);
                 (Diagram::Graph(chart), d)
             }
             Kind::Sequence => {

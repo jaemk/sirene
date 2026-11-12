@@ -1,0 +1,25 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startwbs\n* Release\n**[#lightblue] Build\n***(T) Tests\n***(P) Package\n** Docs\n***_ README\n***_ CHANGELOG\n** Ship\n(T) -> (P)\n@endwbs\n"
+---
+                            +---------+
+                            | Release |
+                            +-+--+--+-+
+                              |  |  |
+                    +---------+  |  +---+
+                    |            |      |
+                    |            |      |
+              +-----+           ++      +--+
+              |                 |          |
+          +---+---+         +---+--+   +---+--+
+          | Build |         | Docs |   | Ship |
+          +-+---+-+         +-+--+-+   +------+
+            |   |             |  |
+       +----+   |            ++  +--+
+       |        |            |      |
+       |        |            |      |
+    +--+        ++           |      +--+
+    |            |           |         |
++---+---+   +----+----+      |         |
+| Tests +-->| Package |   README   CHANGELOG
++-------+   +---------+

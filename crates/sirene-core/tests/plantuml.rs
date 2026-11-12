@@ -169,9 +169,9 @@ fn documents() {
             "missing `@enduml`; the diagram runs to the end of the file".to_owned()
         )]
     );
-    let d = diags("@startmindmap\n* a\n@endmindmap\n");
+    let d = diags("@startsalt\n{}\n@endsalt\n");
     assert_eq!(d[0].0, Severity::Error);
-    assert!(d[0].1.contains("`@startmindmap`"), "{d:?}");
+    assert!(d[0].1.contains("`@startsalt`"), "{d:?}");
     let d = diags("@startuml\nrobust W\n@enduml\n");
     assert_eq!(
         d,

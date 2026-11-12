@@ -1,0 +1,11 @@
+@startwbs
+* Release
+**[#lightblue] Build
+***(T) Tests
+***(P) Package
+** Docs
+***_ README
+***_ CHANGELOG
+** Ship
+(T) -> (P)
+@endwbs

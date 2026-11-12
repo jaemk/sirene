@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startmindmap\ntitle Trip\n* Trip\n** Travel\n***_ Train\n***_ Car\n** :Lodging\nnear the station;\nleft side\n-- Food\n--- Breakfast\n--- Dinner\n@endmindmap\n"
+---
+         Trip
+
+(Trip)
++-- (Travel)
+|   +-- Train
+|   `-- Car
++-- (Lodging
+|    near the station)
+`-- (Food)
+    +-- (Breakfast)
+    `-- (Dinner)
