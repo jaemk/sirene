@@ -73,6 +73,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | PlantUML Embedded Languages | done | [plantuml-embedded-languages.md](plantuml-embedded-languages.md) |
 | PlantUML File Trees | done | [plantuml-file-trees.md](plantuml-file-trees.md) |
 | PlantUML Regex Diagrams | done | [plantuml-regex-diagrams.md](plantuml-regex-diagrams.md) |
+| PlantUML Chen Diagrams | done | [plantuml-chen-diagrams.md](plantuml-chen-diagrams.md) |
 
 ## Conventions
 

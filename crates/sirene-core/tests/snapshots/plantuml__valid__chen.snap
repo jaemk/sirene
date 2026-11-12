@@ -1,0 +1,41 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startchen\ntitle Rentals\nentity CUSTOMER {\n  Number : INTEGER <<key>>\n  Name {\n    First\n    Last\n  }\n  Phone <<multi>>\n  Age <<derived>>\n}\nentity \"Movie\" as MOVIE {\n  Code <<key>>\n}\nentity COPY <<weak>> {\n  Serial\n}\nrelationship RENTED_TO {\n  Date\n}\nrelationship HAS <<identifying>>\nRENTED_TO -1- CUSTOMER\nRENTED_TO -N- COPY\nMOVIE =1= HAS\nHAS =N= COPY\nentity MEMBER\nentity GUEST\nCUSTOMER ->- d { MEMBER, GUEST }\n@endchen\n"
+---
+
+                                                Rentals
+
+  ┌───────┐               ╱───────────╲
+  │ Movie │               │ RENTED_TO │
+  └─┬───┬─┘               ╲─┬───┬───┬─╱
+    │   ┃                   │   │   │
+    │   ┗━━┓               ┌┘   │   └─────────────────┐
+    │      ┃               │    │                     │
+    │      1               │    │                     1
+    │      ┃               │    │                     │
+    │      ┗━━┓          ┌─┘    │                     └────────────────┐
+    │         ┃          │      │                                      │
+╭───┴──╮   ╱──┴──╲   ╭───┴──╮   │                                ┌─────┴────┐
+( Code )   │ HAS │   ( Date )   N                                │ CUSTOMER │
+╰──────╯   ╲──┬──╱   ╰──────╯   │                                └─┬─┬─┬─┬─┬┘
+              ┃                 │                                  │ │ │ │ │
+              ┗━━━━┓          ┌─┘                      ┌───────────┘ │ │ │ └───────┐
+                   ┃          │                        │         ┌───┘ │ └────┐    │
+                   ┃          │                        │         │     │      │    │
+                   N          │                        │         │     │      │    │
+                   ┃          │                        │         │     │      │    │
+                   ┗━━━┓   ┌──┘             ┌──────────┘     ┌───┘     └┐     │    └────────┐
+                       ┃   │                │                │          │     └────┐        │
+                       ┃   │                │                │          │          │        │
+                    ┌┬─┴───┴┬┐    ╭─────────┴────────╮   ╭───┴──╮   ╭───┴───╮   ╭──┴──╮   ╭─┴─╮
+                    ││ COPY ││    ( Number : INTEGER )   ( Name )   ( Phone )   ( Age )   ( d )
+                    └┴───┬──┴┘    ╰──────────────────╯   ╰─┬──┬─╯   ╰───────╯   ╰─────╯   ╰───╯
+                         │                                 │  │                            ▲ ▲
+                         │                               ┌─┘  └─┐                       ┌──┘ └─┐
+                         │                               │      │                       │      │
+                         │                               │      │                       │      │
+                         │                            ┌──┘      └─┐                   ┌─┘      └──┐
+                         │                            │           │                   │           │
+                    ╭────┴───╮                    ╭───┴───╮   ╭───┴──╮           ┌────┴───┐   ┌───┴───┐
+                    ( Serial )                    ( First )   ( Last )           │ MEMBER │   │ GUEST │
+                    ╰────────╯                    ╰───────╯   ╰──────╯           └────────┘   └───────┘

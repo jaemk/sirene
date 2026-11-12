@@ -1,0 +1,11 @@
+@startchen
+entity A {
+  x <<odd>>
+}
+entity A
+relationship R
+R -1- Nope
+what is this
+entity B {
+  y
+@endchen
