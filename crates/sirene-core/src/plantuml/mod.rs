@@ -3,6 +3,7 @@
 
 mod activity;
 mod chen;
+mod chronology;
 mod class;
 mod data;
 mod description;
@@ -14,6 +15,7 @@ mod lines;
 mod link;
 mod lower;
 mod mindmap;
+mod nwdiag;
 mod parser;
 mod regex;
 mod state;
@@ -41,7 +43,7 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Gantt
             | Kind::Json
             | Kind::Yaml
-            | Kind::Other("dot" | "ebnf" | "files" | "regex" | "chen")
+            | Kind::Other("dot" | "ebnf" | "files" | "regex" | "chen" | "nwdiag" | "chronology")
     )
 }
 
@@ -121,6 +123,14 @@ impl Parse {
             }
             Kind::Other("chen") => {
                 let (chart, d) = chen::lower(&root);
+                (Diagram::Graph(chart), d)
+            }
+            Kind::Other("chronology") => {
+                let (t, d) = chronology::lower(&root);
+                (Diagram::Timeline(t), d)
+            }
+            Kind::Other("nwdiag") => {
+                let (chart, d) = nwdiag::lower(&root);
                 (Diagram::Graph(chart), d)
             }
             Kind::Other("regex") => {

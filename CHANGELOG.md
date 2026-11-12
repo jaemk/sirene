@@ -63,6 +63,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - PlantUML `@startchen`: entity-relationship diagrams in Chen notation, with weak entities,
   identifying relationships, key, derived, multi-valued, and composite attributes,
   cardinalities, total participation, and specializations.
+- PlantUML network diagrams (`nwdiag`): networks with addresses, hosts with shapes and
+  descriptions, groups, and peer links.
+- PlantUML `@startchronology`: `[Event] happens on DATE` events drawn as a timeline in date
+  order.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

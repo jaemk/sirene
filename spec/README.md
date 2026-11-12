@@ -74,6 +74,8 @@ can be built). Keep each row's status current with `spec.py set`.
 | PlantUML File Trees | done | [plantuml-file-trees.md](plantuml-file-trees.md) |
 | PlantUML Regex Diagrams | done | [plantuml-regex-diagrams.md](plantuml-regex-diagrams.md) |
 | PlantUML Chen Diagrams | done | [plantuml-chen-diagrams.md](plantuml-chen-diagrams.md) |
+| PlantUML Network Diagrams | done | [plantuml-network-diagrams.md](plantuml-network-diagrams.md) |
+| PlantUML Chronology Diagrams | done | [plantuml-chronology-diagrams.md](plantuml-chronology-diagrams.md) |
 
 ## Conventions
 

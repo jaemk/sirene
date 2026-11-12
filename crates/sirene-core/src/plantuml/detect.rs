@@ -148,6 +148,7 @@ const STRONG: &[(&str, Kind)] = &[
     ("concise", Kind::Timing),
     ("clock", Kind::Timing),
     ("binary", Kind::Timing),
+    ("nwdiag", Kind::Other("nwdiag")),
 ];
 
 /// Keywords several kinds accept, which pick a kind only when no statement names one.
@@ -379,6 +380,7 @@ mod tests {
         // Sequence diagrams accept `database`, and PlantUML tries them first.
         assert_eq!(k("database D\nD -> E"), Kind::Sequence);
         assert_eq!(k("robust \"W\" as W\n@0\nW is On"), Kind::Timing);
+        assert_eq!(k("nwdiag {\nnetwork a {\nb\n}\n}"), Kind::Other("nwdiag"));
         assert_eq!(k("' comment\n/' block\nclass '/\nstart"), Kind::Activity);
         assert_eq!(kind("@startmindmap\n* a\n@endmindmap\n"), Kind::Mindmap);
         assert_eq!(kind("@startsalt\n{}\n@endsalt\n"), Kind::Other("salt"));

@@ -1,0 +1,26 @@
+@startnwdiag
+title Office
+nwdiag {
+  inet [shape = cloud];
+  inet -- router;
+
+  network dmz {
+    address = "210.x.x.x/24"
+    router [address = "210.x.x.1"];
+    web01 [address = "210.x.x.2"];
+    web02 [address = "210.x.x.3"];
+  }
+  network internal {
+    address = "172.x.x.x/24";
+    color = "#ffeedd"
+    web01 [address = "172.x.x.1"];
+    web02 [address = "172.x.x.2"];
+    db01 [address = "172.x.x.100", shape = database, description = "Primary DB"];
+  }
+  group web {
+    color = "#ddeeff"
+    description = "Web tier"
+    web01; web02;
+  }
+}
+@endnwdiag
