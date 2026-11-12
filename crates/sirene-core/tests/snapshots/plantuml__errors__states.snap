@@ -1,0 +1,32 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nstate A {\n  [*] --> X\n  --\n  [*] --> Y\n  Y --> X\n}\n}\n--\nstate B <<sdlreceive>>\nstate C ##[dashed]red\nA -[wavy]-> B\nwhat is this\nstate D {\n  [*] --> E\n@enduml\n"
+---
+6:3: warning: transitions between concurrent regions are not supported; ignoring `Y --> X`
+8:1: error: `}` without a `{` to close
+9:1: warning: `--` separates regions only inside a composite state
+10:9: warning: `<<sdlreceive>>` states are not supported; drawing a plain state
+11:9: warning: `##[dashed]red` borders are not drawn; ignoring it
+12:3: warning: `-[wavy]->`: style `wavy` is not drawn; ignoring it
+13:1: error: expected a state diagram statement such as `[*] --> A`, `state A`, or `A : description`
+14:1: error: unclosed state `D`: expected `}`
+
+        ┌────────── A ──────────┐
+        │                       │
+        │ ┌┄┄┄┄┄┄┄┐   ┌┄┄┄┄┄┄┄┐ │   ┌── D ──┐
+        │ ┆       ┆   ┆       ┆ │   │       │
+        │ ┆   ●   ┆   ┆   ●   ┆ │   │   ●   │
+╭───╮   │ ┆   │   ┆   ┆   │   ┆ │   │   │   │
+│ C │   │ ┆   ▼   ┆   ┆   ▼   ┆ │   │   ▼   │
+╰───╯   │ ┆ ╭───╮ ┆   ┆ ╭───╮ ┆ │   │ ╭───╮ │
+        │ ┆ │ X │ ┆   ┆ │ Y │ ┆ │   │ │ E │ │
+        │ ┆ ╰───╯ ┆   ┆ ╰───╯ ┆ │   │ ╰───╯ │
+        │ ┆       ┆   ┆       ┆ │   │       │
+        │ └┄┄┄┄┄┄┄┘   └┄┄┄┄┄┄┄┘ │   └───────┘
+        │                       │
+        └───────────┬───────────┘
+                    │
+                    ▼
+                  ╭───╮
+                  │ B │
+                  ╰───╯

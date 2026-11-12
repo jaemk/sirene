@@ -225,6 +225,49 @@ fn class_statement() -> impl Strategy<Value = String> {
     })
 }
 
+/// A well-formed state diagram statement (PSTA-*).
+fn state_statement() -> impl Strategy<Value = String> {
+    let names = || prop::sample::select(vec!["A", "B", "C", "[*]", "[H]", "\"Long\""]);
+    let arrows = prop::sample::select(vec![
+        "-->",
+        "->",
+        "-up->",
+        "-left->",
+        "-[#red,dotted]->",
+        "--->",
+    ]);
+    let decls = prop::sample::select(vec![
+        "state S",
+        "state \"Long name\" as L",
+        "state S : does x",
+        "state c <<choice>>",
+        "state f <<fork>>",
+        "state j <<join>>",
+        "state h <<history>>",
+        "state S #pink",
+        "S : more",
+        "note right of S : n",
+        "note \"free\" as N",
+        "hide empty description",
+    ]);
+    let simple = prop_oneof![
+        decls.prop_map(str::to_owned),
+        (names(), arrows, names()).prop_map(|(a, arrow, b)| format!("{a} {arrow} {b} : ev")),
+    ];
+    simple.prop_recursive(3, 24, 4, |inner| {
+        (
+            prop::sample::select(vec!["Outer", "Inner", "\"Long comp\" as LC"]),
+            prop::collection::vec(inner.clone(), 0..3),
+            prop::collection::vec(inner, 0..3),
+            any::<bool>(),
+        )
+            .prop_map(|(name, a, b, split)| {
+                let sep = if split { "\n--\n" } else { "\n" };
+                format!("state {name} {{\n{}{sep}{}\n}}", a.join("\n"), b.join("\n"))
+            })
+    })
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2000))]
 
@@ -258,6 +301,24 @@ proptest! {
         prop_assert_eq!(parse.syntax().to_string(), src.clone());
         let (diagram, diagnostics) = parse.lower();
         prop_assert!(diagnostics.is_empty(), "{:?}\n{}", diagnostics, src);
+        check(&diagram)?;
+    }
+
+    #[test]
+    fn generated_states_lower_and_draw(
+        stmts in prop::collection::vec(state_statement(), 0..8),
+    ) {
+        let src = format!("@startuml\nstate Anchor\n{}\n@enduml\n", stmts.join("\n"));
+        let parse = plantuml::parse(&src);
+        prop_assert_eq!(parse.kind(), plantuml::Kind::State);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        let (diagram, diagnostics) = parse.lower();
+        // Transitions may cross concurrent regions, which is a warning; nothing else is.
+        let others: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| !d.message.starts_with("transitions between concurrent regions"))
+            .collect();
+        prop_assert!(others.is_empty(), "{:?}\n{}", others, src);
         check(&diagram)?;
     }
 

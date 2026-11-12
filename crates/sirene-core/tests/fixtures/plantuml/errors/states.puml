@@ -1,0 +1,16 @@
+@startuml
+state A {
+  [*] --> X
+  --
+  [*] --> Y
+  Y --> X
+}
+}
+--
+state B <<sdlreceive>>
+state C ##[dashed]red
+A -[wavy]-> B
+what is this
+state D {
+  [*] --> E
+@enduml

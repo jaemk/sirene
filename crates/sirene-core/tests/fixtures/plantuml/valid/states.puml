@@ -1,0 +1,20 @@
+@startuml
+title Door
+[*] --> Closed
+state Closed : bolt in
+state "Open wide" as Open #LightGreen
+Closed --> Open : open
+Open --> Closed : close
+Closed --> Locked : lock
+state Locked {
+  [*] --> Armed
+  Armed --> Alarm : force
+  Alarm --> [*]
+}
+Locked --> Closed : unlock
+state check <<choice>>
+Open --> check : wind
+check --> Closed : strong
+check --> Open : calm
+note right of Locked : keyed from outside
+@enduml
