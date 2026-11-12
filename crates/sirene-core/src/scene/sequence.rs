@@ -340,6 +340,33 @@ impl<M: TextMetrics> Painter<'_, M> {
         }
     }
 
+    /// A frame's tab, `w` by `h`, in the top-left corner of `b`, holding `name` in bold.
+    fn tab(&mut self, b: BoxF, name: &str, w: f32, h: f32) {
+        let tab = shapes::polygon(&[
+            (b.x, b.y),
+            (b.x + w, b.y),
+            (b.x + w, b.y + h - 6.0),
+            (b.x + w - 6.0, b.y + h),
+            (b.x, b.y + h),
+        ]);
+        self.path(
+            tab,
+            Some(self.theme.edge_label_fill),
+            Some(solid(1.0, self.theme.edge)),
+        );
+        let bold = TextStyle {
+            bold: true,
+            italic: false,
+        };
+        self.text_at(
+            name,
+            Pt::new(b.x + w / 2.0, b.y + h / 2.0),
+            self.theme.font_size,
+            self.theme.text,
+            bold,
+        );
+    }
+
     /// An `autonumber` badge centered on `at`.
     fn badge(&mut self, n: u32, at: Pt) {
         self.path(
@@ -353,10 +380,9 @@ impl<M: TextMetrics> Painter<'_, M> {
     }
 }
 
-/// A block's tab text.
-fn tab_text(kind: BlockKind) -> &'static str {
-    kind.keyword()
-}
+/// Height of a delay without text, and of a separator's rule.
+const DELAY: f32 = 24.0;
+const RULE: f32 = 3.0;
 
 fn bracketed(label: &str) -> String {
     if label.is_empty() {
@@ -384,7 +410,8 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         .iter()
         .map(|part| p.header_size(part.kind, &part.label))
         .collect();
-    let tab_w = |p: &Painter<_>, kind| p.bold_width(tab_text(kind)) + 2.0 * TAB_PAD;
+    let tab_w = |p: &Painter<_>, name: &str| p.bold_width(name) + 2.0 * TAB_PAD;
+    let tab_h = lh + 4.0;
     let sizes = Sizes {
         headers: headers.clone(),
         events: seq
@@ -398,11 +425,22 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
                 }
                 Event::Start(BlockKind::Rect, _) => (0.0, 0.0),
                 Event::Start(kind, label) => {
-                    let lw = p.width(&bracketed(label));
-                    (tab_w(&p, *kind) + 2.0 * TAB_PAD + lw, lh + 4.0)
+                    let (name, after) = kind.tab(label);
+                    (tab_w(&p, &name) + 2.0 * TAB_PAD + p.width(&after), tab_h)
                 }
                 Event::Divider(label) if label.is_empty() => (0.0, 0.0),
                 Event::Divider(label) => (p.width(&bracketed(label)) + 4.0 * TAB_PAD, lh),
+                Event::Ref { text, .. } => {
+                    let (w, h) = p.measure(text);
+                    let w = (w + 2.0 * NOTE_PAD).max(tab_w(&p, "ref") + 2.0 * TAB_PAD);
+                    (w, tab_h + h + NOTE_PAD)
+                }
+                Event::Separator(t) if t.is_empty() => (0.0, RULE),
+                Event::Separator(t) => (p.width(t) + 4.0 * TAB_PAD, lh + PAD_Y),
+                Event::Delay(Some(t)) if !t.is_empty() => (p.width(t), lh + DELAY),
+                Event::Delay(_) => (0.0, DELAY),
+                Event::Space(None) => (0.0, lh),
+                Event::Space(Some(px)) => (0.0, *px as f32),
                 _ => (0.0, 0.0),
             })
             .collect(),
@@ -469,14 +507,41 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         }
     }
 
-    // Lifelines and activation bars.
+    // Lifelines, dashed through delays, and activation bars.
+    let delays: Vec<(f32, f32)> = l
+        .events
+        .iter()
+        .zip(&seq.events)
+        .filter_map(|(place, e)| match (place, e) {
+            (Placed::Band { y, h }, Event::Delay(_)) => Some((*y, y + h)),
+            _ => None,
+        })
+        .collect();
     for (i, &x) in l.x.iter().enumerate() {
         if seq.participants[i].kind == ParticipantKind::Hidden {
             continue;
         }
-        let y0 = l.head_y[i] + header_h;
+        let mut y0 = l.head_y[i] + header_h;
+        let y1 = l.life_end[i];
+        for &(d0, d1) in &delays {
+            let (d0, d1) = (d0.max(y0), d1.min(y1));
+            if d0 >= d1 {
+                continue;
+            }
+            p.path(
+                line(Pt::new(x, y0), Pt::new(x, d0)),
+                None,
+                Some(solid(1.0, lifeline)),
+            );
+            p.path(
+                line(Pt::new(x, d0), Pt::new(x, d1)),
+                None,
+                Some(dashed(1.0, lifeline)),
+            );
+            y0 = d1;
+        }
         p.path(
-            line(Pt::new(x, y0), Pt::new(x, l.life_end[i])),
+            line(Pt::new(x, y0), Pt::new(x, y1)),
             None,
             Some(solid(1.0, lifeline)),
         );
@@ -512,36 +577,13 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
             h: f.y1 - f.y0,
         };
         p.path(rect(b), None, Some(solid(1.0, theme.edge)));
-        let tw = tab_w(&p, *kind);
-        let th = lh + 4.0;
-        let tab = shapes::polygon(&[
-            (b.x, b.y),
-            (b.x + tw, b.y),
-            (b.x + tw, b.y + th - 6.0),
-            (b.x + tw - 6.0, b.y + th),
-            (b.x, b.y + th),
-        ]);
-        p.path(
-            tab,
-            Some(theme.edge_label_fill),
-            Some(solid(1.0, theme.edge)),
-        );
-        let bold = TextStyle {
-            bold: true,
-            italic: false,
-        };
-        p.text_at(
-            tab_text(*kind),
-            Pt::new(b.x + tw / 2.0, b.y + th / 2.0),
-            theme.font_size,
-            theme.text,
-            bold,
-        );
-        let text = bracketed(label);
+        let (name, text) = kind.tab(label);
+        let tw = tab_w(&p, &name);
+        p.tab(b, &name, tw, tab_h);
         let lw = p.width(&text);
         p.text_at(
             &text,
-            Pt::new(b.x + tw + TAB_PAD + lw / 2.0, b.y + th / 2.0),
+            Pt::new(b.x + tw + TAB_PAD + lw / 2.0, b.y + tab_h / 2.0),
             theme.font_size,
             theme.text,
             TextStyle::default(),
@@ -610,6 +652,45 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
                 );
                 p.lines(&n.text, x + w / 2.0, y + NOTE_PAD);
             }
+            (Placed::Note { x, y, w, h }, Event::Ref { text, .. }) => {
+                let b = BoxF { x, y, w, h };
+                p.path(
+                    rect(b),
+                    Some(theme.background),
+                    Some(solid(1.5, theme.edge)),
+                );
+                p.tab(b, "ref", tab_w(&p, "ref"), tab_h);
+                p.lines(text, x + w / 2.0, y + tab_h);
+            }
+            (Placed::Band { y, h }, Event::Separator(t)) => {
+                let (x0, x1) = (SPACING.margin, l.width - SPACING.margin);
+                let mid = y + h / 2.0;
+                for dy in [-RULE / 2.0, RULE / 2.0] {
+                    p.path(
+                        line(Pt::new(x0, mid + dy), Pt::new(x1, mid + dy)),
+                        None,
+                        Some(solid(1.0, theme.edge)),
+                    );
+                }
+                if !t.is_empty() {
+                    let w = p.width(t) + 2.0 * TAB_PAD;
+                    let b = BoxF {
+                        x: (x0 + x1 - w) / 2.0,
+                        y,
+                        w,
+                        h,
+                    };
+                    p.path(
+                        rect(b),
+                        Some(theme.edge_label_fill),
+                        Some(solid(1.0, theme.edge)),
+                    );
+                    p.lines(std::slice::from_ref(t), (x0 + x1) / 2.0, y + (h - lh) / 2.0);
+                }
+            }
+            (Placed::Band { y, h }, Event::Delay(Some(t))) => {
+                p.lines(std::slice::from_ref(t), l.width / 2.0, y + (h - lh) / 2.0);
+            }
             _ => {}
         }
     }
@@ -639,7 +720,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
                 None,
                 s,
             );
-        } else {
+        } else if !seq.hide_footbox {
             let bottom = BoxF {
                 y: l.footer_y,
                 ..top

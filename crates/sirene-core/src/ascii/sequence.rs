@@ -55,11 +55,18 @@ fn label(m: &Message) -> Vec<String> {
 
 /// A block's tab: its keyword and label; none for `rect`.
 fn tab(kind: BlockKind, label: &str) -> String {
-    match kind {
-        BlockKind::Rect => String::new(),
-        _ if label.is_empty() => kind.keyword().to_owned(),
-        _ => format!("{} [{label}]", kind.keyword()),
+    if kind == BlockKind::Rect {
+        return String::new();
     }
+    match kind.tab(label) {
+        (name, after) if after.is_empty() => name,
+        (name, after) => format!("{name} {after}"),
+    }
+}
+
+/// Rows a `||N||` space of `px` pixels takes: one per 20, at least one.
+fn space_rows(px: Option<u32>) -> i32 {
+    px.map_or(1, |n| (n.saturating_add(10) / 20).max(1) as i32)
 }
 
 fn divider(label: &str) -> String {
@@ -146,6 +153,9 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
             Event::Note(n) => n.text.clone(),
             Event::Start(kind, l) => vec![tab(*kind, l)],
             Event::Divider(l) => vec![divider(l)],
+            Event::Ref { text, .. } => text.clone(),
+            Event::Separator(t) if !t.is_empty() => vec![format!(" {t} ")],
+            Event::Delay(Some(t)) if !t.is_empty() => vec![format!(" {t} ")],
             _ => Vec::new(),
         })
         .collect();
@@ -162,6 +172,10 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
                     Event::Start(..) | Event::Divider(_) => {
                         (if text_w(l) > 0 { text_w(l) + 4 } else { 0 }, 1)
                     }
+                    Event::Ref { .. } => ((text_w(l) + 4).max(7), l.len() as i32 + 2),
+                    Event::Separator(_) => (if l.is_empty() { 0 } else { text_w(l) + 4 }, 1),
+                    Event::Delay(_) => (text_w(l), 1),
+                    Event::Space(px) => (0, space_rows(*px)),
                     _ => (0, 0),
                 };
                 (w as f32, h as f32)
@@ -179,7 +193,9 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
     let cols: Vec<i32> = l.x.iter().map(|&x| c(x)).collect();
     // A cell to spare: notes are placed by lifeline cell, which can differ from the layout's
     // by one.
-    let mut canvas = Canvas::new(c(l.width) + 2, c(l.height));
+    // Without footers, the lifelines' last row is the bottom one.
+    let foot = i32::from(seq.hide_footbox);
+    let mut canvas = Canvas::new(c(l.width) + 2, c(l.height) + foot);
 
     // Groups behind everything; their right and bottom edges are exclusive.
     let group_rect =
@@ -188,7 +204,16 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         draw_box(&mut canvas, group_rect(g), Line::Dotted);
     }
 
-    // Lifelines, heavy where a participant is active.
+    // Lifelines, heavy where a participant is active and dotted through delays.
+    let delays: Vec<(i32, i32)> = l
+        .events
+        .iter()
+        .zip(&seq.events)
+        .filter_map(|(place, e)| match (place, e) {
+            (Placed::Band { y, h }, Event::Delay(_)) => Some((c(*y), c(y + h) - 1)),
+            _ => None,
+        })
+        .collect();
     for (p, &x) in l.x.iter().enumerate() {
         if seq.participants[p].kind == ParticipantKind::Hidden {
             continue;
@@ -200,7 +225,13 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
             let active = l.bars.iter().any(|b| {
                 b.participant == p && c(b.y0) <= y && y <= c(b.y1) && !(y == c(b.y1) && y == y1)
             });
-            let line = if active { Line::Heavy } else { Line::Light };
+            let line = if delays.iter().any(|&(d0, d1)| d0 <= y && y <= d1) {
+                Line::Dotted
+            } else if active {
+                Line::Heavy
+            } else {
+                Line::Light
+            };
             let bits = if y > y0 { UP } else { 0 } | if y < y1 { DOWN } else { 0 };
             canvas.add(col, y, bits, line);
         }
@@ -277,6 +308,26 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
                 draw_box(&mut canvas, r, Line::Light);
                 draw_lines(&mut canvas, &labels[k], r.x + 1, r.w - 2, r.y + 1);
             }
+            (Placed::Note { y, h, .. }, Event::Ref { participants, .. }) => {
+                let over = Note {
+                    side: NoteSide::Over,
+                    participants: participants.clone(),
+                    text: Vec::new(),
+                };
+                let r = note_rect(&over, &cols, sizes.events[k].0 as i32, c(y), h as i32);
+                canvas.clear(r.x, r.y, r.right(), r.bottom());
+                draw_box(&mut canvas, r, Line::Light);
+                canvas.text(r.x + 2, r.y, "ref");
+                draw_lines(&mut canvas, &labels[k], r.x + 1, r.w - 2, r.y + 1);
+            }
+            (Placed::Band { y, .. }, Event::Separator(_)) => {
+                let w = c(l.width) + 1;
+                canvas.hline(0, w - 1, c(y), Line::Double);
+                draw_lines(&mut canvas, &labels[k], 0, w, c(y));
+            }
+            (Placed::Band { y, .. }, Event::Delay(_)) => {
+                draw_lines(&mut canvas, &labels[k], 0, c(l.width) + 1, c(y));
+            }
             _ => {}
         }
     }
@@ -295,7 +346,7 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         );
         if l.destroyed[p] {
             canvas.arrow(c(l.x[p]), c(l.life_end[p]), glyph('×', 'X'));
-        } else {
+        } else if !seq.hide_footbox {
             header(&mut canvas, part.kind, &part.label, x, c(l.footer_y), w);
         }
     }

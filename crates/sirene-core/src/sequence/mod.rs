@@ -156,6 +156,8 @@ pub enum BlockKind {
     Rect,
     /// ZenUML's `try`, with `catch` and `finally` dividers.
     Try,
+    /// PlantUML's `group`: its tab holds its label instead of a keyword (PSEQ-4).
+    Group,
 }
 
 impl BlockKind {
@@ -169,7 +171,32 @@ impl BlockKind {
             BlockKind::Break => "break",
             BlockKind::Rect => "rect",
             BlockKind::Try => "try",
+            BlockKind::Group => "group",
         }
+    }
+
+    /// A block's tab text and the bracketed text after it: the keyword and the label, or
+    /// for `group`, the label up to a final `[...]` and that bracket.
+    pub fn tab(self, label: &str) -> (String, String) {
+        let bracket = |s: &str| {
+            if s.is_empty() {
+                String::new()
+            } else {
+                format!("[{s}]")
+            }
+        };
+        if self != BlockKind::Group {
+            return (self.keyword().to_owned(), bracket(label));
+        }
+        let split = label
+            .strip_suffix(']')
+            .and_then(|s| s.rfind('[').map(|i| (s[..i].trim_end(), &s[i..])));
+        let (name, after) = match split {
+            Some((name, b)) if !name.is_empty() => (name, format!("{b}]")),
+            _ => (label, String::new()),
+        };
+        let name = if name.is_empty() { "group" } else { name };
+        (name.to_owned(), after)
     }
 }
 
@@ -189,6 +216,17 @@ pub enum Event {
     Create(usize),
     /// `destroy`: the participant's lifeline ends at its next message, or here.
     Destroy(usize),
+    /// PlantUML's `== text ==`: a rule across the diagram with the text in the middle.
+    Separator(String),
+    /// PlantUML's `...` or `... text ...`: a gap with dotted lifelines.
+    Delay(Option<String>),
+    /// PlantUML's `|||` (`None`, a blank row) or `||N||` (`N` pixels).
+    Space(Option<u32>),
+    /// PlantUML's `ref over`: a frame tagged `ref` over the participants, holding the text.
+    Ref {
+        participants: Vec<usize>,
+        text: Text,
+    },
 }
 
 /// A sequence diagram (MSEQ-2).
@@ -200,6 +238,8 @@ pub struct Sequence {
     pub participants: Vec<Participant>,
     pub groups: Vec<Group>,
     pub events: Vec<Event>,
+    /// PlantUML's `hide footbox`: no headers at the bottom.
+    pub hide_footbox: bool,
 }
 
 impl Sequence {
