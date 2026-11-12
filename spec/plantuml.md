@@ -1,6 +1,7 @@
 # PlantUML
 
-Status: research; sequence diagrams are specified in `plantuml-sequence-diagrams.md` (PSEQ).
+Status: research; sequence diagrams are specified in `plantuml-sequence-diagrams.md` (PSEQ)
+and activity diagrams in `plantuml-activity-diagrams.md` (PACT).
 PlantUML (<https://plantuml.com>) has a dozen diagram kinds and no formal grammar; its
 reference is the Java implementation and the language reference guide. Full compatibility is
 not the goal. The useful subset reuses the sequence and graph models.
@@ -9,10 +10,12 @@ not the goal. The useful subset reuses the sequence and graph models.
 
 A document is the text between `@startuml` and `@enduml` (or another `@start...` pair); a file
 can hold several, which the editor steps through as it steps through Markdown blocks
-(WYSIWY-20). Text outside them is ignored. The kind is detected as PlantUML does, from the first
-statement only one kind accepts, and a mismatch later is a diagnostic. `@startmindmap`,
-`@startgantt`, `@startwbs`, `@startjson`, `@startyaml`, and `@startsalt` are other kinds
-(PUML-5).
+(WYSIWY-20). Text outside them is ignored. The kind is detected as PlantUML does
+(`plantuml::kind`): the `@start` word first (`@startmindmap`, `@startgantt`, `@startwbs`,
+`@startjson`, `@startyaml`, `@startsalt`, and the like), then the first line only one kind
+accepts (`start` or `:action;` for activity, `class` for class, `[*]` or `state` for state,
+`(x)` or `[x]` links for description diagrams, `@0` for timing), then weaker hints (`package`,
+`rectangle`), and otherwise sequence. A kind that is not drawn yet is an error naming it.
 
 ## PUML-2 Kinds and models
 
@@ -25,7 +28,7 @@ statement only one kind accepts, and a mismatch later is a diagnostic. `@startmi
 | Use case | graph, actor and ellipse shapes | 4 |
 | Component and deployment | graph, component, node, and database shapes | 4 |
 | Timing | own model | later |
-| Activity swimlanes (`\|Lane\|`) | graph with lane clusters, which need a LAYOUT constraint | later |
+| Activity swimlanes (`\|Lane\|`) | graph with lane clusters (PACT-7) | 2 |
 
 ## PUML-3 Sequence
 

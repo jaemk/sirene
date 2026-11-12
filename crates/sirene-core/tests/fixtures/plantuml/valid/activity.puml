@@ -1,0 +1,25 @@
+@startuml
+title Order
+start
+:Receive order;
+if (In stock?) then (yes)
+  :Pick items;
+elseif (Backorder?) then (yes)
+  #LightBlue:Order from supplier;
+else (no)
+  :Cancel;
+  stop
+endif
+fork
+  :Charge card;
+fork again
+  :Pack box;
+end fork
+while (More boxes?) is (yes)
+  :Label box;
+endwhile (no)
+-> ship;
+:Ship;
+note right: tracked
+stop
+@enduml

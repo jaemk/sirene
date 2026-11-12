@@ -311,6 +311,52 @@ pub struct Edge {
     pub range: TextRange,
 }
 
+impl Node {
+    /// A node with no compartments, classes, styles, links, or mentions.
+    pub fn new(id: impl Into<String>, label: Label, shape: Shape) -> Self {
+        Self {
+            id: id.into(),
+            label,
+            shape,
+            sections: Vec::new(),
+            classes: Vec::new(),
+            styles: Vec::new(),
+            click: None,
+            tooltip: None,
+            metadata: Vec::new(),
+            mentions: Vec::new(),
+        }
+    }
+}
+
+impl Edge {
+    /// A solid edge one rank long from `from` to `to`, with an arrowhead at `to`.
+    pub fn new(from: impl Into<String>, to: impl Into<String>, range: TextRange) -> Self {
+        Self {
+            id: None,
+            from: from.into(),
+            to: to.into(),
+            stroke: Stroke::Normal,
+            start: None,
+            end: Some(Arrow::Point),
+            length: 1,
+            constraint: true,
+            ports: [None; 2],
+            rows: [None; 2],
+            label: None,
+            start_label: None,
+            end_label: None,
+            classes: Vec::new(),
+            styles: Vec::new(),
+            curve: None,
+            animate: false,
+            animation: None,
+            metadata: Vec::new(),
+            range,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Subgraph {
     pub id: String,

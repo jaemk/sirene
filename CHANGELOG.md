@@ -32,6 +32,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `++`/`--`/`**`/`!!`, `return`, `autonumber`, notes, frames, `group`, separators (`== x ==`),
   delays (`...`), spaces (`|||`), `ref over`, and `hide footbox`. Constructs that are not drawn
   are warnings, and other PlantUML diagram kinds are errors.
+- PlantUML activity diagrams, drawn by the layered layout: actions and their shapes, `start`,
+  `stop`, `end`, `if`/`elseif`/`else`, `switch`, `while`, `repeat` with `backward`, `break`,
+  `fork`, `split`, partitions and groups, swimlanes (`|Lane|`), arrow labels and styles, and
+  notes. The diagram kind is detected from the first statement as PlantUML does.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

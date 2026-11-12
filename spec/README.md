@@ -63,6 +63,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Agentflow Diagrams | done | [mermaid-agentflow-diagrams.md](mermaid-agentflow-diagrams.md) |
 | Mermaid themes | done | [mermaid-themes.md](mermaid-themes.md) |
 | PlantUML Sequence Diagrams | done | [plantuml-sequence-diagrams.md](plantuml-sequence-diagrams.md) |
+| PlantUML Activity Diagrams | done | [plantuml-activity-diagrams.md](plantuml-activity-diagrams.md) |
 
 ## Conventions
 

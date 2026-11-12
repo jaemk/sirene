@@ -1,0 +1,78 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Order\nstart\n:Receive order;\nif (In stock?) then (yes)\n  :Pick items;\nelseif (Backorder?) then (yes)\n  #LightBlue:Order from supplier;\nelse (no)\n  :Cancel;\n  stop\nendif\nfork\n  :Charge card;\nfork again\n  :Pack box;\nend fork\nwhile (More boxes?) is (yes)\n  :Label box;\nendwhile (no)\n-> ship;\n:Ship;\nnote right: tracked\nstop\n@enduml\n"
+---
+                       Order
+
+                                 *
+                                 |
+                                 v
+                         .---------------.
+                         | Receive order |
+                         '-------+-------'
+                                 |
+                                 v
+                           /-----------\
+                           | In stock? |
+                           \--+-----+--/
+                              |     |
+                     +--------+     |
+                     |              |
+                    yes             |
+                     |              |
+           +---------+              |
+           v                        v
+    .------------.           /------------\
+    | Pick items |           | Backorder? |
+    '------+-----'           \---+-----+--/
+           |                     |     |
+           |                  +--+     +---+
+           |                  |            |
+           |                 yes          no
+           |                  |            |
+           |              +---+            +--+
+           |              v                   v
+           |   .---------------------.   .--------.
+           |   | Order from supplier |   | Cancel |
+           |   '----------+----------'   '----+---'
+           |              |                   |
+           |         +----+                  ++
+           |         |                       |
+           |         |                       |
+           +---+ +---+                       |
+               v v                           v
+              =+=+=                          @
+               | |
+           +---+ +--+
+           |        |
+           |        |
+       +---+        +---+
+       v                v
+.-------------.   .----------.
+| Charge card |   | Pack box |
+'------+------'   '-----+----'
+       |                |
+       +---+        +---+
+           |        |
+           |        |
+           +--+ +---+
+              v v
+             ==+==
+               |
+               v
+        /-------------\
+        | More boxes? |
+        \--+-------+--/
+           |   ^   |
+          ++   |   +---+
+          |    |       |
+         yes   |     ship
+          |    |       |
+         ++    |       +--+
+         v     |          v
+      .--------+--.   .------.  +---------.
+      | Label box |   | Ship |..| tracked |
+      '-----------'   '---+--'  +---------+
+                          |
+                          v
+                          @

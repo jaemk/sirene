@@ -8,8 +8,28 @@ use sirene_core::scene::{Approx, Theme};
 use sirene_core::sequence::{Event, Sequence};
 use sirene_core::{TextSize, plantuml};
 
-/// Every participant index in the events is in range, and the diagram draws in both renderers.
-fn check(s: &Sequence) -> Result<(), TestCaseError> {
+/// A sequence diagram's participant indices are in range, a graph's edges join its nodes, and
+/// the diagram draws in both renderers.
+fn check(d: &Diagram) -> Result<(), TestCaseError> {
+    match d {
+        Diagram::Sequence(s) => check_sequence(s)?,
+        Diagram::Graph(g) => {
+            for e in &g.edges {
+                let known =
+                    |id: &str| g.node(id).is_some() || g.subgraphs.iter().any(|s| s.id == id);
+                prop_assert!(known(&e.from) && known(&e.to), "{e:?}");
+            }
+        }
+        _ => {}
+    }
+    for charset in [Charset::Unicode, Charset::Ascii] {
+        d.ascii(&Options { charset });
+    }
+    d.scene(&Approx, &Theme::LIGHT);
+    Ok(())
+}
+
+fn check_sequence(s: &Sequence) -> Result<(), TestCaseError> {
     let n = s.participants.len();
     for e in &s.events {
         let indices: Vec<usize> = match e {
@@ -25,11 +45,6 @@ fn check(s: &Sequence) -> Result<(), TestCaseError> {
             prop_assert!(p < n, "{p} >= {n}: {e:?}");
         }
     }
-    let d = Diagram::Sequence(s.clone());
-    for charset in [Charset::Unicode, Charset::Ascii] {
-        d.ascii(&Options { charset });
-    }
-    d.scene(&Approx, &Theme::LIGHT);
     Ok(())
 }
 
@@ -47,7 +62,10 @@ fn puml_ish() -> impl Strategy<Value = String> {
         "||40||", "||99999999999||", "return", "activate ", "deactivate ", "create ",
         "destroy ", "autonumber", " stop", " resume", "hide footbox", "title", "end title",
         "legend", "endlegend", "skinparam", "{", "}", "!include", "!define", "#red", "<<s>>",
-        "class", "é", "🐟", "\\n",
+        "class", "é", "🐟", "\\n", "start", "stop", ":", ";", ":act;", "if (", ") then (",
+        "elseif", "endif", "while", "endwhile", "repeat", "repeat while", "backward",
+        "fork", "fork again", "end fork", "split", "end split", "switch", "case", "endswitch",
+        "partition P {", "|Lane|", "-> lbl;", "#red:", "detach", "kill", "break", "(A)",
     ]);
     prop::collection::vec(pieces, 0..64).prop_map(|v| v.concat())
 }
@@ -101,6 +119,53 @@ fn document() -> impl Strategy<Value = String> {
         .prop_map(|stmts| format!("@startuml\n{}\n@enduml\n", stmts.join("\n")))
 }
 
+/// A well-formed activity statement, with nested blocks (PACT-*).
+fn activity_statement() -> impl Strategy<Value = String> {
+    let simple = prop_oneof![
+        prop::sample::select(vec![
+            ":a;",
+            ":two\nlines;",
+            "#pink:colored|",
+            ":send>",
+            "-> label;",
+            "-[#red,dashed]->",
+            "detach",
+            "stop",
+            "end",
+            "kill",
+            "(C)",
+            "note right: n",
+            "note left\nx\nend note",
+            "|L1|",
+            "|L2|",
+        ])
+        .prop_map(str::to_owned),
+    ];
+    simple.prop_recursive(3, 24, 4, |inner| {
+        let body = || prop::collection::vec(inner.clone(), 0..3).prop_map(|v| v.join("\n"));
+        prop_oneof![
+            (body(), body()).prop_map(|(a, b)| format!(
+                "if (c) then (yes)\n{a}\nelseif (d) then\n{b}\nelse (no)\n{a}\nendif"
+            )),
+            body().prop_map(|a| format!("while (w) is (y)\n{a}\nbreak\nendwhile (n)")),
+            body().prop_map(|a| format!(
+                "repeat\n{a}\nbackward :b;\nrepeat while (r) is (y) not (n)"
+            )),
+            (body(), body()).prop_map(|(a, b)| format!("fork\n{a}\nfork again\n{b}\nend fork")),
+            (body(), body()).prop_map(|(a, b)| format!("split\n{a}\nsplit again\n{b}\nend split")),
+            (body(), body())
+                .prop_map(|(a, b)| format!("switch (s)\ncase (1)\n{a}\ncase (2)\n{b}\nendswitch")),
+            body().prop_map(|a| format!("partition P {{\n{a}\n}}")),
+            body().prop_map(|a| format!("group G\n{a}\nend group")),
+        ]
+    })
+}
+
+fn activity() -> impl Strategy<Value = String> {
+    prop::collection::vec(activity_statement(), 0..8)
+        .prop_map(|stmts| format!("@startuml\nstart\n{}\n@enduml\n", stmts.join("\n")))
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2000))]
 
@@ -112,6 +177,16 @@ proptest! {
         prop_assert_eq!(parse.syntax().to_string(), src.clone());
         prop_assert!(parse.diagnostics().is_empty(), "{:?}\n{}", parse.diagnostics(), src);
         check(&parse.lower().0)?;
+    }
+
+    #[test]
+    fn generated_activities_lower_and_draw(src in activity()) {
+        let parse = plantuml::parse(&src);
+        prop_assert_eq!(parse.kind(), plantuml::Kind::Activity);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        let (diagram, diagnostics) = parse.lower();
+        prop_assert!(diagnostics.is_empty(), "{:?}\n{}", diagnostics, src);
+        check(&diagram)?;
     }
 
     #[test]

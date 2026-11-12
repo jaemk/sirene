@@ -1,0 +1,79 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Order\nstart\n:Receive order;\nif (In stock?) then (yes)\n  :Pick items;\nelseif (Backorder?) then (yes)\n  #LightBlue:Order from supplier;\nelse (no)\n  :Cancel;\n  stop\nendif\nfork\n  :Charge card;\nfork again\n  :Pack box;\nend fork\nwhile (More boxes?) is (yes)\n  :Label box;\nendwhile (no)\n-> ship;\n:Ship;\nnote right: tracked\nstop\n@enduml\n"
+---
+
+                       Order
+
+                                 ●
+                                 │
+                                 ▼
+                         ╭───────────────╮
+                         │ Receive order │
+                         ╰───────┬───────╯
+                                 │
+                                 ▼
+                           ╱───────────╲
+                           │ In stock? │
+                           ╲──┬─────┬──╱
+                              │     │
+                     ┌────────┘     │
+                     │              │
+                    yes             │
+                     │              │
+           ┌─────────┘              │
+           ▼                        ▼
+    ╭────────────╮           ╱────────────╲
+    │ Pick items │           │ Backorder? │
+    ╰──────┬─────╯           ╲───┬─────┬──╱
+           │                     │     │
+           │                  ┌──┘     └───┐
+           │                  │            │
+           │                 yes          no
+           │                  │            │
+           │              ┌───┘            └──┐
+           │              ▼                   ▼
+           │   ╭─────────────────────╮   ╭────────╮
+           │   │ Order from supplier │   │ Cancel │
+           │   ╰──────────┬──────────╯   ╰────┬───╯
+           │              │                   │
+           │         ┌────┘                  ┌┘
+           │         │                       │
+           │         │                       │
+           └───┐ ┌───┘                       │
+               ▼ ▼                           ▼
+              ━┬━┬━                          ◉
+               │ │
+           ┌───┘ └──┐
+           │        │
+           │        │
+       ┌───┘        └───┐
+       ▼                ▼
+╭─────────────╮   ╭──────────╮
+│ Charge card │   │ Pack box │
+╰──────┬──────╯   ╰─────┬────╯
+       │                │
+       └───┐        ┌───┘
+           │        │
+           │        │
+           └──┐ ┌───┘
+              ▼ ▼
+             ━━┬━━
+               │
+               ▼
+        ╱─────────────╲
+        │ More boxes? │
+        ╲──┬───────┬──╱
+           │   ▲   │
+          ┌┘   │   └───┐
+          │    │       │
+         yes   │     ship
+          │    │       │
+         ┌┘    │       └──┐
+         ▼     │          ▼
+      ╭────────┴──╮   ╭──────╮  ┌─────────╮
+      │ Label box │   │ Ship │┄┄│ tracked │
+      ╰───────────╯   ╰───┬──╯  └─────────┘
+                          │
+                          ▼
+                          ◉

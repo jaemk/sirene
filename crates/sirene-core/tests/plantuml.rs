@@ -8,6 +8,7 @@ use std::path::Path;
 use sirene_core::Severity;
 use sirene_core::ascii::{Charset, Options};
 use sirene_core::diagram::{self, Diagram, Kind, Lang, Lowered};
+use sirene_core::flowchart::{Flowchart, Shape, Stroke};
 use sirene_core::plantuml;
 use sirene_core::scene::{Approx, Theme};
 use sirene_core::sequence::{BlockKind, Event, Head, LineStyle, ParticipantKind, Sequence};
@@ -85,6 +86,14 @@ fn ascii_charset_snapshots() {
     }
 }
 
+fn diags(src: &str) -> Vec<(Severity, String)> {
+    diagram::lower(src)
+        .diagnostics
+        .iter()
+        .map(|d| (d.severity, d.message.clone()))
+        .collect()
+}
+
 fn lowered(src: &str) -> (Sequence, Vec<(Severity, String)>) {
     let lowered = diagram::lower(src);
     let d = lowered
@@ -160,10 +169,10 @@ fn documents() {
             "missing `@enduml`; the diagram runs to the end of the file".to_owned()
         )]
     );
-    let (_, d) = lowered("@startmindmap\n* a\n@endmindmap\n");
+    let d = diags("@startmindmap\n* a\n@endmindmap\n");
     assert_eq!(d[0].0, Severity::Error);
     assert!(d[0].1.contains("`@startmindmap`"), "{d:?}");
-    let (_, d) = lowered("@startuml\nclass A\n@enduml\n");
+    let d = diags("@startuml\nclass A\n@enduml\n");
     assert_eq!(
         d,
         [(
@@ -364,4 +373,83 @@ fn choosing() {
     assert_eq!(Lang::of_info("puml"), Some(Lang::PlantUml));
     let lowered = diagram::lower_as("A -> B\n", Some(Lang::PlantUml));
     assert!(matches!(lowered.diagram, Diagram::Sequence(_)));
+}
+
+fn graph(src: &str) -> (Flowchart, Vec<(Severity, String)>) {
+    let lowered = diagram::lower(src);
+    let d = diags(src);
+    match lowered.diagram {
+        Diagram::Graph(g) => (g, d),
+        other => panic!("not a graph: {other:?}"),
+    }
+}
+
+/// Edges as `from>to:label` with node labels for ids.
+fn flow(g: &Flowchart) -> Vec<String> {
+    let name = |id: &str| g.node(id).map_or(id.to_owned(), |n| n.label.text.clone());
+    g.edges
+        .iter()
+        .map(|e| {
+            let label = e
+                .label
+                .as_ref()
+                .map_or(String::new(), |l| format!(":{}", l.text));
+            format!("{}>{}{label}", name(&e.from), name(&e.to))
+        })
+        .collect()
+}
+
+/// PACT-2..6: actions, decisions, loops, and arrows lower to a flowchart.
+#[test]
+fn activities() {
+    let (g, d) = graph(
+        "@startuml\nstart\n:a;\nif (c?) then (yes)\n:b;\nelse (no)\n:x;\nendif\n\
+         while (w?) is (more)\n:l;\nendwhile (done)\n-[#red,dashed]-> go;\n:z>\nstop\n@enduml\n",
+    );
+    assert!(d.is_empty(), "{d:?}");
+    assert_eq!(
+        flow(&g),
+        [
+            ">a",
+            "a>c?",
+            "c?>b:yes",
+            "c?>x:no",
+            "b>w?",
+            "x>w?",
+            "w?>l:more",
+            "l>w?",
+            "w?>z:go",
+            "z>",
+        ]
+    );
+    let shape = |label: &str| {
+        g.nodes
+            .iter()
+            .find(|n| n.label.text == label)
+            .map(|n| n.shape)
+    };
+    assert_eq!(shape("a"), Some(Shape::Rounded));
+    assert_eq!(shape("c?"), Some(Shape::Diamond));
+    assert_eq!(shape("z"), Some(Shape::LeanRight));
+    let last = g
+        .edges
+        .iter()
+        .find(|e| g.node(&e.to).is_some_and(|n| n.label.text == "z"));
+    assert_eq!(last.map(|e| e.stroke), Some(Stroke::Dotted));
+}
+
+/// PACT-7, PACT-9: lanes and partitions become subgraphs; misuse is reported.
+#[test]
+fn activity_lanes_and_errors() {
+    let (g, d) = graph("@startuml\n|A|\nstart\n|B|\npartition P {\n:x;\n}\nstop\n@enduml\n");
+    assert!(d.is_empty(), "{d:?}");
+    assert!(g.lanes);
+    let titles: Vec<&str> = g.subgraphs.iter().map(|s| s.title.text.as_str()).collect();
+    assert!(
+        titles.contains(&"A") && titles.contains(&"B") && titles.contains(&"P"),
+        "{titles:?}"
+    );
+    let (_, d) = graph("@startuml\nstart\nendif\nwhile (x)\n:a;\n@enduml\n");
+    assert_eq!(d.len(), 2, "{d:?}");
+    assert!(d.iter().all(|(s, _)| *s == Severity::Error), "{d:?}");
 }

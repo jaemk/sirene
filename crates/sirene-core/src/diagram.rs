@@ -452,9 +452,9 @@ fn lower_diagram(src: &str, kind: Kind) -> Lowered {
     match kind {
         Kind::Dot => lower_dot(src),
         Kind::PlantUml => {
-            let (seq, diagnostics) = plantuml::parse(src).lower();
+            let (diagram, diagnostics) = plantuml::parse(src).lower();
             Lowered {
-                diagram: Diagram::Sequence(seq),
+                diagram,
                 diagnostics,
                 ..Default::default()
             }
