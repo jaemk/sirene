@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startregex\n'quoted'(?=x)\nab(c|d\n@endregex\n"
+---
+2:9: warning: a lookaround is drawn as a group
+3:3: error: the group has no closing `)`
+
+  ╭──────────╮  ╭───╮
+●─┤ 'quoted' ├──┤ x ├─●
+  ╰──────────╯  ╰───╯
+
+  ╭────╮    ╭───╮
+●─┤ ab ├──┬─┤ c ├─┬─●
+  ╰────╯  │ ╰───╯ │
+          │ ╭───╮ │
+          └─┤ d ├─┘
+            ╰───╯

@@ -260,7 +260,11 @@ impl Parser<'_> {
 
     /// The statements of the document's kind, or an error for a kind not drawn yet (PUML-2).
     fn diagram(&mut self, started: bool) {
-        self.trivia();
+        if super::raw(self.kind) {
+            self.blank();
+        } else {
+            self.trivia();
+        }
         if !super::supported(self.kind) {
             let start = self.pos;
             let len = scan::line_len(self.rest());

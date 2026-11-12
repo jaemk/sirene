@@ -169,12 +169,21 @@ fn bypass(c: &mut Canvas, x: i32, right: i32, top: i32, y: i32) {
     c.vline(right, top, y, Line::Light);
 }
 
+/// `name = `, or nothing for an unnamed rule, such as a PlantUML regex.
+fn rule_label(name: &str) -> String {
+    if name.is_empty() {
+        String::new()
+    } else {
+        format!("{name} = ")
+    }
+}
+
 /// Renders `chart` as text (MRAIL-4).
 pub fn render(chart: &Railroad, options: &Options) -> String {
     let rows: Vec<(String, Dim)> = chart
         .rules
         .iter()
-        .map(|r| (format!("{} = ", r.name), measure(&r.definition)))
+        .map(|r| (rule_label(&r.name), measure(&r.definition)))
         .collect();
     let w = rows
         .iter()
