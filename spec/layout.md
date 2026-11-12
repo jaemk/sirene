@@ -37,6 +37,16 @@ broken by reversing back edges found by a depth-first search in input order. Eve
 least `2 * min_len` ranks, and ranks are chosen to shorten edges. An edge label sits on the
 middle rank of its edge.
 
+The nodes of a `same_rank` group that are directly in one container share a rank, and an edge
+without `constraint` takes no part in ranking. An edge whose ends then share a rank, or one of
+length 0, is flat. A flat edge between two neighboring nodes with nothing on their facing sides
+is a straight line, one per pair; another leaves the bottom of one end and runs through a track
+in the gap below the rank (a gap added below the last rank if needed) to the bottom of the
+other. A labeled flat edge instead goes up into its label on the free rank above (one added
+above the first rank if needed) and down to its other end. Through a cluster's border it passes
+the side it leaves or enters by. Tests: `flat_edges` and `rank.rs` in `src/layout`, and
+`ranks` and `flat_edges` in `tests/dot.rs`.
+
 ## LAYOUT-5 Order
 
 Long edges get a dummy per intermediate rank. Items in each rank are ordered by barycenter

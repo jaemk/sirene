@@ -100,7 +100,18 @@ const EDGE_ATTRS: &[&str] = &[
     "arrowtail",
     "dir",
     "minlen",
+    "constraint",
 ];
+
+/// A Graphviz boolean: `true`, `yes`, `false`, `no` in any case, or an integer, nonzero for true.
+fn boolean(text: &str) -> Option<bool> {
+    let t = text.trim().to_ascii_lowercase();
+    match t.as_str() {
+        "true" | "yes" => Some(true),
+        "false" | "no" => Some(false),
+        _ => t.parse::<i64>().ok().map(|n| n != 0),
+    }
+}
 
 /// The defaults in effect in a graph or subgraph (DOT-2).
 #[derive(Debug, Clone, Default)]
@@ -113,6 +124,8 @@ struct Scope {
     cluster: Option<usize>,
     /// Whether this scope is the root graph or a cluster, whose graph attributes are drawn.
     drawn: bool,
+    /// This subgraph's own `rank`, which applies to every node mentioned in it.
+    rank: Option<Attr>,
 }
 
 struct Cluster {
@@ -144,6 +157,8 @@ struct Lowerer {
     edges: Vec<PendingEdge>,
     clusters: Vec<Cluster>,
     cluster_index: HashMap<String, usize>,
+    /// Nodes of each `rank=same` subgraph, and the range of its `rank`.
+    same_rank: Vec<(Vec<usize>, TextRange)>,
     /// Names already warned about, so each is reported once per file.
     warned: HashSet<String>,
 }
@@ -651,11 +666,15 @@ impl Lowerer {
     /// Either way it is a default for the clusters created later in the scope, as in Graphviz.
     fn graph_attr(&mut self, attr: Attr, scope: &mut Scope) {
         if attr.key == "rank" {
-            self.warn_once(
-                "graph:rank",
-                attr.range,
-                "`rank` is not supported yet; the nodes are ranked as usual",
-            );
+            if scope.drawn && scope.cluster.is_none() {
+                self.warn_once(
+                    "graph:rank",
+                    attr.range,
+                    "`rank` applies to subgraphs; ignored on the graph",
+                );
+            } else {
+                scope.rank = Some(attr);
+            }
             return;
         }
         self.check(&attr, Target::Graph);
@@ -777,6 +796,7 @@ impl Lowerer {
             graph: parent.graph.clone(),
             cluster: parent.cluster,
             drawn: cluster,
+            rank: None,
         };
         if cluster {
             let id = name.unwrap_or_default();
@@ -797,7 +817,38 @@ impl Lowerer {
             };
             scope.cluster = Some(c);
         }
-        self.stmts(sub, &mut scope)
+        let nodes = self.stmts(sub, &mut scope);
+        if let Some(rank) = scope.rank.take() {
+            self.rank(&rank, &nodes);
+        }
+        nodes
+    }
+
+    /// A subgraph's `rank`: `same` puts its nodes in one rank (DOT-2).
+    fn rank(&mut self, attr: &Attr, nodes: &[usize]) {
+        let value = attr.value.text.trim().to_ascii_lowercase();
+        match value.as_str() {
+            "same" => {}
+            "min" | "max" | "source" | "sink" => self.warn_once(
+                &format!("rank={value}"),
+                attr.range,
+                format!("`rank={value}` puts the nodes in one rank, not yet the first or last"),
+            ),
+            _ => {
+                self.warn_once(
+                    &format!("rank@{:?}", attr.range),
+                    attr.range,
+                    format!("unknown `rank` `{value}`: expected same, min, max, source, or sink"),
+                );
+                return;
+            }
+        }
+        let mut group = nodes.to_vec();
+        group.sort_unstable();
+        group.dedup();
+        if group.len() > 1 {
+            self.same_rank.push((group, attr.range));
+        }
     }
 
     fn finish(mut self) -> Output {
@@ -852,6 +903,20 @@ impl Lowerer {
         for (c, members) in members.into_iter().enumerate() {
             let sub = self.lower_cluster(c, &graph, members);
             chart.subgraphs.push(sub);
+        }
+        for (group, range) in std::mem::take(&mut self.same_rank) {
+            // Only the nodes in one cluster share a rank, as in Graphviz.
+            let cluster = self.node_cluster[group[0]];
+            if group.iter().any(|&i| self.node_cluster[i] != cluster) {
+                self.warn_once(
+                    &format!("rank-clusters@{range:?}"),
+                    range,
+                    "`rank=same` nodes in different clusters do not share a rank",
+                );
+            }
+            chart
+                .same_rank
+                .push(group.into_iter().map(|i| self.ids[i].clone()).collect());
         }
         Output {
             flowchart: chart,
@@ -1188,7 +1253,22 @@ impl Lowerer {
         let length = get_text(attrs, "minlen")
             .and_then(|m| m.trim().parse::<f32>().ok())
             .filter(|m| !m.is_nan())
-            .map_or(1, |m| m.round().clamp(1.0, 10.0) as u8);
+            .map_or(1, |m| m.round().clamp(0.0, 10.0) as u8);
+        let constraint = match get(attrs, "constraint") {
+            None => true,
+            Some(a) => boolean(&a.value.text).unwrap_or_else(|| {
+                let range = a.range;
+                self.warn_once(
+                    &format!("constraint@{range:?}"),
+                    range,
+                    format!(
+                        "`constraint` `{}` is not a boolean; read as true",
+                        a.value.text
+                    ),
+                );
+                true
+            }),
+        };
         Edge {
             id: None,
             from: tail,
@@ -1197,6 +1277,7 @@ impl Lowerer {
             start,
             end,
             length,
+            constraint,
             label,
             start_label,
             end_label,

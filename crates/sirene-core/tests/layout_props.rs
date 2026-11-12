@@ -93,26 +93,34 @@ fn graph() -> impl Strategy<Value = Graph> {
                     item(),
                     0..4u32,
                     prop::option::weighted(0.3, (1..8i32, 1..3i32)),
+                    prop::bool::weighted(0.8),
                 )
-                    .prop_map(|(from, to, min_len, label)| EdgeSpec {
+                    .prop_map(|(from, to, min_len, label, constraint)| EdgeSpec {
                         from,
                         to,
                         min_len,
                         label: label.map(|(w, h)| Size::new(w, h)),
+                        constraint,
                     }),
                 0..12,
             )
             .boxed()
         };
-        (direction(), clusters, nodes, edges).prop_map(|(direction, clusters, nodes, edges)| {
-            Graph {
+        let same_rank = if n == 0 {
+            Just(Vec::new()).boxed()
+        } else {
+            prop::collection::vec(prop::collection::vec(0..n, 0..4), 0..3).boxed()
+        };
+        (direction(), clusters, nodes, edges, same_rank).prop_map(
+            |(direction, clusters, nodes, edges, same_rank)| Graph {
                 direction,
                 nodes,
                 clusters,
                 edges,
                 notes: Vec::new(),
-            }
-        })
+                same_rank,
+            },
+        )
     })
 }
 

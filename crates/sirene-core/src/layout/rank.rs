@@ -10,10 +10,35 @@ pub(super) struct RankEdge {
     pub len: i32,
 }
 
-/// Ranks `n` items. Returns whether each edge was reversed to break a cycle, and each item's
-/// rank (the smallest is 0). Self-loops must not be passed in.
-pub(super) fn rank(n: usize, edges: &[RankEdge]) -> (Vec<bool>, Vec<i32>) {
-    let reversed = break_cycles(n, edges);
+/// Ranks `n` items, the items of each group in `same` sharing a rank. Returns each item's rank
+/// (the smallest is 0). An edge's ends may end up in either order, or in one rank when the edge
+/// is within a group or its length is 0.
+pub(super) fn rank(n: usize, edges: &[RankEdge], same: &[Vec<usize>]) -> Vec<i32> {
+    // Each group is ranked as its first item.
+    let mut rep: Vec<usize> = (0..n).collect();
+    for group in same {
+        let Some(&first) = group.first() else {
+            continue;
+        };
+        let root = find(&mut rep, first);
+        for &i in group {
+            let r = find(&mut rep, i);
+            rep[r] = root;
+        }
+    }
+    for i in 0..n {
+        rep[i] = find(&mut rep, i);
+    }
+    let edges: Vec<RankEdge> = edges
+        .iter()
+        .filter(|e| rep[e.from] != rep[e.to])
+        .map(|e| RankEdge {
+            from: rep[e.from],
+            to: rep[e.to],
+            len: e.len,
+        })
+        .collect();
+    let reversed = break_cycles(n, &edges);
     let dag: Vec<RankEdge> = edges
         .iter()
         .zip(&reversed)
@@ -31,12 +56,25 @@ pub(super) fn rank(n: usize, edges: &[RankEdge]) -> (Vec<bool>, Vec<i32>) {
         .collect();
     let mut ranks = longest_path(n, &dag);
     tighten(&mut ranks, &dag);
+    let mut ranks: Vec<i32> = (0..n).map(|i| ranks[rep[i]]).collect();
     if let Some(&min) = ranks.iter().min() {
         for r in &mut ranks {
             *r -= min;
         }
     }
-    (reversed, ranks)
+    ranks
+}
+
+/// The representative of `i`'s group, shortening the path to it.
+fn find(rep: &mut [usize], mut i: usize) -> usize {
+    let mut root = i;
+    while rep[root] != root {
+        root = rep[root];
+    }
+    while rep[i] != root {
+        i = std::mem::replace(&mut rep[i], root);
+    }
+    root
 }
 
 /// Marks the back edges of a depth-first search that visits items and edges in input order.
@@ -148,50 +186,71 @@ mod tests {
 
     #[test]
     fn chain() {
-        let (rev, ranks) = rank(3, &edges(&[(0, 1), (1, 2)]));
-        assert_eq!(rev, [false, false]);
-        assert_eq!(ranks, [0, 2, 4]);
+        assert_eq!(rank(3, &edges(&[(0, 1), (1, 2)]), &[]), [0, 2, 4]);
     }
 
     #[test]
     fn cycle_reverses_back_edge() {
-        let (rev, ranks) = rank(3, &edges(&[(0, 1), (1, 2), (2, 0)]));
-        assert_eq!(rev, [false, false, true]);
-        assert_eq!(ranks, [0, 2, 4]);
+        assert_eq!(rank(3, &edges(&[(0, 1), (1, 2), (2, 0)]), &[]), [0, 2, 4]);
     }
 
     #[test]
     fn source_is_pulled_down_to_its_target() {
         // 0 -> 1 -> 2 -> 3 and 4 -> 3: 4 sits just above 3.
-        let (_, ranks) = rank(5, &edges(&[(0, 1), (1, 2), (2, 3), (4, 3)]));
+        let ranks = rank(5, &edges(&[(0, 1), (1, 2), (2, 3), (4, 3)]), &[]);
         assert_eq!(ranks, [0, 2, 4, 6, 4]);
     }
 
     #[test]
     fn sink_is_pulled_up_to_its_source() {
-        let (_, ranks) = rank(4, &edges(&[(0, 1), (1, 2), (0, 3)]));
-        assert_eq!(ranks, [0, 2, 4, 2]);
+        assert_eq!(
+            rank(4, &edges(&[(0, 1), (1, 2), (0, 3)]), &[]),
+            [0, 2, 4, 2]
+        );
     }
 
     #[test]
     fn minimum_lengths() {
-        let e = [RankEdge {
-            from: 0,
-            to: 1,
-            len: 6,
-        }];
-        assert_eq!(rank(2, &e).1, [0, 6]);
+        let e = |len| {
+            [RankEdge {
+                from: 0,
+                to: 1,
+                len,
+            }]
+        };
+        assert_eq!(rank(2, &e(6), &[]), [0, 6]);
+        assert_eq!(rank(2, &e(0), &[]), [0, 0]);
     }
 
     #[test]
     fn isolated_items_and_empty() {
-        assert_eq!(rank(2, &[]).1, [0, 0]);
-        assert_eq!(rank(0, &[]), (vec![], vec![]));
+        assert_eq!(rank(2, &[], &[]), [0, 0]);
+        assert_eq!(rank(0, &[], &[]), Vec::<i32>::new());
     }
 
     #[test]
     fn two_cycles_share_a_node() {
-        let (rev, _) = rank(3, &edges(&[(0, 1), (1, 0), (1, 2), (2, 1)]));
-        assert_eq!(rev, [false, true, false, true]);
+        let ranks = rank(3, &edges(&[(0, 1), (1, 0), (1, 2), (2, 1)]), &[]);
+        assert_eq!(ranks, [0, 2, 4]);
+    }
+
+    #[test]
+    fn groups_share_a_rank() {
+        // 0 -> 1 -> 2 and 3 -> 4, with 4 beside 2: 3 moves down to stay just above 4.
+        let ranks = rank(5, &edges(&[(0, 1), (1, 2), (3, 4)]), &[vec![2, 4]]);
+        assert_eq!(ranks, [0, 2, 4, 2, 4]);
+        // An edge within a group joins two items of one rank.
+        assert_eq!(rank(2, &edges(&[(0, 1)]), &[vec![0, 1]]), [0, 0]);
+        // Groups sharing an item merge.
+        let ranks = rank(4, &edges(&[(0, 1)]), &[vec![0, 2], vec![2, 1], vec![3]]);
+        assert_eq!(ranks, [0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn a_group_against_its_edges() {
+        // 0 -> 1 -> 2 with 0 and 2 together: an edge is reversed or flat, never too short.
+        let ranks = rank(3, &edges(&[(0, 1), (1, 2)]), &[vec![0, 2]]);
+        assert_eq!(ranks[0], ranks[2]);
+        assert_eq!((ranks[1] - ranks[0]).abs(), 2);
     }
 }

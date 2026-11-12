@@ -489,6 +489,7 @@ impl Lowerer {
             start,
             end,
             length,
+            constraint: true,
             label,
             start_label: None,
             end_label: None,
