@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- PlantUML component interface sockets and balls (`[A] -( I`, `I )- [A]`, `-(0-`) are read
+  as links with a warning instead of errors, and a quoted element name may run over several
+  lines up to its closing `"`.
+
 ## [0.3.0] - 2026-11-12
 
 ### Added
