@@ -14,6 +14,7 @@ mod link;
 mod lower;
 mod mindmap;
 mod parser;
+mod regex;
 mod state;
 
 use rowan::GreenNode;
@@ -39,14 +40,14 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Gantt
             | Kind::Json
             | Kind::Yaml
-            | Kind::Other("dot" | "ebnf" | "files")
+            | Kind::Other("dot" | "ebnf" | "files" | "regex")
     )
 }
 
 /// Whether `kind`'s documents are written in another language, whose lines PlantUML's `'`
 /// comments do not apply to.
 pub(crate) fn raw(kind: Kind) -> bool {
-    matches!(kind, Kind::Other("dot" | "ebnf"))
+    matches!(kind, Kind::Other("dot" | "ebnf" | "regex"))
 }
 
 /// The result of parsing PlantUML source: a lossless syntax tree plus diagnostics.
@@ -115,6 +116,10 @@ impl Parse {
             }
             Kind::Other("ebnf") => {
                 let (chart, d) = embedded::lower_ebnf(&root);
+                (Diagram::Railroad(chart), d)
+            }
+            Kind::Other("regex") => {
+                let (chart, d) = regex::lower(&root);
                 (Diagram::Railroad(chart), d)
             }
             Kind::Other("files") => {

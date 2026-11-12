@@ -58,6 +58,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Compartment nodes with an empty label have no title area.
 - PlantUML `@startdot` (a Graphviz graph), `@startebnf` (drawn as a railroad diagram), and
   `@startfiles` (paths drawn as a tree view, with `<note>` descriptions).
+- PlantUML `@startregex`: each line's regex drawn as a railroad track, with classes, escapes,
+  groups, choices, and quantifiers. Railroad rules with no name draw no `name =`.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

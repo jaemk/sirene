@@ -1,0 +1,4 @@
+@startregex
+'quoted'(?=x)
+ab(c|d
+@endregex

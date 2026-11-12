@@ -345,8 +345,17 @@ pub fn railroad(chart: &Railroad, metrics: &impl TextMetrics, theme: &Theme) -> 
     let mut y = PADDING;
     let mut max_w: f32 = 0.0;
     for rule in &chart.rules {
-        let label = format!("{} =", rule.name);
-        let name_w = metrics.width(&label, FONT) + 20.0;
+        // An unnamed rule, such as a PlantUML regex, starts at the left.
+        let label = if rule.name.is_empty() {
+            String::new()
+        } else {
+            format!("{} =", rule.name)
+        };
+        let name_w = if label.is_empty() {
+            PADDING
+        } else {
+            metrics.width(&label, FONT) + 20.0
+        };
         let def_x = name_w + 20.0;
         let dim = d.measure(&rule.definition);
         let baseline = y + dim.up.max(20.0);
@@ -358,13 +367,15 @@ pub fn railroad(chart: &Railroad, metrics: &impl TextMetrics, theme: &Theme) -> 
             italic: false,
         };
         let w = metrics.styled_width(&label, FONT, bold);
-        names.push(el(Primitive::Text {
-            text: label,
-            center: Pt::new(w / 2.0, baseline - FONT * 0.35),
-            size: FONT,
-            color: theme.text,
-            style: bold,
-        }));
+        if !label.is_empty() {
+            names.push(el(Primitive::Text {
+                text: label,
+                center: Pt::new(w / 2.0, baseline - FONT * 0.35),
+                size: FONT,
+                color: theme.text,
+                style: bold,
+            }));
+        }
         let end = def_x + dim.w + 10.0;
         d.marker(Pt::new(name_w, baseline));
         d.marker(Pt::new(end, baseline));
