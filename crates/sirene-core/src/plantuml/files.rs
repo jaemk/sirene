@@ -1,6 +1,8 @@
 //! PlantUML file trees (PFILES-*): `@startfiles` paths, one per line, drawn as a tree view
 //! (MTREEV-2), with each `<note>` as its entry's description.
 
+use std::collections::HashMap;
+
 use rowan::TextRange;
 
 use super::lines::{self, Common, Cursor};
@@ -31,6 +33,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (TreeView, Vec<Diagnostic>) {
     let mut cursor = Cursor::new(lines::read(root));
     // The last path's entry, which a note describes.
     let mut last: Option<Vec<usize>> = None;
+    let mut index = Index::new();
     while let Some(line) = cursor.next() {
         match lines::common(&line, &mut cursor, &mut d) {
             Common::No => {}
@@ -70,14 +73,18 @@ pub(crate) fn lower(root: &SyntaxNode) -> (TreeView, Vec<Diagnostic>) {
             ));
             continue;
         };
-        last = add(&mut view.entries, path, line.range, &mut d);
+        last = add(&mut view.entries, &mut index, path, line.range, &mut d);
     }
     (view, d)
 }
 
+/// Each entry's index among its siblings, by its path from the root (`a/b`).
+type Index = HashMap<String, usize>;
+
 /// Adds `path`'s directories and its entry, returning the entry's place.
 fn add(
     entries: &mut Vec<Entry>,
+    index: &mut Index,
     path: &str,
     range: TextRange,
     d: &mut Vec<Diagnostic>,
@@ -96,16 +103,22 @@ fn add(
     }
     let mut place = Vec::new();
     let mut level = entries;
+    let mut key = String::new();
     for (k, part) in parts.iter().enumerate() {
         let leaf = k + 1 == parts.len();
-        let i = match level.iter().position(|e| e.name == *part) {
-            Some(i) => i,
+        if k > 0 {
+            key.push('/');
+        }
+        key.push_str(part);
+        let i = match index.get(&key) {
+            Some(&i) => i,
             None => {
                 level.push(Entry {
                     name: (*part).to_owned(),
                     directory: !leaf || directory,
                     ..Entry::default()
                 });
+                index.insert(key.clone(), level.len() - 1);
                 level.len() - 1
             }
         };
@@ -143,18 +156,22 @@ mod tests {
     #[test]
     fn paths() {
         let mut entries = Vec::new();
+        let mut index = Index::new();
         let mut d = Vec::new();
         let r = TextRange::default();
-        assert_eq!(add(&mut entries, "a/b.txt", r, &mut d), Some(vec![0, 0]));
-        assert_eq!(add(&mut entries, "a/c/", r, &mut d), Some(vec![0, 1]));
-        assert_eq!(add(&mut entries, "a/c/d", r, &mut d), Some(vec![0, 1, 0]));
-        assert_eq!(add(&mut entries, "e", r, &mut d), Some(vec![1]));
+        let mut add =
+            |path: &str, d: &mut Vec<Diagnostic>| add(&mut entries, &mut index, path, r, d);
+        assert_eq!(add("a/b.txt", &mut d), Some(vec![0, 0]));
+        assert_eq!(add("a/c/", &mut d), Some(vec![0, 1]));
+        assert_eq!(add("a/c/d", &mut d), Some(vec![0, 1, 0]));
+        assert_eq!(add("e", &mut d), Some(vec![1]));
         // A file named again as a directory becomes one.
-        assert_eq!(add(&mut entries, "e/f", r, &mut d), Some(vec![1, 0]));
-        assert_eq!(add(&mut entries, "/", r, &mut d), None);
-        assert_eq!(names(&entries), ["a/(b.txt c/(d))", "e/(f)"]);
+        assert_eq!(add("e/f", &mut d), Some(vec![1, 0]));
+        assert_eq!(add("/", &mut d), None);
+        assert_eq!(add("a//c/d", &mut d), Some(vec![0, 1, 0]));
         let deep = "x/".repeat(MAX_DEPTH + 1);
-        assert_eq!(add(&mut entries, &deep, r, &mut d), None);
+        assert_eq!(add(&deep, &mut d), None);
+        assert_eq!(names(&entries), ["a/(b.txt c/(d))", "e/(f)"]);
         assert_eq!(d.len(), 1);
     }
 }

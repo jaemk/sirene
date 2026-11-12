@@ -2,6 +2,8 @@
 //! peer links, lowered to the graph model. A network is a box linked to its hosts, each link
 //! labeled with the host's address there.
 
+use std::collections::{HashMap, HashSet};
+
 use rowan::TextRange;
 
 use super::description::ELEMENTS;
@@ -107,23 +109,48 @@ struct Host {
     color: Option<String>,
 }
 
+/// A network's label parts, joined as the description (or name) over the address.
+#[derive(Default)]
+struct NetLabel {
+    name: String,
+    description: Option<String>,
+    address: Option<String>,
+}
+
+impl NetLabel {
+    fn text(&self) -> String {
+        let head = self.description.as_deref().unwrap_or(&self.name);
+        match (&self.address, head.is_empty()) {
+            (Some(a), true) => a.clone(),
+            (Some(a), false) => format!("{head}\n{a}"),
+            (None, _) => head.to_owned(),
+        }
+    }
+}
+
 struct Lower {
     chart: Flowchart,
     d: Vec<Diagnostic>,
     blocks: Vec<(Block, TextRange)>,
+    /// Each node's index in `chart.nodes`.
+    ids: HashMap<String, usize>,
     /// Hosts already on a network, whose later networks hang below them.
-    attached: Vec<String>,
+    attached: HashSet<String>,
+    /// Each group's members, for de-duplication.
+    members: Vec<HashSet<String>>,
+    labels: HashMap<String, NetLabel>,
     networks: usize,
 }
 
 impl Lower {
     fn host(&mut self, id: &str, range: TextRange) -> &mut Node {
-        let at = match self.chart.nodes.iter().position(|n| n.id == id) {
-            Some(at) => at,
+        let at = match self.ids.get(id) {
+            Some(&at) => at,
             None => {
                 let mut n = Node::new(id, Label::plain(id), Shape::Rect);
                 n.mentions.push(range);
                 self.chart.nodes.push(n);
+                self.ids.insert(id.to_owned(), self.chart.nodes.len() - 1);
                 self.chart.nodes.len() - 1
             }
         };
@@ -200,20 +227,18 @@ impl Lower {
                 Some(Block::Network(net)) => {
                     let net = net.clone();
                     // The host's first network sits above it; later ones hang below it.
-                    let mut e = if self.attached.contains(&id) {
-                        Edge::new(&id, &net, s.range)
-                    } else {
-                        self.attached.push(id.clone());
+                    let mut e = if self.attached.insert(id.clone()) {
                         Edge::new(&net, &id, s.range)
+                    } else {
+                        Edge::new(&id, &net, s.range)
                     };
                     e.end = None;
                     e.label = h.address.map(Label::plain);
                     self.chart.edges.push(e);
                 }
                 Some(&Block::Group(g)) => {
-                    let members = &mut self.chart.subgraphs[g].members;
-                    if !members.contains(&id) {
-                        members.push(id);
+                    if self.members[g].insert(id.clone()) {
+                        self.chart.subgraphs[g].members.push(id);
                     }
                     if h.address.is_some() {
                         self.d.push(Diagnostic::warning(
@@ -239,17 +264,17 @@ impl Lower {
         match self.blocks.last().map(|(b, _)| b) {
             Some(Block::Network(net)) => {
                 let net = net.clone();
-                let node = self.host(&net, range);
+                let label = self.labels.entry(net.clone()).or_default();
                 match k {
-                    "address" if node.label.text.is_empty() => node.label.text = v.to_owned(),
-                    "address" => node.label.text = format!("{}\n{v}", node.label.text),
-                    "description" => {
-                        let address = node.label.text.split_once('\n').map(|(_, a)| a.to_owned());
-                        node.label.text = match address {
-                            Some(a) => format!("{}\n{a}", lines::text(v)),
-                            None => lines::text(v),
-                        };
-                    }
+                    "address" => label.address = Some(v.to_owned()),
+                    "description" => label.description = Some(lines::text(v)),
+                    _ => {}
+                }
+                let text = label.text();
+                let node = self.host(&net, range);
+                node.label.text = text;
+                match k {
+                    "address" | "description" => {}
                     "color" => {
                         if let Some(c) = lines::color(v) {
                             node.styles.push(style("fill", c));
@@ -283,7 +308,8 @@ impl Lower {
 
     /// `a -- b -- c`.
     fn link(&mut self, s: &Stmt) -> bool {
-        if !s.text.contains("--") {
+        // A `--` inside a host's `[...]` is part of a value, not a link.
+        if !s.text.contains("--") || s.text.contains('[') {
             return false;
         }
         let ends: Vec<&str> = s.text.split("--").map(str::trim).collect();
@@ -315,8 +341,11 @@ impl Lower {
                     "" => format!("network:{}", self.networks),
                     _ => format!("network:{name}"),
                 };
+                let label = self.labels.entry(id.clone()).or_default();
+                label.name = name.to_owned();
+                let text = label.text();
                 let node = self.host(&id, s.range);
-                node.label = Label::plain(name);
+                node.label = Label::plain(text);
                 node.shape = Shape::Rect;
                 node.styles.push(style("stroke-width", "3px"));
                 Block::Network(id)
@@ -326,6 +355,7 @@ impl Lower {
                 self.chart
                     .subgraphs
                     .push(Subgraph::new(&id, Label::plain(name), s.range));
+                self.members.push(HashSet::new());
                 Block::Group(self.chart.subgraphs.len() - 1)
             }
             _ => {
@@ -366,7 +396,10 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
         chart: Flowchart::default(),
         d: Vec::new(),
         blocks: Vec::new(),
-        attached: Vec::new(),
+        ids: HashMap::new(),
+        attached: HashSet::new(),
+        members: Vec::new(),
+        labels: HashMap::new(),
         networks: 0,
     };
     let mut cursor = Cursor::new(lines::read(root));
@@ -413,5 +446,30 @@ mod tests {
             Some(("color".into(), "#red"))
         );
         assert_eq!(attribute("a -- b"), None);
+    }
+
+    fn lower_src(body: &str) -> (Flowchart, Vec<String>) {
+        let src = format!("@startuml\nnwdiag {{\n{body}\n}}\n@enduml\n");
+        let (diagram, d) = super::super::parse(&src).lower();
+        let crate::diagram::Diagram::Graph(g) = diagram else {
+            panic!("not a graph")
+        };
+        (g, d.into_iter().map(|d| d.message).collect())
+    }
+
+    #[test]
+    fn network_labels() {
+        let (g, d) = lower_src("network { address = \"10.0.0.0/24\"; description = \"LAN\"; web }");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(g.nodes[0].label.text, "LAN\n10.0.0.0/24");
+    }
+
+    #[test]
+    fn dashes_in_values() {
+        let (g, d) = lower_src("network n { web [description = \"a--b\"] }");
+        assert!(d.is_empty(), "{d:?}");
+        let web = g.nodes.iter().find(|n| n.id == "web").unwrap();
+        assert_eq!(web.label.text, "a--b");
+        assert_eq!(g.nodes.len(), 2);
     }
 }
