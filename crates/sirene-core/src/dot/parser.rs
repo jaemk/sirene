@@ -72,7 +72,10 @@ impl Iterator for Lexer<'_> {
         let line_start = self.line_start;
         let r = &src[self.at..];
         let c = r.chars().next().expect("not at the end");
-        let (kind, len) = if c == '\n' {
+        let bom = self.at == 0 && c == scan::BOM;
+        let (kind, len) = if bom {
+            (WHITESPACE, c.len_utf8())
+        } else if c == '\n' {
             (NEWLINE, 1)
         } else if r.starts_with("\r\n") {
             (NEWLINE, 2)
@@ -147,8 +150,9 @@ impl Iterator for Lexer<'_> {
             );
             (ERROR_TOKEN, n)
         };
-        // Graphviz discards a line starting with `#` as C preprocessor output.
-        self.line_start = kind == NEWLINE;
+        // Graphviz discards a line starting with `#` as C preprocessor output. A file's byte
+        // order mark is not on the first line.
+        self.line_start = kind == NEWLINE || (bom && line_start);
         let start = self.at;
         self.at += len;
         Some(Tok {
@@ -754,6 +758,12 @@ mod tests {
         assert_eq!(t.matches("COMMENT@").count(), 3);
         // Only at the start of a line.
         assert_eq!(tree("digraph {\n  # x\n}").1, ["unexpected `#`"]);
+        // A byte order mark does not move the first line's start; a later one is whitespace.
+        let (t, d) = tree("\u{feff}# pre\ndigraph {}\n");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(t.matches("COMMENT@").count(), 1);
+        assert!(is_dot("\u{feff}# pre\ndigraph {}"));
+        assert_eq!(tree("\u{feff}\u{feff}# x\ndigraph {}").1.len(), 1);
     }
 
     #[test]
