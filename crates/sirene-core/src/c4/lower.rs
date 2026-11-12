@@ -444,6 +444,7 @@ impl Lowerer {
             length: 1,
             constraint: true,
             ports: [None; 2],
+            rows: [None; 2],
             label: c.get(params, "label").map(|t| label(&t)),
             start_label: None,
             end_label: None,

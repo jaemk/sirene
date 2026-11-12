@@ -149,11 +149,19 @@ struct Cluster {
     range: TextRange,
 }
 
+/// A port written on an edge end: `a:x` or `a:port:x`, read once the node's record fields
+/// are known.
+#[derive(Clone)]
+struct Port {
+    parts: Vec<String>,
+    range: TextRange,
+}
+
 struct PendingEdge {
     from: usize,
     to: usize,
-    /// The compass ports written on the tail and head (`a:n -> b:s`).
-    ports: [Option<Compass>; 2],
+    /// The ports written on the tail and head (`a:n -> b:p:s`).
+    ports: [Option<Port>; 2],
     attrs: Vec<Attr>,
     range: TextRange,
 }
@@ -170,6 +178,8 @@ struct Lowerer {
     node_attrs: Vec<Vec<Attr>>,
     node_cluster: Vec<Option<usize>>,
     mentions: Vec<Vec<TextRange>>,
+    /// Each node's record port names and their lines (`Edge::rows`), once it is lowered.
+    record_ports: Vec<HashMap<String, usize>>,
     edges: Vec<PendingEdge>,
     clusters: Vec<Cluster>,
     cluster_index: HashMap<String, usize>,
@@ -178,6 +188,8 @@ struct Lowerer {
     rank_groups: Vec<(Option<RankEnd>, Vec<usize>, TextRange)>,
     /// The root graph's `compound`, which lets `lhead` and `ltail` end edges at clusters.
     compound: bool,
+    /// Whether `rankdir` is LR or RL, where record ports are drawn.
+    horizontal: bool,
     /// Names already warned about, so each is reported once per file.
     warned: HashSet<String>,
 }
@@ -331,10 +343,11 @@ fn html_text(s: &str) -> String {
     decode_html_entities(out.trim_matches(blank))
 }
 
-/// A field of a record label: text, or a group of fields in braces (DOT-3).
+/// A field of a record label: text and its `<port>` name, or a group of fields in braces
+/// (DOT-3).
 #[derive(Debug, Clone, PartialEq)]
 enum Field {
-    Text(String),
+    Text(String, Option<String>),
     Group(Vec<Field>),
 }
 
@@ -347,13 +360,21 @@ fn record_fields(s: &str) -> Vec<Field> {
     fn group(chars: &mut std::str::Chars, depth: usize) -> Vec<Field> {
         let mut fields = Vec::new();
         let mut text = String::new();
+        let mut port: Option<String> = None;
         let mut nested: Option<Vec<Field>> = None;
-        let push = |fields: &mut Vec<Field>, text: &mut String, nested: &mut Option<Vec<Field>>| {
+        let push = |fields: &mut Vec<Field>,
+                    text: &mut String,
+                    port: &mut Option<String>,
+                    nested: &mut Option<Vec<Field>>| {
             match nested.take() {
                 Some(g) => fields.push(Field::Group(g)),
-                None => fields.push(Field::Text(std::mem::take(text).trim().to_owned())),
+                None => fields.push(Field::Text(
+                    std::mem::take(text).trim().to_owned(),
+                    port.take(),
+                )),
             }
             text.clear();
+            port.take();
         };
         while let Some(c) = chars.next() {
             match c {
@@ -367,18 +388,24 @@ fn record_fields(s: &str) -> Vec<Field> {
                 },
                 '{' if depth < MAX_RECORD_DEPTH => nested = Some(group(chars, depth + 1)),
                 '}' if depth > 0 => break,
-                '|' => push(&mut fields, &mut text, &mut nested),
+                '|' => push(&mut fields, &mut text, &mut port, &mut nested),
                 '<' => {
+                    let mut name = String::new();
                     for p in chars.by_ref() {
                         if p == '>' {
                             break;
                         }
+                        name.push(p);
+                    }
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        port = Some(name.to_owned());
                     }
                 }
                 _ => text.push(c),
             }
         }
-        push(&mut fields, &mut text, &mut nested);
+        push(&mut fields, &mut text, &mut port, &mut nested);
         fields
     }
     let mut fields = group(&mut s.chars(), 0);
@@ -389,10 +416,10 @@ fn record_fields(s: &str) -> Vec<Field> {
     fields
 }
 
-/// The texts in a field, in order.
-fn leaves(field: &Field, out: &mut Vec<String>) {
+/// The texts in a field and their port names, in order.
+fn leaves(field: &Field, out: &mut Vec<(String, Option<String>)>) {
     match field {
-        Field::Text(t) => out.push(t.clone()),
+        Field::Text(t, port) => out.push((t.clone(), port.clone())),
         Field::Group(g) => g.iter().for_each(|f| leaves(f, out)),
     }
 }
@@ -708,32 +735,47 @@ impl Lowerer {
         }
     }
 
-    /// The node a `NODE` names, created with the scope's defaults if new, and its compass port
-    /// (`a:n`, `a:port:n`).
-    fn node_ref(&mut self, n: &SyntaxNode, scope: &Scope) -> (usize, Option<Compass>) {
+    /// The node a `NODE` names, created with the scope's defaults if new, and the port
+    /// written after it (`a:n`, `a:port:n`).
+    fn node_ref(&mut self, n: &SyntaxNode, scope: &Scope) -> (usize, Option<Port>) {
         let mut it = ids(n);
         let Some(id) = it.next() else {
             return (self.node("", n.text_range(), scope), None);
         };
-        let rest: Vec<String> = it.map(|p| value(&p).text).collect();
-        // `a:x` is a compass point or a record port; `a:port:x` a record port and a compass
-        // point.
-        let (port, compass) = match rest.as_slice() {
+        let parts: Vec<String> = it.map(|p| value(&p).text).collect();
+        let port = (!parts.is_empty()).then(|| Port {
+            parts,
+            range: n.text_range(),
+        });
+        let name = value(&id).text;
+        (self.node(&name, id.text_range(), scope), port)
+    }
+
+    /// The record line and compass point of `port` on `node`: `x` is a record port of the
+    /// node, else a compass point; `p:x` a record port and a compass point. An unknown
+    /// record port is a warning and joins the node.
+    fn port(&mut self, node: usize, port: &Port) -> (Option<usize>, Option<Compass>) {
+        let range = port.range;
+        let (name, compass) = match port.parts.as_slice() {
             [] => (None, None),
-            [x] if is_compass(x) => (None, Some(x)),
+            [x] if !self.record_ports[node].contains_key(x) && is_compass(x) => (None, Some(x)),
             [x] => (Some(x), None),
             [p, x, ..] => (Some(p), Some(x)),
         };
-        if port.is_some() {
-            self.warn_once(
-                "<port>",
-                n.text_range(),
-                "record ports are not supported yet; the edge joins the node",
-            );
-        }
-        let compass = compass.and_then(|x| self.compass(x, n.text_range()));
-        let name = value(&id).text;
-        (self.node(&name, id.text_range(), scope), compass)
+        let row = name.and_then(|p| {
+            let row = self.record_ports[node].get(p).copied();
+            if row.is_none() {
+                let id = self.ids[node].clone();
+                self.warn_once(
+                    &format!("port@{range:?}"),
+                    range,
+                    format!("`{id}` has no record port `{p}`; the edge joins the node"),
+                );
+            }
+            row
+        });
+        let compass = compass.cloned().and_then(|x| self.compass(&x, range));
+        (row, compass)
     }
 
     /// A compass point; an unknown one is a warning.
@@ -770,6 +812,7 @@ impl Lowerer {
                 self.node_attrs.push(scope.node.clone());
                 self.node_cluster.push(scope.cluster);
                 self.mentions.push(Vec::new());
+                self.record_ports.push(HashMap::new());
                 i
             }
         };
@@ -792,12 +835,12 @@ impl Lowerer {
     /// `a -> b -> {c d} [attrs]`: an edge from every node of each operand to every node of
     /// the next. Returns the nodes mentioned.
     fn edge_stmt(&mut self, stmt: &SyntaxNode, scope: &mut Scope) -> Vec<usize> {
-        let mut operands: Vec<(Vec<usize>, Option<Compass>, TextRange)> = Vec::new();
+        let mut operands: Vec<(Vec<usize>, Option<Port>, TextRange)> = Vec::new();
         for n in stmt.children() {
             match n.kind() {
                 NODE => {
-                    let (i, compass) = self.node_ref(&n, scope);
-                    operands.push((vec![i], compass, n.text_range()));
+                    let (i, port) = self.node_ref(&n, scope);
+                    operands.push((vec![i], port, n.text_range()));
                 }
                 SUBGRAPH => {
                     let nodes = self.subgraph(&n, scope);
@@ -818,7 +861,7 @@ impl Lowerer {
                     self.edges.push(PendingEdge {
                         from: f,
                         to: t,
-                        ports: [*tail, *head],
+                        ports: [tail.clone(), head.clone()],
                         attrs: attrs.clone(),
                         range,
                     });
@@ -916,6 +959,7 @@ impl Lowerer {
                 }
             }
         }
+        self.horizontal = matches!(chart.direction, Direction::LeftRight | Direction::RightLeft);
         if let Some(a) = get(&root, "label") {
             let title = self.label_text(&a.value.clone(), &graph, "");
             chart.title = Some(title).filter(|t| !t.trim().is_empty());
@@ -1136,28 +1180,49 @@ impl Lowerer {
             let mut texts = |f: &Field| {
                 let mut out = Vec::new();
                 leaves(f, &mut out);
-                out.iter()
-                    .map(|t| {
-                        self.label_text(
+                out.into_iter()
+                    .map(|(t, port)| {
+                        let text = self.label_text(
                             &Value {
-                                text: t.clone(),
+                                text: t,
                                 html: false,
                             },
                             graph,
                             &id,
-                        )
+                        );
+                        (text, port)
                     })
                     .collect::<Vec<_>>()
             };
+            // Each port's line: the title's lines, then the sections' rows (Edge::rows).
+            let mut ports = HashMap::new();
+            let mut row = 0;
+            let mut name = |port: Option<String>, row: usize| {
+                if let Some(p) = port {
+                    ports.entry(p).or_insert(row);
+                }
+            };
             let title = fields.first().map(&mut texts).unwrap_or_default();
+            for (t, port) in &title {
+                name(port.clone(), row);
+                row += t.split('\n').count();
+            }
             for f in fields.iter().skip(1) {
-                let rows: Vec<Row> = texts(f)
-                    .iter()
-                    .flat_map(|t| t.split('\n').map(Row::plain).collect::<Vec<_>>())
-                    .collect();
+                let mut rows = Vec::new();
+                for (t, port) in texts(f) {
+                    name(port, row);
+                    let lines: Vec<Row> = t.split('\n').map(Row::plain).collect();
+                    row += lines.len();
+                    rows.extend(lines);
+                }
                 sections.push(rows);
             }
-            title.join("\n")
+            self.record_ports[i] = ports;
+            title
+                .into_iter()
+                .map(|(t, _)| t)
+                .collect::<Vec<_>>()
+                .join("\n")
         } else {
             self.label_text(&raw, graph, &id)
         };
@@ -1314,28 +1379,38 @@ impl Lowerer {
         let (tail, head) = (self.ids[e.from].clone(), self.ids[e.to].clone());
         let from = self.clip(attrs, "ltail", e.from, e.to);
         let to = self.clip(attrs, "lhead", e.to, e.from);
-        // A port written on the node, else `tailport` or `headport` (`port:compass` or
-        // `compass`).
-        let mut ports = e.ports;
-        for (slot, key) in ports.iter_mut().zip(["tailport", "headport"]) {
-            if slot.is_none()
-                && let Some(a) = get(attrs, key)
-            {
-                let (text, range) = (a.value.text.clone(), a.range);
-                let (port, x) = match text.rsplit_once(':') {
-                    Some((p, x)) => (Some(p), Some(x)),
-                    None if is_compass(&text) => (None, Some(text.as_str())),
-                    None => (Some(text.as_str()), None),
-                };
-                if port.is_some() {
-                    self.warn_once(
-                        "<port>",
-                        range,
-                        "record ports are not supported yet; the edge joins the node",
-                    );
-                }
-                *slot = x.and_then(|x| self.compass(x, range));
+        // A port written on the node, else `tailport` or `headport` (`port:compass`, `port`,
+        // or `compass`).
+        let mut ports = [None; 2];
+        let mut rows = [None; 2];
+        for (k, key) in ["tailport", "headport"].into_iter().enumerate() {
+            let port = e.ports[k].clone().or_else(|| {
+                get(attrs, key).map(|a| Port {
+                    parts: match a.value.text.rsplit_once(':') {
+                        Some((p, x)) => vec![p.to_owned(), x.to_owned()],
+                        None => vec![a.value.text.clone()],
+                    },
+                    range: a.range,
+                })
+            });
+            if let Some(port) = port {
+                let node = if k == 0 { e.from } else { e.to };
+                (rows[k], ports[k]) = self.port(node, &port);
             }
+        }
+        // An end clipped to a cluster joins its border, not a record line.
+        if from.is_some() {
+            rows[0] = None;
+        }
+        if to.is_some() {
+            rows[1] = None;
+        }
+        if rows.iter().any(Option::is_some) && !self.horizontal {
+            self.warn_once(
+                "<rows>",
+                e.range,
+                "record ports are drawn only when `rankdir` is LR or RL; the edge joins the node",
+            );
         }
         let dir = match get(attrs, "dir") {
             None => (if self.directed { "forward" } else { "none" }).to_owned(),
@@ -1439,6 +1514,7 @@ impl Lowerer {
             length,
             constraint,
             ports,
+            rows,
             label,
             start_label,
             end_label,
@@ -1567,22 +1643,25 @@ mod tests {
         fields.iter().for_each(|f| leaves(f, &mut out));
         // The braces past the limit are text.
         assert_eq!(out.len(), 1);
-        assert_eq!(out[0].len(), 100_000 - MAX_RECORD_DEPTH);
+        assert_eq!(out[0].0.len(), 100_000 - MAX_RECORD_DEPTH);
     }
 
     #[test]
     fn records() {
-        let t = |s: &str| Field::Text(s.into());
+        let t = |s: &str| Field::Text(s.into(), None);
+        let p = |s: &str, port: &str| Field::Text(s.into(), Some(port.into()));
         assert_eq!(record_fields("a|b|c"), [t("a"), t("b"), t("c")]);
         assert_eq!(record_fields("{a|b}"), [t("a"), t("b")]);
         assert_eq!(
             record_fields("<f0> left|{<f1> mid\\|dle|x}|right"),
             [
-                t("left"),
-                Field::Group(vec![t("mid|dle"), t("x")]),
+                p("left", "f0"),
+                Field::Group(vec![p("mid|dle", "f1"), t("x")]),
                 t("right")
             ]
         );
+        // A blank port name is none; the last of two names wins.
+        assert_eq!(record_fields("< > a|<x><y> b"), [t("a"), p("b", "y")]);
     }
 
     #[test]

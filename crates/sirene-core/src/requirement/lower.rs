@@ -246,6 +246,7 @@ impl Lowerer {
             length: 1,
             constraint: true,
             ports: [None; 2],
+            rows: [None; 2],
             label: Some(Label::plain(format!("«{kind}»"))),
             start_label: None,
             end_label: None,

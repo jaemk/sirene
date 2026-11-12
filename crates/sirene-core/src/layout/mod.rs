@@ -113,6 +113,9 @@ pub struct EdgeSpec {
     /// Where on a node end the edge attaches (LAYOUT-7): a compass point's part along the
     /// rank puts its port before or after the others on that side.
     pub ports: [Option<Compass>; 2],
+    /// Where on a node end the edge attaches, in cells from the top of the node, when its
+    /// container runs left-right or right-left (LAYOUT-7); this wins over `ports`.
+    pub anchors: [Option<i32>; 2],
 }
 
 /// A box placed beside a node or a cluster, in the same rank (LANGS-3).
@@ -1283,6 +1286,24 @@ impl<'a, 'b> Placer<'a, 'b> {
                     (part + 1) as u8
                 })
             };
+            // A fixed port, in cells from the start of the side, kept on the side.
+            let anchor = |edge: usize| -> Option<i32> {
+                let Kind::Item(item @ Item::Node(_)) = el.kind else {
+                    return None;
+                };
+                if !horizontal(self.dir) {
+                    return None;
+                }
+                let spec = &graph.edges[edge];
+                let at = if spec.from == item {
+                    spec.anchors[0]
+                } else if spec.to == item {
+                    spec.anchors[1]
+                } else {
+                    None
+                }?;
+                Some(at.clamp(0, (el.cross - 1).max(0)) - el.cross / 2)
+            };
             for (downward, side) in [(true, Side::Bottom), (false, Side::Top)] {
                 let segs = if downward { &inc.down[e] } else { &inc.up[e] };
                 let mut list: Vec<((u8, u8, usize, usize), End)> = segs
@@ -1314,6 +1335,7 @@ impl<'a, 'b> Placer<'a, 'b> {
                     };
                     let off = ports
                         .and_then(|p| p.get(&(edge, side)).copied())
+                        .or_else(|| anchor(edge))
                         .unwrap_or_else(|| self.spread(el.cross, k as i32, n));
                     match end {
                         End::Segment(i) if downward => offsets[i].0 = off,

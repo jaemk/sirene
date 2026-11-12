@@ -72,8 +72,10 @@ An edge leaves the downstream side of its upper item and enters the upstream sid
 item. The ports on one side of a node are spread evenly across it, inset from the corners, and
 ordered by the position of the other end; an end with a compass point toward one end of the
 side (west or east across a top-down rank, north or south across a left-right one) is placed
-before or after the ends without one. A node grows along the rank when its ports would not
-fit. An edge reaching a node inside a cluster, or the cluster itself, crosses the cluster border
+before or after the ends without one. An end anchored to a line of a node (a record port)
+joins that line's middle when the node's container runs left-right or right-left, kept on the
+side; the anchor is ignored across a top-down rank. A node grows along the rank when its ports
+would not fit. An edge reaching a node inside a cluster, or the cluster itself, crosses the cluster border
 at its own port on the corresponding side.
 
 ## LAYOUT-8 Routes

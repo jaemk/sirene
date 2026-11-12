@@ -293,6 +293,9 @@ pub struct Edge {
     pub constraint: bool,
     /// Where on the source and target nodes the edge attaches (DOT's compass ports).
     pub ports: [Option<Compass>; 2],
+    /// The line of the source and target nodes each end joins (DOT's record ports): the
+    /// label's lines, then each section's rows in order.
+    pub rows: [Option<usize>; 2],
     pub label: Option<Label>,
     /// Labels beside the source and target ends, such as multiplicities (LANGS-3).
     pub start_label: Option<Label>,

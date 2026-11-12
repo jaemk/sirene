@@ -32,6 +32,7 @@ fn edge(from: usize, to: usize) -> EdgeSpec {
         label: None,
         constraint: true,
         ports: [None; 2],
+        anchors: [None; 2],
     }
 }
 
