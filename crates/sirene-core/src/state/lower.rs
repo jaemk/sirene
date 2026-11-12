@@ -64,8 +64,12 @@ struct Lowerer {
     composites: HashSet<String>,
     /// Lowered composite states and regions, in the order they open.
     subgraphs: Vec<Subgraph>,
+    /// The index in `subgraphs` of the first with each id.
+    subgraph_index: HashMap<String, usize>,
     /// Members of each container, by container id.
     members: HashMap<String, Vec<String>>,
+    /// `(container, member)` pairs in `members`.
+    listed: HashSet<(String, String)>,
     /// The container of each node and subgraph.
     parent: HashMap<String, String>,
     /// Container ids that are regions.
@@ -88,9 +92,22 @@ impl Lowerer {
         self.diagnostics.push(Diagnostic::warning(range, message));
     }
 
+    fn push_subgraph(&mut self, s: Subgraph) {
+        self.subgraph_index
+            .entry(s.id.clone())
+            .or_insert(self.subgraphs.len());
+        self.subgraphs.push(s);
+    }
+
+    /// The first subgraph with `id`.
+    fn subgraph_mut(&mut self, id: &str) -> Option<&mut Subgraph> {
+        let &i = self.subgraph_index.get(id)?;
+        Some(&mut self.subgraphs[i])
+    }
+
     fn add_member(&mut self, container: &str, id: &str) {
-        let list = self.members.entry(container.to_owned()).or_default();
-        if !list.iter().any(|m| m == id) {
+        if self.listed.insert((container.to_owned(), id.to_owned())) {
+            let list = self.members.entry(container.to_owned()).or_default();
             list.push(id.to_owned());
         }
         self.parent
@@ -228,7 +245,7 @@ impl Lowerer {
                 },
                 |s| s.text_range(),
             );
-        self.subgraphs.push(Subgraph {
+        self.push_subgraph(Subgraph {
             id: id.clone(),
             title: Label::default(),
             direction: None,
@@ -338,7 +355,7 @@ impl Lowerer {
         let first = self.described.insert(id.to_owned());
         let target = match self.node_index.get(id) {
             Some(&i) => &mut self.chart.nodes[i].label,
-            None => match self.subgraphs.iter_mut().find(|s| s.id == id) {
+            None => match self.subgraph_mut(id) {
                 Some(s) => &mut s.title,
                 None => return,
             },
@@ -355,7 +372,7 @@ impl Lowerer {
         let Some(id) = token(stmt, IDENT).map(|t| t.text().to_owned()) else {
             return;
         };
-        if self.subgraphs.iter().any(|s| s.id == id) {
+        if self.subgraph_index.contains_key(&id) {
             self.warning(
                 stmt.text_range(),
                 format!("composite state `{id}` is already defined; adding to it"),
@@ -366,7 +383,7 @@ impl Lowerer {
             if token(stmt, STRING).is_some() {
                 self.described.insert(id.clone());
             }
-            self.subgraphs.push(Subgraph {
+            self.push_subgraph(Subgraph {
                 id: id.clone(),
                 title,
                 direction: None,
@@ -381,7 +398,7 @@ impl Lowerer {
         }
         let direction = self.block(stmt, &id);
         if let Some(d) = direction
-            && let Some(s) = self.subgraphs.iter_mut().find(|s| s.id == id)
+            && let Some(s) = self.subgraph_mut(&id)
         {
             s.direction = Some(d);
         }
@@ -504,7 +521,8 @@ impl Lowerer {
             let (classes, styles) = if let Some(&i) = self.node_index.get(&id) {
                 let n = &mut self.chart.nodes[i];
                 (&mut n.classes, &mut n.styles)
-            } else if let Some(s) = self.subgraphs.iter_mut().find(|s| s.id == id) {
+            } else if let Some(&s) = self.subgraph_index.get(&id) {
+                let s = &mut self.subgraphs[s];
                 (&mut s.classes, &mut s.styles)
             } else {
                 self.warning(range, format!("unknown state `{id}`"));

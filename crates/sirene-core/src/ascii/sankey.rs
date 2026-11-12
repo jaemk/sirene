@@ -54,6 +54,10 @@ pub fn render(sankey: &Sankey, options: &Options) -> String {
         .map(|l| width(&sankey.format_value(l.value)))
         .max()
         .unwrap_or(0);
+    let mut outgoing = vec![Vec::new(); sankey.nodes.len()];
+    for (k, l) in sankey.links.iter().enumerate() {
+        outgoing[l.source].push(k);
+    }
     let mut rows = Vec::new();
     for column in &layout.columns {
         for &i in column {
@@ -67,9 +71,7 @@ pub fn render(sankey: &Sankey, options: &Options) -> String {
                 sankey.format_value(n.value)
             ));
             // Outgoing links, top to bottom as drawn.
-            let mut out: Vec<usize> = (0..sankey.links.len())
-                .filter(|&k| sankey.links[k].source == i)
-                .collect();
+            let out = &mut outgoing[i];
             out.sort_by(|&a, &b| layout.links[a].y0.total_cmp(&layout.links[b].y0));
             for (j, &k) in out.iter().enumerate() {
                 let l = &sankey.links[k];

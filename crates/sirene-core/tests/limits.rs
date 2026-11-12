@@ -431,6 +431,33 @@ fn gantt_dependencies() {
     check(&s, &[]);
 }
 
+/// Long lists of states, sibling nodes, slices, and flows, forward and backward: each is read
+/// and drawn in time near linear in its length.
+#[test]
+fn wide_inputs() {
+    let lines = |header: &str, line: &dyn Fn(usize) -> String| {
+        let mut s = format!("{header}\n");
+        for i in 0..10_000 {
+            let _ = writeln!(s, "{}", line(i));
+        }
+        s
+    };
+    check(
+        &lines("stateDiagram-v2", &|i| format!("s{i} --> s{}", i + 1)),
+        &[],
+    );
+    check(&lines("mindmap\nroot", &|i| format!("  c{i}")), &[]);
+    check(&lines("pie", &|i| format!("\"s{i}\" : 1")), &[]);
+    check(
+        &lines("sankey-beta", &|i| format!("a{i},a{},1", i + 1)),
+        &[],
+    );
+    check(
+        &lines("sankey-beta", &|i| format!("a{},a{i},1", i + 1)),
+        &[],
+    );
+}
+
 #[test]
 fn git_branches() {
     let mut s = String::from("gitGraph\ncommit\n");
