@@ -2,7 +2,7 @@
 //! each element is a node of its keyword's shape, each container a subgraph, and each link an
 //! edge.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
@@ -136,6 +136,8 @@ struct Lower {
     last: Option<String>,
     /// The actor shape `skinparam actorStyle` picks.
     actor: Shape,
+    /// The container each node was created in.
+    placed: HashMap<String, usize>,
 }
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
@@ -150,6 +152,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
         stack: Vec::new(),
         last: None,
         actor: Shape::Actor,
+        placed: HashMap::new(),
     };
     let mut cursor = Cursor::new(lines);
     while let Some(line) = cursor.next() {
@@ -168,6 +171,20 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
     // A name only links mention that a container later takes is the container, not a node.
     let implicit = std::mem::take(&mut l.implicit);
     let nodes = std::mem::take(&mut l.chart.nodes);
+    // Its membership came before any entry for the container of the same id, so drop the
+    // first one in the container it was made in.
+    let mut drop: HashMap<usize, HashSet<String>> = HashMap::new();
+    for (node, &implicit) in nodes.iter().zip(&implicit) {
+        if implicit
+            && l.containers.contains_key(&node.id)
+            && let Some(&c) = l.placed.get(&node.id)
+        {
+            drop.entry(c).or_default().insert(node.id.clone());
+        }
+    }
+    for (c, mut ids) in drop {
+        l.chart.subgraphs[c].members.retain(|m| !ids.remove(m));
+    }
     for (mut node, implicit) in nodes.into_iter().zip(implicit) {
         if implicit && l.containers.contains_key(&node.id) {
             continue;
@@ -220,6 +237,7 @@ impl Lower {
         self.index.insert(id.to_owned(), i);
         if let Some(c) = self.container() {
             self.chart.subgraphs[c].members.push(id.to_owned());
+            self.placed.insert(id.to_owned(), c);
         }
         i
     }
@@ -262,9 +280,6 @@ impl Lower {
                 return;
             }
         }
-        if w == "note" {
-            return self.note(line, cursor);
-        }
         if w == "together" && t.ends_with('{') {
             return self.open(None, line.range);
         }
@@ -277,6 +292,9 @@ impl Lower {
             .as_ref()
             .is_some_and(|l| [l.from, l.to].contains(&lines::word(t)))
             && after.starts_with(['-', '.', '<', '*', '}', '|', '"', '+', '#']);
+        if w == "note" && !named_like_keyword {
+            return self.note(line, cursor);
+        }
         if let Some(&(kw, shape)) = ELEMENTS.iter().find(|(k, _)| *k == w)
             && !named_like_keyword
         {
@@ -346,13 +364,8 @@ impl Lower {
             let i = match self.containers.get(&id) {
                 Some(&i) => i,
                 None => {
+                    // A link-only node of this id goes in `lower`.
                     let i = self.chart.subgraphs.len();
-                    // Drop the membership of a link-only node this container replaces.
-                    if self.index.get(&id).is_some_and(|&n| self.implicit[n]) {
-                        for s in &mut self.chart.subgraphs {
-                            s.members.retain(|m| *m != id);
-                        }
-                    }
                     self.chart
                         .subgraphs
                         .push(Subgraph::new(&id, Label::plain(title), line.range));
@@ -616,6 +629,18 @@ mod tests {
         // An explicit element is not dropped by a same-id container later? It stays a node.
         let (g, _) = lower_src("[N]\n[A] --> N\nnode N {\n  [Db]\n}");
         assert!(g.node("N").is_some());
+    }
+
+    #[test]
+    fn note_named_element_links() {
+        let (g, d) = lower_src("[A]\nNote --> [A]\n[A] -up-> note");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(g.edges.len(), 2);
+        assert!(g.notes.is_empty());
+        let (g, d) = lower_src("[A]\nnote right of A : a -> b");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.edges.is_empty());
+        assert_eq!(g.notes.len(), 1);
     }
 
     #[test]

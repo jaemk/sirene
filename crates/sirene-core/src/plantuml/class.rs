@@ -1,7 +1,7 @@
 //! PlantUML class and object diagrams (PCLS-*), lowered to the graph model: each class is a
 //! node with its members in compartments, and each link an edge.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
@@ -91,7 +91,9 @@ struct Lower {
     last: Option<String>,
     hide: Hide,
     /// Nodes created only by a link end, so a later package of that name can replace them.
-    implicit: std::collections::HashSet<String>,
+    implicit: HashSet<String>,
+    /// The package each node was created in.
+    placed: HashMap<String, usize>,
 }
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
@@ -104,7 +106,8 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
         stack: Vec::new(),
         last: None,
         hide: Hide::default(),
-        implicit: Default::default(),
+        implicit: HashSet::new(),
+        placed: HashMap::new(),
     };
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
@@ -198,6 +201,7 @@ impl Lower {
         self.index.insert(id.to_owned(), i);
         if let Some(p) = self.package() {
             self.chart.subgraphs[p].members.push(id.to_owned());
+            self.placed.insert(id.to_owned(), p);
         }
         i
     }
@@ -335,13 +339,7 @@ impl Lower {
         let i = match self.packages.get(&id) {
             Some(&i) => i,
             None => {
-                if self.implicit.contains(&id) {
-                    // The stray node goes in `finish`; drop its membership now, before the
-                    // package adds an entry under the same id.
-                    for sg in &mut self.chart.subgraphs {
-                        sg.members.retain(|m| *m != id);
-                    }
-                }
+                // A node of this id made only by a link end goes in `finish`.
                 let i = self.chart.subgraphs.len();
                 self.chart
                     .subgraphs
@@ -642,19 +640,24 @@ impl Lower {
     fn finish(mut self) -> (Flowchart, Vec<Diagnostic>) {
         let hide = self.hide;
         // A package of the same name replaces a node made only by a link end.
-        let stray: Vec<usize> = self
-            .chart
-            .nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| self.implicit.contains(&n.id) && self.packages.contains_key(&n.id))
-            .map(|(i, _)| i)
-            .collect();
-        for &i in stray.iter().rev() {
-            self.chart.nodes.remove(i);
-            self.classes.remove(i);
+        let stray = |id: &String| self.implicit.contains(id) && self.packages.contains_key(id);
+        // Its membership came before any entry for the package of the same id, so drop the
+        // first one in the package it was made in.
+        let mut drop: HashMap<usize, HashSet<String>> = HashMap::new();
+        for id in self.implicit.iter().filter(|id| stray(id)) {
+            if let Some(&p) = self.placed.get(id) {
+                drop.entry(p).or_default().insert(id.clone());
+            }
         }
-        for (node, class) in self.chart.nodes.iter_mut().zip(self.classes) {
+        for (p, mut ids) in drop {
+            self.chart.subgraphs[p].members.retain(|m| !ids.remove(m));
+        }
+        let (mut nodes, classes): (Vec<Node>, Vec<Class>) = std::mem::take(&mut self.chart.nodes)
+            .into_iter()
+            .zip(std::mem::take(&mut self.classes))
+            .filter(|(n, _)| !stray(&n.id))
+            .unzip();
+        for (node, class) in nodes.iter_mut().zip(classes) {
             if !class.stereotypes.is_empty() && !hide.stereotypes {
                 let s: Vec<String> = class.stereotypes.iter().map(|s| format!("«{s}»")).collect();
                 node.label.text = format!("{}\n{}", s.join(" "), node.label.text);
@@ -685,6 +688,7 @@ impl Lower {
                 }
             }
         }
+        self.chart.nodes = nodes;
         (self.chart, self.d)
     }
 }
@@ -872,6 +876,12 @@ mod tests {
         assert!(g.node("Q").is_none());
         let outer = g.subgraphs.iter().find(|s| s.id == "outer").unwrap();
         assert_eq!(outer.members, ["Q"]);
+        // Both in one package: the node's entry goes and the package's stays.
+        let (g, d) = lower_src("package outer {\nA --> Q\npackage Q {\nclass B\n}\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("Q").is_none());
+        let outer = g.subgraphs.iter().find(|s| s.id == "outer").unwrap();
+        assert_eq!(outer.members, ["A", "Q"]);
     }
 
     #[test]

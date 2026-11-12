@@ -90,6 +90,8 @@ struct Lower {
     clocks: Vec<(usize, TextRange)>,
     /// The signal of a participant-oriented `@W` block.
     focus: Option<String>,
+    /// Each signal's `has` states, by name, as indexes into its `states`.
+    states: HashMap<usize, HashMap<String, usize>>,
 }
 
 impl Lower {
@@ -439,9 +441,13 @@ impl Lower {
 
     /// `ID has a,b,c` or `ID has "Label" as name`.
     fn has(&mut self, id: &str, rest: &str, range: TextRange) {
-        let Some(sig) = self.signal_mut(id, range) else {
+        let Some(&si) = self.ids.get(id) else {
+            self.d
+                .push(Diagnostic::new(range, format!("no signal is named `{id}`")));
             return;
         };
+        let sig = &mut self.t.signals[si];
+        let at = self.states.entry(si).or_default();
         let mut states = Vec::new();
         for part in rest.split(',').map(str::trim).filter(|p| !p.is_empty()) {
             let (label, name) = match lines::keyword_split(part, "as") {
@@ -454,9 +460,12 @@ impl Lower {
             states.push((name, label));
         }
         for (name, label) in states {
-            match sig.states.iter_mut().find(|(n, _)| *n == name) {
-                Some(s) => s.1 = label,
-                None => sig.states.push((name, label)),
+            match at.get(&name) {
+                Some(&i) => sig.states[i].1 = label,
+                None => {
+                    at.insert(name.clone(), sig.states.len());
+                    sig.states.push((name, label));
+                }
             }
         }
     }
@@ -593,6 +602,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
         anchors: HashMap::new(),
         clocks: Vec::new(),
         focus: None,
+        states: HashMap::new(),
     };
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
@@ -679,6 +689,22 @@ mod tests {
         let (t, d) = lower_src("analog V\n@0\nV is \" 5\"");
         assert!(d.is_empty(), "{d:?}");
         assert_eq!(t.signals[0].changes[0].value, Value::State("5".into()));
+    }
+
+    #[test]
+    fn has_states_relabel_in_place() {
+        let (t, d) =
+            lower_src("robust W\nW has a,b\nW has \"Bee\" as b,c\nrobust X\nX has b\nY has z");
+        assert_eq!(d, ["no signal is named `Y`"]);
+        let s = |i: usize| -> Vec<(&str, &str)> {
+            t.signals[i]
+                .states
+                .iter()
+                .map(|(n, l)| (n.as_str(), l.as_str()))
+                .collect()
+        };
+        assert_eq!(s(0), [("a", "a"), ("b", "Bee"), ("c", "c")]);
+        assert_eq!(s(1), [("b", "b")]);
     }
 
     #[test]
