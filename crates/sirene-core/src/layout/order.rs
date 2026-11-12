@@ -3,8 +3,14 @@
 const SWEEPS: usize = 12;
 
 /// Reorders `layers` (element ids per layer) in place. `segments` connect an element to one in
-/// the next layer, as `(upper, lower)`; `elements` is the number of element ids.
-pub(super) fn order(layers: &mut [Vec<usize>], segments: &[(usize, usize)], elements: usize) {
+/// the next layer, as `(upper, lower)`; `elements` is the number of element ids. The elements
+/// of each `fixed` group, all in one layer, stay in the group's order.
+pub(super) fn order(
+    layers: &mut [Vec<usize>],
+    segments: &[(usize, usize)],
+    elements: usize,
+    fixed: &[Vec<usize>],
+) {
     let mut up = vec![Vec::new(); elements];
     let mut down = vec![Vec::new(); elements];
     for &(u, v) in segments {
@@ -13,6 +19,19 @@ pub(super) fn order(layers: &mut [Vec<usize>], segments: &[(usize, usize)], elem
     }
     let mut pos = vec![0usize; elements];
     index(layers, &mut pos);
+    let mut layer_of = vec![0usize; elements];
+    for (l, layer) in layers.iter().enumerate() {
+        for &e in layer {
+            layer_of[e] = l;
+        }
+    }
+    let mut groups = vec![Vec::new(); layers.len()];
+    for g in fixed.iter().filter(|g| g.len() > 1) {
+        groups[layer_of[g[0]]].push(g.as_slice());
+    }
+    for (layer, groups) in layers.iter_mut().zip(&groups) {
+        keep(layer, groups, &mut pos);
+    }
     let mut best = layers.to_vec();
     let mut best_crossings = crossings(layers, &down, &pos);
     for sweep in 0..SWEEPS {
@@ -20,12 +39,14 @@ pub(super) fn order(layers: &mut [Vec<usize>], segments: &[(usize, usize)], elem
             break;
         }
         if sweep % 2 == 0 {
-            for layer in layers.iter_mut().skip(1) {
+            for (layer, groups) in layers.iter_mut().zip(&groups).skip(1) {
                 reorder(layer, &up, &mut pos);
+                keep(layer, groups, &mut pos);
             }
         } else {
-            for layer in layers.iter_mut().rev().skip(1) {
+            for (layer, groups) in layers.iter_mut().zip(&groups).rev().skip(1) {
                 reorder(layer, &down, &mut pos);
+                keep(layer, groups, &mut pos);
             }
         }
         let c = crossings(layers, &down, &pos);
@@ -41,6 +62,18 @@ fn index(layers: &[Vec<usize>], pos: &mut [usize]) {
     for layer in layers {
         for (i, &e) in layer.iter().enumerate() {
             pos[e] = i;
+        }
+    }
+}
+
+/// Puts each group's elements, in the group's order, into the slots they hold in `layer`.
+fn keep(layer: &mut [usize], groups: &[&[usize]], pos: &mut [usize]) {
+    for g in groups {
+        let mut slots: Vec<usize> = g.iter().map(|&e| pos[e]).collect();
+        slots.sort_unstable();
+        for (&slot, &e) in slots.iter().zip(g.iter()) {
+            layer[slot] = e;
+            pos[e] = slot;
         }
     }
 }
@@ -120,14 +153,26 @@ mod tests {
     fn untangles_a_cross() {
         // 0 1 / 2 3 with 0->3 and 1->2.
         let mut layers = vec![vec![0, 1], vec![2, 3]];
-        order(&mut layers, &[(0, 3), (1, 2)], 4);
+        order(&mut layers, &[(0, 3), (1, 2)], 4, &[]);
         assert_eq!(layers, [vec![0, 1], vec![3, 2]]);
+    }
+
+    #[test]
+    fn fixed_groups_keep_their_order() {
+        // As above, but 2 must stay left of 3, so the top layer turns instead.
+        let mut layers = vec![vec![0, 1], vec![2, 3]];
+        order(&mut layers, &[(0, 3), (1, 2)], 4, &[vec![2, 3]]);
+        assert_eq!(layers, [vec![1, 0], vec![2, 3]]);
+        // A group out of order to begin with is put in order.
+        let mut layers = vec![vec![0, 1, 2], vec![3, 4, 5]];
+        order(&mut layers, &[], 6, &[vec![5, 3]]);
+        assert_eq!(layers, [vec![0, 1, 2], vec![5, 4, 3]]);
     }
 
     #[test]
     fn keeps_order_without_crossings() {
         let mut layers = vec![vec![0, 1], vec![2, 3]];
-        order(&mut layers, &[(0, 2), (1, 3)], 4);
+        order(&mut layers, &[(0, 2), (1, 3)], 4, &[]);
         assert_eq!(layers, [vec![0, 1], vec![2, 3]]);
     }
 
@@ -135,7 +180,7 @@ mod tests {
     fn unconnected_elements_keep_their_slot() {
         // 4 has no neighbors and stays in the middle.
         let mut layers = vec![vec![0, 1], vec![2, 4, 3]];
-        order(&mut layers, &[(0, 3), (1, 2)], 5);
+        order(&mut layers, &[(0, 3), (1, 2)], 5, &[]);
         assert_eq!(layers[1][1], 4);
         assert_eq!(layers, [vec![0, 1], vec![3, 4, 2]]);
     }
@@ -183,7 +228,7 @@ mod tests {
     fn upward_sweep_reorders_top_layer() {
         // Reordering the lower layer cannot remove the crossing; reordering the top one can.
         let mut layers = vec![vec![0, 1, 2], vec![3, 4]];
-        order(&mut layers, &[(0, 4), (1, 3), (2, 4)], 5);
+        order(&mut layers, &[(0, 4), (1, 3), (2, 4)], 5, &[]);
         assert_eq!(layers, [vec![1, 0, 2], vec![3, 4]]);
     }
 }

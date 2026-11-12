@@ -376,6 +376,18 @@ pub struct Flowchart {
     /// Ids of nodes that share the first or last rank, one list per group (DOT's `rank=min`,
     /// `max`, `source`, and `sink`).
     pub end_ranks: Vec<(RankEnd, Vec<String>)>,
+    /// Nodes whose edges of one direction keep their source order across the rank (DOT's
+    /// `ordering`).
+    pub ordering: Vec<(String, EdgeOrder)>,
+}
+
+/// Which of a node's edges keep their source order along the rank (LAYOUT-5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EdgeOrder {
+    /// The edges leaving the node.
+    Out,
+    /// The edges entering the node.
+    In,
 }
 
 /// Where a group of nodes is ranked (LAYOUT-4).

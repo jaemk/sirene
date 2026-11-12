@@ -151,6 +151,11 @@ impl Flowchart {
                     (*end, group)
                 })
                 .collect(),
+            ordering: self
+                .ordering
+                .iter()
+                .filter_map(|(id, order)| Some((nodes.get(id.as_str()).copied()?, *order)))
+                .collect(),
         }
     }
 }
