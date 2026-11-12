@@ -75,6 +75,19 @@ fn crlf_line_endings() {
     }
 }
 
+/// Mermaid reads a lone `\r` as a line break.
+#[test]
+fn cr_line_endings() {
+    for (path, src) in fixtures() {
+        same(
+            &path,
+            "with CR line endings",
+            &src,
+            &src.replace('\n', "\r"),
+        );
+    }
+}
+
 #[test]
 fn byte_order_mark() {
     for (path, src) in fixtures() {

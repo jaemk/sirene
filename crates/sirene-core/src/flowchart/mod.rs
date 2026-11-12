@@ -96,6 +96,8 @@ pub struct Lowered {
 
 /// Parses flowchart source. Never fails; problems are reported as diagnostics.
 pub fn parse(src: &str) -> Parse {
+    // A lone `\r` ends a line, as in Mermaid; the tree keeps the source's byte offsets.
+    let src = &*crate::lines::lone_cr_as_lf(src);
     let (green, diagnostics) = parser::parse(src);
     log::debug!(
         "parsed {} bytes, {} lines; {} syntax diagnostics",

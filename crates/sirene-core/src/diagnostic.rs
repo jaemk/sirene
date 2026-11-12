@@ -41,9 +41,15 @@ impl Diagnostic {
         while !src.is_char_boundary(offset) {
             offset -= 1;
         }
+        // A lone `\r` breaks the line too, as editors show it; `\r\n` is one break.
         let before = &src[..offset];
-        let line_start = before.rfind('\n').map_or(0, |i| i + 1);
-        let line = before.matches('\n').count() + 1;
+        let line_start = before.rfind(['\n', '\r']).map_or(0, |i| i + 1);
+        let line = before.matches('\n').count()
+            + before
+                .match_indices('\r')
+                .filter(|&(i, _)| src.as_bytes().get(i + 1) != Some(&b'\n'))
+                .count()
+            + 1;
         (line, before[line_start..].chars().count() + 1)
     }
 }
@@ -68,5 +74,9 @@ mod tests {
         assert_eq!(at(99).line_col(src), (3, 1));
         // Inside a multi-byte character.
         assert_eq!(at(4).line_col(src), (2, 1));
+        // `\r\n` is one break, and a lone `\r` is one too.
+        let src = "a\r\nb\rcd";
+        assert_eq!(at(3).line_col(src), (2, 1));
+        assert_eq!(at(6).line_col(src), (3, 2));
     }
 }

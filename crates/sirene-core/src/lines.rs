@@ -25,6 +25,24 @@ pub(crate) fn too_deep(what: &str, limit: usize) -> String {
     format!("{what} nested more than {limit} deep")
 }
 
+/// `src` with each `\r` not followed by `\n` read as `\n`, as Mermaid reads it. Byte offsets are
+/// unchanged, so ranges into the result are ranges into `src`.
+pub(crate) fn lone_cr_as_lf(src: &str) -> std::borrow::Cow<'_, str> {
+    if !src.contains('\r') {
+        return src.into();
+    }
+    let mut out = String::with_capacity(src.len());
+    let mut chars = src.chars().peekable();
+    while let Some(c) = chars.next() {
+        out.push(if c == '\r' && chars.peek() != Some(&'\n') {
+            '\n'
+        } else {
+            c
+        });
+    }
+    out.into()
+}
+
 fn offset(n: usize) -> TextSize {
     TextSize::try_from(n).expect("source larger than 4 GiB")
 }

@@ -384,10 +384,16 @@ pub fn lower(src: &str) -> Lowered {
 
 /// [`lower`], reading `src` as `lang` when given instead of detecting it (DOT-5).
 pub fn lower_as(src: &str, lang: Option<Lang>) -> Lowered {
-    let kind = Kind::of_lang(src, lang);
+    // Graphviz reads a lone `\r` as a space, and Mermaid as a line break.
+    let mut kind = Kind::of_lang(src, lang);
+    let mermaid = crate::lines::lone_cr_as_lf(src);
+    if kind != Kind::Dot && mermaid != src {
+        kind = Kind::of_lang(&mermaid, lang);
+    }
     let mut lowered = if kind == Kind::Dot {
         lower_dot(src)
     } else {
+        let src = &*mermaid;
         let mut lowered = lower_diagram(src, kind);
         lowered.theme = ThemeConfig::read(src);
         lowered.diagnostics.extend(lowered.theme.diagnostics());
