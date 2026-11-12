@@ -180,6 +180,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   linear in their size; 10,000 sankey flows took tens of seconds.
 - A chain of subgraphs draws straight down; each subgraph sat a little right of the one before,
   so a long chain drew a very wide, slow image.
+- DOT labels decode HTML entities, including `&#NNN;` and `&#xHH;`, in plain labels as well as
+  HTML ones. An unclosed string or HTML string keeps its last character.
+- A DOT cluster starts with the graph attributes set around it before it, as in Graphviz, and a
+  `#` line after a byte order mark is a comment.
+- Mermaid labels decode hex entities such as `&#x2665;`, and `&9829;` without its `#` is text.
+- The editor draws a DOT graph on its `bgcolor`, as the other commands do.
 - An `init` directive that cannot be read, malformed or nested too deep, is a warning; it was
   ignored without one.
 
