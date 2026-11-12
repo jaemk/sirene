@@ -78,6 +78,7 @@ const GRAPH_ATTRS: &[&str] = &[
     "pencolor",
     "fontcolor",
     "style",
+    "compound",
 ];
 const NODE_ATTRS: &[&str] = &[
     "label",
@@ -101,6 +102,8 @@ const EDGE_ATTRS: &[&str] = &[
     "dir",
     "minlen",
     "constraint",
+    "lhead",
+    "ltail",
 ];
 
 /// A Graphviz boolean: `true`, `yes`, `false`, `no` in any case, or an integer, nonzero for true.
@@ -160,6 +163,8 @@ struct Lowerer {
     /// Nodes of each subgraph with a `rank`, its end (none for `same`), and the range of its
     /// `rank`.
     rank_groups: Vec<(Option<RankEnd>, Vec<usize>, TextRange)>,
+    /// The root graph's `compound`, which lets `lhead` and `ltail` end edges at clusters.
+    compound: bool,
     /// Names already warned about, so each is reported once per file.
     warned: HashSet<String>,
 }
@@ -879,6 +884,8 @@ impl Lowerer {
             .cloned()
             .and_then(|a| self.color_of(&a));
 
+        self.compound =
+            get(&root, "compound").is_some_and(|a| boolean(&a.value.text) == Some(true));
         self.name_clusters();
         for i in 0..self.ids.len() {
             let node = self.lower_node(i, &graph);
@@ -1184,9 +1191,54 @@ impl Lowerer {
         }
     }
 
+    /// The cluster that `key` (`lhead` or `ltail`) names, when `compound` is set and the cluster
+    /// holds the edge's `end` node and not its `other` (DOT-3).
+    fn clip(&mut self, attrs: &[Attr], key: &str, end: usize, other: usize) -> Option<String> {
+        let a = get(attrs, key)?;
+        let (range, name) = (a.range, a.value.text.clone());
+        if !self.compound {
+            self.warn_once(
+                &format!("{key}:compound"),
+                range,
+                format!("`{key}` needs `compound=true` on the graph; ignored"),
+            );
+            return None;
+        }
+        let Some(&c) = self.cluster_index.get(&name) else {
+            self.warn_once(
+                &format!("{key}@{range:?}"),
+                range,
+                format!("`{key}` `{name}` is not a cluster; ignored"),
+            );
+            return None;
+        };
+        let inside = |n: usize| {
+            let mut k = self.node_cluster[n];
+            while let Some(x) = k {
+                if x == c {
+                    return true;
+                }
+                k = self.clusters[x].parent;
+            }
+            false
+        };
+        if !inside(end) || inside(other) {
+            let side = if key == "lhead" { "head" } else { "tail" };
+            self.warn_once(
+                &format!("{key}@{range:?}"),
+                range,
+                format!("`{key}` `{name}` does not hold the edge's {side} alone; ignored"),
+            );
+            return None;
+        }
+        Some(self.clusters[c].id.clone())
+    }
+
     fn lower_edge(&mut self, e: &PendingEdge, graph: &str) -> Edge {
         let attrs = &e.attrs;
         let (tail, head) = (self.ids[e.from].clone(), self.ids[e.to].clone());
+        let from = self.clip(attrs, "ltail", e.from, e.to);
+        let to = self.clip(attrs, "lhead", e.to, e.from);
         let dir = match get(attrs, "dir") {
             None => (if self.directed { "forward" } else { "none" }).to_owned(),
             Some(a) => {
@@ -1281,8 +1333,8 @@ impl Lowerer {
         };
         Edge {
             id: None,
-            from: tail,
-            to: head,
+            from: from.unwrap_or(tail),
+            to: to.unwrap_or(head),
             stroke,
             start,
             end,

@@ -425,6 +425,48 @@ fn rank_warnings() {
     );
 }
 
+/// DOT-3: with `compound=true`, `lhead` and `ltail` end an edge at a cluster holding its head
+/// or tail.
+#[test]
+fn compound_edges() {
+    let src = |extra: &str, attrs: &str| {
+        format!(
+            "digraph {{ {extra} subgraph cluster_p {{ a; b }} subgraph cluster_q {{ c }} \
+             a -> c [{attrs}] }}"
+        )
+    };
+    let ends = |c: &Flowchart| (c.edges[0].from.clone(), c.edges[0].to.clone());
+    let c = chart(&src("compound=true;", "lhead=cluster_q"));
+    assert_eq!(ends(&c), ("a".into(), "cluster_q".into()));
+    let c = chart(&src("compound=yes;", "ltail=cluster_p, lhead=cluster_q"));
+    assert_eq!(ends(&c), ("cluster_p".into(), "cluster_q".into()));
+    // The route runs from border to border.
+    let out = ascii::render(&c, &Options::default());
+    assert!(out.contains("└───────┬───────┘"), "{out}");
+    assert!(out.contains("▼\n    ┌───────┐"), "{out}");
+    let messages = |src: &str| -> Vec<String> {
+        let (c, d) = lowered(src);
+        assert_eq!(ends(&c), ("a".into(), "c".into()), "{src}");
+        d.into_iter().map(|(_, m)| m).collect()
+    };
+    assert_eq!(
+        messages(&src("", "lhead=cluster_q")),
+        ["`lhead` needs `compound=true` on the graph; ignored"]
+    );
+    assert_eq!(
+        messages(&src("compound=true;", "lhead=cluster_z")),
+        ["`lhead` `cluster_z` is not a cluster; ignored"]
+    );
+    assert_eq!(
+        messages(&src("compound=true;", "ltail=cluster_q")),
+        ["`ltail` `cluster_q` does not hold the edge's tail alone; ignored"]
+    );
+    assert_eq!(
+        messages(&src("compound=false;", "lhead=cluster_q")),
+        ["`lhead` needs `compound=true` on the graph; ignored"]
+    );
+}
+
 /// DOT-2: `rank=min` and `max` put a subgraph's nodes in the first or last rank, and `source`
 /// and `sink` in a rank of their own above or below every other node.
 #[test]

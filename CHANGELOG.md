@@ -16,6 +16,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   between them run straight across, below the rank, or up through a label above it.
 - DOT `rank=min`, `max`, `source`, and `sink` subgraphs: nodes go in the first or last rank,
   or a rank of their own above or below every other node.
+- DOT `compound=true` with `lhead` and `ltail`: edges end at a cluster's border.
 - `--lang mermaid|dot` reads every diagram as that language. Without it, a file's extension
   (`.dot`, `.gv`, `.mmd`, `.mermaid`) or a Markdown block's name picks the language in the CLI
   and the editor, and other sources are detected from their first line.
