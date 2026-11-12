@@ -52,7 +52,7 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
 ## DOT-3 Attributes
 
 - Graph: `rankdir` (direction), `label` (title; a blank one is none), `bgcolor` (the drawing's
-  background).
+  background), `compound` (a boolean as for `constraint`).
 - Cluster: `label`, `color` and `pencolor` (border), `bgcolor` (fill), `style=filled` (fills
   with `fillcolor`, else `color`, else `bgcolor`, else light gray), `fontcolor`, and `style`.
 - Node: `shape`, `style` (`filled`, `rounded`, `dashed`, `dotted`, `bold`, `invis`, `solid`),
@@ -69,7 +69,10 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
 - Edge: `label`, `headlabel`, `taillabel` (end labels), `style` (`dashed` and `dotted` dashed,
   `bold` thick, `invis`), `color`, `fontcolor`, `penwidth` (drawn up to 32px, DISPLA-6), `dir`,
   `minlen` (rounded, 0 to 10), `constraint` (`true`, `yes`, `false`, `no` in any case, or an
-  integer, nonzero for true; another value is a warning and reads as true), and
+  integer, nonzero for true; another value is a warning and reads as true), `lhead` and
+  `ltail` (with `compound=true` on the graph, the edge ends at the named cluster's border, and
+  ranks against the cluster; a warning without `compound`, for a name that is not a cluster,
+  or for a cluster that does not hold the edge's head or tail and not its other end), and
   `arrowhead` and `arrowtail`: `normal`, `inv`, `vee`, `curve` an arrow; `empty`, `onormal` a
   hollow triangle; `diamond` and `odiamond`; `dot` and `odot` a circle; `box` and `tee` a bar;
   `crow` and `ocrow` crow's feet; `none`. The first shape of a stacked name such as `invdot` is
@@ -89,7 +92,7 @@ word.
 ## DOT-4 Not drawn yet
 
 These are parsed and warned about, then ignored: ports (`a:p:n`; the edge joins the node), HTML labels
-(drawn as their text), `group`, `compound` with `lhead` and `ltail`, `ordering`, and images.
+(drawn as their text), `group`, `ordering`, and images.
 
 ## DOT-5 Choosing the language
 
