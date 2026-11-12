@@ -22,7 +22,8 @@ PlantUML sequence diagrams lower to the same model (PUML-3). Reference:
 Participants in order of declaration or first mention, each with a kind and label. Events in
 order: messages (from, to, arrow, label, activation change), notes (side and participants),
 block openings, dividers (`else`, `and`, `option`), and closings, creations, and destructions.
-Activations are spans on a participant from activation to deactivation. Deactivating a
+PlantUML adds separators, delays, spaces, `ref` frames, `group` blocks, and a hidden footbox
+(PSEQ-5). Activations are spans on a participant from activation to deactivation. Deactivating a
 participant that is not active is an error; one left active is a warning and closes at the end.
 Blocks are balanced: a divider outside its block (`else` in `alt`, `and` in `par`, `option` in
 `critical`) and an `end` with nothing to close are errors, and a block left open is an error and

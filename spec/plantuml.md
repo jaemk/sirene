@@ -1,8 +1,9 @@
 # PlantUML
 
-Status: research. PlantUML (<https://plantuml.com>) has a dozen diagram kinds and no formal
-grammar; its reference is the Java implementation and the language reference guide. Full
-compatibility is not the goal. The useful subset reuses the sequence and graph models.
+Status: research; sequence diagrams are specified in `plantuml-sequence-diagrams.md` (PSEQ).
+PlantUML (<https://plantuml.com>) has a dozen diagram kinds and no formal grammar; its
+reference is the Java implementation and the language reference guide. Full compatibility is
+not the goal. The useful subset reuses the sequence and graph models.
 
 ## PUML-1 Documents
 
@@ -32,7 +33,8 @@ Participants (`participant`, `actor`, `boundary`, `control`, `entity`, `database
 `collections`, `queue`), messages (`->`, `-->`, `->>`, `->x`, `<->`, colors in arrows), `activate`
 and `deactivate`, `++` and `--` shorthands, `return`, notes, `alt`/`else`/`opt`/`loop`/`par`/
 `break`/`critical`/`group` ... `end`, dividers (`== title ==`), delays (`...`), spacing (`|||`),
-`autonumber`, and `title`, `header`, `footer`, all onto the sequence model.
+`autonumber`, and `title`, `header`, `footer`, all onto the sequence model. Specified in detail
+by PSEQ.
 
 ## PUML-4 Preprocessor and settings
 
@@ -44,8 +46,8 @@ warnings. `!theme` is a warning.
 
 ## PUML-5 Open questions
 
-- Which PlantUML version's behavior is the reference, and how to build a fixture corpus without
-  copying its examples' license terms.
+- Resolved: the reference is the current language reference guide and plantuml.com, and the
+  fixtures are written for sirene rather than copied from PlantUML's examples (PSEQ).
 - Whether the non-UML kinds (mindmap, WBS, Gantt, JSON, YAML, Salt) share Mermaid's chart work
   (MCHART).
 - How far the preprocessor has to go before typical files render.
