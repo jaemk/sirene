@@ -1,0 +1,41 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startnwdiag\ntitle Office\nnwdiag {\n  inet [shape = cloud];\n  inet -- router;\n\n  network dmz {\n    address = \"210.x.x.x/24\"\n    router [address = \"210.x.x.1\"];\n    web01 [address = \"210.x.x.2\"];\n    web02 [address = \"210.x.x.3\"];\n  }\n  network internal {\n    address = \"172.x.x.x/24\";\n    color = \"#ffeedd\"\n    web01 [address = \"172.x.x.1\"];\n    web02 [address = \"172.x.x.2\"];\n    db01 [address = \"172.x.x.100\", shape = database, description = \"Primary DB\"];\n  }\n  group web {\n    color = \"#ddeeff\"\n    description = \"Web tier\"\n    web01; web02;\n  }\n}\n@endnwdiag\n"
+---
+
+                         Office
+
+┌──────┐             ┌──────────────┐
+│ inet │             │     dmz      │
+└───┬──┘             │ 210.x.x.x/24 │
+    │                └──┬────┬───┬──┘
+    │                   │    │   │
+    └┐         ┌────────┘  ┌─┘   └─────┐
+     │         │           │           │
+     │     210.x.x.1   210.x.x.2   210.x.x.3
+     │         │           │           │
+     │   ┌─────┘           └┐          └┐
+     │   │                  │           │
+     │   │            ┌─────┼───────────┼─── Web tier ─┐
+     │   │            │     │           │              │
+  ┌──┴───┴─┐          │ ┌───┴───┐   ┌───┴───┐          │
+  │ router │          │ │ web01 │   │ web02 │          │
+  └────────┘          │ └───┬───┘   └───┬───┘          │
+                      │     │           │              │
+                      └─────┼───────────┼──────────────┘
+                            │           │
+                        172.x.x.1   172.x.x.2
+                            │           │
+                            └──┐      ┌─┘
+                               │      │
+                           ┌───┴──────┴───┐
+                           │   internal   │
+                           │ 172.x.x.x/24 │
+                           └───────┬──────┘
+                                   │
+                              172.x.x.100
+                                   │
+                            ╭──────┴─────╮
+                            ├────────────┤
+                            │ Primary DB │
+                            ╰────────────╯

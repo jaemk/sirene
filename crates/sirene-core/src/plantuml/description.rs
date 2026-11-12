@@ -17,7 +17,7 @@ pub(crate) const STATEMENT: &str = "expected a use case, component, or deploymen
      such as `actor A`, `(Use)`, `[Component]`, or `A --> B`";
 
 /// Element keywords and their shapes (PDSC-2).
-const ELEMENTS: &[(&str, Shape)] = &[
+pub(crate) const ELEMENTS: &[(&str, Shape)] = &[
     ("actor", Shape::Actor),
     ("usecase", Shape::UseCase),
     ("component", Shape::Rect),

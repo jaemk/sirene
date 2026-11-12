@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startchronology\n[A] happens on 2024-01-15\n[B] happens on yesterday\n[C happens on 2024-01-16\n[D] lasts 3 days\nwhat is this\n@endchronology\n"
+---
+3:16: error: expected a date such as `2024-01-15` or `2024-01-15 13:08:12`, not `yesterday`
+4:1: error: `[` has no closing `]`
+5:1: error: expected an event such as `[Launch] happens on 2024-01-15`
+6:1: error: expected an event such as `[Launch] happens on 2024-01-15`
+
+┌────────────┐
+│ 2024-01-15 │
+└──────┬─────┘
+───────┼───────►
+┌──────┴─────┐
+│     A      │
+└────────────┘

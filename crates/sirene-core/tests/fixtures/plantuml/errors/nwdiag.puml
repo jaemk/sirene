@@ -1,0 +1,15 @@
+@startnwdiag
+nwdiag {
+  network a {
+    web [address = "10.0.0.1", speed = fast, shape = blob];
+    db [address = "10.0.0.2";
+    mtu = 1500
+  }
+  router [address = "10.0.0.3"]
+  frame x {
+  }
+  what is this
+  network b {
+    web
+}
+@endnwdiag
