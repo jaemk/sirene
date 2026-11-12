@@ -2,9 +2,10 @@
 top to bottom direction
 * Root
 ** One
-* Second root
-not a node
 **[#nope] Two
 **[#red] Three
+* Second root
+** Under the second root
+not a node
 ** :Four
 @endmindmap

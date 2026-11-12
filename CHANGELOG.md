@@ -247,6 +247,26 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A graph's title stays centered when an edge's end label widens the drawing on one side.
 - A Mermaid source with lone `\r` line endings reads line by line, as in Mermaid, and diagnostics
   count a lone `\r` as a line break.
+- PlantUML no longer crashes on an activity arrow `-][>`, a chain of `as` aliases, a Gantt `D+N`
+  past the end of time, or `today is [Task]'s end`. Repeated `split` blocks, closed-day ranges,
+  long dependency chains, and large sequence, state, WBS, and multi-line action sources read in
+  time near linear in their size.
+- PlantUML kinds are picked past note, legend, and `skinparam` bodies, and from colored actions
+  and actions with a colon; `analog` picks a timing diagram.
+- PlantUML class and component names that match a keyword or a setting (`Exception <|-- X`,
+  `Set --> Y`) are read as links; `ns::Foo : member` goes to `ns::Foo`; a link end later declared
+  as a package or container is not also drawn as a node.
+- `note on link: x`, a one-line `<style>`, and `note left on link` no longer swallow the rest of
+  the file.
+- PlantUML activity arrows before `else`, `endif`, and `end fork` label only their own branch;
+  `(no) elseif` is read; an action ending in an HTML tag is not cut short.
+- PlantUML sequence `-[#red]->` is dashed, `note left` after a message follows `order`, and
+  `autonumber resume` keeps the numbering.
+- A PlantUML composite state opened twice keeps its regions, and a description before it is its
+  title. A mindmap line with no parent leaves out the lines under it.
+- Gantt `ends D+N` matches `ends DATE`, `saturday are open` reopens Saturday, ` and ` inside a
+  task name is part of the name, an end before the start is an error, and errors point at the
+  clause that caused them.
 
 ## [0.2.0] - 2026-11-08
 

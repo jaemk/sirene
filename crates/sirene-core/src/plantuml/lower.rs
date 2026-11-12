@@ -1,5 +1,7 @@
 //! Collects a PlantUML sequence diagram's participants and events (PSEQ-2 to PSEQ-6).
 
+use std::collections::HashMap;
+
 use rowan::TextRange;
 
 use crate::diagnostic::Diagnostic;
@@ -45,9 +47,9 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sequence, Vec<Diagnostic>) {
     l.finish()
 }
 
-/// A `box` or frame waiting for its `end`.
+/// A `box` (with its group) or frame waiting for its `end`.
 enum Open {
-    Box(TextRange),
+    Box(TextRange, usize),
     Block(BlockKind, TextRange),
 }
 
@@ -67,11 +69,15 @@ struct Lower {
     skipped: usize,
     deep_block: bool,
     deep_activation: bool,
+    /// Each participant's index by id.
+    index: HashMap<String, usize>,
     /// Where each participant's open activations began.
     active: Vec<Vec<TextRange>>,
-    /// Each open activation made by a message or after one: the participant and its caller,
-    /// for `return`.
-    calls: Vec<(usize, usize)>,
+    /// Each activation made by a message or after one: the participant, its caller, and
+    /// whether it is still open, for `return`. The last entry is always open.
+    calls: Vec<(usize, usize, bool)>,
+    /// Each participant's open entries in `calls`, latest last.
+    calls_of: Vec<Vec<usize>>,
     /// The next `autonumber` number and the step, while numbering is on, and while paused.
     numbering: Option<(u32, u32)>,
     paused: Option<(u32, u32)>,
@@ -83,6 +89,9 @@ struct Lower {
     last_message: Option<usize>,
     /// The `note across` events, filled in once every participant is known.
     across: Vec<usize>,
+    /// The `note left`/`note right` events without `of` and the message each goes beside,
+    /// resolved once `order` has placed the participants.
+    beside: Vec<(usize, usize)>,
     /// Warnings given once.
     told_o: bool,
     told_style: bool,
@@ -156,19 +165,13 @@ fn head(s: &str, right: bool) -> Option<Head> {
 }
 
 fn spell(s: &str) -> Spelled {
-    // `-[style]>` and `-[style]->`: the dashes on either side of the style, which is dropped.
-    let (s, dashes, styled) = match (s.find('['), s.rfind(']')) {
-        (Some(a), Some(b)) if a < b => {
-            let before = s[..a].matches('-').count();
-            let after = s[b + 1..].matches('-').count();
-            (
-                format!("{}{}", &s[..a], &s[b + 1..]),
-                before.max(after),
-                true,
-            )
-        }
-        _ => (s.to_owned(), s.matches('-').count(), false),
+    // `-[style]>` and `-[style]->`: the style is dropped, and the dashes on both sides count,
+    // so `-[#red]->` is dashed as in PlantUML.
+    let (s, styled) = match (s.find('['), s.rfind(']')) {
+        (Some(a), Some(b)) if a < b => (format!("{}{}", &s[..a], &s[b + 1..]), true),
+        _ => (s.to_owned(), false),
     };
+    let dashes = s.matches('-').count();
     let first = s.find('-').unwrap_or(0);
     let last = s.rfind('-').unwrap_or(first);
     let line = if dashes >= 2 {
@@ -237,10 +240,13 @@ impl Lower {
     }
 
     fn find(&self, id: &str) -> Option<usize> {
-        self.seq.participants.iter().position(|p| p.id == id)
+        self.index.get(id).copied()
     }
 
     fn push_participant(&mut self, id: &str, label: Text, kind: ParticipantKind) -> usize {
+        let i = self.seq.participants.len();
+        // The first participant with an id keeps it.
+        self.index.entry(id.to_owned()).or_insert(i);
         self.seq.participants.push(Participant {
             id: id.to_owned(),
             label,
@@ -248,9 +254,10 @@ impl Lower {
             group: None,
         });
         self.active.push(Vec::new());
+        self.calls_of.push(Vec::new());
         self.order.push(None);
         self.mentioned.push(false);
-        self.seq.participants.len() - 1
+        i
     }
 
     /// The participant named `id`, added on first mention.
@@ -282,11 +289,12 @@ impl Lower {
         }
     }
 
+    /// The innermost open `box`'s group, also from inside a frame in it.
     fn current_group(&self) -> Option<usize> {
-        match self.stack.last() {
-            Some(Open::Box(_)) => Some(self.seq.groups.len() - 1),
-            _ => None,
-        }
+        self.stack.iter().rev().find_map(|o| match o {
+            Open::Box(_, g) => Some(*g),
+            Open::Block(..) => None,
+        })
     }
 
     fn color_warning(&mut self, t: Option<SyntaxToken>, what: &str) {
@@ -378,10 +386,20 @@ impl Lower {
             self.error(range, format!("`{id}` is not active"));
             return false;
         }
-        if let Some(k) = self.calls.iter().rposition(|&(p, _)| p == i) {
-            self.calls.remove(k);
+        // Close `i`'s latest call, then drop closed calls from the end so the last is open.
+        if let Some(k) = self.calls_of[i].pop() {
+            self.calls[k].2 = false;
+            while self.calls.last().is_some_and(|c| !c.2) {
+                self.calls.pop();
+            }
         }
         self.active[i].len() < MAX_DEPTH
+    }
+
+    /// Records an activation of `callee` made by `caller`, for `return`.
+    fn call(&mut self, callee: usize, caller: usize) {
+        self.calls_of[callee].push(self.calls.len());
+        self.calls.push((callee, caller, true));
     }
 
     fn number(&mut self) -> Option<u32> {
@@ -446,7 +464,7 @@ impl Lower {
         let deactivate = modifiers.contains("--") && self.deactivate(from, range);
         let activate = modifiers.contains("++") && self.activate(to, range);
         if modifiers.contains("++") {
-            self.calls.push((to, from));
+            self.call(to, from);
         }
         let number = self.number();
         let text = text_of(stmt, TEXT).map_or_else(Vec::new, |t| display(&t));
@@ -516,15 +534,13 @@ impl Lower {
                 };
                 let p = if let Some(&n) = names.first() {
                     n
-                } else if let Some(Event::Message(m)) =
-                    self.last_message.map(|k| &self.seq.events[k])
+                } else if let Some(k) = self.last_message
+                    && let Event::Message(m) = &self.seq.events[k]
                 {
-                    let (lo, hi) = if self.rank(m.from) <= self.rank(m.to) {
-                        (m.from, m.to)
-                    } else {
-                        (m.to, m.from)
-                    };
-                    if side == NoteSide::Left { lo } else { hi }
+                    // Which end is left is known once `order` sorts the participants.
+                    let from = m.from;
+                    self.beside.push((self.seq.events.len(), k));
+                    from
                 } else {
                     self.error(
                         stmt.text_range(),
@@ -634,7 +650,7 @@ impl Lower {
                     && m.to == i
                 {
                     let from = m.from;
-                    self.calls.push((i, from));
+                    self.call(i, from);
                 }
             }
             "deactivate" => {
@@ -658,7 +674,7 @@ impl Lower {
                 }
             }
             "return" => {
-                let Some(&(callee, caller)) = self.calls.last() else {
+                let Some(&(callee, caller, _)) = self.calls.last() else {
                     self.error(range, "`return` needs a participant activated by a message");
                     return;
                 };
@@ -691,21 +707,23 @@ impl Lower {
                     self.warning(range, "unknown `box` color; drawing no background");
                 }
                 self.seq.groups.push(g);
-                self.stack.push(Open::Box(range));
+                self.stack.push(Open::Box(range, self.seq.groups.len() - 1));
             }
             "else" => match self.stack.last() {
                 Some(Open::Block(..)) => self.seq.events.push(Event::Divider(label)),
                 _ => self.error(range, "`else` belongs in a frame such as `alt`"),
             },
             "end" if kws.len() > 1 => match self.stack.last() {
-                Some(Open::Box(_)) => {
+                Some(Open::Box(..)) => {
                     self.stack.pop();
                 }
                 _ => self.error(range, "`end box` without a `box` to close"),
             },
             "end" => match self.stack.pop() {
                 Some(Open::Block(..)) => self.seq.events.push(Event::End),
-                Some(Open::Box(_)) => {}
+                Some(Open::Box(..)) => {
+                    self.warning(range, "`end` closes a `box`; expected `end box`")
+                }
                 None => self.error(range, "`end` without a frame to close"),
             },
             "hide" | "show" if label.eq_ignore_ascii_case("footbox") => {
@@ -742,7 +760,9 @@ impl Lower {
         match words.as_slice() {
             ["stop"] => self.paused = self.numbering.take().or(self.paused),
             ["resume", rest @ ..] => {
-                let (n, step) = self.paused.take().unwrap_or((1, 1));
+                // Numbering that is on carries on; otherwise the paused numbering resumes.
+                let paused = self.paused.take();
+                let (n, step) = self.numbering.or(paused).unwrap_or((1, 1));
                 match rest {
                     [] => self.numbering = Some((n, step)),
                     [s] => match s.parse() {
@@ -772,7 +792,7 @@ impl Lower {
                     self.error(range, format!("unclosed `{kw}`: expected `end`"));
                     self.seq.events.push(Event::End);
                 }
-                Open::Box(range) => self.error(range, "unclosed `box`: expected `end box`"),
+                Open::Box(range, _) => self.error(range, "unclosed `box`: expected `end box`"),
             }
         }
         for i in 0..self.active.len() {
@@ -782,6 +802,16 @@ impl Lower {
             }
         }
         self.sort();
+        // Sorted, a lower index is further left.
+        for &(note, msg) in &self.beside {
+            let Event::Message(m) = &self.seq.events[msg] else {
+                continue;
+            };
+            let (lo, hi) = (m.from.min(m.to), m.from.max(m.to));
+            if let Event::Note(n) = &mut self.seq.events[note] {
+                n.participants = vec![if n.side == NoteSide::Left { lo } else { hi }];
+            }
+        }
         let shown: Vec<usize> = (0..self.seq.participants.len())
             .filter(|&i| self.seq.participants[i].kind != ParticipantKind::Hidden)
             .collect();
@@ -835,6 +865,9 @@ impl Lower {
             .iter()
             .map(|&o| parts[o].take().expect("each once"))
             .collect();
+        for i in self.index.values_mut() {
+            *i = new_of[*i];
+        }
         let m = |p: &mut usize| *p = new_of[*p];
         for e in &mut self.seq.events {
             match e {
@@ -878,7 +911,10 @@ mod tests {
         assert_eq!(a("x<-"), (Solid, Cross, false, true));
         assert_eq!(a("<->"), (Solid, Filled, true, false));
         assert_eq!(a("-[#red]>"), (Solid, Filled, false, false));
-        assert_eq!(a("-[#red]->"), (Solid, Filled, false, false));
+        // The dashes on both sides of the style count, as in PlantUML.
+        assert_eq!(a("-[#red]->"), (Dotted, Filled, false, false));
+        assert_eq!(a("-[#0000FF]->"), (Dotted, Filled, false, false));
+        assert_eq!(a("<-[#red]-"), (Dotted, Filled, false, true));
         assert_eq!(a("--[#red]>"), (Dotted, Filled, false, false));
         assert_eq!(a("x->"), (Solid, Filled, false, false));
         assert!(spell("-[#red]>").styled);
@@ -899,5 +935,376 @@ mod tests {
         let (g, bad) = group("#nocolor");
         assert_eq!(g, Group::default());
         assert!(bad);
+    }
+
+    fn lowered(src: &str) -> (Sequence, Vec<Diagnostic>) {
+        lower(&crate::plantuml::parse(src).syntax())
+    }
+
+    fn id(seq: &Sequence, i: usize) -> &str {
+        &seq.participants[i].id
+    }
+
+    fn notes(seq: &Sequence) -> Vec<(NoteSide, Vec<&str>)> {
+        seq.events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Note(n) => {
+                    Some((n.side, n.participants.iter().map(|&p| id(seq, p)).collect()))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn numbers(seq: &Sequence) -> Vec<Option<u32>> {
+        seq.events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Message(m) => Some(m.number),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn note_beside_message_follows_order() {
+        let (seq, d) = lowered(
+            "@startuml\nparticipant A order 20\nparticipant B order 10\nA -> B : hi\n\
+             note left : l\nnote right : r\n@enduml\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(id(&seq, 0), "B");
+        assert_eq!(
+            notes(&seq),
+            vec![(NoteSide::Left, vec!["B"]), (NoteSide::Right, vec!["A"])]
+        );
+    }
+
+    #[test]
+    fn note_beside_message_with_edges() {
+        let (seq, _) = lowered("@startuml\nA -> ] : out\nnote right : r\nnote left : l\n@enduml\n");
+        assert_eq!(
+            notes(&seq),
+            vec![(NoteSide::Right, vec!["]"]), (NoteSide::Left, vec!["A"])]
+        );
+    }
+
+    #[test]
+    fn autonumber_resume_keeps_numbering() {
+        let (seq, d) =
+            lowered("@startuml\nautonumber 5\nA -> B\nautonumber resume\nA -> B\n@enduml\n");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(numbers(&seq), vec![Some(5), Some(6)]);
+        let (seq, _) = lowered(
+            "@startuml\nautonumber 5 10\nA -> B\nautonumber resume 2\nA -> B\nA -> B\n@enduml\n",
+        );
+        assert_eq!(numbers(&seq), vec![Some(5), Some(15), Some(17)]);
+        let (seq, _) = lowered(
+            "@startuml\nautonumber\nA -> B\nautonumber stop\nA -> B\nautonumber resume\nA -> B\n@enduml\n",
+        );
+        assert_eq!(numbers(&seq), vec![Some(1), None, Some(2)]);
+        let (seq, _) = lowered("@startuml\nautonumber resume\nA -> B\n@enduml\n");
+        assert_eq!(numbers(&seq), vec![Some(1)]);
+    }
+
+    #[test]
+    fn plain_end_closes_box_with_warning() {
+        let (seq, d) =
+            lowered("@startuml\nbox \"T\"\nparticipant A\nend\nparticipant B\n@enduml\n");
+        assert_eq!(seq.participants[0].group, Some(0));
+        assert_eq!(seq.participants[1].group, None);
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert_eq!(d[0].severity, crate::diagnostic::Severity::Warning);
+        assert!(d[0].message.contains("`end box`"), "{}", d[0].message);
+    }
+
+    #[test]
+    fn participant_in_frame_in_box_is_grouped() {
+        let (seq, d) = lowered(
+            "@startuml\nA -> B\nbox \"T\"\nparticipant C\nalt x\nA -> C\nparticipant D\nend\n\
+             participant E\nend box\nbox \"U\"\ngroup g\nparticipant F\nend\nend box\n@enduml\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        let group = |name: &str| {
+            seq.participants
+                .iter()
+                .find(|p| p.id == name)
+                .and_then(|p| p.group)
+        };
+        assert_eq!(group("B"), None);
+        assert_eq!(group("C"), Some(0));
+        assert_eq!(group("D"), Some(0));
+        assert_eq!(group("E"), Some(0));
+        assert_eq!(group("F"), Some(1));
+    }
+
+    #[test]
+    fn index_tracks_participants_through_order() {
+        let (seq, _) = lowered(
+            "@startuml\nparticipant A order 3\nparticipant B order 1\nparticipant C order 2\n\
+             A -> B\nB -> C\n@enduml\n",
+        );
+        let ids: Vec<&str> = seq.participants.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, ["B", "C", "A"]);
+        let ends: Vec<(&str, &str)> = seq
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Message(m) => Some((id(&seq, m.from), id(&seq, m.to))),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(ends, [("A", "B"), ("B", "C")]);
+    }
+
+    #[test]
+    fn many_participants_lower_quickly() {
+        // 100k participants, each named twice: linear lookup made this quadratic.
+        let mut src = String::from("@startuml\n");
+        for i in 0..100_000 {
+            src.push_str(&format!("p{i} -> p{}\n", i + 1));
+        }
+        src.push_str("@enduml\n");
+        // Time only the lowering, not the parse.
+        let tree = crate::plantuml::parse(&src).syntax();
+        let t = std::time::Instant::now();
+        let (seq, d) = lower(&tree);
+        assert!(d.is_empty());
+        assert_eq!(seq.participants.len(), 100_001);
+        assert!(t.elapsed().as_secs() < 5, "{:?}", t.elapsed());
+    }
+
+    #[test]
+    fn deactivate_closes_latest_call() {
+        // `return` answers the latest open call after an inner one is deactivated.
+        let (seq, d) = lowered(
+            "@startuml\nA -> B ++\nB -> C ++\nC -> D ++\ndeactivate C\nreturn r1\nreturn r2\n\
+             @enduml\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        let returns: Vec<(&str, &str)> = seq
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Message(m) if m.text == ["r1"] || m.text == ["r2"] => {
+                    Some((id(&seq, m.from), id(&seq, m.to)))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(returns, [("D", "C"), ("B", "A")]);
+    }
+
+    fn errors(d: &[Diagnostic]) -> Vec<&str> {
+        d.iter()
+            .filter(|d| d.severity == crate::diagnostic::Severity::Error)
+            .map(|d| d.message.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn note_beside_survives_destroy_insert() {
+        // `destroy` inserts before the message, shifting it by one.
+        let (seq, d) = lowered(
+            "@startuml\nparticipant A order 2\nparticipant B order 1\nA -> B\nnote left : l0\n\
+             B -> A\ndestroy A\nnote right : r\nnote left : l\n@enduml\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(
+            notes(&seq),
+            vec![
+                (NoteSide::Left, vec!["B"]),
+                (NoteSide::Right, vec!["A"]),
+                (NoteSide::Left, vec!["B"]),
+            ]
+        );
+        assert!(
+            matches!(seq.events[2], Event::Destroy(_)),
+            "{:?}",
+            seq.events
+        );
+    }
+
+    #[test]
+    fn note_beside_after_destroy_and_create() {
+        let (seq, d) = lowered(
+            "@startuml\nparticipant A order 2\nparticipant B order 1\nA -> B\ndestroy B\n\
+             note right : r\ncreate C\nC -> A\nnote left : l\nnote right : r2\n@enduml\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        let ns = notes(&seq);
+        assert_eq!(ns[0], (NoteSide::Right, vec!["A"]));
+        // C has no order, so it follows B (the ordered one before it): B, C, A.
+        assert_eq!(ns[1], (NoteSide::Left, vec!["C"]));
+        assert_eq!(ns[2], (NoteSide::Right, vec!["A"]));
+    }
+
+    #[test]
+    fn note_beside_with_across_notes() {
+        let (seq, d) = lowered(
+            "@startuml\nparticipant B order 1\nparticipant A order 2\nA -> B\nnote across : x\n\
+             note left : l\nnote across : y\nnote right : r\n@enduml\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(
+            notes(&seq),
+            vec![
+                (NoteSide::Over, vec!["B", "A"]),
+                (NoteSide::Left, vec!["B"]),
+                (NoteSide::Over, vec!["B", "A"]),
+                (NoteSide::Right, vec!["A"]),
+            ]
+        );
+    }
+
+    #[test]
+    fn note_beside_without_message_errors() {
+        let (seq, d) = lowered("@startuml\nA -> B\nnote left : ok\n@enduml\n");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(notes(&seq).len(), 1);
+        let (seq, d) = lowered("@startuml\nparticipant A\nnote right : x\n@enduml\n");
+        assert_eq!(errors(&d).len(), 1, "{d:?}");
+        assert!(notes(&seq).is_empty());
+    }
+
+    #[test]
+    fn quoted_edge_names_stay_distinct() {
+        let (seq, d) = lowered(
+            "@startuml\nparticipant \"[\"\nparticipant \"]\"\n[-> A : in\nA -> ] : out\n\
+             \"[\" -> \"]\" : q\n@enduml\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        let hidden = |i: usize| seq.participants[i].kind == ParticipantKind::Hidden;
+        let ids: Vec<&str> = seq.participants.iter().map(|p| p.id.as_str()).collect();
+        // Hidden left edge first, hidden right edge last.
+        assert!(hidden(0) && hidden(ids.len() - 1), "{ids:?}");
+        let ends: Vec<(usize, usize)> = seq
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Message(m) => Some((m.from, m.to)),
+                _ => None,
+            })
+            .collect();
+        assert!(hidden(ends[0].0) && !hidden(ends[0].1));
+        assert!(!hidden(ends[1].0) && hidden(ends[1].1));
+        // The quoted names are real, drawn participants.
+        assert!(!hidden(ends[2].0) && !hidden(ends[2].1), "{ends:?}");
+        assert_ne!(ends[2].0, ends[0].0);
+    }
+
+    #[test]
+    fn activation_depth_is_capped() {
+        let n = MAX_DEPTH + 1;
+        let mut src = String::from("@startuml\n");
+        for _ in 0..n {
+            src.push_str("A -> B ++\n");
+        }
+        for _ in 0..n {
+            src.push_str("deactivate B\n");
+        }
+        src.push_str("return r\n@enduml\n");
+        let (seq, d) = lowered(&src);
+        // One error for the overflow, one for the `return` with no open call.
+        let errs = errors(&d);
+        assert_eq!(errs.len(), 2, "{d:?}");
+        assert!(errs[0].contains("activations nested"), "{errs:?}");
+        assert!(errs[1].contains("`return`"), "{errs:?}");
+        let msgs: Vec<&Message> = seq
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                Event::Message(m) => Some(m),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(msgs.iter().filter(|m| m.activate).count(), MAX_DEPTH);
+        // The overflowing call is the last one and is not drawn.
+        assert!(!msgs[MAX_DEPTH].activate);
+        let drawn = seq
+            .events
+            .iter()
+            .filter(|e| matches!(e, Event::Deactivate(_)))
+            .count();
+        assert_eq!(drawn, MAX_DEPTH);
+    }
+
+    #[test]
+    fn return_after_all_calls_closed_errors() {
+        let (seq, d) = lowered("@startuml\nA -> B ++\ndeactivate B\nreturn r\n@enduml\n");
+        assert_eq!(errors(&d).len(), 1, "{d:?}");
+        assert!(errors(&d)[0].contains("`return`"));
+        assert_eq!(numbers(&seq).len(), 1, "no return message");
+    }
+
+    #[test]
+    fn end_with_frame_open_inside_box() {
+        // `end` closes the frame, a second plain `end` warns and closes the box.
+        let (seq, d) = lowered(
+            "@startuml\nbox \"T\"\nalt x\nparticipant A\nend\nend\nparticipant B\n@enduml\n",
+        );
+        assert!(errors(&d).is_empty(), "{d:?}");
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert!(d[0].message.contains("`end box`"));
+        assert_eq!(seq.participants[0].group, Some(0));
+        assert_eq!(seq.participants[1].group, None);
+    }
+
+    #[test]
+    fn end_box_with_frame_open_errors() {
+        let (seq, d) =
+            lowered("@startuml\nbox \"T\"\nalt x\nA -> B\nend box\nend\nparticipant C\n@enduml\n");
+        let errs = errors(&d);
+        assert!(errs.iter().any(|m| m.contains("`end box`")), "{d:?}");
+        // The box was never closed, so it is reported at the end.
+        assert!(errs.iter().any(|m| m.contains("unclosed `box`")), "{d:?}");
+        assert_eq!(seq.participants.last().unwrap().group, Some(0));
+        let ends = seq
+            .events
+            .iter()
+            .filter(|e| matches!(e, Event::End))
+            .count();
+        assert_eq!(ends, 1);
+    }
+
+    #[test]
+    fn autonumber_stop_twice_then_resume() {
+        let (seq, d) = lowered(
+            "@startuml\nautonumber 3\nA -> B\nautonumber stop\nautonumber stop\nA -> B\n\
+             autonumber resume\nA -> B\nautonumber resume\nA -> B\n@enduml\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(numbers(&seq), vec![Some(3), None, Some(4), Some(5)]);
+    }
+
+    #[test]
+    fn many_open_calls_deactivate_quickly() {
+        // Each `deactivate` used to scan every open call: quadratic.
+        let n = 40_000;
+        let mut src = String::from("@startuml\n");
+        for _ in 0..n {
+            src.push_str("A -> B ++\n");
+        }
+        for _ in 0..n {
+            src.push_str("A -> A ++\n");
+        }
+        for _ in 0..n {
+            src.push_str("deactivate B\n");
+        }
+        src.push_str("return r\n@enduml\n");
+        let tree = crate::plantuml::parse(&src).syntax();
+        let t = std::time::Instant::now();
+        let (seq, _) = lower(&tree);
+        assert!(t.elapsed().as_secs() < 5, "{:?}", t.elapsed());
+        let Some(Event::Message(m)) = seq
+            .events
+            .iter()
+            .rev()
+            .find(|e| matches!(e, Event::Message(_)))
+        else {
+            panic!("no return");
+        };
+        assert_eq!((id(&seq, m.from), id(&seq, m.to)), ("A", "A"));
     }
 }

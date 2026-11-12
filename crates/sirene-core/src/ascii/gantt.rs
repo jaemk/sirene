@@ -67,7 +67,7 @@ pub fn render(gantt: &Gantt, options: &Options) -> String {
     for (c, cell) in base.iter_mut().enumerate() {
         let tc = t0 + ((c as f64 + 0.5) / W as f64 * span) as i64;
         let day = t0 + (tc - t0).div_euclid(DAY) * DAY;
-        if !gantt.excludes.is_empty() && gantt.is_excluded(day) {
+        if (!gantt.excludes.is_empty() || !gantt.closed_days.is_empty()) && gantt.is_excluded(day) {
             *cell = g("·", ".");
         }
     }
@@ -241,5 +241,19 @@ mod tests {
         let mut line = "ab".to_owned();
         place(&mut line, 4, "c");
         assert_eq!(line, "ab  c");
+    }
+
+    #[test]
+    fn closed_dates_are_dotted() {
+        // A's row is empty on the closed day, which B's span covers.
+        let src = "@startgantt\nProject starts 2026-01-05\n2026-01-07 is closed\n\
+                   [A] lasts 1 day\n[B] starts 2026-01-09 and lasts 1 day\n@endgantt\n";
+        let (diagram, d) = crate::plantuml::parse(src).lower();
+        assert!(d.is_empty(), "{d:?}");
+        let crate::diagram::Diagram::Gantt(g) = diagram else {
+            panic!("not a gantt");
+        };
+        let out = render(&g, &Options::default());
+        assert!(out.contains('·'), "{out}");
     }
 }

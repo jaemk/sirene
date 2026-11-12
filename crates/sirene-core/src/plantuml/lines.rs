@@ -232,6 +232,9 @@ pub(crate) fn name(s: &str) -> Option<(String, String, &str)> {
                 (&after[..end], after[end..].trim_start())
             }
         };
+        if unquote(alias).is_empty() {
+            return None;
+        }
         // `"Display" as Id` or `Id as "Display"`.
         let (id, label) = if first.starts_with('"') || !alias.starts_with('"') {
             (unquote(alias), display)
@@ -345,16 +348,13 @@ pub(crate) fn note(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) ->
     } else {
         r
     };
-    let on_link = side.is_none() && keyword(r, "on").is_some_and(|x| keyword(x, "link").is_some());
+    let link_rest = keyword(r, "on").and_then(|x| keyword(x, "link"));
+    let on_link = link_rest.is_some();
     let (target, r) = match keyword(r, "of").and_then(note_target) {
         Some((t, rest)) if side.is_some() => (Some(t.to_owned()), rest),
         _ => (None, r),
     };
-    let r = if on_link {
-        r.splitn(3, ' ').nth(2).unwrap_or("").trim_start()
-    } else {
-        r
-    };
+    let r = link_rest.unwrap_or(r);
     // A `#color` is not drawn.
     let r = match r.strip_prefix('#') {
         Some(c) => c[c.find([' ', ':']).unwrap_or(c.len())..].trim_start(),
@@ -465,6 +465,38 @@ pub(crate) fn common(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) 
         "top to bottom direction" => return Common::Direction(Direction::TopBottom),
         _ => {}
     }
+    // `Set <|-- HashSet` and `Style --> Page` link elements named like a setting;
+    // `Set : +add()` is a member line.
+    let is_link = super::link::link(t).is_some_and(|l| l.from == word(t));
+    // `title`, `header`, `footer` and `caption` accept `word: text`.
+    let is_member = !matches!(w.as_str(), "title" | "header" | "footer" | "caption")
+        && t[word(t).len()..].trim_start().starts_with(':');
+    let setting = matches!(
+        w.as_str(),
+        "title"
+            | "header"
+            | "footer"
+            | "legend"
+            | "caption"
+            | "skinparam"
+            | "scale"
+            | "mainframe"
+            | "skin"
+            | "allowmixing"
+            | "allow_mixing"
+            | "set"
+            | "hide"
+            | "show"
+            | "remove"
+            | "restore"
+            | "newpage"
+            | "page"
+            | "pragma"
+            | "style"
+    );
+    if setting && (is_link || is_member) {
+        return Common::No;
+    }
     match w.as_str() {
         "title" => {
             let rest = line.after_word();
@@ -507,7 +539,13 @@ pub(crate) fn common(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) 
                 // A `skinparam x {` or `<style>` block runs to its `}`.
                 let mut depth = 1;
                 while depth > 0 {
-                    let Some(next) = cursor.next() else { break };
+                    let Some(next) = cursor.next() else {
+                        d.push(Diagnostic::new(
+                            line.range,
+                            format!("unclosed `{w}` block: expected `}}`"),
+                        ));
+                        break;
+                    };
                     depth += next.text.matches('{').count();
                     depth -= next.text.matches('}').count().min(depth);
                 }
@@ -519,7 +557,15 @@ pub(crate) fn common(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) 
             Common::Done
         }
         _ if t.starts_with("<style>") => {
-            let _ = cursor.until(&["</style>"]);
+            if !t.to_ascii_lowercase().contains("</style>") {
+                let (_, end) = cursor.until(&["</style>"]);
+                if end.is_none() {
+                    d.push(Diagnostic::new(
+                        line.range,
+                        "unclosed `<style>`: expected `</style>`",
+                    ));
+                }
+            }
             d.push(Diagnostic::warning(
                 line.range,
                 "`<style>` is not drawn yet; ignoring it",
@@ -562,5 +608,95 @@ mod tests {
             TextRange::at(15.into(), 4.into())
         );
         assert_eq!(line.after_word(), "left");
+    }
+
+    fn cursor(src: &[&str]) -> Cursor {
+        Cursor::new(src.iter().map(|s| ln(s)).collect())
+    }
+
+    fn ln(s: &str) -> Line {
+        Line {
+            text: s.into(),
+            range: TextRange::at(0.into(), (s.len() as u32).into()),
+        }
+    }
+
+    fn is_no(s: &str) -> bool {
+        let mut d = Vec::new();
+        matches!(common(&ln(s), &mut cursor(&[]), &mut d), Common::No)
+    }
+
+    #[test]
+    fn common_leaves_links_and_members_named_like_settings() {
+        for s in [
+            "Set <|-- HashSet",
+            "Style --> Page",
+            "Footer --> [Api]",
+            "Title --> X",
+            "Set : +add()",
+            "Page: +x",
+        ] {
+            assert!(is_no(s), "{s}");
+        }
+        for s in [
+            "title A -> B",
+            "title : x",
+            "skinparam x 1",
+            "footer hi",
+            "header: x",
+            "Header : x",
+            "caption: x",
+            "footer: x",
+            "hide X : y",
+            "scale 2 : x",
+            "legend left : x",
+            "skinparam x: y",
+            "show members",
+            "remove @unlinked",
+            "hide empty members",
+        ] {
+            assert!(!is_no(s), "{s}");
+        }
+    }
+
+    #[test]
+    fn common_style_blocks() {
+        let mut d = Vec::new();
+        let mut c = cursor(&["A -> B"]);
+        assert!(matches!(
+            common(&ln("<style>x{}</style>"), &mut c, &mut d),
+            Common::Done
+        ));
+        assert!(c.next().is_some());
+        assert_eq!(d.len(), 1);
+        let mut d = Vec::new();
+        common(&ln("<style>"), &mut cursor(&["a"]), &mut d);
+        assert!(d.iter().any(|x| x.message.contains("unclosed `<style>`")));
+        let mut d = Vec::new();
+        common(&ln("skinparam x {"), &mut cursor(&["a"]), &mut d);
+        assert!(d.iter().any(|x| x.message.contains("unclosed")));
+    }
+
+    #[test]
+    fn note_on_link_forms() {
+        for s in [
+            "note on link: x",
+            "note  on   link : x",
+            "note left on link : x",
+        ] {
+            let mut d = Vec::new();
+            let mut c = cursor(&["B -> C"]);
+            let n = note(&ln(s), &mut c, &mut d);
+            assert_eq!(n, Some(NoteStmt::OnLink { text: "x".into() }), "{s}");
+            assert!(c.next().is_some(), "{s}");
+            assert!(d.is_empty());
+        }
+    }
+
+    #[test]
+    fn empty_alias_is_not_a_name() {
+        assert!(name("X as").is_none());
+        assert!(name("X as \"\"").is_none());
+        assert_eq!(name("X as Y").map(|n| n.0), Some("Y".into()));
     }
 }

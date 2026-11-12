@@ -186,7 +186,13 @@ fn arrow_at(line: &str, dash: usize) -> Option<(usize, usize)> {
     // The dashes, with an optional `[style]` after the first.
     let mut end = dash + 1;
     if line[end..].starts_with('[') {
-        end += line[end..].find(']')? + 1;
+        // The style holds no `[`, so the search stops there: each line byte is scanned once.
+        let inner = &line[end + 1..];
+        let close = inner.find([']', '['])?;
+        if !inner[close..].starts_with(']') {
+            return None;
+        }
+        end += 1 + close + 1;
     }
     end += line[end..].len() - line[end..].trim_start_matches('-').len();
     let right_head = head_len(&line[end..], false);
@@ -910,11 +916,55 @@ mod tests {
         assert_eq!(a("A -\\ B"), Some("-\\"));
         assert_eq!(a("A -[#red]> B"), Some("-[#red]>"));
         assert_eq!(a("A -[#red]-> B"), Some("-[#red]->"));
+        assert_eq!(a("A -[#red,dashed]-> B"), Some("-[#red,dashed]->"));
+        assert_eq!(a("A -[bold]-> B"), Some("-[bold]->"));
+        assert_eq!(a("A -[ B"), None);
         assert_eq!(a("Max->Bob"), Some("->"));
         assert_eq!(a("x->y"), Some("->"));
         assert_eq!(a("A - B"), None);
         assert_eq!(a("A: x -> y"), None);
         assert_eq!(a("\"a->b\" -> c"), Some("->"));
+    }
+
+    #[test]
+    fn styled_arrows_beside_edge_markers() {
+        fn a(s: &str) -> Option<&str> {
+            find_arrow(s).map(|(at, n)| &s[at..at + n])
+        }
+        assert_eq!(a("[-[#red]> A"), Some("-[#red]>"));
+        assert_eq!(a("A -[#red]>]"), Some("-[#red]>"));
+        assert_eq!(a("[-[#red]>] "), Some("-[#red]>"));
+        assert_eq!(a("[x-[#red]> A"), Some("x-[#red]>"));
+        assert_eq!(a("A -[#red]>o]"), Some("-[#red]>o"));
+        assert_eq!(a("[<-[#red]- A"), Some("<-[#red]-"));
+        // A `[` inside a style is not a style: no arrow starts at that dash.
+        assert_eq!(a("A -[#a[b]> B"), None);
+        assert_eq!(a("A -[[#red]> B"), None);
+        // An unclosed style, or one closed only after a `[`, is not an arrow.
+        assert_eq!(a("A -[#red"), None);
+        assert_eq!(a("A -[#red[x] B"), None);
+        // A later plain arrow on the line is still found.
+        assert_eq!(a("A -[ B -> C"), Some("->"));
+        // Edge markers without a style.
+        assert_eq!(a("[-> A"), Some("->"));
+        assert_eq!(a("A ->]"), Some("->"));
+        assert_eq!(a("[<- A"), Some("<-"));
+    }
+
+    #[test]
+    fn styled_edge_messages_parse_cleanly() {
+        for body in ["[-[#red]> A: hi", "A -[#red]>]: hi", "A -[#red]> B: x"] {
+            let (_, d) = tree(&doc(body));
+            assert!(d.is_empty(), "{body}: {d:?}");
+        }
+    }
+
+    #[test]
+    fn repeated_style_openers_are_linear() {
+        let line = format!("A -{}", "[-".repeat(20_000));
+        let t = std::time::Instant::now();
+        assert_eq!(find_arrow(&line), None);
+        assert!(t.elapsed().as_secs() < 2);
     }
 
     #[test]

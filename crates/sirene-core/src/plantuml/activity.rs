@@ -16,20 +16,36 @@ use crate::syntax::SyntaxNode;
 pub(crate) const STATEMENT: &str = "expected an activity statement such as `:action;`, `start`, \
                                     `if (...) then`, or `while (...)`";
 
-/// An open end of the flow: the next node is joined to it, with the label of the branch.
+/// The most edges an activity diagram draws; past it the rest are dropped with one error.
+const MAX_EDGES: usize = 100_000;
+
+/// An open end of the flow: the next node is joined to it, with the label of the branch and
+/// the arrow statement that ended its branch.
 #[derive(Debug, Clone)]
 struct Tail {
     node: String,
     label: Option<String>,
+    arrow: Option<Arrow>,
 }
 
 impl Tail {
     fn plain(node: &str) -> Self {
+        Self::labeled(node, None)
+    }
+
+    fn labeled(node: &str, label: Option<String>) -> Self {
         Self {
             node: node.to_owned(),
-            label: None,
+            label,
+            arrow: None,
         }
     }
+}
+
+/// Drops repeated tails (same node and label), keeping the first.
+fn dedupe(tails: &mut Vec<Tail>) {
+    let mut seen = std::collections::HashSet::new();
+    tails.retain(|t| seen.insert((t.node.clone(), t.label.clone())));
 }
 
 /// A statement that is open until its closer.
@@ -100,11 +116,17 @@ impl Open {
 }
 
 /// The style of the next edges, from an arrow statement (`-> text;`, `-[#red,dashed]->`).
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 struct Arrow {
     label: Option<String>,
     stroke: Option<Stroke>,
     styles: Vec<Style>,
+}
+
+impl Arrow {
+    fn is_empty(&self) -> bool {
+        self.label.is_none() && self.stroke.is_none() && self.styles.is_empty()
+    }
 }
 
 struct Lower {
@@ -119,32 +141,66 @@ struct Lower {
     lanes: HashMap<String, usize>,
     /// The last node added, which notes attach to.
     last: Option<String>,
+    /// Whether the `MAX_EDGES` error was reported.
+    capped: bool,
 }
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
-    let mut l = Lower {
-        chart: Flowchart::default(),
-        d: Vec::new(),
-        tails: Vec::new(),
-        arrow: Arrow::default(),
-        stack: Vec::new(),
-        count: 0,
-        lane: None,
-        lanes: HashMap::new(),
-        last: None,
-    };
+    let mut l = Lower::new();
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
         l.statement(&line, &mut cursor);
     }
     for open in std::mem::take(&mut l.stack) {
-        let (kw, closer) = open.names();
-        l.d.push(Diagnostic::new(
-            open.range(),
-            format!("unclosed `{kw}`: expected `{closer}`"),
-        ));
+        l.d.push(unclosed(&open));
     }
     (l.chart, l.d)
+}
+
+fn unclosed(open: &Open) -> Diagnostic {
+    let (kw, closer) = open.names();
+    Diagnostic::new(
+        open.range(),
+        format!("unclosed `{kw}`: expected `{closer}`"),
+    )
+}
+
+/// Whether `body` (an action's last line) ends in `>` as part of a tag such as `</b>` or
+/// `<i>`, which does not close the action.
+fn ends_in_tag(body: &str) -> bool {
+    let Some(b) = body.strip_suffix('>') else {
+        return false;
+    };
+    let name = b.len()
+        - b.chars()
+            .rev()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .map(char::len_utf8)
+            .sum::<usize>();
+    let n = b[name..].chars().count();
+    if !(1..=5).contains(&n) {
+        return false;
+    }
+    let b = &b[..name];
+    let b = b.strip_suffix('/').unwrap_or(b);
+    b.ends_with('<')
+}
+
+/// Where `line` closes an action: the byte offset of its closing character and the character.
+fn action_end(line: &str) -> Option<(usize, char)> {
+    let b = line.trim_end();
+    // A stereotype such as `<<input>>` may follow the closing `;`.
+    let b = match b.rfind("<<") {
+        Some(i) if b.ends_with(">>") && b[..i].trim_end().ends_with(';') => b[..i].trim_end(),
+        _ => b,
+    };
+    if ends_in_tag(b) {
+        return None;
+    }
+    b.chars()
+        .last()
+        .filter(|c| ACTION_ENDS.contains(c))
+        .map(|c| (b.len() - c.len_utf8(), c))
 }
 
 /// The shape an action's closing character gives it (PACT-2).
@@ -177,6 +233,21 @@ fn label(s: &str) -> Option<String> {
 }
 
 impl Lower {
+    fn new() -> Self {
+        Self {
+            chart: Flowchart::default(),
+            d: Vec::new(),
+            tails: Vec::new(),
+            arrow: Arrow::default(),
+            stack: Vec::new(),
+            count: 0,
+            lane: None,
+            lanes: HashMap::new(),
+            last: None,
+            capped: false,
+        }
+    }
+
     fn error(&mut self, range: TextRange, message: impl Into<String>) {
         self.d.push(Diagnostic::new(range, message));
     }
@@ -207,24 +278,81 @@ impl Lower {
         id
     }
 
+    /// Adds `edge` unless the diagram has `MAX_EDGES` already, reporting that once.
+    fn push_edge(&mut self, edge: Edge) {
+        if self.chart.edges.len() < MAX_EDGES {
+            self.chart.edges.push(edge);
+        } else if !self.capped {
+            self.capped = true;
+            self.error(
+                edge.range,
+                format!("more than {MAX_EDGES} edges; dropping the rest"),
+            );
+        }
+    }
+
     fn edge(&mut self, from: &str, to: &str, label: Option<String>, range: TextRange) {
         let mut edge = Edge::new(from, to, range);
         edge.label = label.map(Label::plain);
-        self.chart.edges.push(edge);
+        self.push_edge(edge);
     }
 
-    /// Joins every open end to `to`, with the pending arrow's label and style.
+    /// Joins every open end to `to`, with the pending arrow's label and style, else the arrow
+    /// that ended the tail's branch.
     fn join(&mut self, to: &str, range: TextRange) {
-        let arrow = std::mem::take(&mut self.arrow);
+        let pending = std::mem::take(&mut self.arrow);
         for tail in std::mem::take(&mut self.tails) {
+            let baked = tail.arrow.unwrap_or_default();
             let mut edge = Edge::new(tail.node, to, range);
-            edge.label = arrow.label.clone().or(tail.label).map(Label::plain);
-            if let Some(stroke) = arrow.stroke {
+            edge.label = pending
+                .label
+                .clone()
+                .or(baked.label)
+                .or(tail.label)
+                .map(Label::plain);
+            if let Some(stroke) = pending.stroke.or(baked.stroke) {
                 edge.stroke = stroke;
             }
-            edge.styles = arrow.styles.clone();
-            self.chart.edges.push(edge);
+            edge.styles = if pending.styles.is_empty() {
+                baked.styles
+            } else {
+                pending.styles.clone()
+            };
+            self.push_edge(edge);
         }
+    }
+
+    /// Ends a branch: the pending arrow statement styles only this branch's open ends.
+    fn bake(&mut self) {
+        let arrow = std::mem::take(&mut self.arrow);
+        if arrow.is_empty() {
+            return;
+        }
+        for tail in &mut self.tails {
+            tail.arrow = Some(arrow.clone());
+        }
+    }
+
+    /// Pops the blocks above the innermost one `is` accepts, reporting each as unclosed and
+    /// merging its open ends into the flow. `false`, with an error, when no block matches.
+    fn unwind(&mut self, line: &Line, is: fn(&Open) -> bool, missing: &str) -> bool {
+        if !self.stack.iter().any(is) {
+            self.error(line.range, missing.to_owned());
+            return false;
+        }
+        while let Some(open) = self.stack.pop_if(|o| !is(o)) {
+            self.d.push(unclosed(&open));
+            let mut ends = match open {
+                Open::If { ends, .. } | Open::Switch { ends, .. } | Open::Fork { ends, .. } => ends,
+                Open::While { breaks, .. } | Open::Repeat { breaks, .. } => breaks,
+                Open::Group { .. } => Vec::new(),
+            };
+            self.bake();
+            ends.append(&mut self.tails);
+            dedupe(&mut ends);
+            self.tails = ends;
+        }
+        true
     }
 
     /// A new node joined to the flow, which becomes its only open end.
@@ -271,12 +399,19 @@ impl Lower {
         if t == "{" && matches!(self.stack.last(), Some(Open::Group { brace: true, .. })) {
             return;
         }
-        if let Some((name, rest)) = parens(t)
-            && rest.is_empty()
-        {
-            // A connector.
-            self.add(Shape::Circle, &lines::text(name.trim()), line.range);
-            return;
+        if let Some((name, rest)) = parens(t) {
+            if rest.is_empty() {
+                // A connector.
+                self.add(Shape::Circle, &lines::text(name.trim()), line.range);
+                return;
+            }
+            // `(no) elseif (cond) then (yes)`: the label is on the edge to the new test.
+            let after = keyword(rest, "elseif")
+                .or_else(|| keyword(rest, "else").and_then(|r| keyword(r, "if")));
+            if let Some(after) = after {
+                let label = Some(lines::text(name.trim()));
+                return self.else_if(line, after, label);
+            }
         }
         match squeezed.as_str() {
             "start" => {
@@ -305,7 +440,7 @@ impl Lower {
             || squeezed.starts_with("end merge")
             || squeezed == "end split"
         {
-            return self.end_fork(line, squeezed.starts_with("end merge"));
+            return self.end_fork(line, &squeezed);
         }
         if squeezed.starts_with("endwhile") || squeezed.starts_with("end while") {
             return self.end_while(line);
@@ -314,11 +449,11 @@ impl Lower {
             return self.repeat_while(line);
         }
         if squeezed.starts_with("else if") {
-            return self.else_if(line, t[4..].trim_start()[2..].trim_start());
+            return self.else_if(line, t[4..].trim_start()[2..].trim_start(), None);
         }
         match w.as_str() {
             "if" => return self.if_(line),
-            "elseif" => return self.else_if(line, line.after_word()),
+            "elseif" => return self.else_if(line, line.after_word(), None),
             "else" => return self.else_(line),
             "switch" => return self.switch(line),
             "case" => return self.case(line),
@@ -347,33 +482,18 @@ impl Lower {
         let color = &t[..colon];
         let mut body = t[colon + 1..].to_owned();
         let mut range = line.range;
-        let closed = |b: &str| {
-            let b = b.trim_end();
-            // A stereotype such as `<<input>>` may follow the closing `;`.
-            let b = match b.rfind("<<") {
-                Some(i) if b.ends_with(">>") && b[..i].trim_end().ends_with(';') => {
-                    b[..i].trim_end()
-                }
-                _ => b,
+        // Only the newest line can close the action.
+        let mut end = action_end(&body);
+        while end.is_none() {
+            let Some(next) = cursor.next() else {
+                break;
             };
-            b.chars()
-                .last()
-                .filter(|c| ACTION_ENDS.contains(c))
-                .map(|c| (b.len() - c.len_utf8(), c))
-        };
-        let end = loop {
-            if let Some(end) = closed(&body) {
-                break Some(end);
-            }
-            match cursor.next() {
-                Some(next) => {
-                    range = range.cover(next.range);
-                    body.push('\n');
-                    body.push_str(&next.text);
-                }
-                None => break None,
-            }
-        };
+            range = range.cover(next.range);
+            body.push('\n');
+            let at = body.len();
+            body.push_str(&next.text);
+            end = action_end(&next.text).map(|(i, c)| (at + i, c));
+        }
         let Some((at, end)) = end else {
             self.error(line.range, "unclosed action: expected `;` at its end");
             return None;
@@ -410,7 +530,9 @@ impl Lower {
         let head = t.find('>').expect("checked");
         let shaft = &t[..head];
         let mut arrow = Arrow::default();
-        if let (Some(open), Some(close)) = (shaft.find('['), shaft.rfind(']')) {
+        if let (Some(open), Some(close)) = (shaft.find('['), shaft.rfind(']'))
+            && open < close
+        {
             for part in shaft[open + 1..close].split(',').map(str::trim) {
                 match part.to_ascii_lowercase().as_str() {
                     "dashed" => arrow.stroke = Some(Stroke::Dotted),
@@ -539,10 +661,7 @@ impl Lower {
         }
         let (yes, _) = label_after(rest, "then");
         let decision = self.add(Shape::Diamond, &text, line.range);
-        self.tails = vec![Tail {
-            node: decision.clone(),
-            label: yes,
-        }];
+        self.tails = vec![Tail::labeled(&decision, yes)];
         self.push(
             Open::If {
                 decision,
@@ -554,9 +673,14 @@ impl Lower {
         );
     }
 
-    fn else_if(&mut self, line: &Line, rest: &str) {
-        let Some(Open::If { decision, ends, .. }) = self.stack.last_mut() else {
+    /// `elseif (cond) then (yes)`, with `no` from a leading `(no)` on the edge to the new test.
+    fn else_if(&mut self, line: &Line, rest: &str, no: Option<String>) {
+        if !matches!(self.stack.last(), Some(Open::If { .. })) {
             return self.error(line.range, "`elseif` belongs in an `if`");
+        }
+        self.bake();
+        let Some(Open::If { decision, ends, .. }) = self.stack.last_mut() else {
+            unreachable!()
         };
         ends.append(&mut self.tails);
         let from = decision.clone();
@@ -565,18 +689,24 @@ impl Lower {
         };
         let (yes, _) = label_after(rest, "then");
         let next = self.node(Shape::Diamond, &lines::text(cond.trim()), line.range);
-        self.edge(&from, &next, None, line.range);
+        self.edge(&from, &next, no, line.range);
         if let Some(Open::If { decision, .. }) = self.stack.last_mut() {
             *decision = next.clone();
         }
         self.last = Some(next.clone());
-        self.tails = vec![Tail {
-            node: next,
-            label: yes,
-        }];
+        self.tails = vec![Tail::labeled(&next, yes)];
     }
 
     fn else_(&mut self, line: &Line) {
+        if matches!(
+            self.stack.last(),
+            Some(Open::If {
+                otherwise: false,
+                ..
+            })
+        ) {
+            self.bake();
+        }
         let Some(Open::If {
             decision,
             ends,
@@ -593,16 +723,15 @@ impl Lower {
         *otherwise = true;
         ends.append(&mut self.tails);
         let node = decision.clone();
-        self.tails = vec![Tail {
-            node,
-            label: label(line.after_word()),
-        }];
+        self.tails = vec![Tail::labeled(&node, label(line.after_word()))];
     }
 
     fn end_if(&mut self, line: &Line) {
-        let Some(Open::If { .. }) = self.stack.last() else {
-            return self.error(line.range, "`endif` without an `if` to close");
-        };
+        let is = |o: &Open| matches!(o, Open::If { .. });
+        if !self.unwind(line, is, "`endif` without an `if` to close") {
+            return;
+        }
+        self.bake();
         let Some(Open::If {
             decision,
             mut ends,
@@ -637,6 +766,9 @@ impl Lower {
     }
 
     fn case(&mut self, line: &Line) {
+        if matches!(self.stack.last(), Some(Open::Switch { .. })) {
+            self.bake();
+        }
         let Some(Open::Switch {
             decision,
             ends,
@@ -651,16 +783,15 @@ impl Lower {
         }
         *cases += 1;
         let node = decision.clone();
-        self.tails = vec![Tail {
-            node,
-            label: label(line.after_word()),
-        }];
+        self.tails = vec![Tail::labeled(&node, label(line.after_word()))];
     }
 
     fn end_switch(&mut self, line: &Line) {
-        let Some(Open::Switch { .. }) = self.stack.last() else {
-            return self.error(line.range, "`endswitch` without a `switch` to close");
-        };
+        let is = |o: &Open| matches!(o, Open::Switch { .. });
+        if !self.unwind(line, is, "`endswitch` without a `switch` to close") {
+            return;
+        }
+        self.bake();
         let Some(Open::Switch {
             decision,
             mut ends,
@@ -683,10 +814,7 @@ impl Lower {
         };
         let (yes, _) = label_after(rest, "is");
         let decision = self.add(Shape::Diamond, &lines::text(cond.trim()), line.range);
-        self.tails = vec![Tail {
-            node: decision.clone(),
-            label: yes,
-        }];
+        self.tails = vec![Tail::labeled(&decision, yes)];
         self.push(
             Open::While {
                 decision,
@@ -698,9 +826,10 @@ impl Lower {
     }
 
     fn end_while(&mut self, line: &Line) {
-        let Some(Open::While { .. }) = self.stack.last() else {
-            return self.error(line.range, "`endwhile` without a `while` to close");
-        };
+        let is = |o: &Open| matches!(o, Open::While { .. });
+        if !self.unwind(line, is, "`endwhile` without a `while` to close") {
+            return;
+        }
         let Some(Open::While {
             decision,
             mut breaks,
@@ -717,10 +846,7 @@ impl Lower {
         } else {
             line.after_word()
         };
-        let mut tails = vec![Tail {
-            node: decision,
-            label: label(rest),
-        }];
+        let mut tails = vec![Tail::labeled(&decision, label(rest))];
         tails.append(&mut breaks);
         self.tails = tails;
     }
@@ -768,9 +894,10 @@ impl Lower {
     }
 
     fn repeat_while(&mut self, line: &Line) {
-        let Some(Open::Repeat { .. }) = self.stack.last() else {
-            return self.error(line.range, "`repeat while` without a `repeat` to close");
-        };
+        let is = |o: &Open| matches!(o, Open::Repeat { .. });
+        if !self.unwind(line, is, "`repeat while` without a `repeat` to close") {
+            return;
+        }
         let Some(Open::Repeat {
             start,
             backward,
@@ -794,10 +921,7 @@ impl Lower {
             }
             None => self.edge(&decision, &start, yes, line.range),
         }
-        let mut tails = vec![Tail {
-            node: decision,
-            label: no,
-        }];
+        let mut tails = vec![Tail::labeled(&decision, no)];
         tails.append(&mut breaks);
         self.tails = tails;
     }
@@ -832,27 +956,44 @@ impl Lower {
     }
 
     fn fork_again(&mut self, line: &Line) {
+        if matches!(self.stack.last(), Some(Open::Fork { .. })) {
+            self.bake();
+        }
         let Some(Open::Fork {
             bar, from, ends, ..
         }) = self.stack.last_mut()
         else {
             return self.error(line.range, "`fork again` belongs in a `fork` or `split`");
         };
+        // Empty `split` branches repeat the same ends; keep one of each.
         ends.append(&mut self.tails);
+        dedupe(ends);
         self.tails = match bar {
             Some(bar) => vec![Tail::plain(bar)],
             None => from.clone(),
         };
     }
 
-    fn end_fork(&mut self, line: &Line, merge: bool) {
-        let Some(Open::Fork { .. }) = self.stack.last() else {
-            return self.error(line.range, "`end fork` without a `fork` to close");
+    /// `end fork`, `end merge`, or `end split` (`closer`, squeezed).
+    fn end_fork(&mut self, line: &Line, closer: &str) {
+        let merge = closer.starts_with("end merge");
+        let (used, opener) = if closer.starts_with("end split") {
+            ("end split", "split")
+        } else if merge {
+            ("end merge", "fork")
+        } else {
+            ("end fork", "fork")
         };
+        let is = |o: &Open| matches!(o, Open::Fork { .. });
+        if !self.unwind(line, is, &format!("`{used}` without a `{opener}` to close")) {
+            return;
+        }
+        self.bake();
         let Some(Open::Fork { bar, mut ends, .. }) = self.stack.pop() else {
             unreachable!()
         };
         ends.append(&mut self.tails);
+        dedupe(&mut ends);
         self.tails = ends;
         if bar.is_some() {
             let shape = if merge { Shape::Diamond } else { Shape::Fork };
@@ -1018,5 +1159,268 @@ mod tests {
         );
         let (_, d) = lower_src("(*) --> \"a\"");
         assert!(d[0].contains("older activity syntax"), "{d:?}");
+    }
+
+    #[test]
+    fn arrow_style_closing_before_opening_does_not_panic() {
+        let (c, d) = lower_src(":a;\n-][>\n:b;");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(edges(&c), ["a>b"]);
+    }
+
+    #[test]
+    fn sequential_empty_splits_stay_bounded() {
+        let body = ":s;\n".to_owned() + &"split\nsplit again\nend split\n".repeat(22) + ":e;";
+        let started = std::time::Instant::now();
+        let (c, d) = lower_src(&body);
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(edges(&c), ["s>e"]);
+        assert!(started.elapsed().as_secs() < 5);
+    }
+
+    #[test]
+    fn edges_are_capped_with_one_error() {
+        let mut l = Lower::new();
+        let range = TextRange::default();
+        let join = |l: &mut Lower, to: &str| {
+            l.tails = (0..MAX_EDGES / 2 + 1)
+                .map(|i| Tail::plain(&format!("t{i}")))
+                .collect();
+            l.join(to, range);
+        };
+        join(&mut l, "x");
+        join(&mut l, "y");
+        join(&mut l, "z");
+        assert_eq!(l.chart.edges.len(), MAX_EDGES);
+        assert_eq!(l.d.len(), 1);
+        assert!(l.d[0].message.contains("edges"), "{:?}", l.d[0].message);
+    }
+
+    #[test]
+    fn arrow_before_else_labels_only_its_branch() {
+        let (c, d) = lower_src("if (x) then (yes)\n:a;\n-> done;\nelse (no)\n:b;\nendif\n:c;");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(edges(&c), ["x>a:yes", "x>b:no", "a>c:done", "b>c"]);
+        let (c, _) = lower_src(
+            "if (x) then\n:a;\n-> one;\nelseif (y) then\n:b;\n-> two;\nelse\n:c;\nendif\n:d;",
+        );
+        assert_eq!(
+            edges(&c),
+            ["x>a", "x>y", "y>b", "y>c", "a>d:one", "b>d:two", "c>d"]
+        );
+        let (c, _) = lower_src("switch (v)\ncase (1)\n:a;\n-> one;\ncase (2)\n:b;\nendswitch\n:c;");
+        assert_eq!(edges(&c), ["v>a:1", "v>b:2", "a>c:one", "b>c"]);
+        let (c, _) = lower_src("fork\n:a;\n-> one;\nfork again\n:b;\nend fork");
+        assert_eq!(edges(&c), ["Fork>a", "Fork>b", "a>Fork:one", "b>Fork"]);
+    }
+
+    #[test]
+    fn arrow_before_endif_styles_one_merging_edge() {
+        let (c, d) = lower_src("if (x) then\n:a;\nelse\n:b;\n-[#red,dashed]->\nendif\n:c;");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(edges(&c), ["x>a", "x>b", "a>c", "b>c"]);
+        let styled: Vec<bool> = c
+            .edges
+            .iter()
+            .map(|e| e.stroke == Stroke::Dotted && !e.styles.is_empty())
+            .collect();
+        assert_eq!(styled, [false, false, false, true]);
+        // An arrow after the closer still styles every merging edge.
+        let (c, _) = lower_src("if (x) then\n:a;\nelse\n:b;\nendif\n-> all;\n:c;");
+        assert_eq!(edges(&c), ["x>a", "x>b", "a>c:all", "b>c:all"]);
+    }
+
+    #[test]
+    fn leading_label_before_elseif() {
+        let (c, d) =
+            lower_src("if (x) then (yes)\n:a;\n(no) elseif (y) then (ok)\n:b;\nendif\n:c;");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(
+            edges(&c),
+            ["x>a:yes", "x>y:no", "y>b:ok", "a>c", "b>c", "y>c"]
+        );
+        let (c, d) = lower_src("if (x) then\n:a;\n(no) else if (y) then\n:b;\nendif");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(edges(&c).contains(&"x>y:no".to_owned()), "{:?}", edges(&c));
+    }
+
+    #[test]
+    fn closing_tag_does_not_close_an_action() {
+        let (c, d) = lower_src(":This is <b>bold</b>\nand more;\n:b;");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(edges(&c), ["This is <b>bold</b>\nand more>b"]);
+        assert_eq!(c.nodes[0].shape, Shape::Rounded);
+        let (c, _) = lower_src(":x <i>\ny;");
+        assert_eq!(c.nodes[0].shape, Shape::Rounded);
+        // A plain trailing `>` still closes.
+        let (c, _) = lower_src(":send>");
+        assert_eq!(c.nodes[0].shape, Shape::LeanRight);
+    }
+
+    #[test]
+    fn long_multiline_action_is_linear() {
+        let body = ":x\n".to_owned() + &"abcdefghi\n".repeat(50_000) + "done;";
+        let started = std::time::Instant::now();
+        let (c, d) = lower_src(&body);
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(c.nodes.len(), 1);
+        // Rescanning the growing body per line took many seconds here.
+        assert!(started.elapsed().as_secs() < 2);
+    }
+
+    #[test]
+    fn closer_reports_the_unclosed_inner_block() {
+        let (c, d) = lower_src("start\nif (x) then\nwhile (y)\n:a;\nendif\n:b;");
+        assert_eq!(d, ["unclosed `while`: expected `endwhile`"]);
+        assert!(edges(&c).contains(&"a>b".to_owned()), "{:?}", edges(&c));
+        let (_, d) = lower_src("while (y)\nfork\n:a;\nendwhile");
+        assert_eq!(d, ["unclosed `fork`: expected `end fork`"]);
+        let (_, d) = lower_src("start\nend split");
+        assert_eq!(d, ["`end split` without a `split` to close"]);
+        let (_, d) = lower_src("start\nend fork");
+        assert_eq!(d, ["`end fork` without a `fork` to close"]);
+        let (_, d) = lower_src("if (x) then\nend split\nendif");
+        assert_eq!(d, ["`end split` without a `split` to close"]);
+    }
+
+    #[test]
+    fn closer_reports_unclosed_repeat_switch_and_group() {
+        let (_, d) = lower_src("start\nif (x) then\nrepeat\n:a;\nendif\n:b;");
+        assert_eq!(d, ["unclosed `repeat`: expected `repeat while`"]);
+        let (c, d) = lower_src("if (x) then\nswitch (v)\ncase (1)\n:a;\nendif\n:b;");
+        assert_eq!(d, ["unclosed `switch`: expected `endswitch`"]);
+        assert!(edges(&c).contains(&"a>b".to_owned()), "{:?}", edges(&c));
+        let (c, d) = lower_src("fork\npartition P {\n:a;\nend fork\n:b;");
+        assert_eq!(d, ["unclosed `partition`: expected `}`"]);
+        assert!(edges(&c).contains(&"a>Fork".to_owned()), "{:?}", edges(&c));
+        let (_, d) = lower_src("while (y)\ngroup G\n:a;\nendwhile");
+        assert_eq!(d, ["unclosed `group`: expected `end group`"]);
+        // A repeat popped by `endwhile` keeps its breaks as open ends.
+        let (c, d) = lower_src("while (y)\nrepeat\nbreak\nendwhile\n:z;");
+        assert_eq!(d, ["unclosed `repeat`: expected `repeat while`"]);
+        assert!(c.edges.len() >= 2);
+    }
+
+    #[test]
+    fn deduped_tails_with_different_arrows_keep_the_first() {
+        let (c, d) = lower_src(":s;\nsplit\n-> one;\nsplit again\n-> two;\nend split\n:c;");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(edges(&c), ["s>c:one"]);
+        // Distinct nodes keep their own arrows.
+        let (c, _) = lower_src("fork\n:a;\n-> one;\nfork again\n:b;\n-> two;\nend fork");
+        assert_eq!(edges(&c), ["Fork>a", "Fork>b", "a>Fork:one", "b>Fork:two"]);
+    }
+
+    #[test]
+    fn elseif_without_an_if_is_an_error() {
+        let (_, d) = lower_src("start\n(no) elseif (y) then\n:a;");
+        assert_eq!(d, ["`elseif` belongs in an `if`"]);
+        let (_, d) = lower_src("start\n(no) else if (y) then\n:a;");
+        assert_eq!(d, ["`elseif` belongs in an `if`"]);
+        let (_, d) = lower_src("while (w)\n(no) elseif (y) then\nendwhile");
+        assert_eq!(d, ["`elseif` belongs in an `if`"]);
+        let (_, d) = lower_src("start\nelseif (y) then");
+        assert_eq!(d, ["`elseif` belongs in an `if`"]);
+    }
+
+    #[test]
+    fn leading_label_without_elseif_is_not_a_connector_or_elseif() {
+        let (_, d) = lower_src("start\n(no) foo");
+        assert_eq!(d, [STATEMENT]);
+        let (_, d) = lower_src("start\n(no) elsewhere");
+        assert_eq!(d, [STATEMENT]);
+    }
+
+    #[test]
+    fn ends_in_tag_edges() {
+        assert!(ends_in_tag("x <b>"));
+        assert!(ends_in_tag("x </b>"));
+        assert!(ends_in_tag("x <abcde>"));
+        // Six-character names and empty tags are not tags.
+        assert!(!ends_in_tag("x <abcdef>"));
+        assert!(!ends_in_tag("x <>"));
+        assert!(!ends_in_tag("x </>"));
+        assert!(!ends_in_tag("send>"));
+        assert!(!ends_in_tag("a < b>"));
+        assert!(!ends_in_tag("a/b>"));
+        assert!(!ends_in_tag(""));
+        assert!(!ends_in_tag(">"));
+        // Non-ASCII names count in characters, not bytes.
+        assert!(ends_in_tag("x <\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}>"));
+        assert!(!ends_in_tag("x <\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}>"));
+        assert!(ends_in_tag("x <\u{65e5}\u{672c}>"));
+        assert!(!ends_in_tag("\u{65e5}\u{672c}>"));
+        let (c, _) = lower_src(":x <abcdef>");
+        assert_eq!(c.nodes[0].shape, Shape::LeanRight);
+        let (c, _) = lower_src(":x <>");
+        assert_eq!(c.nodes[0].shape, Shape::LeanRight);
+    }
+
+    #[test]
+    fn action_end_handles_stereotypes_and_tags() {
+        assert_eq!(action_end("a;"), Some((1, ';')));
+        assert_eq!(action_end("a; <<input>>"), Some((1, ';')));
+        assert_eq!(action_end("a;<<input>>  "), Some((1, ';')));
+        assert_eq!(action_end("a <b>"), None);
+        assert_eq!(action_end("a"), None);
+        assert_eq!(action_end(""), None);
+        assert_eq!(action_end("\u{e9};"), Some((2, ';')));
+    }
+
+    #[test]
+    fn stereotype_on_a_later_action_line() {
+        let (c, d) = lower_src(":a\nb; <<input>>\n:c;");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(c.nodes.len(), 2);
+        assert_eq!(c.nodes[0].label.text, "a\nb");
+        assert_eq!(c.nodes[0].shape, Shape::Rounded);
+        // Only the newest line closes it: a `;` mid-body does not.
+        let (c, d) = lower_src(":a;b\nc;");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(c.nodes.len(), 1);
+        assert_eq!(c.nodes[0].label.text, "a;b\nc");
+    }
+
+    #[test]
+    fn arrow_before_the_first_case_is_dropped_not_leaked() {
+        let (c, d) = lower_src("switch (v)\n-> early;\ncase (1)\n:a;\ncase (2)\n:b;\nendswitch");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(edges(&c), ["v>a:1", "v>b:2"]);
+    }
+
+    #[test]
+    fn edge_cap_applies_to_direct_edges() {
+        let mut l = Lower::new();
+        let range = TextRange::default();
+        l.chart.edges = (0..MAX_EDGES).map(|_| Edge::new("p", "q", range)).collect();
+        l.edge("a", "b", None, range);
+        l.edge("a", "b", Some("x".into()), range);
+        assert_eq!(l.chart.edges.len(), MAX_EDGES);
+        assert_eq!(l.d.len(), 1);
+
+        // `elseif` still adds its node and tails past the cap.
+        let mut l = Lower::new();
+        l.chart.edges = (0..MAX_EDGES).map(|_| Edge::new("p", "q", range)).collect();
+        let at = |t: &str| Line {
+            text: t.to_owned(),
+            range,
+        };
+        l.statement(&at("if (x) then"), &mut Cursor::new(Vec::new()));
+        l.statement(&at("elseif (y) then"), &mut Cursor::new(Vec::new()));
+        assert_eq!(l.chart.edges.len(), MAX_EDGES);
+        assert_eq!(l.chart.nodes.len(), 2);
+        assert_eq!(l.tails.len(), 1);
+        assert_eq!(l.d.len(), 1);
+
+        // `repeat while` too, without a second error.
+        let mut l = Lower::new();
+        l.chart.edges = (0..MAX_EDGES).map(|_| Edge::new("p", "q", range)).collect();
+        for t in ["repeat", ":a;", "repeat while (c)", ":z;"] {
+            l.statement(&at(t), &mut Cursor::new(Vec::new()));
+        }
+        assert_eq!(l.chart.edges.len(), MAX_EDGES);
+        assert_eq!(l.chart.nodes.len(), 4);
+        assert_eq!(l.d.len(), 1);
+        assert!(l.d[0].message.contains("edges"));
     }
 }

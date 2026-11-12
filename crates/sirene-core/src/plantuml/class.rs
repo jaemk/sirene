@@ -90,6 +90,8 @@ struct Lower {
     /// The last class declared, which `note left: text` attaches to.
     last: Option<String>,
     hide: Hide,
+    /// Nodes created only by a link end, so a later package of that name can replace them.
+    implicit: std::collections::HashSet<String>,
 }
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
@@ -102,6 +104,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
         stack: Vec::new(),
         last: None,
         hide: Hide::default(),
+        implicit: Default::default(),
     };
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
@@ -205,6 +208,9 @@ impl Lower {
         if !self.index.contains_key(&id) && self.packages.contains_key(&id) {
             return id;
         }
+        if !self.index.contains_key(&id) {
+            self.implicit.insert(id.clone());
+        }
         self.class(&id, range);
         id
     }
@@ -233,30 +239,58 @@ impl Lower {
                 return;
             }
         }
-        if w == "note" {
+        let link = link::link(t);
+        // `Entity --> X` links a class named like a keyword. The arrow (or a multiplicity)
+        // must follow the word directly: in `class x.y.Z` the `x.` is part of a name.
+        let after = t[lines::word(t).len()..].trim_start();
+        // `-up->` swaps the ends, so the word may be either.
+        let named_like_keyword = link
+            .as_ref()
+            .is_some_and(|l| [l.from, l.to].contains(&lines::word(t)))
+            && after.starts_with(['-', '.', '<', '*', '}', '|', '"', '+', '#']);
+        if w == "note" && !named_like_keyword {
             return self.note(line, cursor);
         }
         if w == "together" && t.ends_with('{') {
             return self.open(None, line.range);
         }
-        if PACKAGES.contains(&w.as_str())
+        if !named_like_keyword
+            && PACKAGES.contains(&w.as_str())
             && (t.ends_with('{') || w == "package" || w == "namespace")
         {
             return self.package_decl(line);
         }
-        if let Some(rest) = keyword(t, "abstract") {
+        if !named_like_keyword && let Some(rest) = keyword(t, "abstract") {
             let rest = keyword(rest, "class").unwrap_or(rest);
             return self.declare(line, rest, "class", Some("abstract"), cursor);
         }
-        if let Some(&(kw, stereo)) = KINDS.iter().find(|(k, _)| *k == w) {
+        if !named_like_keyword && let Some(&(kw, stereo)) = KINDS.iter().find(|(k, _)| *k == w) {
             return self.declare(line, line.after_word(), kw, stereo, cursor);
         }
-        if let Some(link) = link::link(t) {
+        if let Some(link) = link {
             return self.link(line, &link);
         }
-        if let Some((target, member)) = t.split_once(':')
+        // The member colon is the first `:` that is not half of a `::` pair.
+        let colon = {
+            let b = t.as_bytes();
+            let mut i = 0;
+            let mut found = None;
+            while i < b.len() {
+                if b[i] == b':' {
+                    if b.get(i + 1) == Some(&b':') {
+                        i += 2;
+                        continue;
+                    }
+                    found = Some(i);
+                    break;
+                }
+                i += 1;
+            }
+            found
+        };
+        if let Some(c) = colon
+            && let (target, member) = (&t[..c], &t[c + 1..])
             && !target.trim().is_empty()
-            && !target.contains("::")
         {
             let i = self.class(&id_of(target), line.range_of(target.trim()));
             return self.add_member(i, member);
@@ -301,6 +335,13 @@ impl Lower {
         let i = match self.packages.get(&id) {
             Some(&i) => i,
             None => {
+                if self.implicit.contains(&id) {
+                    // The stray node goes in `finish`; drop its membership now, before the
+                    // package adds an entry under the same id.
+                    for sg in &mut self.chart.subgraphs {
+                        sg.members.retain(|m| *m != id);
+                    }
+                }
                 let i = self.chart.subgraphs.len();
                 self.chart
                     .subgraphs
@@ -345,6 +386,7 @@ impl Lower {
             return self.error(line.range, format!("expected a name after `{kw}`"));
         };
         let i = self.class(&id, line.range);
+        self.implicit.remove(&id);
         self.chart.nodes[i].label = Label::plain(label);
         self.last = Some(id.clone());
         if let Some(s) = stereo
@@ -599,6 +641,19 @@ impl Lower {
     /// Stereotypes above the name, then the compartments (PCLS-2, PCLS-3, PCLS-7).
     fn finish(mut self) -> (Flowchart, Vec<Diagnostic>) {
         let hide = self.hide;
+        // A package of the same name replaces a node made only by a link end.
+        let stray: Vec<usize> = self
+            .chart
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| self.implicit.contains(&n.id) && self.packages.contains_key(&n.id))
+            .map(|(i, _)| i)
+            .collect();
+        for &i in stray.iter().rev() {
+            self.chart.nodes.remove(i);
+            self.classes.remove(i);
+        }
         for (node, class) in self.chart.nodes.iter_mut().zip(self.classes) {
             if !class.stereotypes.is_empty() && !hide.stereotypes {
                 let s: Vec<String> = class.stereotypes.iter().map(|s| format!("«{s}»")).collect();
@@ -649,6 +704,174 @@ mod tests {
 
     fn cells(rows: &[Row]) -> Vec<&str> {
         rows.iter().map(|r| r.cells[0].as_str()).collect()
+    }
+
+    #[test]
+    fn keyword_named_classes_link() {
+        for name in [
+            "Exception",
+            "Entity",
+            "Map",
+            "Object",
+            "Annotation",
+            "Circle",
+            "Record",
+            "Package",
+            "abstract",
+        ] {
+            let (g, d) = lower_src(&format!("class Z\n{name} --> X"));
+            assert!(d.is_empty(), "{name}: {d:?}");
+            assert_eq!(g.edges.len(), 1, "{name}");
+            assert_eq!(g.edges[0].to, "X");
+        }
+        let (g, d) = lower_src("class Z\nException <|-- IOException");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(g.edges.len(), 1);
+        let (g, d) = lower_src("class A\nentity E\npackage P {\nclass B\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("A").is_some() && g.node("E").is_some() && g.node("B").is_some());
+    }
+
+    #[test]
+    fn namespaced_member() {
+        let (g, d) = lower_src("class ns::Foo\nns::Foo : +bar()");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("ns").is_none());
+        assert_eq!(g.nodes.len(), 1);
+        assert_eq!(g.nodes[0].sections.len(), 2);
+    }
+
+    #[test]
+    fn dotted_name_after_keyword_is_a_declaration() {
+        // `x.` reads as an arrow head, but `class x.y.Z {` declares a class.
+        let (g, d) = lower_src("class x.y.Z {\n  -id : int\n  +run()\n}\nclass x.Y");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.edges.is_empty());
+        assert!(g.node("x.y.Z").is_some() && g.node("x.Y").is_some());
+    }
+
+    #[test]
+    fn link_end_package_replaces_stray_node() {
+        let (g, d) = lower_src("A --> P\npackage P {\nclass B\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("P").is_none());
+        assert_eq!(g.edges.len(), 1);
+        assert_eq!(g.edges[0].to, "P");
+        assert!(
+            g.subgraphs
+                .iter()
+                .all(|s| !s.members.iter().any(|m| m == "P"))
+        );
+    }
+
+    #[test]
+    fn note_named_class_links() {
+        for name in ["note", "Note", "NOTE"] {
+            let (g, d) = lower_src(&format!("class Z\n{name} --> X"));
+            assert!(d.is_empty(), "{name}: {d:?}");
+            assert_eq!(g.edges.len(), 1, "{name}");
+            assert_eq!(g.edges[0].from, name);
+            assert!(g.notes.is_empty(), "{name}");
+        }
+        // Real notes, even with arrow-like text, stay notes.
+        let (g, d) = lower_src("class A\nnote \"x -> y\" as N\nnote right of A : a -> b");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.edges.is_empty(), "{:?}", g.edges.len());
+        assert_eq!(g.node("N").unwrap().shape, Shape::Note);
+        assert_eq!(g.notes.len(), 1);
+    }
+
+    #[test]
+    fn keyword_named_class_with_multiplicities() {
+        let (g, d) = lower_src("class Z\nEntity \"1\" --> \"n\" Map : uses");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(g.edges.len(), 1);
+        let e = &g.edges[0];
+        assert_eq!((e.from.as_str(), e.to.as_str()), ("Entity", "Map"));
+        assert_eq!(e.start_label.as_ref().unwrap().text, "1");
+        assert_eq!(e.end_label.as_ref().unwrap().text, "n");
+        // A declaration that merely follows a keyword is still a declaration.
+        let (g, d) = lower_src("class Entity\nentity E2 <<x>>");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("E2").is_some());
+        assert!(g.edges.is_empty());
+    }
+
+    #[test]
+    fn member_colon_skips_double_colons() {
+        let (g, d) = lower_src("class Z\nns::Foo::Bar : +x : int");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("ns").is_none() && g.node("ns::Foo").is_none());
+        assert_eq!(g.nodes.len(), 2);
+        assert_eq!(cells(&g.nodes[1].sections[0]), ["+x : int"]);
+        // A member holding `::` itself.
+        let (g, d) = lower_src("class Z\nA : +std::vector<int> v");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(
+            cells(&g.node("A").unwrap().sections[0]),
+            ["+std::vector<int> v"]
+        );
+        // Only `::` pairs: no member colon is an error, and a leading colon has no target.
+        let (_, d) = lower_src("class Z\nns::Foo");
+        assert_eq!(d, [STATEMENT]);
+        let (_, d) = lower_src("class Z\n: x");
+        assert_eq!(d, [STATEMENT]);
+    }
+
+    #[test]
+    fn implicit_node_declared_then_packaged() {
+        // Declared as a class, so the later package does not replace it.
+        let (g, d) = lower_src("A --> P\nclass P\npackage P {\nclass B\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("P").is_some());
+        assert_eq!(g.edges[0].to, "P");
+        // A link end that names an existing package never makes a node.
+        let (g, d) = lower_src("package P {\nclass B\n}\nA --> P\nP --> C");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("P").is_none());
+        assert_eq!(g.edges.len(), 2);
+    }
+
+    #[test]
+    fn stray_node_removal_keeps_classes_aligned() {
+        let (g, d) = lower_src(
+            "X --> P1\nclass K {\n  km()\n}\nY --> P2\nclass L {\n  lf\n}\n\
+             package P1 {\n}\npackage P2 {\n  class In\n}\nclass M {\n  mm()\n}\n\
+             note left of M : n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        let ids: Vec<_> = g.nodes.iter().map(|n| n.id.as_str()).collect();
+        assert_eq!(ids, ["X", "K", "Y", "L", "In", "M"]);
+        assert_eq!(cells(&g.node("K").unwrap().sections[1]), ["km()"]);
+        assert_eq!(cells(&g.node("L").unwrap().sections[0]), ["lf"]);
+        assert_eq!(cells(&g.node("M").unwrap().sections[1]), ["mm()"]);
+        assert!(g.node("X").unwrap().sections.is_empty());
+        assert!(
+            g.subgraphs
+                .iter()
+                .all(|s| s.members.iter().all(|m| m != "P1" && m != "P2"))
+        );
+        assert_eq!(g.subgraphs[1].members, ["In"]);
+        assert_eq!(g.notes[0].target, "M");
+    }
+
+    #[test]
+    fn stray_package_removed_from_enclosing_subgraph() {
+        // The link end `Q` is created inside `outer`, then a package `Q` replaces it.
+        let (g, d) = lower_src("package outer {\nA --> Q\n}\npackage Q {\nclass B\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("Q").is_none());
+        assert_eq!(g.subgraphs[0].members, ["A"]);
+    }
+
+    #[test]
+    fn stray_removal_keeps_nested_package_membership() {
+        // The package `Q` itself stays a member of `outer`; only the stray node goes.
+        let (g, d) = lower_src("A --> Q\npackage outer {\npackage Q {\nclass B\n}\n}");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(g.node("Q").is_none());
+        let outer = g.subgraphs.iter().find(|s| s.id == "outer").unwrap();
+        assert_eq!(outer.members, ["Q"]);
     }
 
     #[test]
