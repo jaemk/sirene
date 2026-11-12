@@ -210,11 +210,42 @@ fn clusters() {
                 "A",
                 vec!["x".to_owned(), "cluster_b".to_owned()]
             ),
-            ("cluster_b", "", vec!["y".to_owned()]),
+            // Set in `cluster_a` before `cluster_b`, so inherited as in Graphviz.
+            ("cluster_b", "A", vec!["y".to_owned()]),
         ]
     );
     assert_eq!(style(&c.subgraphs[0].styles, "fill"), Some("#add8e6"));
     assert_eq!(style(&c.subgraphs[0].styles, "stroke"), Some("#ff0000"));
+}
+
+/// DOT-2: a cluster starts with the graph attributes set around it before it, by `a=b` or
+/// `graph [...]`, in clusters and plain subgraphs alike; later ones and its own override them.
+#[test]
+fn cluster_inherits_graph_attributes() {
+    let c = chart(
+        "digraph {\n  subgraph cluster_before { a }\n  label=\"T\"; graph [pencolor=red]\n  subgraph cluster_after { b }\n  subgraph cluster_own { label=\"own\"; c }\n  subgraph { pencolor=blue; subgraph cluster_inner { d } }\n  pencolor=green\n}\n",
+    );
+    let got: Vec<_> = c
+        .subgraphs
+        .iter()
+        .map(|s| {
+            (
+                s.id.as_str(),
+                s.title.text.as_str(),
+                style(&s.styles, "stroke"),
+            )
+        })
+        .collect();
+    assert_eq!(
+        got,
+        [
+            ("cluster_before", "", None),
+            ("cluster_after", "T", Some("#ff0000")),
+            ("cluster_own", "own", Some("#ff0000")),
+            ("cluster_inner", "T", Some("#0000ff")),
+        ]
+    );
+    assert_eq!(c.title.as_deref(), Some("T"));
 }
 
 /// DOT-2: a node is a member of the innermost cluster that mentions it, wherever it is

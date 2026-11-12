@@ -107,6 +107,8 @@ const EDGE_ATTRS: &[&str] = &[
 struct Scope {
     node: Vec<Attr>,
     edge: Vec<Attr>,
+    /// Graph attributes set here and in the enclosing scopes, which new clusters start with.
+    graph: Vec<Attr>,
     /// The innermost cluster, whose members the nodes mentioned here become.
     cluster: Option<usize>,
     /// Whether this scope is the root graph or a cluster, whose graph attributes are drawn.
@@ -141,6 +143,7 @@ struct Lowerer {
     mentions: Vec<Vec<TextRange>>,
     edges: Vec<PendingEdge>,
     clusters: Vec<Cluster>,
+    cluster_index: HashMap<String, usize>,
     /// Names already warned about, so each is reported once per file.
     warned: HashSet<String>,
 }
@@ -645,7 +648,8 @@ impl Lowerer {
     }
 
     /// A graph attribute: the root graph's or a cluster's; a plain subgraph's draw nothing.
-    fn graph_attr(&mut self, attr: Attr, scope: &Scope) {
+    /// Either way it is a default for the clusters created later in the scope, as in Graphviz.
+    fn graph_attr(&mut self, attr: Attr, scope: &mut Scope) {
         if attr.key == "rank" {
             self.warn_once(
                 "graph:rank",
@@ -655,6 +659,7 @@ impl Lowerer {
             return;
         }
         self.check(&attr, Target::Graph);
+        scope.graph.push(attr.clone());
         if !scope.drawn {
             return;
         }
@@ -769,21 +774,28 @@ impl Lowerer {
         let mut scope = Scope {
             node: parent.node.clone(),
             edge: parent.edge.clone(),
+            graph: parent.graph.clone(),
             cluster: parent.cluster,
             drawn: cluster,
         };
         if cluster {
             let id = name.unwrap_or_default();
-            let existing = self.clusters.iter().position(|c| c.id == id);
-            scope.cluster = Some(existing.unwrap_or_else(|| {
-                self.clusters.push(Cluster {
-                    id,
-                    parent: parent.cluster,
-                    attrs: Vec::new(),
-                    range: sub.text_range(),
-                });
-                self.clusters.len() - 1
-            }));
+            let c = match self.cluster_index.get(&id) {
+                Some(&c) => c,
+                None => {
+                    let c = self.clusters.len();
+                    self.cluster_index.insert(id.clone(), c);
+                    // A new cluster starts with the graph attributes set around it so far.
+                    self.clusters.push(Cluster {
+                        id,
+                        parent: parent.cluster,
+                        attrs: parent.graph.clone(),
+                        range: sub.text_range(),
+                    });
+                    c
+                }
+            };
+            scope.cluster = Some(c);
         }
         self.stmts(sub, &mut scope)
     }
@@ -825,8 +837,20 @@ impl Lowerer {
             let edge = self.lower_edge(&e, &graph);
             chart.edges.push(edge);
         }
-        for c in 0..self.clusters.len() {
-            let sub = self.lower_cluster(c, &graph);
+        // Each cluster's members: its nodes in order, then the clusters directly inside it.
+        let mut members = vec![Vec::new(); self.clusters.len()];
+        for (i, c) in self.node_cluster.iter().enumerate() {
+            if let Some(c) = *c {
+                members[c].push(self.ids[i].clone());
+            }
+        }
+        for k in &self.clusters {
+            if let Some(p) = k.parent {
+                members[p].push(k.id.clone());
+            }
+        }
+        for (c, members) in members.into_iter().enumerate() {
+            let sub = self.lower_cluster(c, &graph, members);
             chart.subgraphs.push(sub);
         }
         Output {
@@ -844,9 +868,10 @@ impl Lowerer {
                 continue;
             }
             let mut id = self.clusters[c].id.clone();
-            while self.node_index.contains_key(&id) || self.clusters.iter().any(|k| k.id == id) {
+            while self.node_index.contains_key(&id) || self.cluster_index.contains_key(&id) {
                 id.push('_');
             }
+            self.cluster_index.insert(id.clone(), c);
             self.clusters[c].id = id;
         }
     }
@@ -1185,7 +1210,8 @@ impl Lowerer {
         }
     }
 
-    fn lower_cluster(&mut self, c: usize, graph: &str) -> Subgraph {
+    /// Cluster `c` with its member nodes and clusters.
+    fn lower_cluster(&mut self, c: usize, graph: &str, members: Vec<String>) -> Subgraph {
         let attrs = std::mem::take(&mut self.clusters[c].attrs);
         let title = get(&attrs, "label")
             .map(|a| a.value.clone())
@@ -1200,16 +1226,6 @@ impl Lowerer {
             ],
         );
         let styles = self.shape_styles(&attrs, &words, true);
-        let mut members: Vec<String> = (0..self.ids.len())
-            .filter(|&i| self.node_cluster[i] == Some(c))
-            .map(|i| self.ids[i].clone())
-            .collect();
-        members.extend(
-            self.clusters
-                .iter()
-                .filter(|k| k.parent == Some(c))
-                .map(|k| k.id.clone()),
-        );
         Subgraph {
             id: self.clusters[c].id.clone(),
             title: Label::plain(title),

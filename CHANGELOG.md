@@ -180,6 +180,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   linear in their size; 10,000 sankey flows took tens of seconds.
 - DOT labels decode HTML entities, including `&#NNN;` and `&#xHH;`, in plain labels as well as
   HTML ones. An unclosed string or HTML string keeps its last character.
+- A DOT cluster starts with the graph attributes set around it before it, as in Graphviz, and a
+  `#` line after a byte order mark is a comment.
 - Mermaid labels decode hex entities such as `&#x2665;`, and `&9829;` without its `#` is text.
 
 ## [0.2.0] - 2026-11-08

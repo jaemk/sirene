@@ -33,7 +33,9 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
 - A subgraph whose name starts with `cluster` (any case) is a cluster titled by its `label`,
   nested as in the source; a node is a member of the innermost cluster it is mentioned in, and of
   the first of two clusters that do not nest. Other subgraphs only scope defaults. A cluster named
-  as a node is renamed with a trailing `_`, since the graph model names both from one set.
+  as a node is renamed with a trailing `_`, since the graph model names both from one set. A
+  cluster starts with the graph attributes (`a=b` or `graph [...]`) set in the scopes around it
+  before it, as Graphviz does: a root `label` before a cluster also titles the cluster.
 - `node [...]` and `edge [...]` defaults apply to later statements in their scope, as Graphviz
   does; a node takes the defaults in effect where it is first mentioned.
 - `strict` merges repeated edges (either direction in a `graph`), combining their attributes.
