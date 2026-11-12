@@ -460,7 +460,7 @@ impl Lower {
             When::Date(t) => Some(*t),
             When::Day(n) => Some(project + n * time::DAY),
             When::Ref { target, end, days } => {
-                let (s, e) = placed[*self.index.get(target)?]?;
+                let (s, e) = (*placed.get(*self.index.get(target)?)?)?;
                 Some(if *end { e } else { s } + days * time::DAY)
             }
         }
@@ -594,7 +594,7 @@ impl Lower {
             self.g.sections.remove(0);
         }
         if let Some(today) = self.today.take()
-            && let Some(t) = self.resolve(&today, &[], project)
+            && let Some(t) = self.resolve(&today, &placed, project)
         {
             self.g.now = t;
             self.g.today_marker = TodayMarker::Default;
@@ -699,6 +699,14 @@ mod tests {
         assert_eq!(g.today_marker, TodayMarker::Default);
         assert_eq!(g.now, time::DAY);
         assert_eq!(g.tick_interval.unwrap().unit, Unit::Week);
+    }
+
+    #[test]
+    fn today_at_a_task() {
+        let (g, d) = lower_src("[A] lasts 2 days\ntoday is [A]'s end");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(g.today_marker, TodayMarker::Default);
+        assert_eq!(g.now, 2 * time::DAY);
     }
 
     #[test]
