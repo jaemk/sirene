@@ -1,0 +1,20 @@
+@startuml
+participant Client
+participant Server
+participant Cache
+autonumber
+Client -> Server ++ : request
+Server -> Cache ++ : lookup
+return miss
+Server -> Server : compute
+activate Server
+deactivate Server
+return response
+autonumber stop
+Client -> Server : unnumbered
+autonumber resume
+Client -> Server : numbered again
+create Worker
+Server -> Worker : start
+Server -> Worker !! : stop
+@enduml

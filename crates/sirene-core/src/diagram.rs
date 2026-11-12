@@ -30,7 +30,7 @@ use crate::treeview::{self, TreeView};
 use crate::venn::{self, Venn};
 use crate::wardley::{self, Wardley};
 use crate::xychart::{self, XyChart};
-use crate::{class, dot, er, requirement, state, usecase, zenuml};
+use crate::{class, dot, er, plantuml, requirement, state, usecase, zenuml};
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,6 +73,8 @@ pub enum Kind {
     Agentflow,
     /// A Graphviz DOT graph (DOT-1), detected by its `graph` or `digraph` header (LANGS-1).
     Dot,
+    /// A PlantUML sequence diagram (PSEQ-1), detected by its `@start` line (LANGS-1).
+    PlantUml,
 }
 
 /// A diagram language (LANGS-1).
@@ -81,26 +83,31 @@ pub enum Lang {
     Mermaid,
     /// Graphviz DOT (DOT-1).
     Dot,
+    /// PlantUML (PSEQ-7).
+    PlantUml,
 }
 
 impl Lang {
     /// The language a diagram file's extension names: `.mmd` or `.mermaid` for Mermaid, `.dot`
-    /// or `.gv` for DOT, in any case (DOT-5).
+    /// or `.gv` for DOT, and `.puml`, `.plantuml`, `.pu`, or `.iuml` for PlantUML, in any case
+    /// (DOT-5, PSEQ-7).
     pub fn of_path(path: &std::path::Path) -> Option<Lang> {
         let ext = path.extension()?.to_str()?.to_ascii_lowercase();
         match ext.as_str() {
             "mmd" | "mermaid" => Some(Lang::Mermaid),
             "dot" | "gv" => Some(Lang::Dot),
+            "puml" | "plantuml" | "pu" | "iuml" => Some(Lang::PlantUml),
             _ => None,
         }
     }
 
-    /// The language a Markdown code block's info word names: `mermaid`, or `dot` or `graphviz`
-    /// (MARKDO-1).
+    /// The language a Markdown code block's info word names: `mermaid`, `dot` or `graphviz`,
+    /// or `plantuml` or `puml` (MARKDO-1).
     pub fn of_info(word: &str) -> Option<Lang> {
         match word {
             "mermaid" => Some(Lang::Mermaid),
             "dot" | "graphviz" => Some(Lang::Dot),
+            "plantuml" | "puml" => Some(Lang::PlantUml),
             _ => None,
         }
     }
@@ -118,8 +125,10 @@ impl Kind {
     pub fn of_lang(src: &str, lang: Option<Lang>) -> Kind {
         match lang {
             Some(Lang::Dot) => Kind::Dot,
+            Some(Lang::PlantUml) => Kind::PlantUml,
             Some(Lang::Mermaid) => Kind::mermaid(src),
             None if dot::is_dot(src) => Kind::Dot,
+            None if plantuml::is_plantuml(src) => Kind::PlantUml,
             None => Kind::mermaid(src),
         }
     }
@@ -392,6 +401,8 @@ pub fn lower_as(src: &str, lang: Option<Lang>) -> Lowered {
     }
     let mut lowered = if kind == Kind::Dot {
         lower_dot(src)
+    } else if kind == Kind::PlantUml {
+        lower_diagram(&mermaid, kind)
     } else {
         let src = &*mermaid;
         let mut lowered = lower_diagram(src, kind);
@@ -440,6 +451,14 @@ fn lower_dot(src: &str) -> Lowered {
 fn lower_diagram(src: &str, kind: Kind) -> Lowered {
     match kind {
         Kind::Dot => lower_dot(src),
+        Kind::PlantUml => {
+            let (seq, diagnostics) = plantuml::parse(src).lower();
+            Lowered {
+                diagram: Diagram::Sequence(seq),
+                diagnostics,
+                ..Default::default()
+            }
+        }
         Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => flowchart::parse(src).lower().into(),
         Kind::Sequence => {
             let (seq, diagnostics) = sequence::parse(src).lower();
@@ -740,6 +759,13 @@ mod tests {
         assert_eq!(Kind::of_lang(dot, Some(Lang::Mermaid)), Kind::Flowchart);
         assert_eq!(Kind::of_lang("pie\n", Some(Lang::Dot)), Kind::Dot);
         assert_eq!(Kind::of_lang("pie\n", Some(Lang::Mermaid)), Kind::Pie);
+        assert_eq!(Lang::of_path(Path::new("a.PUML")), Some(Lang::PlantUml));
+        assert_eq!(Kind::of_lang("pie\n", Some(Lang::PlantUml)), Kind::PlantUml);
+        assert_eq!(Kind::of_lang("@startuml\n", None), Kind::PlantUml);
+        assert_ne!(
+            Kind::of_lang("@startuml\n", Some(Lang::Mermaid)),
+            Kind::PlantUml
+        );
 
         // A forced DOT source without a graph header is an error, not a Mermaid flowchart.
         let l = lower_as("a -> b\n", Some(Lang::Dot));

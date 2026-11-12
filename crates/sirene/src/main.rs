@@ -35,6 +35,8 @@ enum LangArg {
     Mermaid,
     /// Graphviz DOT.
     Dot,
+    /// PlantUML sequence diagrams.
+    Plantuml,
 }
 
 /// The language `--lang` forces, set once at startup (DOT-5).
@@ -217,6 +219,7 @@ fn main() -> ExitCode {
     let _ = FORCED_LANG.set(cli.lang.map(|l| match l {
         LangArg::Mermaid => Lang::Mermaid,
         LangArg::Dot => Lang::Dot,
+        LangArg::Plantuml => Lang::PlantUml,
     }));
     log::debug!(
         "sirene {} ({}, {}): {:?}",
@@ -577,15 +580,17 @@ fn stamp(path: &Path) -> Option<Stamp> {
     Some((meta.modified().ok()?, meta.len()))
 }
 
-/// The diagram files under `dir` (`.mmd`, `.mermaid`, `.dot`, and `.gv`; LANGS-1), sorted,
-/// each with its output: the same path relative to `out`, with extension `ext`. Hidden entries
-/// and symlinked directories are skipped.
-pub(crate) const DIAGRAM_EXTENSIONS: &[&str] = &["mmd", "mermaid", "dot", "gv"];
+/// The diagram files under `dir` (`.mmd`, `.mermaid`, `.dot`, `.gv`, `.puml`, `.plantuml`,
+/// `.pu`, and `.iuml`; LANGS-1), sorted, each with its output: the same path relative to `out`,
+/// with extension `ext`. Hidden entries and symlinked directories are skipped.
+pub(crate) const DIAGRAM_EXTENSIONS: &[&str] = &[
+    "mmd", "mermaid", "dot", "gv", "puml", "plantuml", "pu", "iuml",
+];
 
 /// The message for a directory with no diagram files.
 pub(crate) fn no_diagrams(dir: &Path) -> String {
     format!(
-        "error: no .mmd, .mermaid, .dot, or .gv files in {}",
+        "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, or .iuml files in {}",
         dir.display()
     )
 }

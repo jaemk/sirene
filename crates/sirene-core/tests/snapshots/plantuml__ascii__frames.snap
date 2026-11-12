@@ -1,0 +1,48 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nparticipant A\nparticipant B\nparticipant C\nA -> B : start\nalt success\n  B -> C : forward\nelse failure\n  B --> A : error\nend\nloop 3 times\n  group retry [with backoff]\n    A -> B : again\n  end\nend\n== Phase two ==\n...\n... 5 minutes later ...\n|||\n||40||\nref over A, B : handshake\nref over C\n  cleanup\n  and close\nend ref\n@enduml\n"
+---
+  +---+   +---+    +---+
+  | A |   | B |    | C |
+  +-+-+   +-+-+    +-+-+
+    |       |        |
+    | start |        |
+    +------>|        |
+    |       |        |
+  +-alt [success]----+-+
+  | |       |forward | |
+  | |       +------->| |
+  | |       |        | |
+  +.[failure]........+.+
+  | | error |        | |
+  | |<......+        | |
+  | |       |        | |
+  +-+-------+--------+-+
++-loop [3 times]-----+------+
+| +-retry [with backoff]--+ |
+| | | again |        |    | |
+| | +------>|        |    | |
+| | |       |        |    | |
+| +-+-------+--------+----+ |
++---+-------+--------+------+
+====+==== Phase two =+========
+    |       |        |
+    :       :        :
+    |       |        |
+    :  5 minutes later
+    |       |        |
+    |       |        |
+    |       |        |
+    |       |        |
+  +-ref-------+      |
+  | handshake |      |
+  +-----------+      |
+    |       |        |
+    |       |  +-ref-------+
+    |       |  |  cleanup  |
+    |       |  | and close |
+    |       |  +-----------+
+    |       |        |
+  +-+-+   +-+-+    +-+-+
+  | A |   | B |    | C |
+  +---+   +---+    +---+

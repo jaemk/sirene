@@ -70,9 +70,9 @@ diagrams. End labels take no room in the layout. In ASCII the crow's feet are `?
 `diagram::Kind::of` is `Kind::Dot` for a source that starts with a DOT graph header (DOT-1), and
 otherwise reads the Mermaid header keyword after frontmatter, comments, and directives;
 `diagram::lower` sends the source to its parser, and the CLI and the editor go through it.
-`Kind::of_lang` and `diagram::lower_as` take a `diagram::Lang` (Mermaid or DOT) that overrides
-detection: `--lang`, else `Lang::of_path` (the extension) or `Lang::of_info` (the Markdown
-block's info word), as DOT-5. `--lang` takes `mermaid` and `dot` so far.
+`Kind::of_lang` and `diagram::lower_as` take a `diagram::Lang` (Mermaid, DOT, or PlantUML) that
+overrides detection: `--lang`, else `Lang::of_path` (the extension) or `Lang::of_info` (the
+Markdown block's info word), as DOT-5. `--lang` takes `mermaid`, `dot`, and `plantuml` so far.
 
 ## LANGS-4 Commands
 

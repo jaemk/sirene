@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 68b83a63a48194a0bd044e684cc7dd706eff1a9a704d0a2beeb3dc76e0fa0c28 # shrinks to src = ""
+cc dcae5b50f84766a828cba81dd5f39a36324e918898089e04e6d0f33928b52341 # shrinks to src = ""
+cc 7666d0e131df3a9702c3bf1bc27c9194b8d7daf1e15156fadaac14de3919b3bb # shrinks to src = "@startuml\nalt a\nalt a\nA -> A ** : msg\nelse\n\nend\nelse\n\nend\nparticipant A\n@enduml\n"

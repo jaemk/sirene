@@ -1,0 +1,36 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\n' Participants of each kind, an alias, and a message to an undeclared one.\ntitle Checkout\nactor User\nparticipant \"Web Shop\" as Shop\ndatabase Orders\nUser -> Shop : add to cart\nShop --> User : ok\nUser ->> Shop : pay\nShop -> Payments : charge\nPayments -->x Shop : declined\nShop <- User : retry\nUser <-> Shop : sync\n@enduml\n"
+---
+                      Checkout
+
+  o
+ /|\     +-----------+   +---------+   +-----------+
+ / \     | Web Shop  |   | Orders  |   | Payments  |
+User     +-----+-----+   +----+----+   +-----+-----+
+  |            |              |              |
+  |add to cart |              |              |
+  +----------->|              |              |
+  |            |              |              |
+  |     ok     |              |              |
+  |<...........+              |              |
+  |            |              |              |
+  |    pay     |              |              |
+  +----------->|              |              |
+  |            |              |              |
+  |            |           charge            |
+  |            +--------------+------------->|
+  |            |              |              |
+  |            |          declined           |
+  |            |x.............+..............+
+  |            |              |              |
+  |   retry    |              |              |
+  +----------->|              |              |
+  |            |              |              |
+  |    sync    |              |              |
+  |<---------->|              |              |
+  |            |              |              |
+  o      +-----+-----+   +----+----+   +-----+-----+
+ /|\     | Web Shop  |   | Orders  |   | Payments  |
+ / \     +-----------+   +---------+   +-----------+
+User

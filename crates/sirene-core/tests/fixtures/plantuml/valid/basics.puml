@@ -1,0 +1,14 @@
+@startuml
+' Participants of each kind, an alias, and a message to an undeclared one.
+title Checkout
+actor User
+participant "Web Shop" as Shop
+database Orders
+User -> Shop : add to cart
+Shop --> User : ok
+User ->> Shop : pay
+Shop -> Payments : charge
+Payments -->x Shop : declined
+Shop <- User : retry
+User <-> Shop : sync
+@enduml
