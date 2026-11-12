@@ -8,6 +8,7 @@ use sirene_core::diagram::{self, Diagram, Kind, Lang};
 use sirene_core::flowchart::Flowchart;
 use sirene_core::markdown::{Block, is_markdown, mermaid_blocks};
 use sirene_core::scene::{Scene, TextMetrics, Theme};
+use sirene_core::theme::ThemeConfig;
 
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
@@ -74,6 +75,9 @@ pub struct Document {
     /// A diagram of a type not lowered to the graph model, drawn read-only (LANGS-2).
     pub other: Option<Diagram>,
     pub problems: Vec<Problem>,
+    /// The diagram's own theme settings: Mermaid's frontmatter and directives, or DOT's
+    /// `bgcolor`.
+    pub theme: ThemeConfig,
     /// Why the file could not be read, when it could not.
     pub read_error: Option<String>,
     /// Why the last save failed, until the next save or reload.
@@ -106,7 +110,7 @@ impl Document {
                 .map_or_else(Default::default, |b| (b.code.clone(), Some(b.lang))),
             None => (source.clone(), path.as_deref().and_then(Lang::of_path)),
         };
-        let (chart, other, problems) = parse(&code, lang);
+        let (chart, other, problems, theme) = parse(&code, lang);
         Self {
             path,
             saved: source,
@@ -115,6 +119,7 @@ impl Document {
             chart,
             other,
             problems,
+            theme,
             read_error: None,
             write_error: None,
             disk_changed: false,
@@ -123,7 +128,7 @@ impl Document {
 
     /// The language the shown diagram is read as: its Markdown block's, or its file extension's,
     /// and otherwise detected from the source (DOT-5).
-    fn lang(&self) -> Option<Lang> {
+    pub fn lang(&self) -> Option<Lang> {
         match &self.markdown {
             Some(md) => md.blocks.get(md.block).map(|b| b.lang),
             None => self.path.as_deref().and_then(Lang::of_path),
@@ -180,7 +185,7 @@ impl Document {
     /// The drawing of whichever diagram the document holds.
     pub fn scene(&self, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
         // The diagram's own theme settings win over the app's (MTHEME-1).
-        let theme = &sirene_core::theme::ThemeConfig::read(&self.source).apply(theme);
+        let theme = &self.theme.apply(theme);
         match &self.other {
             Some(d) => d.scene(metrics, theme),
             None => sirene_core::scene::flowchart(&self.chart, metrics, theme),
@@ -208,7 +213,7 @@ impl Document {
         }
         md.block = i;
         self.source = block.code.clone();
-        (self.chart, self.other, self.problems) = parse(&self.source, Some(block.lang));
+        (self.chart, self.other, self.problems, self.theme) = parse(&self.source, Some(block.lang));
         true
     }
 
@@ -260,7 +265,7 @@ impl Document {
         if source == self.source {
             return false;
         }
-        (self.chart, self.other, self.problems) = parse(&source, self.lang());
+        (self.chart, self.other, self.problems, self.theme) = parse(&source, self.lang());
         if let Some(md) = &mut self.markdown {
             // The code goes back in its block; a file with no block gets one at the end.
             md.text = match md.blocks.get(md.block) {
@@ -446,9 +451,12 @@ impl Document {
     }
 }
 
-/// The graph (empty for other types), any other diagram, and the problems in `source`, read as
-/// `lang` when given.
-fn parse(source: &str, lang: Option<Lang>) -> (Flowchart, Option<Diagram>, Vec<Problem>) {
+/// The graph (empty for other types), any other diagram, the problems in `source`, and its theme
+/// settings, read as `lang` when given.
+fn parse(
+    source: &str,
+    lang: Option<Lang>,
+) -> (Flowchart, Option<Diagram>, Vec<Problem>, ThemeConfig) {
     let lowered = diagram::lower_as(source, lang);
     let problems = lowered
         .diagnostics
@@ -465,8 +473,8 @@ fn parse(source: &str, lang: Option<Lang>) -> (Flowchart, Option<Diagram>, Vec<P
         })
         .collect();
     match lowered.diagram {
-        Diagram::Graph(chart) => (chart, None, problems),
-        other => (Flowchart::default(), Some(other), problems),
+        Diagram::Graph(chart) => (chart, None, problems, lowered.theme),
+        other => (Flowchart::default(), Some(other), problems, lowered.theme),
     }
 }
 
@@ -591,6 +599,22 @@ mod tests {
             "1:1: error: expected `flowchart` or `graph` header"
         );
         assert_eq!(d.problems[0].range, 0..0);
+    }
+
+    /// The drawing takes the diagram's own theme: DOT's `bgcolor` as well as Mermaid's settings,
+    /// and an edit re-reads it.
+    #[test]
+    fn scene_uses_the_diagram_theme() {
+        use sirene_core::scene::{Approx, Color};
+        let mut d = Document::from_source(None, "digraph { bgcolor=red; a }".into());
+        let light = Theme::LIGHT;
+        assert_eq!(d.scene(&Approx, &light).background, Color::rgb(0xff0000));
+        d.set_source("digraph { a }".into());
+        assert_eq!(d.scene(&Approx, &light).background, light.background);
+        d.set_source(
+            "%%{init: {'themeVariables': {'background': '#00ff00'}}}%%\nflowchart\nA\n".into(),
+        );
+        assert_eq!(d.scene(&Approx, &light).background, Color::rgb(0x00ff00));
     }
 
     #[test]
