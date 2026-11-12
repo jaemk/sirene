@@ -97,7 +97,12 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
   attribute however many nodes or edges it applies to.
 - HTML labels are drawn as their text: tags are dropped, `<br/>` and each table row start a
   line, a row's cells are a space apart, and entities are decoded as in other labels (DOT-2).
-  `&nbsp;` padding is kept; source indentation is not.
+  `&nbsp;` padding is kept; source indentation is not. A node label that is one table, with
+  only tags around it, is compartments instead (LANGS-3), without a warning: the first row is
+  the title (its cells a space apart), each other `<TR>` a row whose `<TD>`s are columns, and
+  `<HR/>` between rows starts a section. A cell's content is drawn as text, a nested table
+  too, and its `PORT` is a record port (DOT-2). A `plaintext`, `plain`, `none`, or `underline`
+  node with a table is a box. Table, cell, and font attributes other than `PORT` are ignored.
 
 Any other attribute is a warning, once per name and kind per file (LANGS-6); layout attributes
 from other engines (`pos`, `overlap`, `splines`), font attributes, and `width` and `height` are
@@ -107,7 +112,8 @@ word.
 ## DOT-4 Not drawn yet
 
 These are parsed and warned about, then ignored: record ports in top-down graphs (the edge
-joins the node), HTML labels (drawn as their text), and images.
+joins the node), HTML labels other than node tables (drawn as their text), HTML table and font
+styles, and images.
 
 ## DOT-5 Choosing the language
 

@@ -70,6 +70,8 @@ fn attr() -> impl Strategy<Value = String> {
         "0", "3", "99", "-1", "nan", "inf", "back", "both", "none", "forward", "odiamond", "crow",
         "LR", "BT", "same", "min", "max", "source", "sink", "false", "no", "true", "cluster_a", "cluster_b", "out", "in",
         "n", "se", "\"p:w\"", "\"p\"", "c", "up",
+        "<<table><tr><td port=\"p\">a</td><td>b</td></tr><hr/><tr><td port='q'>c</td></tr></table>>",
+        "<<TABLE><TR><TD><TABLE><TR><TD>in</TD></TR></TABLE></TD></TR></TABLE>>",
     ]);
     (keys, values).prop_map(|(k, v)| format!("{k}={v}"))
 }
