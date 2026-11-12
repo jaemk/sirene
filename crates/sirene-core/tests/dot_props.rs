@@ -44,6 +44,11 @@ fn id() -> impl Strategy<Value = &'static str> {
         "cluster_a",
         "cluster_b",
         "é",
+        "a:n",
+        "b:p:sw",
+        "c:p",
+        "d:up",
+        "a:_",
     ])
 }
 
@@ -54,6 +59,7 @@ fn attr() -> impl Strategy<Value = String> {
         "label", "headlabel", "taillabel", "shape", "style", "color", "fillcolor", "pencolor",
         "bgcolor", "fontcolor", "penwidth", "dir", "arrowhead", "arrowtail", "minlen", "rankdir",
         "rank", "width", "constraint", "compound", "lhead", "ltail", "ordering", "group",
+        "headport", "tailport",
     ]);
     #[rustfmt::skip]
     let values = prop::sample::select(vec![
@@ -63,6 +69,7 @@ fn attr() -> impl Strategy<Value = String> {
         "red", "\"#12345678\"", "\"0.5 1 1\"", "\"nan nan nan\"", "\"/x11/navy\"", "transparent",
         "0", "3", "99", "-1", "nan", "inf", "back", "both", "none", "forward", "odiamond", "crow",
         "LR", "BT", "same", "min", "max", "source", "sink", "false", "no", "true", "cluster_a", "cluster_b", "out", "in",
+        "n", "se", "\"p:w\"", "\"p\"", "c", "up",
     ]);
     (keys, values).prop_map(|(k, v)| format!("{k}={v}"))
 }

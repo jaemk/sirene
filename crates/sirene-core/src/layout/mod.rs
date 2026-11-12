@@ -7,7 +7,7 @@ mod route;
 
 use std::collections::{HashMap, HashSet};
 
-use crate::flowchart::{Direction, EdgeOrder, RankEnd};
+use crate::flowchart::{Compass, Direction, EdgeOrder, RankEnd};
 use position::{Link, Span};
 use rank::RankEdge;
 use route::Jog;
@@ -110,6 +110,9 @@ pub struct EdgeSpec {
     /// Whether the edge ranks its ends (LAYOUT-4); when false they are ranked as if it were
     /// absent, and it may run up or along a rank.
     pub constraint: bool,
+    /// Where on a node end the edge attaches (LAYOUT-7): a compass point's part along the
+    /// rank puts its port before or after the others on that side.
+    pub ports: [Option<Compass>; 2],
 }
 
 /// A box placed beside a node or a cluster, in the same rank (LANGS-3).
@@ -1248,6 +1251,7 @@ impl<'a, 'b> Placer<'a, 'b> {
         let pos = self.positions();
         let mut offsets = vec![(0, 0); segments.len()];
         let mut flat_offsets = vec![(0, 0); self.flats.len()];
+        let graph = &self.b.graph;
         for (e, el) in self.elems.iter().enumerate() {
             let ports = match el.kind {
                 Kind::Item(Item::Node(_)) => None,
@@ -1256,14 +1260,38 @@ impl<'a, 'b> Placer<'a, 'b> {
                 }
                 _ => continue,
             };
+            // A compass port's part along the rank: 0 first, 1 none, 2 last.
+            let bias = |edge: usize| -> u8 {
+                let Kind::Item(item @ Item::Node(_)) = el.kind else {
+                    return 1;
+                };
+                let spec = &graph.edges[edge];
+                let port = if spec.from == item {
+                    spec.ports[0]
+                } else if spec.to == item {
+                    spec.ports[1]
+                } else {
+                    None
+                };
+                port.map_or(1, |p| {
+                    let (west_east, north_south) = p.parts();
+                    let part = if horizontal(self.dir) {
+                        north_south
+                    } else {
+                        west_east
+                    };
+                    (part + 1) as u8
+                })
+            };
             for (downward, side) in [(true, Side::Bottom), (false, Side::Top)] {
                 let segs = if downward { &inc.down[e] } else { &inc.up[e] };
-                let mut list: Vec<((u8, usize, usize), End)> = segs
+                let mut list: Vec<((u8, u8, usize, usize), End)> = segs
                     .iter()
                     .map(|&i| {
                         let (u, v, c) = segments[i];
                         let other = if downward { v } else { u };
-                        ((1, pos[other], self.chains[c].edge), End::Segment(i))
+                        let edge = self.chains[c].edge;
+                        ((bias(edge), 1, pos[other], edge), End::Segment(i))
                     })
                     .collect();
                 if downward {
@@ -1271,7 +1299,10 @@ impl<'a, 'b> Placer<'a, 'b> {
                         let f = self.flats[i];
                         let other = if source { f.v } else { f.u };
                         let group = if pos[other] < pos[e] { 0 } else { 2 };
-                        ((group, pos[other], f.edge), End::Flat(i, source))
+                        (
+                            (bias(f.edge), group, pos[other], f.edge),
+                            End::Flat(i, source),
+                        )
                     }));
                 }
                 list.sort_by_key(|&(key, _)| key);

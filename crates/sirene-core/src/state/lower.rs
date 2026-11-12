@@ -285,6 +285,7 @@ impl Lowerer {
             end: Some(Arrow::Point),
             length: 1,
             constraint: true,
+            ports: [None; 2],
             label,
             start_label: None,
             end_label: None,

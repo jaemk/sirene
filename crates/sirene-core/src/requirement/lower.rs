@@ -245,6 +245,7 @@ impl Lowerer {
             end: (!contains).then_some(Arrow::Point),
             length: 1,
             constraint: true,
+            ports: [None; 2],
             label: Some(Label::plain(format!("«{kind}»"))),
             start_label: None,
             end_label: None,

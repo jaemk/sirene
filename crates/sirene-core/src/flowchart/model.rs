@@ -291,6 +291,8 @@ pub struct Edge {
     pub length: u8,
     /// Whether the edge ranks its ends; DOT's `constraint=false` clears it.
     pub constraint: bool,
+    /// Where on the source and target nodes the edge attaches (DOT's compass ports).
+    pub ports: [Option<Compass>; 2],
     pub label: Option<Label>,
     /// Labels beside the source and target ends, such as multiplicities (LANGS-3).
     pub start_label: Option<Label>,
@@ -382,6 +384,51 @@ pub struct Flowchart {
     /// Ids of nodes whose edges to each other are kept straight, one list per group (DOT's
     /// `group`).
     pub groups: Vec<Vec<String>>,
+}
+
+/// A side or corner of a node an edge attaches at (LAYOUT-7).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Compass {
+    North,
+    NorthEast,
+    East,
+    SouthEast,
+    South,
+    SouthWest,
+    West,
+    NorthWest,
+}
+
+impl Compass {
+    /// The compass point a DOT port names (`n`, `ne`, ... in any case); `c`, `_`, and other
+    /// names are none.
+    pub fn parse(name: &str) -> Option<Self> {
+        Some(match name.to_ascii_lowercase().as_str() {
+            "n" => Self::North,
+            "ne" => Self::NorthEast,
+            "e" => Self::East,
+            "se" => Self::SouthEast,
+            "s" => Self::South,
+            "sw" => Self::SouthWest,
+            "w" => Self::West,
+            "nw" => Self::NorthWest,
+            _ => return None,
+        })
+    }
+
+    /// The west-east and north-south parts, each -1, 0, or 1.
+    pub fn parts(self) -> (i8, i8) {
+        match self {
+            Self::North => (0, -1),
+            Self::NorthEast => (1, -1),
+            Self::East => (1, 0),
+            Self::SouthEast => (1, 1),
+            Self::South => (0, 1),
+            Self::SouthWest => (-1, 1),
+            Self::West => (-1, 0),
+            Self::NorthWest => (-1, -1),
+        }
+    }
 }
 
 /// Which of a node's edges keep their source order along the rank (LAYOUT-5).

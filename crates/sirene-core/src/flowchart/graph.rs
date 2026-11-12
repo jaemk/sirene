@@ -120,6 +120,7 @@ impl Flowchart {
                     min_len: u32::from(e.length),
                     label: e.label.as_ref().and_then(|l| measure.edge_label(l)),
                     constraint: e.constraint,
+                    ports: e.ports,
                 })
                 .collect(),
             notes: self

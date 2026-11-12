@@ -70,7 +70,9 @@ centered in it.
 
 An edge leaves the downstream side of its upper item and enters the upstream side of its lower
 item. The ports on one side of a node are spread evenly across it, inset from the corners, and
-ordered by the position of the other end; a node grows along the rank when its ports would not
+ordered by the position of the other end; an end with a compass point toward one end of the
+side (west or east across a top-down rank, north or south across a left-right one) is placed
+before or after the ends without one. A node grows along the rank when its ports would not
 fit. An edge reaching a node inside a cluster, or the cluster itself, crosses the cluster border
 at its own port on the corresponding side.
 
