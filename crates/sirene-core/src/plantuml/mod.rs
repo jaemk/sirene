@@ -19,6 +19,7 @@ mod nwdiag;
 mod parser;
 mod regex;
 mod state;
+mod timing;
 
 use rowan::GreenNode;
 
@@ -41,6 +42,7 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Mindmap
             | Kind::Wbs
             | Kind::Gantt
+            | Kind::Timing
             | Kind::Json
             | Kind::Yaml
             | Kind::Other("dot" | "ebnf" | "files" | "regex" | "chen" | "nwdiag" | "chronology")
@@ -104,6 +106,10 @@ impl Parse {
             Kind::Gantt => {
                 let (g, d) = gantt::lower(&root);
                 (Diagram::Gantt(g), d)
+            }
+            Kind::Timing => {
+                let (t, d) = timing::lower(&root);
+                (Diagram::Timing(t), d)
             }
             Kind::Json => {
                 let (chart, d) = data::lower_json(&root);

@@ -76,6 +76,8 @@ can be built). Keep each row's status current with `spec.py set`.
 | PlantUML Chen Diagrams | done | [plantuml-chen-diagrams.md](plantuml-chen-diagrams.md) |
 | PlantUML Network Diagrams | done | [plantuml-network-diagrams.md](plantuml-network-diagrams.md) |
 | PlantUML Chronology Diagrams | done | [plantuml-chronology-diagrams.md](plantuml-chronology-diagrams.md) |
+| Timing Diagrams | done | [timing-diagrams.md](timing-diagrams.md) |
+| PlantUML Timing Diagrams | done | [plantuml-timing-diagrams.md](plantuml-timing-diagrams.md) |
 
 ## Conventions
 

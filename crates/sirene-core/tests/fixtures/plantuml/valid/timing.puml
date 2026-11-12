@@ -1,0 +1,40 @@
+@startuml
+title Request handling
+clock "Clock" as C with period 50
+binary "Enable" as EN
+robust "Web Browser" as WB
+concise "Web User" as WU
+analog "Load" as L between 0 and 10
+
+WB has "Busy loading" as Processing, Waiting, Idle
+
+@0
+WU is Idle
+WB is Idle
+EN is low
+L is 1
+
+@100 as :request
+WU is Waiting : clicks
+WB is Processing
+EN is high
+L is 8
+
+@300
+WB is Waiting
+WU is {-}
+L is 4
+
+@WU
+500 is Idle #palegreen
++100 is {hidden}
+
+@:request+50
+WU -> WB : URL
+
+WB@300 -> EN@400 : done
+WB@100 <-> @+200 : {200 ms}
+@500 <-> @600 : {idle}
+highlight 300 to 400 #Gold : Waiting
+note bottom of WU : response
+@enduml

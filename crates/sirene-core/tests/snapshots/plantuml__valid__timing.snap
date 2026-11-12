@@ -1,0 +1,34 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Request handling\nclock \"Clock\" as C with period 50\nbinary \"Enable\" as EN\nrobust \"Web Browser\" as WB\nconcise \"Web User\" as WU\nanalog \"Load\" as L between 0 and 10\n\nWB has \"Busy loading\" as Processing, Waiting, Idle\n\n@0\nWU is Idle\nWB is Idle\nEN is low\nL is 1\n\n@100 as :request\nWU is Waiting : clicks\nWB is Processing\nEN is high\nL is 8\n\n@300\nWB is Waiting\nWU is {-}\nL is 4\n\n@WU\n500 is Idle #palegreen\n+100 is {hidden}\n\n@:request+50\nWU -> WB : URL\n\nWB@300 -> EN@400 : done\nWB@100 <-> @+200 : {200 ms}\n@500 <-> @600 : {idle}\nhighlight 300 to 400 #Gold : Waiting\nnote bottom of WU : response\n@enduml\n"
+---
+
+                                   Request handling
+
+                                                     ═Waiting══
+Clock                     ──┐  ┌─┐ ┌─┐  ┌─┐ ┌─┐  ┌─┐ ┌──┐ ┌─┐ ┌──┐ ┌─┐ ┌──┐ ┌─┐  ┌─┐ ┌─
+                            └──┘ └─┘ └──┘ └─┘ └──┘ └─┘  └─┘ └─┘  └─┘ └─┘  └─┘ └──┘ └─┘
+
+Enable                             ┌───────────────────────────────────────────────────
+                          ─────────┘
+                                                              ▲ done
+Web Browser Busy loading           ┌─────────────────┐
+                 Waiting           │                 └─────────────────────────────────
+                    Idle  ─────────┘
+                                   ◄──── 200 ms ─────►
+                                        ┆ URL
+                                   clicks
+Web User                  ┌────────┬─────────────────┬─────────────────┬─────────┐
+                          │  Idle  │     Waiting     │/////////////////│  Idle   │
+                          └────────┴─────────────────┴─────────────────┴─────────┘
+                          response
+
+Load
+                                   ┌─────────────────┐
+                                   │                 └─────────────────────────────────
+                                   │
+                          ─────────┘
+
+                          ┬────────┬────────┬────────┬────────┬────────┬─────────┬─────
+                          0       100      200      300      400      500       600
+                                                                       ◄─ idle ──►

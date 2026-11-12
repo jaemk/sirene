@@ -1053,14 +1053,14 @@ fn plantuml_sequences() {
         .stderr("");
     let tmp = tempfile::tempdir().unwrap();
     std::fs::write(tmp.path().join("a.puml"), src).unwrap();
-    std::fs::write(tmp.path().join("b.pu"), "@startuml\nrobust W\n@enduml\n").unwrap();
+    std::fs::write(tmp.path().join("b.pu"), "@startsalt\n{\n}\n@endsalt\n").unwrap();
     sirene()
         .arg("check")
         .arg(tmp.path())
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "b.pu:2:1: error: PlantUML timing diagrams are not supported yet",
+            "b.pu:1:1: error: `@startsalt` diagrams are not supported yet",
         ));
     let md = tmp.path().join("doc.md");
     std::fs::write(

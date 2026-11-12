@@ -67,6 +67,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   descriptions, groups, and peer links.
 - PlantUML `@startchronology`: `[Event] happens on DATE` events drawn as a timeline in date
   order.
+- PlantUML timing diagrams: robust, concise, rectangle, binary, clock, and analog signals,
+  absolute, relative, named, clock-based, and date moments, hidden and undefined states,
+  messages, constraints, highlights, and notes, drawn on a time axis in SVG, PNG, and text.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

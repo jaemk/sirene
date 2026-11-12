@@ -1,0 +1,18 @@
+@startuml
+robust "A" as A
+robust "Again" as A
+clock "C" as C
+analog "V" as V between 5 and 1
+concise "B" as B with speed 3
+@0
+A is Idle
+Nope is Busy
+V is high
+@soon
+@:missing+5
+A -> Nope : hi
+manual time-axis
+@10
+A is Busy
+what is this
+@enduml

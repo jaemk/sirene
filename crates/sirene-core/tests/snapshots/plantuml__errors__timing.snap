@@ -1,0 +1,34 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nrobust \"A\" as A\nrobust \"Again\" as A\nclock \"C\" as C\nanalog \"V\" as V between 5 and 1\nconcise \"B\" as B with speed 3\n@0\nA is Idle\nNope is Busy\nV is high\n@soon\n@:missing+5\nA -> Nope : hi\nmanual time-axis\n@10\nA is Busy\nwhat is this\n@enduml\n"
+---
+3:1: error: `A` is already declared
+4:1: error: a clock needs `with period N`
+5:1: error: expected `between LOW and HIGH`
+6:23: error: unexpected `speed`
+9:1: error: no signal is named `Nope`
+10:1: error: an analog signal's value is a number, not `high`
+11:1: error: expected a moment such as `100` or `+50`, not `soon`
+12:1: error: no moment is named `:missing`
+13:1: error: no signal is named `Nope`
+14:1: warning: `manual time-axis` is not drawn; the axis is numbered
+17:1: error: no signal is named `what`
+
+A Idle  ───────────────────────────────────────────────────────┐
+  Busy                                                         └─────
+
+C
+
+
+V
+
+
+
+
+
+B
+
+
+
+        ┬──────────┬──────────┬──────────┬──────────┬──────────┬─────
+        0          2          4          6          8         10

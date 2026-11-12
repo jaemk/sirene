@@ -172,14 +172,8 @@ fn documents() {
     let d = diags("@startsalt\n{}\n@endsalt\n");
     assert_eq!(d[0].0, Severity::Error);
     assert!(d[0].1.contains("`@startsalt`"), "{d:?}");
-    let d = diags("@startuml\nrobust W\n@enduml\n");
-    assert_eq!(
-        d,
-        [(
-            Severity::Error,
-            "PlantUML timing diagrams are not supported yet".to_owned()
-        )]
-    );
+    // Every kind detected inside `@startuml` is drawn, timing diagrams among them.
+    assert!(diags("@startuml\nrobust W\n@enduml\n").is_empty());
     // Keywords match in any case; comments are skipped.
     let (s, d) = lowered("@startuml\n' c\nACTOR A\n/' x\ny '/\nA -> A : self\n@enduml\n");
     assert!(d.is_empty(), "{d:?}");
