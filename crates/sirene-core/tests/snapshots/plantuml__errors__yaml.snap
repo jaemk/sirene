@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startyaml\nname: x\n    indented: too far\n@endyaml\n"
+---
+3:5: error: unexpected indentation
+
+┌────────┐
+│ name x │
+└────────┘

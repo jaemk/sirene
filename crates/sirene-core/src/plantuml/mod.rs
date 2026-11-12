@@ -3,6 +3,7 @@
 
 mod activity;
 mod class;
+mod data;
 mod description;
 mod detect;
 mod gantt;
@@ -34,6 +35,8 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Mindmap
             | Kind::Wbs
             | Kind::Gantt
+            | Kind::Json
+            | Kind::Yaml
     )
 }
 
@@ -88,6 +91,14 @@ impl Parse {
             Kind::Gantt => {
                 let (g, d) = gantt::lower(&root);
                 (Diagram::Gantt(g), d)
+            }
+            Kind::Json => {
+                let (chart, d) = data::lower_json(&root);
+                (Diagram::Graph(chart), d)
+            }
+            Kind::Yaml => {
+                let (chart, d) = data::lower_yaml(&root);
+                (Diagram::Graph(chart), d)
             }
             Kind::Wbs => {
                 let (chart, d) = mindmap::lower_wbs(&root);
