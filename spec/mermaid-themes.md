@@ -9,7 +9,9 @@ and `diagram_themes` in `crates/sirene/tests/cli.rs`.
 `theme` and `themeVariables` are read from the frontmatter's `config:` map and from every
 `%%{init: ...}%%` or `%%{initialize: ...}%%` directive, in any diagram type. Directives take
 precedence over the frontmatter, and a later directive over an earlier one. Directive bodies are
-JSON or the lenient form Mermaid accepts (single quotes, bare keys).
+JSON or the lenient form Mermaid accepts (single quotes, bare keys). An `init` directive that
+cannot be read, malformed or nested more than 64 deep (LANGS-8), is a warning, and its settings
+are ignored.
 
 ## MTHEME-2 Themes
 

@@ -180,6 +180,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   linear in their size; 10,000 sankey flows took tens of seconds.
 - A chain of subgraphs draws straight down; each subgraph sat a little right of the one before,
   so a long chain drew a very wide, slow image.
+- An `init` directive that cannot be read, malformed or nested too deep, is a warning; it was
+  ignored without one.
 
 ## [0.2.0] - 2026-11-08
 
