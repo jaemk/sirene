@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startchen\nentity A {\n  x <<odd>>\n}\nentity A\nrelationship R\nR -1- Nope\nwhat is this\nentity B {\n  y\n@endchen\n"
+---
+3:3: warning: the stereotype `<<odd>>` is not drawn
+5:1: error: `A` is already declared
+7:1: error: no entity or relationship is named `Nope`
+8:1: error: expected `entity`, `relationship`, or a link such as `A -N- B`
+9:1: error: `{` has no closing `}`
+
+┌───┐   ╱───╲   ┌───┐
+│ A │   │ R │   │ B │
+└─┬─┘   ╲───╱   └─┬─┘
+  │               │
+  │               │
+╭─┴─╮           ╭─┴─╮
+( x )           ( y )
+╰───╯           ╰───╯

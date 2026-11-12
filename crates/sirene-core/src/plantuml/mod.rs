@@ -2,6 +2,7 @@
 //! the other kinds lowered to the graph model, one module each.
 
 mod activity;
+mod chen;
 mod class;
 mod data;
 mod description;
@@ -40,7 +41,7 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Gantt
             | Kind::Json
             | Kind::Yaml
-            | Kind::Other("dot" | "ebnf" | "files" | "regex")
+            | Kind::Other("dot" | "ebnf" | "files" | "regex" | "chen")
     )
 }
 
@@ -117,6 +118,10 @@ impl Parse {
             Kind::Other("ebnf") => {
                 let (chart, d) = embedded::lower_ebnf(&root);
                 (Diagram::Railroad(chart), d)
+            }
+            Kind::Other("chen") => {
+                let (chart, d) = chen::lower(&root);
+                (Diagram::Graph(chart), d)
             }
             Kind::Other("regex") => {
                 let (chart, d) = regex::lower(&root);

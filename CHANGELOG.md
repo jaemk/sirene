@@ -60,6 +60,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `@startfiles` (paths drawn as a tree view, with `<note>` descriptions).
 - PlantUML `@startregex`: each line's regex drawn as a railroad track, with classes, escapes,
   groups, choices, and quantifiers. Railroad rules with no name draw no `name =`.
+- PlantUML `@startchen`: entity-relationship diagrams in Chen notation, with weak entities,
+  identifying relationships, key, derived, multi-valued, and composite attributes,
+  cardinalities, total participation, and specializations.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its

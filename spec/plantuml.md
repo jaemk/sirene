@@ -7,7 +7,8 @@ use case, component, and deployment diagrams in `plantuml-description-diagrams.m
 mindmaps and WBS in `plantuml-mindmaps-and-wbs.md` (PMIND), Gantt charts in
 `plantuml-gantt-charts.md` (PGANTT), JSON and YAML in `plantuml-json-and-yaml.md` (PDATA),
 DOT and EBNF in `plantuml-embedded-languages.md` (PEMB), file trees in
-`plantuml-file-trees.md` (PFILES), and regexes in `plantuml-regex-diagrams.md` (PREGEX).
+`plantuml-file-trees.md` (PFILES), regexes in `plantuml-regex-diagrams.md` (PREGEX), and
+Chen diagrams in `plantuml-chen-diagrams.md` (PCHEN).
 PlantUML (<https://plantuml.com>) has a dozen diagram kinds and no formal grammar; its
 reference is the Java implementation and the language reference guide. Full compatibility is
 not the goal. The useful subset reuses the sequence and graph models.

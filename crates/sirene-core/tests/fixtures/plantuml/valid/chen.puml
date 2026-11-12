@@ -1,0 +1,29 @@
+@startchen
+title Rentals
+entity CUSTOMER {
+  Number : INTEGER <<key>>
+  Name {
+    First
+    Last
+  }
+  Phone <<multi>>
+  Age <<derived>>
+}
+entity "Movie" as MOVIE {
+  Code <<key>>
+}
+entity COPY <<weak>> {
+  Serial
+}
+relationship RENTED_TO {
+  Date
+}
+relationship HAS <<identifying>>
+RENTED_TO -1- CUSTOMER
+RENTED_TO -N- COPY
+MOVIE =1= HAS
+HAS =N= COPY
+entity MEMBER
+entity GUEST
+CUSTOMER ->- d { MEMBER, GUEST }
+@endchen
