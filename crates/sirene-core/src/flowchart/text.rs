@@ -65,32 +65,52 @@ fn br_len(s: &str) -> Option<usize> {
     (b.get(i) == Some(&b'>')).then_some(i + 1)
 }
 
-/// Decodes Mermaid's `#name;` and `#NNN;` entity codes, and HTML's `&name;` and `&#NNN;`;
-/// unknown codes are kept verbatim.
+/// Decodes Mermaid's `#name;` and `#NNN;` entity codes, and HTML's `&name;`, `&#NNN;`, and
+/// `&#xHH;`; unknown codes are kept verbatim.
 pub(crate) fn decode_entities(s: &str) -> String {
+    decode(s, &['#', '&'])
+}
+
+/// Decodes HTML's `&name;`, `&#NNN;`, and `&#xHH;`; unknown codes are kept verbatim.
+pub(crate) fn decode_html_entities(s: &str) -> String {
+    decode(s, &['&'])
+}
+
+/// The character a named entity, or (with `numeric`) a decimal code, stands for.
+fn entity(code: &str, numeric: bool) -> Option<char> {
+    match code {
+        "quot" => Some('"'),
+        "amp" => Some('&'),
+        "lt" => Some('<'),
+        "gt" => Some('>'),
+        "apos" => Some('\''),
+        "nbsp" => Some('\u{a0}'),
+        _ if numeric && !code.is_empty() && code.bytes().all(|b| b.is_ascii_digit()) => {
+            code.parse().ok().and_then(char::from_u32)
+        }
+        _ => None,
+    }
+}
+
+fn decode(s: &str, marks: &[char]) -> String {
     let mut out = String::with_capacity(s.len());
     let mut rest = s;
-    while let Some(i) = rest.find(['#', '&']) {
+    while let Some(i) = rest.find(marks) {
         out.push_str(&rest[..i]);
         let mark = &rest[i..i + 1];
         let tail = &rest[i + 1..];
         let decoded = tail.find(';').and_then(|end| {
             let code = &tail[..end];
-            let code = match mark {
-                "&" => code.strip_prefix('#').unwrap_or(code),
-                _ => code,
-            };
-            let c = match code {
-                "quot" => Some('"'),
-                "amp" => Some('&'),
-                "lt" => Some('<'),
-                "gt" => Some('>'),
-                "apos" => Some('\''),
-                "nbsp" => Some('\u{a0}'),
-                _ if !code.is_empty() && code.bytes().all(|b| b.is_ascii_digit()) => {
-                    code.parse().ok().and_then(char::from_u32)
-                }
-                _ => None,
+            let c = match (mark, code.strip_prefix('#')) {
+                ("&", Some(num)) => match num.strip_prefix(['x', 'X']) {
+                    Some(hex) if !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()) => {
+                        u32::from_str_radix(hex, 16).ok().and_then(char::from_u32)
+                    }
+                    Some(_) => None,
+                    None => entity(num, true),
+                },
+                ("&", None) => entity(code, false),
+                _ => entity(code, true),
             };
             c.map(|c| (c, end))
         });
@@ -391,6 +411,18 @@ mod tests {
         assert_eq!(decode_entities("#lt;br#gt;"), "<br>");
         assert_eq!(decode_entities("&nbsp;&amp;&#9829;"), "\u{a0}&\u{2665}");
         assert_eq!(decode_entities("a & b; &nope; &"), "a & b; &nope; &");
+        assert_eq!(
+            decode_entities("&#x2665;&#X41;&#x;&#xZ;"),
+            "\u{2665}A&#x;&#xZ;"
+        );
+        // A numeral after `&` needs its `#`.
+        assert_eq!(decode_entities("&9829;"), "&9829;");
+    }
+
+    #[test]
+    fn decodes_html_entities_only() {
+        assert_eq!(decode_html_entities("#amp; &amp; #9829;"), "#amp; & #9829;");
+        assert_eq!(decode_html_entities("&amp;lt;"), "&lt;");
     }
 
     #[test]

@@ -4,8 +4,10 @@ use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
+use super::parser;
 use super::x11::X11;
 use crate::diagnostic::Diagnostic;
+use crate::flowchart::text::decode_html_entities;
 use crate::flowchart::{
     Arrow, Direction, Edge, Flowchart, Label, Node, Row, Shape, Stroke, Style, Subgraph,
 };
@@ -105,6 +107,8 @@ const EDGE_ATTRS: &[&str] = &[
 struct Scope {
     node: Vec<Attr>,
     edge: Vec<Attr>,
+    /// Graph attributes set here and in the enclosing scopes, which new clusters start with.
+    graph: Vec<Attr>,
     /// The innermost cluster, whose members the nodes mentioned here become.
     cluster: Option<usize>,
     /// Whether this scope is the root graph or a cluster, whose graph attributes are drawn.
@@ -139,6 +143,7 @@ struct Lowerer {
     mentions: Vec<Vec<TextRange>>,
     edges: Vec<PendingEdge>,
     clusters: Vec<Cluster>,
+    cluster_index: HashMap<String, usize>,
     /// Names already warned about, so each is reported once per file.
     warned: HashSet<String>,
 }
@@ -160,10 +165,12 @@ fn ids(node: &SyntaxNode) -> impl Iterator<Item = SyntaxNode> {
 /// The text of a quoted string: without its quotes, `\"` as `"`, and a backslash before a
 /// line break joining the lines. Other escapes stay for the label (DOT-2).
 fn unquote(s: &str) -> String {
-    let inner = s
-        .strip_prefix('"')
-        .map(|s| s.strip_suffix('"').unwrap_or(s))
-        .unwrap_or(s);
+    let inner = s.strip_prefix('"').unwrap_or(s);
+    // An unclosed string runs to the end of the source, which may end in an escaped quote.
+    let inner = match parser::string_len(s) {
+        Some(n) if n == s.len() => inner.strip_suffix('"').unwrap_or(inner),
+        _ => inner,
+    };
     inner
         .replace("\\\r\n", "")
         .replace("\\\n", "")
@@ -179,7 +186,13 @@ fn value(id: &SyntaxNode) -> Value {
             HTML_STRING => {
                 html = true;
                 let s = t.text();
-                text.push_str(s.get(1..s.len().saturating_sub(1)).unwrap_or(""));
+                let inner = s.strip_prefix('<').unwrap_or(s);
+                // An unclosed HTML string keeps its last character.
+                let inner = match parser::html_len(s) {
+                    Some(n) if n == s.len() => inner.strip_suffix('>').unwrap_or(inner),
+                    _ => inner,
+                };
+                text.push_str(inner);
             }
             IDENT | NUMBER => text.push_str(t.text()),
             _ => {}
@@ -190,7 +203,8 @@ fn value(id: &SyntaxNode) -> Value {
 
 /// A label's escapes: `\n`, `\l`, and `\r` break lines, `\N` is the node's name, `\G` the
 /// graph's, `\E` the edge's, `\T` and `\H` its tail and head, and `\x` is `x`. A name's own
-/// escapes are read too, as Graphviz does: the node `"a\nb"` is labeled on two lines.
+/// escapes are read too, as Graphviz does: the node `"a\nb"` is labeled on two lines. HTML
+/// entities are decoded after the names are put in and before the line breaks are read.
 fn escape(text: &str, names: &Names) -> String {
     let mut named = String::new();
     let mut chars = text.chars();
@@ -212,6 +226,7 @@ fn escape(text: &str, names: &Names) -> String {
             None => named.push('\\'),
         }
     }
+    let named = decode_html_entities(&named);
     let mut out = String::new();
     let mut chars = named.chars();
     while let Some(c) = chars.next() {
@@ -272,19 +287,14 @@ fn html_text(s: &str) -> String {
         rest = &rest[after..];
     }
     out.extend(rest.chars().filter(|c| !c.is_control()));
+    // Source indentation is not text, but `&nbsp;` padding is.
+    let blank = |c: char| c.is_ascii_whitespace();
     let out = out
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&nbsp;", " ")
-        .replace("&amp;", "&");
-    out.lines()
-        .map(str::trim)
+        .lines()
+        .map(|l| l.trim_matches(blank))
         .collect::<Vec<_>>()
-        .join("\n")
-        .trim()
-        .to_owned()
+        .join("\n");
+    decode_html_entities(out.trim_matches(blank))
 }
 
 /// A field of a record label: text, or a group of fields in braces (DOT-3).
@@ -638,7 +648,8 @@ impl Lowerer {
     }
 
     /// A graph attribute: the root graph's or a cluster's; a plain subgraph's draw nothing.
-    fn graph_attr(&mut self, attr: Attr, scope: &Scope) {
+    /// Either way it is a default for the clusters created later in the scope, as in Graphviz.
+    fn graph_attr(&mut self, attr: Attr, scope: &mut Scope) {
         if attr.key == "rank" {
             self.warn_once(
                 "graph:rank",
@@ -648,6 +659,7 @@ impl Lowerer {
             return;
         }
         self.check(&attr, Target::Graph);
+        scope.graph.push(attr.clone());
         if !scope.drawn {
             return;
         }
@@ -762,21 +774,28 @@ impl Lowerer {
         let mut scope = Scope {
             node: parent.node.clone(),
             edge: parent.edge.clone(),
+            graph: parent.graph.clone(),
             cluster: parent.cluster,
             drawn: cluster,
         };
         if cluster {
             let id = name.unwrap_or_default();
-            let existing = self.clusters.iter().position(|c| c.id == id);
-            scope.cluster = Some(existing.unwrap_or_else(|| {
-                self.clusters.push(Cluster {
-                    id,
-                    parent: parent.cluster,
-                    attrs: Vec::new(),
-                    range: sub.text_range(),
-                });
-                self.clusters.len() - 1
-            }));
+            let c = match self.cluster_index.get(&id) {
+                Some(&c) => c,
+                None => {
+                    let c = self.clusters.len();
+                    self.cluster_index.insert(id.clone(), c);
+                    // A new cluster starts with the graph attributes set around it so far.
+                    self.clusters.push(Cluster {
+                        id,
+                        parent: parent.cluster,
+                        attrs: parent.graph.clone(),
+                        range: sub.text_range(),
+                    });
+                    c
+                }
+            };
+            scope.cluster = Some(c);
         }
         self.stmts(sub, &mut scope)
     }
@@ -818,8 +837,20 @@ impl Lowerer {
             let edge = self.lower_edge(&e, &graph);
             chart.edges.push(edge);
         }
-        for c in 0..self.clusters.len() {
-            let sub = self.lower_cluster(c, &graph);
+        // Each cluster's members: its nodes in order, then the clusters directly inside it.
+        let mut members = vec![Vec::new(); self.clusters.len()];
+        for (i, c) in self.node_cluster.iter().enumerate() {
+            if let Some(c) = *c {
+                members[c].push(self.ids[i].clone());
+            }
+        }
+        for k in &self.clusters {
+            if let Some(p) = k.parent {
+                members[p].push(k.id.clone());
+            }
+        }
+        for (c, members) in members.into_iter().enumerate() {
+            let sub = self.lower_cluster(c, &graph, members);
             chart.subgraphs.push(sub);
         }
         Output {
@@ -837,9 +868,10 @@ impl Lowerer {
                 continue;
             }
             let mut id = self.clusters[c].id.clone();
-            while self.node_index.contains_key(&id) || self.clusters.iter().any(|k| k.id == id) {
+            while self.node_index.contains_key(&id) || self.cluster_index.contains_key(&id) {
                 id.push('_');
             }
+            self.cluster_index.insert(id.clone(), c);
             self.clusters[c].id = id;
         }
     }
@@ -1178,7 +1210,8 @@ impl Lowerer {
         }
     }
 
-    fn lower_cluster(&mut self, c: usize, graph: &str) -> Subgraph {
+    /// Cluster `c` with its member nodes and clusters.
+    fn lower_cluster(&mut self, c: usize, graph: &str, members: Vec<String>) -> Subgraph {
         let attrs = std::mem::take(&mut self.clusters[c].attrs);
         let title = get(&attrs, "label")
             .map(|a| a.value.clone())
@@ -1193,16 +1226,6 @@ impl Lowerer {
             ],
         );
         let styles = self.shape_styles(&attrs, &words, true);
-        let mut members: Vec<String> = (0..self.ids.len())
-            .filter(|&i| self.node_cluster[i] == Some(c))
-            .map(|i| self.ids[i].clone())
-            .collect();
-        members.extend(
-            self.clusters
-                .iter()
-                .filter(|k| k.parent == Some(c))
-                .map(|k| k.id.clone()),
-        );
         Subgraph {
             id: self.clusters[c].id.clone(),
             title: Label::plain(title),
@@ -1252,6 +1275,19 @@ mod tests {
         };
         assert_eq!(escape("\\N", &named), "a\nb");
         assert_eq!(escape("\\G", &named), "g\\N");
+        // Entities: named, decimal, and hex, decoded once; `#` codes are text.
+        assert_eq!(e("a &amp; b &lt;&#169;&#xA9;"), "a & b <\u{a9}\u{a9}");
+        assert_eq!(e("&amp;lt; #amp; & x;"), "&lt; #amp; & x;");
+        // Decoded after names are put in, before line breaks are read.
+        let amp = Names {
+            node: "x&amp;y",
+            ..names()
+        };
+        assert_eq!(escape("\\N", &amp), "x&y");
+        assert_eq!(e("a&#92;nb"), "a\nb");
+        // An unclosed string keeps an escaped quote at its end.
+        assert_eq!(unquote("\"a\\\""), "a\"");
+        assert_eq!(unquote("\"a"), "a");
     }
 
     #[test]
@@ -1276,6 +1312,9 @@ mod tests {
         assert_eq!(html_text("é<"), "é");
         assert_eq!(html_text("<>é</>"), "é");
         assert_eq!(html_text(""), "");
+        // Numeric entities, and `&nbsp;` padding kept while source indentation is not.
+        assert_eq!(html_text("&#9829; &#x2665;"), "\u{2665} \u{2665}");
+        assert_eq!(html_text("\n  &nbsp;a&nbsp;\n"), "\u{a0}a\u{a0}");
     }
 
     #[test]
