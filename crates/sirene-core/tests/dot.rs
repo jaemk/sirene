@@ -7,7 +7,9 @@ use std::path::Path;
 
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::diagram::{self, Kind, Lowered};
-use sirene_core::flowchart::{Arrow, Direction, EdgeOrder, Flowchart, RankEnd, Shape, Stroke};
+use sirene_core::flowchart::{
+    Arrow, Compass, Direction, EdgeOrder, Flowchart, RankEnd, Shape, Stroke,
+};
 use sirene_core::scene::{Approx, Color, Theme};
 use sirene_core::{Severity, dot};
 
@@ -504,6 +506,61 @@ fn ordering() {
     );
 }
 
+/// DOT-2: a compass port puts an edge's end toward that side of the node, along the rank.
+#[test]
+fn ports() {
+    let c = lowered(
+        "digraph { a:e -> b; a:p:SW -> c; a:_ -> d:n; a -> e [tailport=w, headport=\"p:se\"] }",
+    )
+    .0;
+    let ports: Vec<_> = c.edges.iter().map(|e| e.ports).collect();
+    use Compass::*;
+    assert_eq!(
+        ports,
+        [
+            [Some(East), None],
+            [Some(SouthWest), None],
+            [None, Some(North)],
+            [Some(West), Some(SouthEast)],
+        ]
+    );
+    // A node's port beats the attribute.
+    let c = chart("digraph { a:e -> b [tailport=w] }");
+    assert_eq!(c.edges[0].ports, [Some(East), None]);
+    let draw = |src: &str| ascii::render(&chart(src), &Options::default());
+    // a's ports run west to east, whichever way b and c lie: ports in the order the edges
+    // take anyway change nothing, and the other order swaps the ends.
+    for (dir, first, last) in [
+        ("TB", "w", "e"),
+        ("BT", "w", "e"),
+        ("LR", "n", "s"),
+        ("RL", "n", "s"),
+    ] {
+        let plain = draw(&format!("digraph {{ rankdir={dir}; a -> b; a -> c }}"));
+        let along = draw(&format!(
+            "digraph {{ rankdir={dir}; a:{first} -> b; a:{last} -> c }}"
+        ));
+        let against = draw(&format!(
+            "digraph {{ rankdir={dir}; a:{last} -> b; a:{first} -> c }}"
+        ));
+        assert_eq!(plain, along, "{dir}");
+        assert_ne!(plain, against, "{dir}\n{against}");
+    }
+    let messages =
+        |src: &str| -> Vec<String> { lowered(src).1.into_iter().map(|(_, m)| m).collect() };
+    assert_eq!(
+        messages("digraph { a:p:up -> b }"),
+        [
+            "record ports are not supported yet; the edge joins the node",
+            "unknown compass point `up`: expected n, ne, e, se, s, sw, w, nw, c, or _",
+        ]
+    );
+    assert_eq!(
+        messages("digraph { a -> b [headport=p] }"),
+        ["record ports are not supported yet; the edge joins the node"]
+    );
+}
+
 /// DOT-3: the edges between nodes of one `group` are kept straight before others.
 #[test]
 fn groups() {
@@ -713,14 +770,14 @@ fn records() {
 #[test]
 fn warnings() {
     let (c, d) = lowered(
-        "digraph {\n  splines=ortho; splines=line\n  { rank=same; a; b }\n  a:n -> b:s\n  a [label=<<i>x</i>>, shape=star2]\n  b [width=1, color=nope]\n  a -> b [arrowhead=zzz, weight=2]\n}\ndigraph two {}\n",
+        "digraph {\n  splines=ortho; splines=line\n  { rank=same; a; b }\n  a:p -> b:s\n  a [label=<<i>x</i>>, shape=star2]\n  b [width=1, color=nope]\n  a -> b [arrowhead=zzz, weight=2]\n}\ndigraph two {}\n",
     );
     let w = |s: &str| (Severity::Warning, s.to_owned());
     assert_eq!(
         d,
         [
             w("the graph attribute `splines` is not supported; ignored"),
-            w("ports are not supported yet; the edge joins the node"),
+            w("record ports are not supported yet; the edge joins the node"),
             w("HTML labels are drawn as their text"),
             w("the shape `star2` is not supported; drawn as an ellipse"),
             w("the node attribute `width` is not supported; ignored"),

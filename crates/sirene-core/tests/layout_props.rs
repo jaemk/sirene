@@ -2,7 +2,7 @@
 
 use proptest::prelude::*;
 use sirene_core::ascii;
-use sirene_core::flowchart::{Direction, EdgeOrder, RankEnd};
+use sirene_core::flowchart::{Compass, Direction, EdgeOrder, RankEnd};
 use sirene_core::layout::{
     ClusterSpec, Config, EdgeSpec, Graph, Item, Layout, NodeSpec, Point, Rect, Size, Spacing,
     layout,
@@ -40,6 +40,22 @@ fn direction() -> impl Strategy<Value = Direction> {
         Direction::LeftRight,
         Direction::RightLeft,
     ])
+}
+
+fn compass() -> impl Strategy<Value = Option<Compass>> {
+    prop::option::weighted(
+        0.3,
+        prop::sample::select(vec![
+            Compass::North,
+            Compass::NorthEast,
+            Compass::East,
+            Compass::SouthEast,
+            Compass::South,
+            Compass::SouthWest,
+            Compass::West,
+            Compass::NorthWest,
+        ]),
+    )
 }
 
 fn size() -> impl Strategy<Value = Size> {
@@ -94,13 +110,17 @@ fn graph() -> impl Strategy<Value = Graph> {
                     0..4u32,
                     prop::option::weighted(0.3, (1..8i32, 1..3i32)),
                     prop::bool::weighted(0.8),
+                    [compass(), compass()],
                 )
-                    .prop_map(|(from, to, min_len, label, constraint)| EdgeSpec {
-                        from,
-                        to,
-                        min_len,
-                        label: label.map(|(w, h)| Size::new(w, h)),
-                        constraint,
+                    .prop_map(|(from, to, min_len, label, constraint, ports)| {
+                        EdgeSpec {
+                            from,
+                            to,
+                            min_len,
+                            label: label.map(|(w, h)| Size::new(w, h)),
+                            constraint,
+                            ports,
+                        }
                     }),
                 0..12,
             )

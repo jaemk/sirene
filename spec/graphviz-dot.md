@@ -30,6 +30,11 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
   unknown one is text.
 - Edges are edges; a `digraph` edge has an arrow at its head, a `graph` edge none, and `dir`,
   `arrowhead`, and `arrowtail` change that. An edge to a subgraph joins every node in it.
+- An edge end's compass point (`a:e`, `a:p:sw`; `n`, `ne`, `e`, `se`, `s`, `sw`, `w`, `nw` in any
+  case) moves the end toward that end of the node side it joins (LAYOUT-7); the side itself
+  does not change, so `a:n` in a top-down graph still leaves `a` from the bottom. `c` and `_`
+  are none, another name is a warning, and a record field port (`a:p`) is a warning and joins
+  the node. A port on a node statement is ignored.
 - A subgraph whose name starts with `cluster` (any case) is a cluster titled by its `label`,
   nested as in the source; a node is a member of the innermost cluster it is mentioned in, and of
   the first of two clusters that do not nest. Other subgraphs only scope defaults. A cluster named
@@ -77,7 +82,8 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
   integer, nonzero for true; another value is a warning and reads as true), `lhead` and
   `ltail` (with `compound=true` on the graph, the edge ends at the named cluster's border, and
   ranks against the cluster; a warning without `compound`, for a name that is not a cluster,
-  or for a cluster that does not hold the edge's head or tail and not its other end), and
+  or for a cluster that does not hold the edge's head or tail and not its other end),
+  `tailport` and `headport` (as the port of an edge end, which wins over them), and
   `arrowhead` and `arrowtail`: `normal`, `inv`, `vee`, `curve` an arrow; `empty`, `onormal` a
   hollow triangle; `diamond` and `odiamond`; `dot` and `odot` a circle; `box` and `tee` a bar;
   `crow` and `ocrow` crow's feet; `none`. The first shape of a stacked name such as `invdot` is
@@ -96,8 +102,8 @@ word.
 
 ## DOT-4 Not drawn yet
 
-These are parsed and warned about, then ignored: ports (`a:p:n`; the edge joins the node), HTML labels
-(drawn as their text), and images.
+These are parsed and warned about, then ignored: record field ports (`a:p`; the edge joins the
+node), HTML labels (drawn as their text), and images.
 
 ## DOT-5 Choosing the language
 

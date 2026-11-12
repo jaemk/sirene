@@ -507,6 +507,7 @@ impl Lowerer {
                     end,
                     length,
                     constraint: true,
+                    ports: [None; 2],
                     label: label.clone(),
                     start_label: None,
                     end_label: None,

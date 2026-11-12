@@ -9,8 +9,8 @@ use super::x11::X11;
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text::decode_html_entities;
 use crate::flowchart::{
-    Arrow, Direction, Edge, EdgeOrder, Flowchart, Label, Node, RankEnd, Row, Shape, Stroke, Style,
-    Subgraph,
+    Arrow, Compass, Direction, Edge, EdgeOrder, Flowchart, Label, Node, RankEnd, Row, Shape,
+    Stroke, Style, Subgraph,
 };
 use crate::scene::{Color, parse_color};
 use crate::syntax::SyntaxKind::*;
@@ -108,7 +108,14 @@ const EDGE_ATTRS: &[&str] = &[
     "constraint",
     "lhead",
     "ltail",
+    "headport",
+    "tailport",
 ];
+
+/// Whether `x` is a compass point, `c` and `_` (the center) included.
+fn is_compass(x: &str) -> bool {
+    Compass::parse(x).is_some() || matches!(x, "c" | "C" | "_")
+}
 
 /// A Graphviz boolean: `true`, `yes`, `false`, `no` in any case, or an integer, nonzero for true.
 fn boolean(text: &str) -> Option<bool> {
@@ -145,6 +152,8 @@ struct Cluster {
 struct PendingEdge {
     from: usize,
     to: usize,
+    /// The compass ports written on the tail and head (`a:n -> b:s`).
+    ports: [Option<Compass>; 2],
     attrs: Vec<Attr>,
     range: TextRange,
 }
@@ -643,7 +652,8 @@ impl Lowerer {
                     let Some(n) = stmt.children().find(|n| n.kind() == NODE) else {
                         continue;
                     };
-                    let i = self.node_ref(&n, scope);
+                    // A port on a node statement means nothing; Graphviz ignores it too.
+                    let (i, _) = self.node_ref(&n, scope);
                     let attrs = self.attr_lists(&stmt, Target::Node);
                     self.node_attrs[i].extend(attrs);
                     mentioned.push(i);
@@ -698,21 +708,46 @@ impl Lowerer {
         }
     }
 
-    /// The node a `NODE` names, created with the scope's defaults if new.
-    fn node_ref(&mut self, n: &SyntaxNode, scope: &Scope) -> usize {
+    /// The node a `NODE` names, created with the scope's defaults if new, and its compass port
+    /// (`a:n`, `a:port:n`).
+    fn node_ref(&mut self, n: &SyntaxNode, scope: &Scope) -> (usize, Option<Compass>) {
         let mut it = ids(n);
         let Some(id) = it.next() else {
-            return self.node("", n.text_range(), scope);
+            return (self.node("", n.text_range(), scope), None);
         };
-        if it.next().is_some() {
+        let rest: Vec<String> = it.map(|p| value(&p).text).collect();
+        // `a:x` is a compass point or a record port; `a:port:x` a record port and a compass
+        // point.
+        let (port, compass) = match rest.as_slice() {
+            [] => (None, None),
+            [x] if is_compass(x) => (None, Some(x)),
+            [x] => (Some(x), None),
+            [p, x, ..] => (Some(p), Some(x)),
+        };
+        if port.is_some() {
             self.warn_once(
                 "<port>",
                 n.text_range(),
-                "ports are not supported yet; the edge joins the node",
+                "record ports are not supported yet; the edge joins the node",
             );
         }
+        let compass = compass.and_then(|x| self.compass(x, n.text_range()));
         let name = value(&id).text;
-        self.node(&name, id.text_range(), scope)
+        (self.node(&name, id.text_range(), scope), compass)
+    }
+
+    /// A compass point; an unknown one is a warning.
+    fn compass(&mut self, x: &str, range: TextRange) -> Option<Compass> {
+        if !is_compass(x) {
+            self.warn_once(
+                &format!("compass@{range:?}"),
+                range,
+                format!(
+                    "unknown compass point `{x}`: expected n, ne, e, se, s, sw, w, nw, c, or _"
+                ),
+            );
+        }
+        Compass::parse(x)
     }
 
     fn node(&mut self, id: &str, range: TextRange, scope: &Scope) -> usize {
@@ -757,39 +792,40 @@ impl Lowerer {
     /// `a -> b -> {c d} [attrs]`: an edge from every node of each operand to every node of
     /// the next. Returns the nodes mentioned.
     fn edge_stmt(&mut self, stmt: &SyntaxNode, scope: &mut Scope) -> Vec<usize> {
-        let mut operands: Vec<(Vec<usize>, TextRange)> = Vec::new();
+        let mut operands: Vec<(Vec<usize>, Option<Compass>, TextRange)> = Vec::new();
         for n in stmt.children() {
             match n.kind() {
                 NODE => {
-                    let i = self.node_ref(&n, scope);
-                    operands.push((vec![i], n.text_range()));
+                    let (i, compass) = self.node_ref(&n, scope);
+                    operands.push((vec![i], compass, n.text_range()));
                 }
                 SUBGRAPH => {
                     let nodes = self.subgraph(&n, scope);
-                    operands.push((nodes, n.text_range()));
+                    operands.push((nodes, None, n.text_range()));
                 }
                 // A subgraph nested too deep to read: no nodes, and no edge across it.
-                ERROR => operands.push((Vec::new(), n.text_range())),
+                ERROR => operands.push((Vec::new(), None, n.text_range())),
                 _ => {}
             }
         }
         let mut attrs = scope.edge.clone();
         attrs.extend(self.attr_lists(stmt, Target::Edge));
         for pair in operands.windows(2) {
-            let ((from, a), (to, b)) = (&pair[0], &pair[1]);
+            let ((from, tail, a), (to, head, b)) = (&pair[0], &pair[1]);
             let range = a.cover(*b);
             for &f in from {
                 for &t in to {
                     self.edges.push(PendingEdge {
                         from: f,
                         to: t,
+                        ports: [*tail, *head],
                         attrs: attrs.clone(),
                         range,
                     });
                 }
             }
         }
-        operands.into_iter().flat_map(|(n, _)| n).collect()
+        operands.into_iter().flat_map(|(n, _, _)| n).collect()
     }
 
     /// A subgraph: a cluster when its name starts with `cluster`; its defaults are scoped to
@@ -1278,6 +1314,29 @@ impl Lowerer {
         let (tail, head) = (self.ids[e.from].clone(), self.ids[e.to].clone());
         let from = self.clip(attrs, "ltail", e.from, e.to);
         let to = self.clip(attrs, "lhead", e.to, e.from);
+        // A port written on the node, else `tailport` or `headport` (`port:compass` or
+        // `compass`).
+        let mut ports = e.ports;
+        for (slot, key) in ports.iter_mut().zip(["tailport", "headport"]) {
+            if slot.is_none()
+                && let Some(a) = get(attrs, key)
+            {
+                let (text, range) = (a.value.text.clone(), a.range);
+                let (port, x) = match text.rsplit_once(':') {
+                    Some((p, x)) => (Some(p), Some(x)),
+                    None if is_compass(&text) => (None, Some(text.as_str())),
+                    None => (Some(text.as_str()), None),
+                };
+                if port.is_some() {
+                    self.warn_once(
+                        "<port>",
+                        range,
+                        "record ports are not supported yet; the edge joins the node",
+                    );
+                }
+                *slot = x.and_then(|x| self.compass(x, range));
+            }
+        }
         let dir = match get(attrs, "dir") {
             None => (if self.directed { "forward" } else { "none" }).to_owned(),
             Some(a) => {
@@ -1379,6 +1438,7 @@ impl Lowerer {
             end,
             length,
             constraint,
+            ports,
             label,
             start_label,
             end_label,
