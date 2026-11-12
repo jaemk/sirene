@@ -491,6 +491,7 @@ impl Lowerer {
             length,
             constraint: true,
             ports: [None; 2],
+            rows: [None; 2],
             label,
             start_label: None,
             end_label: None,

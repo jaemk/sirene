@@ -1,0 +1,11 @@
+digraph structs {
+  rankdir=LR
+  node [shape=record]
+  list [label="<head> list|{<a> first|<b> second|<c> third}"]
+  first [label="<v> 1|<next> next"]
+  second [label="<v> 2|<next> next"]
+  list:a -> first:v
+  list:b -> second:v
+  first:next -> second:v
+  list:c -> second:next
+}

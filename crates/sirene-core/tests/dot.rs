@@ -10,7 +10,7 @@ use sirene_core::diagram::{self, Kind, Lowered};
 use sirene_core::flowchart::{
     Arrow, Compass, Direction, EdgeOrder, Flowchart, RankEnd, Shape, Stroke,
 };
-use sirene_core::scene::{Approx, Color, Theme};
+use sirene_core::scene::{Approx, Color, Owner, Primitive, Segment, Theme};
 use sirene_core::{Severity, dot};
 
 fn fixtures(dir: &str) -> Vec<(String, String)> {
@@ -551,13 +551,88 @@ fn ports() {
     assert_eq!(
         messages("digraph { a:p:up -> b }"),
         [
-            "record ports are not supported yet; the edge joins the node",
+            "`a` has no record port `p`; the edge joins the node",
             "unknown compass point `up`: expected n, ne, e, se, s, sw, w, nw, c, or _",
         ]
     );
     assert_eq!(
         messages("digraph { a -> b [headport=p] }"),
-        ["record ports are not supported yet; the edge joins the node"]
+        ["`b` has no record port `p`; the edge joins the node"]
+    );
+}
+
+/// DOT-2: a record port joins its field's line in a left-right graph.
+#[test]
+fn record_ports() {
+    let src = |dir: &str| {
+        format!(
+            "digraph {{ rankdir={dir}; node [shape=record]
+              s [label=\"<h> head|{{<x> one|<y> two}}|<n> three\"]
+              t -> s:y; u -> s:h:w; v -> s [headport=n]; s:x -> w }}"
+        )
+    };
+    let c = chart(&src("LR"));
+    let rows: Vec<_> = c.edges.iter().map(|e| e.rows).collect();
+    // `n` names a field here, not north.
+    assert_eq!(
+        rows,
+        [
+            [None, Some(2)],
+            [None, Some(0)],
+            [None, Some(3)],
+            [Some(1), None]
+        ]
+    );
+    assert_eq!(c.edges[1].ports, [None, Some(Compass::West)]);
+    // Each edge reaches the box on its field's line.
+    for dir in ["LR", "RL"] {
+        let out = ascii::render(&chart(&src(dir)), &Options::default());
+        let line = |text: &str| out.lines().find(|l| l.contains(text)).unwrap();
+        for field in ["head", "two", "three"] {
+            assert!(line(field).contains(['►', '◄']), "{dir} {field}\n{out}");
+        }
+        assert!(line("one").contains('─'), "{dir}\n{out}");
+    }
+    // The scene too: in LR each edge's head, its rightmost point, is level with its field.
+    let s = diagram::lower(&src("LR"))
+        .diagram
+        .scene(&Approx, &Theme::LIGHT);
+    let text_y = |want: &str| {
+        s.elements
+            .iter()
+            .find_map(|e| match &e.primitive {
+                Primitive::Text { text, center, .. } if text == want => Some(center.y),
+                _ => None,
+            })
+            .unwrap()
+    };
+    let head = |edge: usize| {
+        s.elements
+            .iter()
+            .filter(|e| e.owner == Owner::Edge(edge))
+            .flat_map(|e| match &e.primitive {
+                Primitive::Path { segments, .. } => segments.clone(),
+                Primitive::Text { .. } => Vec::new(),
+            })
+            .filter_map(|seg| match seg {
+                Segment::Move(p) | Segment::Line(p) => Some(p),
+                _ => None,
+            })
+            .max_by(|a, b| a.x.total_cmp(&b.x))
+            .unwrap()
+    };
+    for (edge, field) in [(0, "two"), (1, "head"), (2, "three")] {
+        let (y, want) = (head(edge).y, text_y(field));
+        assert!((y - want).abs() <= 3.0, "{field}: {y} vs {want}");
+    }
+    let (_, d) = lowered(&src("TB"));
+    assert_eq!(
+        d,
+        [(
+            Severity::Warning,
+            "record ports are drawn only when `rankdir` is LR or RL; the edge joins the node"
+                .into()
+        )]
     );
 }
 
@@ -777,7 +852,7 @@ fn warnings() {
         d,
         [
             w("the graph attribute `splines` is not supported; ignored"),
-            w("record ports are not supported yet; the edge joins the node"),
+            w("`a` has no record port `p`; the edge joins the node"),
             w("HTML labels are drawn as their text"),
             w("the shape `star2` is not supported; drawn as an ellipse"),
             w("the node attribute `width` is not supported; ignored"),

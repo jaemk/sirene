@@ -60,6 +60,16 @@ pub fn check_model(c: &Flowchart) -> Result<(), TestCaseError> {
     for e in &c.edges {
         prop_assert!(known(&e.from) && known(&e.to), "dangling edge {:?}", e);
         prop_assert!(e.length <= 10);
+        // A record line is one of its node's: the label's lines, then the sections' rows.
+        for (id, row) in [(&e.from, e.rows[0]), (&e.to, e.rows[1])] {
+            if let Some(row) = row {
+                let node = c.nodes.iter().find(|n| &n.id == id);
+                prop_assert!(node.is_some(), "a record line on a subgraph end {:?}", e);
+                let n = node.unwrap();
+                let lines = n.label.lines().len() + n.sections.iter().map(Vec::len).sum::<usize>();
+                prop_assert!(row < lines, "line {} past the {} of {}", row, lines, id);
+            }
+        }
     }
     for (id, _) in &c.ordering {
         prop_assert!(known(id), "ordering names a missing node {:?}", id);

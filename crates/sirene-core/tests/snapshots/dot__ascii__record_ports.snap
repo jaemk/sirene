@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/dot.rs
+expression: "digraph structs {\n  rankdir=LR\n  node [shape=record]\n  list [label=\"<head> list|{<a> first|<b> second|<c> third}\"]\n  first [label=\"<v> 1|<next> next\"]\n  second [label=\"<v> 2|<next> next\"]\n  list:a -> first:v\n  list:b -> second:v\n  first:next -> second:v\n  list:c -> second:next\n}\n"
+---
+                 +------+
++--------+    +->|  1   |
+|  list  | +--+  +------+
++--------+ |     | next +-+
+| first  +-+     +------+ +---+ +------+
+| second +-----+             ++>|  2   |
+| third  +----++-------------+  +------+
++--------+    +---------------->| next |
+                                +------+

@@ -211,6 +211,32 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
             cells(th + 2.0 * shapes::PAD_Y),
         )
     }
+
+    /// The label's lines are centered in the node, or in the title area of a compartment
+    /// node; each section's rows follow its padding.
+    fn row(&self, node: &Node, row: usize) -> Option<i32> {
+        let lh = self.theme.line_height;
+        let title = node.label.spans().len();
+        if row < title {
+            let height = if node.sections.is_empty() {
+                (self.node(node).h - 1) as f32
+            } else {
+                Compartments::of(node, self.metrics, self.theme).title
+            };
+            let mid = height / 2.0 + (row as f32 - (title as f32 - 1.0) / 2.0) * lh;
+            return Some(mid.round() as i32);
+        }
+        let mut y = Compartments::of(node, self.metrics, self.theme).title;
+        let mut k = row - title;
+        for section in &node.sections {
+            if k < section.len() {
+                return Some((y + SECTION_PAD + k as f32 * lh + lh / 2.0).round() as i32);
+            }
+            k -= section.len();
+            y += section.len() as f32 * lh + 2.0 * SECTION_PAD;
+        }
+        None
+    }
 }
 
 /// The size of a note's folded corner.

@@ -58,6 +58,11 @@ fn compass() -> impl Strategy<Value = Option<Compass>> {
     )
 }
 
+/// A fixed port, sometimes off the node's side.
+fn anchor() -> impl Strategy<Value = Option<i32>> {
+    prop::option::weighted(0.2, -2..16i32)
+}
+
 fn size() -> impl Strategy<Value = Size> {
     (3..14i32, 3..6i32).prop_map(|(w, h)| Size::new(w, h))
 }
@@ -111,17 +116,19 @@ fn graph() -> impl Strategy<Value = Graph> {
                     prop::option::weighted(0.3, (1..8i32, 1..3i32)),
                     prop::bool::weighted(0.8),
                     [compass(), compass()],
+                    [anchor(), anchor()],
                 )
-                    .prop_map(|(from, to, min_len, label, constraint, ports)| {
-                        EdgeSpec {
+                    .prop_map(
+                        |(from, to, min_len, label, constraint, ports, anchors)| EdgeSpec {
                             from,
                             to,
                             min_len,
                             label: label.map(|(w, h)| Size::new(w, h)),
                             constraint,
                             ports,
-                        }
-                    }),
+                            anchors,
+                        },
+                    ),
                 0..12,
             )
             .boxed()

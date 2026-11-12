@@ -33,8 +33,11 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
 - An edge end's compass point (`a:e`, `a:p:sw`; `n`, `ne`, `e`, `se`, `s`, `sw`, `w`, `nw` in any
   case) moves the end toward that end of the node side it joins (LAYOUT-7); the side itself
   does not change, so `a:n` in a top-down graph still leaves `a` from the bottom. `c` and `_`
-  are none, another name is a warning, and a record field port (`a:p`) is a warning and joins
-  the node. A port on a node statement is ignored.
+  are none, and another name is a warning. A record port (`a:p`, `a:p:sw`, named `<p>` in the
+  record's label; `a:x` names a port before a compass point) joins its field's first line when
+  `rankdir` is LR or RL, where the fields stack as compartments; in a top-down graph it is a
+  warning and joins the node, as is a name the record lacks. An end clipped to a cluster
+  (`lhead`, `ltail`) drops its record port. A port on a node statement is ignored.
 - A subgraph whose name starts with `cluster` (any case) is a cluster titled by its `label`,
   nested as in the source; a node is a member of the innermost cluster it is mentioned in, and of
   the first of two clusters that do not nest. Other subgraphs only scope defaults. A cluster named
@@ -75,7 +78,8 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
   `triangle`, `invtriangle`; `note`; `tab` and `folder` a folder; `box3d` stacked boxes;
   `component` a lined box; `cds` a flag; `star` a bang. `record` and `Mrecord` are compartments
   (LANGS-3): the first field is the title, and each other field a section with a row per nested
-  field; `<port>` names are dropped, and braces nest 16 deep (a deeper one is text).
+  field; `<port>` names a field for edges (DOT-2), and braces nest 16 deep (a deeper one is
+  text).
 - Edge: `label`, `headlabel`, `taillabel` (end labels), `style` (`dashed` and `dotted` dashed,
   `bold` thick, `invis`), `color`, `fontcolor`, `penwidth` (drawn up to 32px, DISPLA-6), `dir`,
   `minlen` (rounded, 0 to 10), `constraint` (`true`, `yes`, `false`, `no` in any case, or an
@@ -102,8 +106,8 @@ word.
 
 ## DOT-4 Not drawn yet
 
-These are parsed and warned about, then ignored: record field ports (`a:p`; the edge joins the
-node), HTML labels (drawn as their text), and images.
+These are parsed and warned about, then ignored: record ports in top-down graphs (the edge
+joins the node), HTML labels (drawn as their text), and images.
 
 ## DOT-5 Choosing the language
 

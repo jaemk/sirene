@@ -21,6 +21,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - DOT node `group`: edges between nodes of one group run straight.
 - DOT compass ports (`a:e`, `a:p:sw`, `tailport`, `headport`) move an edge end toward that end
   of the node side.
+- DOT record ports (`a:p`, `<p>` fields) join the field's line in `rankdir=LR` and `RL` graphs.
 - `--lang mermaid|dot` reads every diagram as that language. Without it, a file's extension
   (`.dot`, `.gv`, `.mmd`, `.mermaid`) or a Markdown block's name picks the language in the CLI
   and the editor, and other sources are detected from their first line.

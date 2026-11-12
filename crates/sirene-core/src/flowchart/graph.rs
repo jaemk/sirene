@@ -14,6 +14,12 @@ pub trait Measure {
     fn subgraph_title(&self, subgraph: &Subgraph) -> Size;
     /// The size of a note's box.
     fn note(&self, label: &Label) -> Size;
+    /// The middle of line `row` of a node (its label's lines, then each section's rows), in
+    /// cells from the node's top; `None` when there is no such line.
+    fn row(&self, node: &Node, row: usize) -> Option<i32> {
+        let _ = (node, row);
+        None
+    }
 }
 
 impl Flowchart {
@@ -114,13 +120,21 @@ impl Flowchart {
             edges: self
                 .edges
                 .iter()
-                .map(|e| EdgeSpec {
-                    from: item(&e.from),
-                    to: item(&e.to),
-                    min_len: u32::from(e.length),
-                    label: e.label.as_ref().and_then(|l| measure.edge_label(l)),
-                    constraint: e.constraint,
-                    ports: e.ports,
+                .map(|e| {
+                    let (from, to) = (item(&e.from), item(&e.to));
+                    let anchor = |end: Item, row: Option<usize>| match end {
+                        Item::Node(n) => measure.row(&self.nodes[n], row?),
+                        Item::Cluster(_) => None,
+                    };
+                    EdgeSpec {
+                        from,
+                        to,
+                        min_len: u32::from(e.length),
+                        label: e.label.as_ref().and_then(|l| measure.edge_label(l)),
+                        constraint: e.constraint,
+                        ports: e.ports,
+                        anchors: [anchor(from, e.rows[0]), anchor(to, e.rows[1])],
+                    }
                 })
                 .collect(),
             notes: self

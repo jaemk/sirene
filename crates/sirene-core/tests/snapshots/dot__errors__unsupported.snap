@@ -4,7 +4,7 @@ expression: "digraph u {\n  splines=ortho\n  fontname=\"Helvetica\"\n  { rank=sa
 ---
 2:3: warning: the graph attribute `splines` is not supported; ignored
 3:3: warning: the graph attribute `fontname` is not supported; ignored
-5:3: warning: record ports are not supported yet; the edge joins the node
+5:3: warning: `a` has no record port `f0`; the edge joins the node
 6:6: warning: HTML labels are drawn as their text
 6:32: warning: the node attribute `width` is not supported; ignored
 6:41: warning: the shape `egg2` is not supported; drawn as an ellipse

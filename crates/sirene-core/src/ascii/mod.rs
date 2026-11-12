@@ -242,6 +242,24 @@ impl Measure for Cells {
         let w = lines.iter().map(|l| width(l)).max().unwrap_or(0);
         Size::new(w + 4, lines.len() as i32 + 2)
     }
+
+    /// The label's lines start below the top border; each section's rows below its rule.
+    fn row(&self, node: &Node, row: usize) -> Option<i32> {
+        let title = lines(&node.label).len();
+        if row < title {
+            return Some(1 + row as i32);
+        }
+        let mut y = 1 + title as i32;
+        let mut k = row - title;
+        for section in &node.sections {
+            if k < section.len() {
+                return Some(y + 1 + k as i32);
+            }
+            k -= section.len();
+            y += 1 + section.len() as i32;
+        }
+        None
+    }
 }
 
 fn width(s: &str) -> i32 {
