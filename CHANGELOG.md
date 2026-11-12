@@ -186,6 +186,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `#` line after a byte order mark is a comment.
 - Mermaid labels decode hex entities such as `&#x2665;`, and `&9829;` without its `#` is text.
 - The editor draws a DOT graph on its `bgcolor`, as the other commands do.
+- An `init` directive that cannot be read, malformed or nested too deep, is a warning; it was
+  ignored without one.
 
 ## [0.2.0] - 2026-11-08
 

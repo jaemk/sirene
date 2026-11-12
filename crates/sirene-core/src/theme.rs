@@ -34,6 +34,9 @@ pub struct ThemeConfig {
     pub name: Option<(String, Range<usize>)>,
     /// `themeVariables` entries, in source order; later ones win.
     pub variables: Vec<(String, String)>,
+    /// The byte ranges of `init` directives that could not be read, malformed or nested too
+    /// deep (LANGS-8); their settings are ignored.
+    pub unread: Vec<Range<usize>>,
 }
 
 impl ThemeConfig {
@@ -45,24 +48,34 @@ impl ThemeConfig {
         out
     }
 
-    /// Warnings for settings Mermaid ignores: an unknown theme name.
+    /// Warnings for settings Mermaid ignores: an unknown theme name, and `init` directives that
+    /// could not be read.
     pub fn diagnostics(&self) -> Vec<Diagnostic> {
-        match &self.name {
-            Some((name, range)) if !NAMES.contains(&name.as_str()) => {
-                let range = TextRange::new(
-                    TextSize::new(range.start as u32),
-                    TextSize::new(range.end as u32),
-                );
-                vec![Diagnostic::warning(
-                    range,
-                    format!(
-                        "`{name}` is not a Mermaid theme; expected one of {}",
-                        NAMES.join(", ")
-                    ),
-                )]
-            }
-            _ => Vec::new(),
+        let text_range = |r: &Range<usize>| {
+            TextRange::new(TextSize::new(r.start as u32), TextSize::new(r.end as u32))
+        };
+        let mut out: Vec<Diagnostic> = self
+            .unread
+            .iter()
+            .map(|r| {
+                Diagnostic::warning(
+                    text_range(r),
+                    "this `init` directive could not be read; its settings are ignored",
+                )
+            })
+            .collect();
+        if let Some((name, range)) = &self.name
+            && !NAMES.contains(&name.as_str())
+        {
+            out.push(Diagnostic::warning(
+                text_range(range),
+                format!(
+                    "`{name}` is not a Mermaid theme; expected one of {}",
+                    NAMES.join(", ")
+                ),
+            ));
         }
+        out
     }
 
     /// `base` with this diagram's theme and variables applied. With no theme name the variables
@@ -713,7 +726,15 @@ fn directives(src: &str, from: usize, out: &mut ThemeConfig) {
             depth: 0,
         };
         let mut entries = Vec::new();
-        if p.object_body("", &mut entries).is_some() {
+        if p.object_body("", &mut entries).is_none() {
+            // Other directives, such as `%%{wrap}%%`, are not settings.
+            let key = src[open..close]
+                .trim_start()
+                .trim_start_matches(['"', '\'']);
+            if key.starts_with("init") {
+                out.unread.push(open - 3..close + 3);
+            }
+        } else {
             for (path, value, range) in entries {
                 let key = path
                     .strip_prefix("init.")
@@ -945,6 +966,36 @@ mod tests {
             ThemeConfig::read("%%{init: {broken\nA\n"),
             ThemeConfig::default()
         );
+    }
+
+    /// An `init` directive that cannot be read, malformed or nested past `MAX_DEPTH`, is one
+    /// warning over the directive, and the others still apply.
+    #[test]
+    fn unread_directives() {
+        let src = "%%{init: {'theme': }}%%\n%%{init: {'theme': 'dark'}}%%\nA\n";
+        let c = ThemeConfig::read(src);
+        assert_eq!(c.name.as_ref().unwrap().0, "dark");
+        assert_eq!(c.unread.len(), 1);
+        assert_eq!(&src[c.unread[0].clone()], "%%{init: {'theme': }}%%");
+        let d = c.diagnostics();
+        assert_eq!(d.len(), 1);
+        assert!(
+            d[0].message.contains("could not be read"),
+            "{}",
+            d[0].message
+        );
+        let deep = format!(
+            "%%{{\"initialize\": {}{}}}%%\nA\n",
+            "{'a': ".repeat(MAX_DEPTH + 1),
+            "}".repeat(MAX_DEPTH + 1)
+        );
+        assert_eq!(ThemeConfig::read(&deep).unread.len(), 1);
+        let shallow = format!(
+            "%%{{init: {}1{}}}%%\nA\n",
+            "{'a': ".repeat(MAX_DEPTH - 2),
+            "}".repeat(MAX_DEPTH - 2)
+        );
+        assert!(ThemeConfig::read(&shallow).unread.is_empty());
     }
 
     #[test]
