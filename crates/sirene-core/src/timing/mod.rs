@@ -1,6 +1,8 @@
 //! Timing diagrams (TIMING-*): signals whose state changes over time, with messages,
 //! constraints, and highlights between them. PlantUML timing diagrams lower to this model.
 
+use std::collections::HashMap;
+
 /// How a signal is drawn (TIMING-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignalKind {
@@ -80,51 +82,90 @@ impl Signal {
         }
     }
 
-    /// A state's display label.
-    pub fn state_label<'a>(&'a self, name: &'a str) -> &'a str {
-        self.states
-            .iter()
-            .find(|(n, _)| n == name)
-            .map_or(name, |(_, l)| l.as_str())
-    }
-
     /// The levels of a robust or binary signal, top first: the declared states, then the others
     /// in the order they appear. Binary and clock signals are high over low.
-    pub fn levels(&self) -> Vec<String> {
-        if matches!(self.kind, SignalKind::Binary | SignalKind::Clock) {
-            return vec!["high".to_owned(), "low".to_owned()];
-        }
-        let mut out: Vec<String> = self.states.iter().map(|(n, _)| n.clone()).collect();
-        for c in &self.changes {
-            if let Value::State(s) = &c.value
-                && !out.contains(s)
-            {
-                out.push(s.clone());
-            }
-        }
-        out
-    }
-
-    /// The level of `state` among `levels`, 0 at the top.
-    pub fn level(&self, levels: &[String], state: &str) -> Option<usize> {
-        let s = if matches!(self.kind, SignalKind::Binary | SignalKind::Clock) {
-            match state.to_ascii_lowercase().as_str() {
-                "high" | "1" | "true" | "on" => "high",
-                _ => "low",
-            }
+    pub fn levels(&self) -> Levels<'_> {
+        let binary = matches!(self.kind, SignalKind::Binary | SignalKind::Clock);
+        let candidates: Vec<&str> = if binary {
+            vec!["high", "low"]
         } else {
-            state
+            let declared = self.states.iter().map(|(n, _)| n.as_str());
+            let used = self.changes.iter().filter_map(|c| match &c.value {
+                Value::State(s) => Some(s.as_str()),
+                _ => None,
+            });
+            declared.chain(used).collect()
         };
-        levels.iter().position(|l| l == s)
+        let mut names: Vec<&str> = Vec::new();
+        let mut index: HashMap<&str, usize> = HashMap::new();
+        for n in candidates {
+            if !index.contains_key(n) {
+                index.insert(n, names.len());
+                names.push(n);
+            }
+        }
+        let labels = self
+            .states
+            .iter()
+            .map(|(n, l)| (n.as_str(), l.as_str()))
+            .collect();
+        Levels {
+            names,
+            index,
+            labels,
+            binary,
+        }
+    }
+}
+
+/// A signal's levels and state labels, indexed (TIMING-2).
+#[derive(Debug, Clone)]
+pub struct Levels<'a> {
+    /// Level names, top first.
+    pub names: Vec<&'a str>,
+    index: HashMap<&'a str, usize>,
+    labels: HashMap<&'a str, &'a str>,
+    binary: bool,
+}
+
+impl<'a> Levels<'a> {
+    pub fn len(&self) -> usize {
+        self.names.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.names.is_empty()
+    }
+
+    /// The level of `state`, 0 at the top. A binary value other than a true word is low.
+    pub fn level(&self, state: &str) -> Option<usize> {
+        if self.binary {
+            let high = matches!(
+                state.to_ascii_lowercase().as_str(),
+                "high" | "1" | "true" | "on"
+            );
+            return Some(usize::from(!high));
+        }
+        self.index.get(state).copied()
+    }
+
+    /// A state's display label.
+    pub fn label<'b>(&self, name: &'b str) -> &'b str
+    where
+        'a: 'b,
+    {
+        self.labels.get(name).copied().unwrap_or(name)
+    }
+}
+
+impl Signal {
     /// An analog signal's scale: its fixed one, or its values' range.
     pub fn analog_scale(&self) -> (f64, f64) {
         if let Some(s) = self.scale {
             return s;
         }
         let values = self.changes.iter().filter_map(|c| match &c.value {
-            Value::State(s) => s.parse::<f64>().ok(),
+            Value::State(s) => s.trim().parse::<f64>().ok(),
             _ => None,
         });
         let (lo, hi) = values.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), v| {
@@ -190,7 +231,7 @@ pub struct Timing {
 }
 
 /// The most clock periods drawn.
-const MAX_PERIODS: f64 = 1000.0;
+pub(crate) const MAX_PERIODS: f64 = 1000.0;
 
 impl Timing {
     /// The span of time drawn: every change, message, constraint, and highlight, and at least
@@ -367,8 +408,12 @@ mod tests {
         let segs = t.segments(&s, range);
         assert_eq!(segs.len(), 2);
         assert_eq!(segs[1].value, Value::State("off".into()));
-        assert_eq!(s.levels(), ["busy", "idle", "off"]);
-        assert_eq!(s.state_label("busy"), "Busy");
+        let levels = s.levels();
+        assert_eq!(levels.names, ["busy", "idle", "off"]);
+        assert_eq!(levels.level("off"), Some(2));
+        assert_eq!(levels.level("nope"), None);
+        assert_eq!(levels.label("busy"), "Busy");
+        assert_eq!(levels.label("idle"), "idle");
     }
 
     #[test]
@@ -387,7 +432,8 @@ mod tests {
         assert!(t.segments(&s, (0.0, 1e12)).len() <= 2 * MAX_PERIODS as usize + 2);
         // Far from zero, where a float step would stall, it still ends.
         assert!(t.segments(&s, (1e17, 1e17 + 1e4)).len() <= 2 * MAX_PERIODS as usize + 2);
-        assert_eq!(s.level(&s.levels(), "1"), Some(0));
+        assert_eq!(s.levels().level("1"), Some(0));
+        assert_eq!(s.levels().level("low"), Some(1));
     }
 
     #[test]

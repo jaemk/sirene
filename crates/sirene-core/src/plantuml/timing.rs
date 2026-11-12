@@ -1,13 +1,16 @@
 //! PlantUML timing diagrams (PTIM-*): signals, `@` moments, state changes, messages,
 //! constraints, highlights, and notes, lowered to the timing model (TIMING-1).
 
+use std::collections::HashMap;
+
 use rowan::TextRange;
 
 use super::lines::{self, Common, Cursor, Line};
 use crate::diagnostic::Diagnostic;
 use crate::syntax::SyntaxNode;
 use crate::timing::{
-    Change, Clock, Constraint, Highlight, Message, Note, Signal, SignalKind, Timing, Value,
+    Change, Clock, Constraint, Highlight, MAX_PERIODS, Message, Note, Signal, SignalKind, Timing,
+    Value,
 };
 
 pub(crate) const STATEMENT: &str = "expected a signal such as `robust \"Web\" as W`, a moment \
@@ -79,7 +82,12 @@ struct Lower {
     t: Timing,
     d: Vec<Diagnostic>,
     now: f64,
-    anchors: Vec<(String, f64)>,
+    /// Each signal's index in `t.signals`.
+    ids: HashMap<String, usize>,
+    /// Named moments; a later `as :name` replaces an earlier one.
+    anchors: HashMap<String, f64>,
+    /// Where each clock was declared.
+    clocks: Vec<(usize, TextRange)>,
     /// The signal of a participant-oriented `@W` block.
     focus: Option<String>,
 }
@@ -102,22 +110,25 @@ impl Lower {
     fn moment_of(&mut self, s: &str, base: f64, range: TextRange) -> Option<f64> {
         let s = s.trim();
         if let Some(rest) = s.strip_prefix(':') {
-            let end = rest.find(['+', '-']).unwrap_or(rest.len());
-            let (name, off) = rest.split_at(end);
-            let Some(&(_, at)) = self.anchors.iter().find(|(n, _)| n == name.trim()) else {
-                self.d.push(Diagnostic::new(
-                    range,
-                    format!("no moment is named `:{}`", name.trim()),
-                ));
-                return None;
-            };
-            return match off {
-                "" => Some(at),
-                _ => self.number(off, range).map(|o| at + o),
-            };
+            let rest = rest.trim();
+            if let Some(&at) = self.anchors.get(rest) {
+                return Some(at);
+            }
+            // `:name+5`: the offset follows the last sign, so names may hold `-`.
+            if let Some(i) = rest.rfind(['+', '-'])
+                && let Some(&at) = self.anchors.get(rest[..i].trim())
+            {
+                return self.number(&rest[i..], range).map(|o| at + o);
+            }
+            let name = rest.rfind(['+', '-']).map_or(rest, |i| rest[..i].trim());
+            self.d.push(Diagnostic::new(
+                range,
+                format!("no moment is named `:{name}`"),
+            ));
+            return None;
         }
         if let Some((id, n)) = s.split_once('*') {
-            let clock = self.t.signal(id.trim()).and_then(|sig| sig.clock);
+            let clock = self.signal(id.trim()).and_then(|sig| sig.clock);
             let Some(c) = clock else {
                 self.d.push(Diagnostic::new(
                     range,
@@ -220,18 +231,27 @@ impl Lower {
                     .push(Diagnostic::new(line.range, "a clock needs `with period N`"));
             }
         }
-        if self.t.signal(&s.id).is_some() {
+        if self.ids.contains_key(&s.id) {
             self.d.push(Diagnostic::new(
                 line.range,
                 format!("`{}` is already declared", s.id),
             ));
             return;
         }
+        let i = self.t.signals.len();
+        if s.clock.is_some() {
+            self.clocks.push((i, line.range));
+        }
+        self.ids.insert(s.id.clone(), i);
         self.t.signals.push(s);
     }
 
+    fn signal(&self, id: &str) -> Option<&Signal> {
+        self.ids.get(id).map(|&i| &self.t.signals[i])
+    }
+
     fn signal_mut(&mut self, id: &str, range: TextRange) -> Option<&mut Signal> {
-        let at = self.t.signals.iter().position(|s| s.id == id);
+        let at = self.ids.get(id).copied();
         if at.is_none() {
             self.d
                 .push(Diagnostic::new(range, format!("no signal is named `{id}`")));
@@ -250,7 +270,7 @@ impl Lower {
             "{hidden}" => Value::Hidden,
             "{-}" => Value::Undefined,
             v if v.starts_with('{') && v.ends_with('}') => Value::Undefined,
-            v => Value::State(lines::unquote(v).to_owned()),
+            v => Value::State(lines::unquote(v).trim().to_owned()),
         };
         if let Value::State(s) = &v
             && s.is_empty()
@@ -318,7 +338,7 @@ impl Lower {
         };
         let Some(to_at) = to_at else { return true };
         for id in [&from, &to] {
-            if self.t.signal(id).is_none() {
+            if self.signal(id).is_none() {
                 self.d
                     .push(Diagnostic::new(range, format!("no signal is named `{id}`")));
                 return true;
@@ -365,7 +385,7 @@ impl Lower {
         let sig = sig.trim();
         let signal = if sig.is_empty() {
             None
-        } else if self.t.signal(sig).is_some() {
+        } else if self.signal(sig).is_some() {
             Some(sig.to_owned())
         } else {
             self.d.push(Diagnostic::new(
@@ -507,7 +527,7 @@ impl Lower {
         if let Some(rest) = t.strip_prefix('@') {
             // `@W` starts a participant-oriented block; `@100 as :name` is a moment.
             let first = rest.split_whitespace().next().unwrap_or("");
-            if !first.contains('*') && self.t.signal(first).is_some() {
+            if !first.contains('*') && self.signal(first).is_some() {
                 self.focus = Some(first.to_owned());
                 return;
             }
@@ -520,8 +540,8 @@ impl Lower {
             if let Some(at) = self.moment(at, now, line.range) {
                 self.now = at;
                 if let Some(name) = name {
-                    let name = name.strip_prefix(':').unwrap_or(name).to_owned();
-                    self.anchors.push((name, at));
+                    let name = name.strip_prefix(':').unwrap_or(name).trim().to_owned();
+                    self.anchors.insert(name, at);
                 }
             }
             return;
@@ -569,7 +589,9 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
         t: Timing::default(),
         d: Vec::new(),
         now: 0.0,
-        anchors: Vec::new(),
+        ids: HashMap::new(),
+        anchors: HashMap::new(),
+        clocks: Vec::new(),
         focus: None,
     };
     let mut cursor = Cursor::new(lines::read(root));
@@ -589,6 +611,23 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
         }
         l.line(&line, &mut cursor);
     }
+    // A clock draws at most MAX_PERIODS periods (TIMING-3).
+    if let Some((lo, hi)) = l.t.range() {
+        for &(i, range) in &l.clocks {
+            if let Some(c) = l.t.signals[i].clock
+                && (hi - lo) / c.period > MAX_PERIODS
+            {
+                l.d.push(Diagnostic::warning(
+                    range,
+                    format!(
+                        "the diagram spans more than {MAX_PERIODS} periods of `{}`; only the \
+                         first {MAX_PERIODS} are drawn",
+                        l.t.signals[i].id
+                    ),
+                ));
+            }
+        }
+    }
     (l.t, l.d)
 }
 
@@ -604,6 +643,42 @@ mod tests {
         assert_eq!(clock_time("1:75"), None);
         assert_eq!(clock_time("2019/13/01"), None);
         assert_eq!(clock_time("100"), None);
+    }
+
+    fn lower_src(body: &str) -> (Timing, Vec<String>) {
+        let src = format!("@startuml\n{body}\n@enduml\n");
+        let (diagram, d) = super::super::parse(&src).lower();
+        let crate::diagram::Diagram::Timing(t) = diagram else {
+            panic!("not a timing diagram")
+        };
+        (t, d.into_iter().map(|d| d.message).collect())
+    }
+
+    #[test]
+    fn anchors() {
+        let (t, d) = lower_src(
+            "concise A\n@0 as :a\n@50 as :a\n@100 as :t-1\n@:t-1-10\nA is x\n@:a+5\nA is y",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        let at: Vec<f64> = t.signals[0].changes.iter().map(|c| c.at).collect();
+        // `:t-1-10` is 10 before `:t-1`, and the later `:a` wins.
+        assert_eq!(at, [90.0, 55.0]);
+        let (_, d) = lower_src("concise A\n@:b-5\nA is x");
+        assert_eq!(d, ["no moment is named `:b`"]);
+    }
+
+    #[test]
+    fn long_clocks_warn() {
+        let (_, d) = lower_src("clock C with period 1\nconcise A\n@0\nA is x\n@5000\nA is y");
+        assert_eq!(d.len(), 1, "{d:?}");
+        assert!(d[0].contains("more than 1000 periods of `C`"), "{d:?}");
+    }
+
+    #[test]
+    fn analog_values_trimmed() {
+        let (t, d) = lower_src("analog V\n@0\nV is \" 5\"");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(t.signals[0].changes[0].value, Value::State("5".into()));
     }
 
     #[test]

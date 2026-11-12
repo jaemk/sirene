@@ -1,8 +1,10 @@
 //! Timing diagrams as text (TIMING-5).
 
+use std::collections::HashMap;
+
 use super::canvas::{Canvas, Line, glyph};
 use super::{Options, width};
-use crate::timing::{SignalKind, Timing, Value};
+use crate::timing::{Constraint, Levels, SignalKind, Timing, Value};
 
 /// Width of the time axis, in cells.
 const W: i32 = 60;
@@ -29,14 +31,27 @@ pub fn render(timing: &Timing, options: &Options) -> String {
     let (t0, t1) = range;
     let span = (t1 - t0).max(1e-9);
     // A column of signal names, then one of robust state labels.
+    let levels: Vec<Levels> = timing.signals.iter().map(|s| s.levels()).collect();
     let mut name_w = 0;
     let mut state_w = 0;
-    for s in &timing.signals {
+    for (s, lv) in timing.signals.iter().zip(&levels) {
         name_w = name_w.max(width(&s.label));
         if s.kind == SignalKind::Robust {
-            for l in s.levels() {
-                state_w = state_w.max(width(s.state_label(&l)));
+            for l in &lv.names {
+                state_w = state_w.max(width(lv.label(l)));
             }
+        }
+    }
+    let index: HashMap<&str, usize> = timing
+        .signals
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (s.id.as_str(), i))
+        .collect();
+    let mut constraints: HashMap<&str, Vec<&Constraint>> = HashMap::new();
+    for k in &timing.constraints {
+        if let Some(id) = k.signal.as_deref() {
+            constraints.entry(id).or_default().push(k);
         }
     }
     let states_end = name_w + 1 + state_w;
@@ -54,7 +69,7 @@ pub fn render(timing: &Timing, options: &Options) -> String {
         y += 1;
     }
     let mut rows = Vec::new();
-    for s in &timing.signals {
+    for (s, lv) in timing.signals.iter().zip(&levels) {
         for n in s.notes.iter().filter(|n| n.above) {
             y += n.text.lines().count() as i32;
         }
@@ -62,21 +77,17 @@ pub fn render(timing: &Timing, options: &Options) -> String {
             y += 1;
         }
         let h = match s.kind {
-            SignalKind::Robust => s.levels().len().max(2) as i32,
+            SignalKind::Robust => lv.len().max(2) as i32,
             SignalKind::Binary | SignalKind::Clock => 2,
             SignalKind::Concise | SignalKind::Rectangle => 3,
             SignalKind::Analog => ANALOG_LINES,
         };
         let row_y = y;
         y += h;
-        let constraint_y = timing
-            .constraints
-            .iter()
-            .any(|c| c.signal.as_deref() == Some(s.id.as_str()))
-            .then(|| {
-                y += 1;
-                y - 1
-            });
+        let constraint_y = constraints.contains_key(s.id.as_str()).then(|| {
+            y += 1;
+            y - 1
+        });
         for n in s.notes.iter().filter(|n| !n.above) {
             y += n.text.lines().count() as i32;
         }
@@ -117,7 +128,7 @@ pub fn render(timing: &Timing, options: &Options) -> String {
         }
     }
 
-    for (s, row) in timing.signals.iter().zip(&rows) {
+    for ((s, row), lv) in timing.signals.iter().zip(&rows).zip(&levels) {
         let mut ny = row.y
             - s.changes.iter().any(|c| c.note.is_some()) as i32
             - s.notes
@@ -154,7 +165,7 @@ pub fn render(timing: &Timing, options: &Options) -> String {
                             c.vline(a, top, bot, Line::Light);
                             c.vline(b, top, bot, Line::Light);
                             let label = match &g.value {
-                                Value::State(v) => s.state_label(v).to_owned(),
+                                Value::State(v) => lv.label(v).to_owned(),
                                 _ => "/".repeat((b - a - 1).max(0) as usize),
                             };
                             let room = b - a - 1;
@@ -168,19 +179,18 @@ pub fn render(timing: &Timing, options: &Options) -> String {
                 }
             }
             _ => {
-                let levels = s.levels();
                 let n = row.h;
+                let (lo, hi) = s.analog_scale();
                 let level = |v: &str| -> Option<i32> {
                     if s.kind == SignalKind::Analog {
-                        let (lo, hi) = s.analog_scale();
-                        let f = ((v.parse::<f64>().ok()? - lo) / (hi - lo)).clamp(0.0, 1.0);
+                        let f = ((v.trim().parse::<f64>().ok()? - lo) / (hi - lo)).clamp(0.0, 1.0);
                         return Some(((1.0 - f) * f64::from(n - 1)).round() as i32);
                     }
-                    s.level(&levels, v).map(|i| i as i32)
+                    lv.level(v).map(|i| i as i32)
                 };
                 if s.kind == SignalKind::Robust {
-                    for (i, l) in levels.iter().enumerate() {
-                        let label = s.state_label(l);
+                    for (i, l) in lv.names.iter().enumerate() {
+                        let label = lv.label(l);
                         c.text(states_end - width(label), row.y + i as i32, label);
                     }
                 }
@@ -217,11 +227,7 @@ pub fn render(timing: &Timing, options: &Options) -> String {
             }
         }
         if let Some(cy) = row.constraint_y {
-            for k in timing
-                .constraints
-                .iter()
-                .filter(|k| k.signal.as_deref() == Some(s.id.as_str()))
-            {
+            for k in constraints.get(s.id.as_str()).into_iter().flatten() {
                 constraint(&mut c, col(k.from), col(k.to), cy, &k.label);
             }
         }
@@ -236,9 +242,7 @@ pub fn render(timing: &Timing, options: &Options) -> String {
 
     // Messages: a dotted line down (or up) at the target moment into the target signal.
     for m in &timing.messages {
-        let fi = timing.signals.iter().position(|s| s.id == m.from);
-        let ti = timing.signals.iter().position(|s| s.id == m.to);
-        let (Some(fi), Some(ti)) = (fi, ti) else {
+        let (Some(&fi), Some(&ti)) = (index.get(m.from.as_str()), index.get(m.to.as_str())) else {
             continue;
         };
         if fi == ti {
@@ -300,8 +304,11 @@ pub fn render(timing: &Timing, options: &Options) -> String {
 /// `label` cut to `room` columns.
 fn fit(label: &str, room: i32) -> String {
     let mut out = String::new();
+    let mut used = 0;
+    let mut buf = [0; 4];
     for ch in label.chars() {
-        if width(&format!("{out}{ch}")) > room {
+        used += width(ch.encode_utf8(&mut buf));
+        if used > room {
             break;
         }
         out.push(ch);

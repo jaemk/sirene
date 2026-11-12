@@ -1,5 +1,7 @@
 //! Timing diagram to scene (TIMING-4).
 
+use std::collections::HashMap;
+
 use super::git::ink;
 use super::shapes::{self, BoxF};
 use super::style::parse_color;
@@ -7,7 +9,7 @@ use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment as Seg, Stroke, TextMetrics, TextStyle,
     Theme,
 };
-use crate::timing::{SignalKind, Timing, Value};
+use crate::timing::{Constraint, Levels, SignalKind, Timing, Value};
 
 const MARGIN: f32 = 16.0;
 const PAD: f32 = 8.0;
@@ -123,14 +125,27 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
     };
     let (t0, t1) = range;
     // A column of signal names, then one of robust state labels.
+    let levels: Vec<Levels> = timing.signals.iter().map(|s| s.levels()).collect();
     let mut name_w: f32 = 60.0;
     let mut state_w: f32 = 0.0;
-    for s in &timing.signals {
+    for (s, lv) in timing.signals.iter().zip(&levels) {
         name_w = name_w.max(p.width(&s.label, fs) + 2.0 * PAD);
         if s.kind == SignalKind::Robust {
-            for l in s.levels() {
-                state_w = state_w.max(p.width(s.state_label(&l), small) + PAD);
+            for l in &lv.names {
+                state_w = state_w.max(p.width(lv.label(l), small) + PAD);
             }
+        }
+    }
+    let index: HashMap<&str, usize> = timing
+        .signals
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (s.id.as_str(), i))
+        .collect();
+    let mut constraints: HashMap<&str, Vec<&Constraint>> = HashMap::new();
+    for c in &timing.constraints {
+        if let Some(id) = c.signal.as_deref() {
+            constraints.entry(id).or_default().push(c);
         }
     }
     let x0 = MARGIN + name_w + state_w;
@@ -148,14 +163,14 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
     }
     let rows_top = y;
     let mut rows = Vec::new();
-    for s in &timing.signals {
+    for (s, lv) in timing.signals.iter().zip(&levels) {
         let top = y;
         for n in s.notes.iter().filter(|n| n.above) {
             y += n.text.lines().count() as f32 * lh + PAD;
         }
         y += PAD;
         let h = match s.kind {
-            SignalKind::Robust => s.levels().len().max(2) as f32 * LEVEL,
+            SignalKind::Robust => lv.len().max(2) as f32 * LEVEL,
             SignalKind::Binary | SignalKind::Clock => 2.0 * LEVEL,
             SignalKind::Concise | SignalKind::Rectangle => BAND,
             SignalKind::Analog => ANALOG_H,
@@ -167,15 +182,11 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         }
         let band_y = y;
         y += h + PAD;
-        let constraint_y = timing
-            .constraints
-            .iter()
-            .any(|c| c.signal.as_deref() == Some(s.id.as_str()))
-            .then(|| {
-                let cy = y + lh;
-                y += lh + PAD;
-                cy
-            });
+        let constraint_y = constraints.contains_key(s.id.as_str()).then(|| {
+            let cy = y + lh;
+            y += lh + PAD;
+            cy
+        });
         for n in s.notes.iter().filter(|n| !n.above) {
             y += n.text.lines().count() as f32 * lh + PAD;
         }
@@ -250,7 +261,7 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         dash: None,
     };
 
-    for (s, row) in timing.signals.iter().zip(&rows) {
+    for ((s, row), lv) in timing.signals.iter().zip(&rows).zip(&levels) {
         // Name, and a rule between signals.
         p.text_at(&s.label, MARGIN, row.y + small / 2.0, fs, theme.text);
         if row.top > rows_top {
@@ -264,21 +275,20 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         let segs = timing.segments(s, range);
         match s.kind {
             SignalKind::Robust | SignalKind::Binary | SignalKind::Clock | SignalKind::Analog => {
-                let levels = s.levels();
+                let (lo, hi) = s.analog_scale();
                 let level_y = |v: &str| -> Option<f32> {
                     if s.kind == SignalKind::Analog {
-                        let (lo, hi) = s.analog_scale();
-                        let f = ((v.parse::<f64>().ok()? - lo) / (hi - lo)).clamp(0.0, 1.0);
+                        let f = ((v.trim().parse::<f64>().ok()? - lo) / (hi - lo)).clamp(0.0, 1.0);
                         return Some(row.y + row.h - f as f32 * row.h);
                     }
-                    let n = levels.len().max(2) as f32;
+                    let n = lv.len().max(2) as f32;
                     let h = row.h / n;
-                    s.level(&levels, v).map(|i| row.y + h * (i as f32 + 0.5))
+                    lv.level(v).map(|i| row.y + h * (i as f32 + 0.5))
                 };
                 if s.kind == SignalKind::Robust {
-                    for l in &levels {
+                    for l in &lv.names {
                         if let Some(ly) = level_y(l) {
-                            let label = s.state_label(l);
+                            let label = lv.label(l);
                             let w = p.width(label, small);
                             p.text_at(label, x0 - PAD - w, ly, small, theme.text);
                         }
@@ -374,7 +384,7 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
                         Value::State(v) => {
                             let fill = g.color.and_then(parse_color).unwrap_or(theme.node_fill);
                             p.path(shapes::polygon(&hex), Some(fill), Some(stroke));
-                            let label = s.state_label(v);
+                            let label = lv.label(v);
                             if p.width(label, small) + 2.0 * d + 2.0 <= b - a {
                                 p.text_c(label, (a + b) / 2.0, mid, small, ink(fill));
                             }
@@ -390,11 +400,7 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
             }
         }
         if let Some(cy) = row.constraint_y {
-            for c in timing
-                .constraints
-                .iter()
-                .filter(|c| c.signal.as_deref() == Some(s.id.as_str()))
-            {
+            for c in constraints.get(s.id.as_str()).into_iter().flatten() {
                 constraint(&mut p, x(c.from), x(c.to), cy, &c.label, small);
             }
         }
@@ -407,7 +413,7 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
 
     // Messages.
     let center = |id: &str| -> Option<f32> {
-        let i = timing.signals.iter().position(|s| s.id == id)?;
+        let i = *index.get(id)?;
         Some(rows[i].y + rows[i].h / 2.0)
     };
     let arrow = Stroke {
