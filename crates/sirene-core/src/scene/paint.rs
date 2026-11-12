@@ -348,6 +348,8 @@ pub(super) fn draw(
         metrics,
         elements: Vec::new(),
     };
+    // The title is the first element, if any.
+    let titled = title.is_some();
     if let Some(t) = title {
         p.text(
             Owner::Diagram,
@@ -580,6 +582,13 @@ pub(super) fn draw(
         for e in &mut elements {
             translate(&mut e.primitive, Pt::new(left, top));
         }
+    }
+    // The title stays centered on the grown scene.
+    if titled && left != right {
+        translate(
+            &mut elements[0].primitive,
+            Pt::new((right - left) / 2.0, 0.0),
+        );
     }
     let (width, height) = (width + left + right, height + top + bottom);
     let off = Pt::new(off.x + left, off.y + top);
