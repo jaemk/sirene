@@ -54,10 +54,13 @@ pub(crate) fn lower(root: &SyntaxNode) -> (TreeView, Vec<Diagnostic>) {
                 Some(path) => {
                     let e = entry(&mut view.entries, path);
                     let note = text.join(" ");
-                    e.description = Some(match e.description.take() {
-                        Some(before) => format!("{before} {note}"),
-                        None => note,
-                    });
+                    match &mut e.description {
+                        Some(before) => {
+                            before.push(' ');
+                            before.push_str(&note);
+                        }
+                        None => e.description = Some(note),
+                    }
                 }
                 None => d.push(Diagnostic::new(
                     line.range,
@@ -151,6 +154,21 @@ mod tests {
                 }
             })
             .collect()
+    }
+
+    #[test]
+    fn notes_join_on_their_entry() {
+        let src = "@startfiles\n<note>\nx\n</note>\n/a/b\n<note>\none\ntwo\n</note>\n\
+                   <note>\nthree\n</note>\n@endfiles\n";
+        let (diagram, d) = super::super::parse(src).lower();
+        let d: Vec<_> = d.iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(d, ["a note follows the path it describes"]);
+        let crate::diagram::Diagram::TreeView(v) = diagram else {
+            panic!("not a tree view")
+        };
+        let b = &v.entries[0].children[0];
+        assert_eq!(b.description.as_deref(), Some("one two three"));
+        assert_eq!(v.entries[0].description, None);
     }
 
     #[test]

@@ -271,6 +271,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `Style -up-> Page` and other directional links from a setting-named element are links.
 - PlantUML activity `elseif` after `else` is an error, and a malformed `elseif` or a `break`
   outside a loop no longer cuts the flow.
+- Large PlantUML class and component diagrams with many packages, timing diagrams with many
+  `has` lines, and JSON or YAML tables with many nested rows no longer take quadratic time.
+- A PlantUML element named `note` can be linked (`note --> A`), and repeated `<note>` bodies on
+  one file-tree entry are joined in place.
 
 ## [0.2.0] - 2026-11-08
 

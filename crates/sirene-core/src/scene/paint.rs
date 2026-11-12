@@ -225,12 +225,12 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
             let height = if node.sections.is_empty() {
                 (self.node(node).h - 1) as f32
             } else {
-                Compartments::of(node, self.metrics, self.theme).title
+                Compartments::title(node, self.theme)
             };
             let mid = height / 2.0 + (row as f32 - (title as f32 - 1.0) / 2.0) * lh;
             return Some(mid.round() as i32);
         }
-        let mut y = Compartments::of(node, self.metrics, self.theme).title;
+        let mut y = Compartments::title(node, self.theme);
         let mut k = row - title;
         for section in &node.sections {
             if k < section.len() {
@@ -280,11 +280,7 @@ impl Compartments {
                     .sum::<f32>()
             })
             .fold(0.0, f32::max);
-        let title = if node.untitled() {
-            0.0
-        } else {
-            node.label.spans().len() as f32 * theme.line_height + 2.0 * shapes::PAD_Y
-        };
+        let title = Self::title(node, theme);
         let mut width = title_w;
         let mut height = title;
         let mut columns = Vec::new();
@@ -310,6 +306,15 @@ impl Compartments {
             height,
             title,
             columns,
+        }
+    }
+
+    /// Height of `node`'s title area, without measuring its rows.
+    fn title(node: &Node, theme: &Theme) -> f32 {
+        if node.untitled() {
+            0.0
+        } else {
+            node.label.spans().len() as f32 * theme.line_height + 2.0 * shapes::PAD_Y
         }
     }
 }
