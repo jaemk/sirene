@@ -1,0 +1,28 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nactor User\n(Login)\nUser --> (Login)\n}\ncomponent\nUser -[wavy]-> (Login)\nactor Bob ?\nwhat is this\nnote on link : first\npackage P {\n  [Inner]\n@enduml\n"
+---
+5:1: error: `}` without a `{` to close
+6:1: error: expected a name after `component`
+7:6: warning: `-[wavy]->`: style `wavy` is not drawn; ignoring it
+8:11: warning: `?` is not drawn; ignoring it
+9:1: error: expected a use case, component, or deployment statement such as `actor A`, `(Use)`, `[Component]`, or `A --> B`
+11:1: error: unclosed `{`: expected `}`
+
+                     ┌──── P ────┐
+                     │           │
+┌──────┐   ┌─────┐   │ ┌───────┐ │
+│ User │   │ Bob │   │ │ Inner │ │
+└─┬──┬─┘   └─────┘   │ └───────┘ │
+  │  │               │           │
+  │  │               └───────────┘
+  │  │
+  │  └──┐
+  │     │
+  │   first
+  │     │
+  │   ┌─┘
+  ▼   ▼
+╭───────╮
+( Login )
+╰───────╯

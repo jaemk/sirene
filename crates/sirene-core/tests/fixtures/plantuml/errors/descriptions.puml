@@ -1,0 +1,13 @@
+@startuml
+actor User
+(Login)
+User --> (Login)
+}
+component
+User -[wavy]-> (Login)
+actor Bob ?
+what is this
+note on link : first
+package P {
+  [Inner]
+@enduml

@@ -1,0 +1,22 @@
+@startuml
+cloud Internet
+node Gateway #lightblue
+frame Cluster {
+  node Worker [
+    worker
+    x3
+  ]
+  queue Jobs
+  storage Cache
+}
+database Db
+artifact "app.jar" as Jar
+file Config
+Internet --> Gateway
+Gateway --> Worker : routes
+Worker -right-> Jobs
+Worker --> Cache
+Worker --> Db
+Jar ..> Worker : deploys
+Config .. Jar
+@enduml

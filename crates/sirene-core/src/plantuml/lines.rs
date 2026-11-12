@@ -4,7 +4,7 @@
 use rowan::{TextRange, TextSize};
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::Direction;
+use crate::flowchart::{Direction, Flowchart, Label, NoteSide};
 use crate::syntax::{SyntaxKind, SyntaxNode};
 
 /// One statement line, trimmed, with its range in the source.
@@ -234,6 +234,132 @@ impl Cursor {
         }
         (body, None)
     }
+}
+
+/// A `note` statement, which the line-read kinds read alike (PCLS-8, PSTA-6, PDSC-6).
+#[derive(Debug, PartialEq)]
+pub(crate) enum NoteStmt {
+    /// `note "text" as N`, or `note as N` ... `end note`: a note of its own, `N` its id.
+    Free {
+        id: Option<String>,
+        text: String,
+        range: TextRange,
+    },
+    /// `note on link : text`: more label for the last link.
+    OnLink { text: String },
+    /// `note left of A : text`, or a block to `end note`; with no `of`, the target is the
+    /// element declared last. `target` is as written, for the kind to resolve.
+    Attached {
+        side: NoteSide,
+        target: Option<String>,
+        text: String,
+        range: TextRange,
+    },
+}
+
+/// The end of a note's target at the start of `s`: a bracketed `(x)`, `[x]`, `:x:`, a quoted
+/// name, or a name.
+fn note_target(s: &str) -> Option<(&str, &str)> {
+    let close = match s.as_bytes().first()? {
+        b'(' => ')',
+        b'[' => ']',
+        b':' => ':',
+        _ => {
+            let (_, _, rest) = name(s)?;
+            let end = s.len() - rest.len();
+            return Some((s[..end].trim_end(), rest));
+        }
+    };
+    let end = s[1..].find(close)? + 2;
+    Some((&s[..end], s[end..].trim_start()))
+}
+
+/// Reads a `note` statement and its block, if it has one; `None` after an error.
+pub(crate) fn note(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) -> Option<NoteStmt> {
+    let r = line.after_word();
+    let side_word = word(r).to_ascii_lowercase();
+    let side = match side_word.as_str() {
+        "left" | "top" => Some(NoteSide::Before),
+        "right" | "bottom" => Some(NoteSide::After),
+        _ => None,
+    };
+    let r = if side.is_some() {
+        r[side_word.len()..].trim_start()
+    } else {
+        r
+    };
+    let on_link = side.is_none() && keyword(r, "on").is_some_and(|x| keyword(x, "link").is_some());
+    let (target, r) = match keyword(r, "of").and_then(note_target) {
+        Some((t, rest)) if side.is_some() => (Some(t.to_owned()), rest),
+        _ => (None, r),
+    };
+    let r = if on_link {
+        r.splitn(3, ' ').nth(2).unwrap_or("").trim_start()
+    } else {
+        r
+    };
+    // A `#color` is not drawn.
+    let r = match r.strip_prefix('#') {
+        Some(c) => c[c.find([' ', ':']).unwrap_or(c.len())..].trim_start(),
+        None => r,
+    };
+    let mut block = || {
+        let (body, end) = cursor.until(&["end note", "endnote"]);
+        let Some(end) = end else {
+            d.push(Diagnostic::new(
+                line.range,
+                "unclosed `note`: expected `end note`",
+            ));
+            return None;
+        };
+        let body: Vec<&str> = body.iter().map(|l| l.text.as_str()).collect();
+        Some((text(&body.join("\n")), line.range.cover(end.range)))
+    };
+    if side.is_none() && !on_link {
+        let (inline, alias) = if let Some(body) = r.strip_prefix('"') {
+            let close = body.find('"').unwrap_or(body.len());
+            let alias = keyword(body.get(close + 1..).unwrap_or("").trim_start(), "as");
+            (Some(text(&body[..close])), alias)
+        } else {
+            (None, keyword(r, "as"))
+        };
+        let (text, range) = match inline {
+            Some(t) => (t, line.range),
+            None => block()?,
+        };
+        let id = alias
+            .map(str::trim)
+            .filter(|a| !a.is_empty())
+            .map(str::to_owned);
+        return Some(NoteStmt::Free { id, text, range });
+    }
+    let (text, range) = match r.strip_prefix(':') {
+        Some(t) => (text(t.trim()), line.range),
+        None => block()?,
+    };
+    if on_link {
+        return Some(NoteStmt::OnLink { text });
+    }
+    Some(NoteStmt::Attached {
+        side: side.unwrap_or(NoteSide::After),
+        target,
+        text,
+        range,
+    })
+}
+
+pub(crate) const LINK_NOTE: &str = "a note on a link needs a link before it; ignoring it";
+
+/// Adds a `note on link` to the last edge's label; `false` with no edge.
+pub(crate) fn link_note(chart: &mut Flowchart, text: String) -> bool {
+    let Some(edge) = chart.edges.last_mut() else {
+        return false;
+    };
+    edge.label = Some(Label::plain(match edge.label.take() {
+        Some(l) => format!("{}\n{text}", l.text),
+        None => text,
+    }));
+    true
 }
 
 /// What a statement every kind shares did.

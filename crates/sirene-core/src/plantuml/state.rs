@@ -5,10 +5,10 @@ use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
-use super::lines::{self, Common, Cursor, Line, id_of, keyword, name};
+use super::lines::{self, Common, Cursor, Line, NoteStmt, id_of, name};
 use super::link::{self, Link};
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::{Edge, Flowchart, Label, Node, Note, NoteSide, Row, Shape, Style, Subgraph};
+use crate::flowchart::{Edge, Flowchart, Label, Node, Note, Row, Shape, Style, Subgraph};
 use crate::lines::MAX_DEPTH;
 use crate::syntax::SyntaxNode;
 
@@ -405,79 +405,33 @@ impl Lower {
     /// Notes (PSTA-6): `note left of S : text` or a block to `end note`, `note left : text`
     /// after a declaration, `note "text" as N`, and `note on link`.
     fn note(&mut self, line: &Line, cursor: &mut Cursor) {
-        let r = line.after_word();
-        let side_word = lines::word(r).to_ascii_lowercase();
-        let side = match side_word.as_str() {
-            "left" | "top" => Some(NoteSide::Before),
-            "right" | "bottom" => Some(NoteSide::After),
-            _ => None,
-        };
-        let r = if side.is_some() {
-            r[side_word.len()..].trim_start()
-        } else {
-            r
-        };
-        let on_link =
-            side.is_none() && keyword(r, "on").is_some_and(|x| keyword(x, "link").is_some());
-        let (target, r) = match keyword(r, "of").and_then(name) {
-            Some((id, _, rest)) if side.is_some() => (Some(id), rest),
-            _ => (None, r),
-        };
-        let r = if on_link {
-            r.splitn(3, ' ').nth(2).unwrap_or("").trim_start()
-        } else {
-            r
-        };
-        let r = match r.strip_prefix('#') {
-            Some(c) => c[c.find([' ', ':']).unwrap_or(c.len())..].trim_start(),
-            None => r,
-        };
-        if side.is_none() && !on_link {
-            let (text, alias) = if let Some(body) = r.strip_prefix('"') {
-                let close = body.find('"').unwrap_or(body.len());
-                let alias = keyword(body.get(close + 1..).unwrap_or("").trim_start(), "as");
-                (Some(lines::text(&body[..close])), alias)
-            } else {
-                (None, keyword(r, "as"))
-            };
-            let (text, range) = match text {
-                Some(t) => (t, line.range),
-                None => match self.block(line, cursor) {
-                    Some(b) => b,
-                    None => return,
-                },
-            };
-            let id = match alias {
-                Some(a) if !a.trim().is_empty() => a.trim().to_owned(),
-                _ => format!("note:{}", self.chart.nodes.len()),
-            };
-            let scope = self.scope();
-            let i = self.node(&id, &scope, Shape::Note, Label::default());
-            self.chart.nodes[i].label = Label::plain(text);
-            self.chart.nodes[i].shape = Shape::Note;
-            self.chart.nodes[i].mentions.push(range);
+        let Some(stmt) = lines::note(line, cursor, &mut self.d) else {
             return;
-        }
-        let (text, range) = match r.strip_prefix(':') {
-            Some(text) => (lines::text(text.trim()), line.range),
-            None => match self.block(line, cursor) {
-                Some(b) => b,
-                None => return,
-            },
         };
-        if on_link {
-            let Some(edge) = self.chart.edges.last_mut() else {
-                return self.warn(
-                    line.range,
-                    "a note on a link needs a link before it; ignoring it",
-                );
-            };
-            edge.label = Some(Label::plain(match edge.label.take() {
-                Some(l) => format!("{}\n{text}", l.text),
-                None => text,
-            }));
-            return;
-        }
+        let (side, target, text, range) = match stmt {
+            NoteStmt::Free { id, text, range } => {
+                let id = id.unwrap_or_else(|| format!("note:{}", self.chart.nodes.len()));
+                let scope = self.scope();
+                let i = self.node(&id, &scope, Shape::Note, Label::default());
+                self.chart.nodes[i].label = Label::plain(text);
+                self.chart.nodes[i].shape = Shape::Note;
+                self.chart.nodes[i].mentions.push(range);
+                return;
+            }
+            NoteStmt::OnLink { text } => {
+                if !lines::link_note(&mut self.chart, text) {
+                    self.warn(line.range, lines::LINK_NOTE);
+                }
+                return;
+            }
+            NoteStmt::Attached {
+                side,
+                target,
+                text,
+                range,
+            } => (side, target, text, range),
+        };
+        let target = target.and_then(|t| name(&t).map(|n| n.0));
         let target = match target.or_else(|| self.last.clone()) {
             Some(t) => t,
             None => {
@@ -493,20 +447,10 @@ impl Lower {
         }
         self.chart.notes.push(Note {
             target,
-            side: side.unwrap_or(NoteSide::After),
+            side,
             label: Label::plain(text),
             range,
         });
-    }
-
-    fn block(&mut self, line: &Line, cursor: &mut Cursor) -> Option<(String, TextRange)> {
-        let (body, end) = cursor.until(&["end note", "endnote"]);
-        let Some(end) = end else {
-            self.error(line.range, "unclosed `note`: expected `end note`");
-            return None;
-        };
-        let text: Vec<&str> = body.iter().map(|l| l.text.as_str()).collect();
-        Some((lines::text(&text.join("\n")), line.range.cover(end.range)))
     }
 
     /// The containers holding `id`, outermost first.

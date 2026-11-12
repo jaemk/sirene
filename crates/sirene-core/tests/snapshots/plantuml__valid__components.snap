@@ -1,0 +1,33 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\npackage \"Front end\" {\n  [Web app] as Web\n  [Admin]\n}\nnode \"App server\" {\n  [Api] <<service>>\n  () REST\n}\ndatabase Orders\nWeb --> REST\nAdmin --> REST\nREST - [Api]\n[Api] ..> Orders : reads\nnote left of Orders\n  primary\n  replica\nend note\n@enduml\n"
+---
+
+┌─────── Front end ───────┐
+│                         │
+│ ┌─────────┐   ┌───────┐ │
+│ │ Web app │   │ Admin │ │
+│ └────┬────┘   └───┬───┘ │
+│      │            │     │
+└──────┼────────────┼─────┘
+       │            │
+       └──┐       ┌─┘
+          │       │
+          │       │
+          └─┐  ┌──┘
+            │  │
+        ┌───┼──┼─── App server ────┐
+        │   ▼  ▼                   │
+        │ ╭──────╮   ┌───────────┐ │
+        │ ( REST ├───┤ «service» │ │
+        │ ╰──────╯   │    Api    │ │
+        │            └─────┬─────┘ │
+        │                  ┆       │
+        └──────────────────┼───────┘
+                           ┆
+                         reads
+                           ▼
+         ┌─────────╮  ╭────────╮
+         │ primary │  ├────────┤
+         │ replica │┄┄│ Orders │
+         └─────────┘  ╰────────╯

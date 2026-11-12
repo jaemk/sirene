@@ -268,6 +268,68 @@ fn state_statement() -> impl Strategy<Value = String> {
     })
 }
 
+/// Use case, component, and deployment statements, with containers holding more of them.
+fn description_statement() -> impl Strategy<Value = String> {
+    let ends = || {
+        prop::sample::select(vec![
+            "A",
+            "Card",
+            ":Actor:",
+            "(Use)",
+            "(Use two)",
+            "[Comp]",
+            "[Comp-1]",
+            "() I",
+            "\"Long\"",
+            "Box",
+        ])
+    };
+    let arrows = prop::sample::select(vec![
+        "-->",
+        "->",
+        "..>",
+        ".>",
+        "--",
+        "-up->",
+        "-left->",
+        "<--",
+        "-[#red,dashed]->",
+        "--->",
+    ]);
+    let decls = prop::sample::select(vec![
+        "actor A",
+        "actor :Long actor: as LA <<Human>>",
+        "usecase (Use one) as U1",
+        "(Use)",
+        "(Use) #pink",
+        "[Comp]",
+        "[Comp] as C2 <<service>>",
+        "() I",
+        "component C3 [\n  multi\n  line\n]",
+        "node N #lightblue",
+        "database Db",
+        "cloud Net",
+        "queue Q",
+        "artifact \"app.jar\" as Jar",
+        "label \"text\"",
+        "note right of A : n",
+        "note left of (Use) : n",
+        "note \"free\" as NF",
+        "skinparam actorStyle hollow",
+    ]);
+    let simple = prop_oneof![
+        decls.prop_map(str::to_owned),
+        (ends(), arrows, ends()).prop_map(|(a, arrow, b)| format!("{a} {arrow} {b} : x")),
+    ];
+    simple.prop_recursive(3, 24, 4, |inner| {
+        (
+            prop::sample::select(vec!["package P", "node \"App\" as App", "rectangle R"]),
+            prop::collection::vec(inner, 0..4),
+        )
+            .prop_map(|(name, body)| format!("{name} {{\n{}\n}}", body.join("\n")))
+    })
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2000))]
 
@@ -319,6 +381,19 @@ proptest! {
             .filter(|d| !d.message.starts_with("transitions between concurrent regions"))
             .collect();
         prop_assert!(others.is_empty(), "{:?}\n{}", others, src);
+        check(&diagram)?;
+    }
+
+    #[test]
+    fn generated_descriptions_lower_and_draw(
+        stmts in prop::collection::vec(description_statement(), 0..8),
+    ) {
+        let src = format!("@startuml\n[Anchor]\n{}\n@enduml\n", stmts.join("\n"));
+        let parse = plantuml::parse(&src);
+        prop_assert_eq!(parse.kind(), plantuml::Kind::Description);
+        prop_assert_eq!(parse.syntax().to_string(), src.clone());
+        let (diagram, diagnostics) = parse.lower();
+        prop_assert!(diagnostics.is_empty(), "{:?}\n{}", diagnostics, src);
         check(&diagram)?;
     }
 

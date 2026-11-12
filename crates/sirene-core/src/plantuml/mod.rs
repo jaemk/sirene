@@ -3,6 +3,7 @@
 
 mod activity;
 mod class;
+mod description;
 mod detect;
 mod lines;
 mod link;
@@ -23,7 +24,7 @@ use crate::syntax::SyntaxNode;
 pub(crate) fn supported(kind: Kind) -> bool {
     matches!(
         kind,
-        Kind::Sequence | Kind::Activity | Kind::Class | Kind::State
+        Kind::Sequence | Kind::Activity | Kind::Class | Kind::State | Kind::Description
     )
 }
 
@@ -65,6 +66,10 @@ impl Parse {
             }
             Kind::State => {
                 let (chart, d) = state::lower(&root);
+                (Diagram::Graph(chart), d)
+            }
+            Kind::Description => {
+                let (chart, d) = description::lower(&root);
                 (Diagram::Graph(chart), d)
             }
             Kind::Sequence => {

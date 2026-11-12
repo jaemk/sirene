@@ -1,0 +1,19 @@
+@startuml
+package "Front end" {
+  [Web app] as Web
+  [Admin]
+}
+node "App server" {
+  [Api] <<service>>
+  () REST
+}
+database Orders
+Web --> REST
+Admin --> REST
+REST - [Api]
+[Api] ..> Orders : reads
+note left of Orders
+  primary
+  replica
+end note
+@enduml

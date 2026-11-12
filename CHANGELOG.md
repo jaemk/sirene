@@ -43,6 +43,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - PlantUML state diagrams: start and end states, descriptions below the name, colors,
   `<<choice>>`, `<<fork>>`, `<<join>>`, history states, composite states with concurrent
   regions (`--`, `||`), styled transitions, and notes.
+- PlantUML use case, component, and deployment diagrams: actors, use cases, components,
+  interfaces, and the deployment element shapes (`node`, `database`, `cloud`, `queue`,
+  `artifact`, ...), the `:x:`, `(x)`, `[x]`, and `() x` short forms, stereotypes, colors,
+  descriptions, nested containers, styled links, notes, and `skinparam actorStyle`.
 - Notes on composite states in state diagrams, and class diagram notes with no class
   (`note "text"`), which draw as a note box of their own.
 - Mermaid themes: a diagram's `theme` and `themeVariables` (including `fontSize`) from its
