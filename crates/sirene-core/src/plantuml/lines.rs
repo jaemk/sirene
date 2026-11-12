@@ -453,9 +453,11 @@ pub(crate) fn common(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) 
                 format!("`!{name}` reads other files and is not supported"),
             ));
         } else {
+            // `!$a = 1` is named by its whole first token, not an empty directive.
+            let shown = t.split_whitespace().next().unwrap_or(t);
             d.push(Diagnostic::warning(
                 r,
-                format!("`!{name}` is not supported; ignoring the line"),
+                format!("`{shown}` is not supported; ignoring the line"),
             ));
         }
         return Common::Done;
@@ -688,6 +690,27 @@ mod tests {
             Common::Done
         ));
         assert_eq!(c.next().map(|l| l.text), Some("A -> B".to_owned()));
+    }
+
+    #[test]
+    fn common_preprocessor_lines() {
+        let message = |s: &str| {
+            let mut d = Vec::new();
+            common(&ln(s), &mut cursor(&[]), &mut d);
+            d[0].message.clone()
+        };
+        assert_eq!(
+            message("!include x.puml"),
+            "`!include` reads other files and is not supported"
+        );
+        assert_eq!(
+            message("!define X 1"),
+            "`!define` is not supported; ignoring the line"
+        );
+        assert_eq!(
+            message("!$a = 1"),
+            "`!$a` is not supported; ignoring the line"
+        );
     }
 
     #[test]

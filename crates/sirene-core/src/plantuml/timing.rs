@@ -185,6 +185,8 @@ impl Lower {
             pulse: None,
             offset: 0.0,
         };
+        // A bad `period` or `pulse` was already reported.
+        let mut bad_clock = false;
         while i < words.len() {
             let w = words[i].to_ascii_lowercase();
             let arg = words.get(i + 1).and_then(|v| real(v));
@@ -196,6 +198,16 @@ impl Lower {
                 }
                 ("pulse", Some(v)) if v >= 0.0 => {
                     clock.pulse = Some(v);
+                    i += 2;
+                }
+                ("period" | "pulse", _) => {
+                    let what = if w == "period" {
+                        "a clock's period is a number above 0"
+                    } else {
+                        "a clock's pulse is a number of 0 or more"
+                    };
+                    self.d.push(Diagnostic::new(line.range_of(words[i]), what));
+                    bad_clock = true;
                     i += 2;
                 }
                 ("offset", Some(v)) => {
@@ -228,7 +240,7 @@ impl Lower {
         if kind == SignalKind::Clock {
             if clock.period > 0.0 {
                 s.clock = Some(clock);
-            } else {
+            } else if !bad_clock {
                 self.d
                     .push(Diagnostic::new(line.range, "a clock needs `with period N`"));
             }
@@ -675,6 +687,17 @@ mod tests {
         assert_eq!(at, [90.0, 55.0]);
         let (_, d) = lower_src("concise A\n@:b-5\nA is x");
         assert_eq!(d, ["no moment is named `:b`"]);
+    }
+
+    #[test]
+    fn bad_clock_settings() {
+        let (_, d) = lower_src("clock C with period 0");
+        assert_eq!(d, ["a clock's period is a number above 0"]);
+        let (t, d) = lower_src("clock C with period 4 pulse -1");
+        assert_eq!(d, ["a clock's pulse is a number of 0 or more"]);
+        assert!(t.signals[0].clock.is_some());
+        let (_, d) = lower_src("clock C");
+        assert_eq!(d, ["a clock needs `with period N`"]);
     }
 
     #[test]

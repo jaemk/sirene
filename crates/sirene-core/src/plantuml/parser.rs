@@ -62,6 +62,9 @@ const KEYWORDS: &[&str] = &[
     "autoactivate",
     "caption",
     "mainframe",
+    "scale",
+    "skin",
+    "set",
 ];
 
 struct Parser<'a> {

@@ -150,7 +150,8 @@ impl Json<'_> {
                     .find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '-' | '+' | '.')))
                     .unwrap_or(rest.len());
                 let word = &rest[..len];
-                let number = word.parse::<f64>().is_ok_and(f64::is_finite)
+                // Drawn as written, so a number out of `f64` range is still a number.
+                let number = word.parse::<f64>().is_ok()
                     && !word.starts_with('+')
                     && !word.contains(|c: char| c.is_ascii_alphabetic() && c != 'e' && c != 'E');
                 if !(number || matches!(word, "true" | "false" | "null")) {
@@ -243,12 +244,19 @@ impl Json<'_> {
                         'n' | 'r' | 't' => out.push(' '),
                         'b' | 'f' => {}
                         'u' => {
-                            let hex: String = chars.by_ref().take(4).map(|(_, c)| c).collect();
-                            let c = u32::from_str_radix(&hex, 16)
-                                .ok()
-                                .and_then(char::from_u32)
-                                .unwrap_or('\u{fffd}');
-                            out.push(c);
+                            let mut c = hex4(&mut chars);
+                            // A high surrogate joins the low one after it.
+                            if let Some(high @ 0xd800..=0xdbff) = c {
+                                let mut ahead = chars.clone();
+                                if let (Some((_, '\\')), Some((_, 'u'))) =
+                                    (ahead.next(), ahead.next())
+                                    && let Some(low @ 0xdc00..=0xdfff) = hex4(&mut ahead)
+                                {
+                                    chars = ahead;
+                                    c = Some(0x10000 + ((high - 0xd800) << 10) + (low - 0xdc00));
+                                }
+                            }
+                            out.push(c.and_then(char::from_u32).unwrap_or('\u{fffd}'));
                         }
                         other => out.push(other),
                     }
@@ -259,6 +267,19 @@ impl Json<'_> {
         self.fail((at(start, 1), "the string has no closing `\"`".into()));
         None
     }
+}
+
+/// The value of up to four hex digits after `\u`, taking only the digits; `None` unless there
+/// are four.
+fn hex4(chars: &mut std::str::CharIndices<'_>) -> Option<u32> {
+    let mut v = 0;
+    for _ in 0..4 {
+        let mut ahead = chars.clone();
+        let d = ahead.next().and_then(|(_, c)| c.to_digit(16))?;
+        *chars = ahead;
+        v = v * 16 + d;
+    }
+    Some(v)
 }
 
 /// The document's value, if any, and the first error.
@@ -792,6 +813,19 @@ mod tests {
         assert_eq!(scalar(p[3].1), "-2.5e3");
         assert_eq!(json("  "), (None, None));
         assert_eq!(scalar(&json("\"\\u0041\"").0.unwrap()), "A");
+    }
+
+    #[test]
+    fn json_escapes_and_big_numbers() {
+        let s = |src: &str| scalar(&json(src).0.unwrap()).to_owned();
+        // A surrogate pair is one character; a lone surrogate is a replacement character.
+        assert_eq!(s(r#""\ud83d\ude00""#), "\u{1f600}");
+        assert_eq!(s(r#""\ud83dx""#), "\u{fffd}x");
+        assert_eq!(s(r#""\ud83d\u0041""#), "\u{fffd}A");
+        // A short `\u` escape stops at the closing quote.
+        assert_eq!(s(r#""\u12""#), "\u{fffd}");
+        assert_eq!(s(r#""\u12g""#), "\u{fffd}g");
+        assert_eq!(s("1e999999"), "1e999999");
     }
 
     #[test]

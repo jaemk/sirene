@@ -625,9 +625,12 @@ impl Lower {
                     format!("`!{directive}` reads other files and is not supported"),
                 );
             } else {
+                // `!$a = 1` is named by its whole first token, not an empty directive.
+                let text = stmt.text().to_string();
+                let shown = text.split_whitespace().next().unwrap_or("!");
                 self.warning(
                     range,
-                    format!("`!{directive}` is not supported; ignoring the line"),
+                    format!("`{shown}` is not supported; ignoring the line"),
                 );
             }
             return;
@@ -1228,6 +1231,14 @@ mod tests {
             .filter(|e| matches!(e, Event::Deactivate(_)))
             .count();
         assert_eq!(drawn, MAX_DEPTH);
+    }
+
+    #[test]
+    fn scale_and_skin_are_ignored() {
+        let (seq, d) = lowered("@startuml\nscale 2\nskin rose\nscale -> B\n@enduml\n");
+        assert!(errors(&d).is_empty(), "{d:?}");
+        assert_eq!(d.len(), 2, "{d:?}");
+        assert_eq!(numbers(&seq).len(), 1, "`scale -> B` is a message");
     }
 
     #[test]
