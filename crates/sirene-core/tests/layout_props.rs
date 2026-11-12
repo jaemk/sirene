@@ -2,7 +2,7 @@
 
 use proptest::prelude::*;
 use sirene_core::ascii;
-use sirene_core::flowchart::Direction;
+use sirene_core::flowchart::{Direction, RankEnd};
 use sirene_core::layout::{
     ClusterSpec, Config, EdgeSpec, Graph, Item, Layout, NodeSpec, Point, Rect, Size, Spacing,
     layout,
@@ -111,14 +111,26 @@ fn graph() -> impl Strategy<Value = Graph> {
         } else {
             prop::collection::vec(prop::collection::vec(0..n, 0..4), 0..3).boxed()
         };
-        (direction(), clusters, nodes, edges, same_rank).prop_map(
-            |(direction, clusters, nodes, edges, same_rank)| Graph {
+        let end_ranks = if n == 0 {
+            Just(Vec::new()).boxed()
+        } else {
+            let end = prop::sample::select(vec![
+                RankEnd::Min,
+                RankEnd::Max,
+                RankEnd::Source,
+                RankEnd::Sink,
+            ]);
+            prop::collection::vec((end, prop::collection::vec(0..n, 0..3)), 0..3).boxed()
+        };
+        (direction(), clusters, nodes, edges, (same_rank, end_ranks)).prop_map(
+            |(direction, clusters, nodes, edges, (same_rank, end_ranks))| Graph {
                 direction,
                 nodes,
                 clusters,
                 edges,
                 notes: Vec::new(),
                 same_rank,
+                end_ranks,
             },
         )
     })

@@ -38,7 +38,10 @@ least `2 * min_len` ranks, and ranks are chosen to shorten edges. An edge label 
 middle rank of its edge.
 
 The nodes of a `same_rank` group that are directly in one container share a rank, and an edge
-without `constraint` takes no part in ranking. An edge whose ends then share a rank, or one of
+without `constraint` takes no part in ranking. The nodes of the `end_ranks` groups of one kind
+in a container share a rank too: `Min` the first and `Max` the last, which other items may
+share, and `Source` one above and `Sink` one below every other item. An edge into a `Min` or
+`Source` group, or out of a `Max` or `Sink` group, is ranked as if reversed. An edge whose ends then share a rank, or one of
 length 0, is flat. A flat edge between two neighboring nodes with nothing on their facing sides
 is a straight line, one per pair; another leaves the bottom of one end and runs through a track
 in the gap below the rank (a gap added below the last rank if needed) to the bottom of the

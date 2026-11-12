@@ -140,6 +140,17 @@ impl Flowchart {
                         .collect()
                 })
                 .collect(),
+            end_ranks: self
+                .end_ranks
+                .iter()
+                .map(|(end, group)| {
+                    let group = group
+                        .iter()
+                        .filter_map(|id| nodes.get(id.as_str()).copied())
+                        .collect();
+                    (*end, group)
+                })
+                .collect(),
         }
     }
 }

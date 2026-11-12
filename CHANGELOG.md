@@ -14,6 +14,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and end labels. Attributes that are not drawn are warnings.
 - DOT `rank=same` subgraphs, `constraint=false`, and `minlen=0`: nodes share a rank, and edges
   between them run straight across, below the rank, or up through a label above it.
+- DOT `rank=min`, `max`, `source`, and `sink` subgraphs: nodes go in the first or last rank,
+  or a rank of their own above or below every other node.
 - `--lang mermaid|dot` reads every diagram as that language. Without it, a file's extension
   (`.dot`, `.gv`, `.mmd`, `.mermaid`) or a Markdown block's name picks the language in the CLI
   and the editor, and other sources are detected from their first line.

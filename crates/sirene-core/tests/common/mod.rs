@@ -61,7 +61,8 @@ pub fn check_model(c: &Flowchart) -> Result<(), TestCaseError> {
         prop_assert!(known(&e.from) && known(&e.to), "dangling edge {:?}", e);
         prop_assert!(e.length <= 10);
     }
-    for group in &c.same_rank {
+    let ends = c.end_ranks.iter().map(|(_, g)| g);
+    for group in c.same_rank.iter().chain(ends) {
         for id in group {
             prop_assert!(known(id), "rank group names a missing node {:?}", id);
         }

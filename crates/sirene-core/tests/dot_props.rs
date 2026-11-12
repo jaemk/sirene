@@ -62,7 +62,7 @@ fn attr() -> impl Strategy<Value = String> {
         "circle", "plaintext", "nope", "\"filled,rounded\"", "\"dashed,bold\"", "invis", "dotted",
         "red", "\"#12345678\"", "\"0.5 1 1\"", "\"nan nan nan\"", "\"/x11/navy\"", "transparent",
         "0", "3", "99", "-1", "nan", "inf", "back", "both", "none", "forward", "odiamond", "crow",
-        "LR", "BT", "same", "min", "false", "no",
+        "LR", "BT", "same", "min", "max", "source", "sink", "false", "no",
     ]);
     (keys, values).prop_map(|(k, v)| format!("{k}={v}"))
 }
