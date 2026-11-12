@@ -597,7 +597,12 @@ impl Lower {
         if let Some(directive) = kw.strip_prefix('!') {
             if matches!(
                 directive,
-                "include" | "includeurl" | "includesub" | "import"
+                "include"
+                    | "includeurl"
+                    | "includesub"
+                    | "include_many"
+                    | "include_once"
+                    | "import"
             ) {
                 self.error(
                     range,

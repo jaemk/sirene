@@ -60,11 +60,11 @@ by PSEQ.
 
 ## PUML-4 Preprocessor and settings
 
-`!include`, `!includeurl`, and `!import` read other files or the network and are not followed:
-each is an error naming it. `!define`, `!function`, variables, and conditionals are research:
-they may be worth a small evaluator, since real files use them. `skinparam` maps a subset (colors,
-fonts, and the monochrome and handwritten switches as warnings) to the theme; the rest are
-warnings. `!theme` is a warning.
+`!include`, `!includeurl`, `!includesub`, `!include_many`, `!include_once`, and `!import` read
+other files or the network and are not followed: each is an error naming it. `!define`,
+`!function`, variables, and conditionals are research: they may be worth a small evaluator,
+since real files use them. `skinparam` is a warning, except `actorStyle` in use case diagrams;
+mapping colors and fonts to the theme is research. `!theme` is a warning.
 
 ## PUML-5 Open questions
 

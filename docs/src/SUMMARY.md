@@ -61,6 +61,7 @@
 # Other languages
 
 - [Graphviz DOT](dot.md)
+- [PlantUML](plantuml.md)
 
 # Project
 

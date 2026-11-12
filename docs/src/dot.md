@@ -56,6 +56,11 @@ drawing side. Only the first graph in a file is drawn.
 | `color`, `fillcolor`, `fontcolor`, `penwidth` | border, fill, text color, line width |
 | `label`, `headlabel`, `taillabel` | labels, with `\n`, `\l`, `\N`, `\G`, `\E`, `\T`, `\H` |
 | `arrowhead`, `arrowtail`, `dir`, `minlen` | end markers, which ends have them, and rank span |
+| `rank=same`, `min`, `max`, `source`, `sink` | nodes sharing a rank, or in the first or last |
+| `constraint=false`, `group`, `ordering` | edges that do not rank, straight edges in a group, source order |
+| `compound=true` with `lhead`, `ltail` | edges ending at a cluster's border |
+| `a:e`, `a:p`, `tailport`, `headport` | compass ports; record ports with `rankdir=LR` or `RL` |
+| HTML `<TABLE>` node labels | compartments, with `<HR/>` sections and `PORT` cells |
 
 Colors are X11 names, `#rrggbb`, `#rrggbbaa`, or `H,S,V` fractions. See
 `spec/graphviz-dot.md` for the full list of shapes and arrows.
@@ -68,6 +73,7 @@ second graph in a file are warnings, each once.
 
 ## Not drawn
 
-The layout is sirene's, not Graphviz's. `rank=same` and the other `rank` values, `constraint`,
-ports, `group`, `compound` with `lhead` and `ltail`, `ordering`, images, node sizes, and fonts are
-warned about and ignored. HTML labels are drawn as their text.
+The layout is sirene's, not Graphviz's. Record ports in top-down graphs (the edge joins the
+node), images, node sizes, fonts, and other engines' layout attributes (`pos`, `overlap`,
+`splines`) are warned about and ignored. HTML labels other than node tables are drawn as their
+text.
