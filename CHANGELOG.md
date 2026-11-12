@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-12
+
 ### Added
 
 - Graphviz DOT: `graph`, `digraph`, and `strict` sources, `.dot` and `.gv` files in
