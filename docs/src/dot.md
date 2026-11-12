@@ -59,7 +59,7 @@ drawing side. Only the first graph in a file is drawn.
 | `rank=same`, `min`, `max`, `source`, `sink` | nodes sharing a rank, or in the first or last |
 | `constraint=false`, `group`, `ordering` | edges that do not rank, straight edges in a group, source order |
 | `compound=true` with `lhead`, `ltail` | edges ending at a cluster's border |
-| `a:p`, `a:e`, `tailport`, `headport` | record and compass ports |
+| `a:e`, `a:p`, `tailport`, `headport` | compass ports; record ports with `rankdir=LR` or `RL` |
 | HTML `<TABLE>` node labels | compartments, with `<HR/>` sections and `PORT` cells |
 
 Colors are X11 names, `#rrggbb`, `#rrggbbaa`, or `H,S,V` fractions. See
