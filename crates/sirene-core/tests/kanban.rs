@@ -9,7 +9,7 @@ use sirene_core::Severity;
 use sirene_core::ascii::{Charset, Options};
 use sirene_core::diagram::{self, Diagram, Kind, Lowered};
 use sirene_core::kanban::{self, Kanban, Priority};
-use sirene_core::scene::{Approx, Owner, Primitive, Pt, Scene, Theme};
+use sirene_core::scene::{Approx, Owner, Primitive, Pt, Scene, TextMetrics, Theme};
 
 fn fixtures(dir: &str) -> Vec<(String, String)> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/kanban");
@@ -222,4 +222,17 @@ fn drawing() {
     for (_, p) in &t {
         assert!(p.x > 0.0 && p.x < s.width && p.y > 0.0 && p.y < s.height);
     }
+    // A long ticket and assignee are cut to share the card's width, without overlapping.
+    let long = "x".repeat(200);
+    let src = format!(
+        "kanban\n  todo[To do]\n    a[One]@{{ ticket: PROJ-{long}, assigned: \"A Very Long {long}\" }}\n"
+    );
+    let s = diagram::lower(&src).diagram.scene(&Approx, &Theme::LIGHT);
+    let t = texts(&s);
+    let ticket = t.iter().find(|(s, _)| s.starts_with("PROJ-")).unwrap();
+    let who = t.iter().find(|(s, _)| s.starts_with("A Very")).unwrap();
+    assert!(ticket.0.ends_with("...") && who.0.ends_with("..."), "{t:?}");
+    let w = |s: &str| Approx.width(s, Theme::LIGHT.font_size - 2.0);
+    assert!(ticket.1.x + w(&ticket.0) / 2.0 < who.1.x - w(&who.0) / 2.0);
+    assert!(who.1.x + w(&who.0) / 2.0 <= s.width);
 }

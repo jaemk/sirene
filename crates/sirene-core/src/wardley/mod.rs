@@ -12,6 +12,12 @@ use crate::flowchart::text;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxElement, SyntaxNode, SyntaxToken};
 
+/// The smallest `size` side: smaller leaves no room inside the padding.
+const MIN_SIZE: f64 = 100.0;
+
+/// The largest `size` side.
+const MAX_SIZE: f64 = 20000.0;
+
 /// What a node is drawn as.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
@@ -312,7 +318,16 @@ impl Parse {
         };
         for n in &of("size") {
             if let [w, h] = numbers(n, COORDS)[..] {
-                map.size = Some((w as f32, h as f32));
+                if [w, h].iter().all(|v| (MIN_SIZE..=MAX_SIZE).contains(v)) {
+                    map.size = Some((w as f32, h as f32));
+                } else {
+                    lw.diagnostics.push(Diagnostic::warning(
+                        n.text_range(),
+                        format!(
+                            "a map size must be from {MIN_SIZE} to {MAX_SIZE}; using the default"
+                        ),
+                    ));
+                }
             }
         }
         for n in &of("evolution") {
@@ -324,11 +339,19 @@ impl Parse {
                     .map(|t| unquote(t.text()))
                     .collect();
                 map.stages.push(names.join(" / "));
-                if let Some(b) = tokens(&stage)
-                    .find(|t| t.kind() == NUMBER)
-                    .and_then(|t| t.text().parse().ok())
+                if let Some(t) = tokens(&stage).find(|t| t.kind() == NUMBER)
+                    && let Ok(b) = t.text().parse::<f64>()
                 {
-                    map.boundaries.push(b);
+                    // A fraction of the axis, after the one before it.
+                    let low = map.boundaries.last().copied().unwrap_or(0.0);
+                    if (low..=1.0).contains(&b) {
+                        map.boundaries.push(b);
+                    } else {
+                        lw.diagnostics.push(Diagnostic::new(
+                            t.text_range(),
+                            format!("a stage boundary must be from {low} to 1; got {b}"),
+                        ));
+                    }
                 }
             }
         }
@@ -412,8 +435,16 @@ impl Parse {
                 });
                 components.push(i);
             }
-            map.pipelines.retain(|p| p.parent != parent);
-            map.pipelines.push(Pipeline { parent, components });
+            // A pipeline declared again keeps its place, as Mermaid's `Map.set` does.
+            let pipeline = Pipeline { parent, components };
+            match map
+                .pipelines
+                .iter_mut()
+                .find(|p| p.parent == pipeline.parent)
+            {
+                Some(old) => *old = pipeline,
+                None => map.pipelines.push(pipeline),
+            }
         }
         for n in &of("->") {
             self.link(&mut map, &mut lw, n);
@@ -437,8 +468,10 @@ impl Parse {
                 continue;
             };
             let y = map.nodes[node].y;
-            map.trends.retain(|t| t.node != node);
-            map.trends.push(Trend { node, x, y });
+            match map.trends.iter_mut().find(|t| t.node == node) {
+                Some(old) => *old = Trend { node, x, y },
+                None => map.trends.push(Trend { node, x, y }),
+            }
         }
         if let Some(n) = of("annotations").first() {
             map.annotations_box = lw.coords(n, "the annotations box");

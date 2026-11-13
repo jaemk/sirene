@@ -40,7 +40,9 @@ label. Tests: `model`, `pipelines`.
 
 ## MWARD-3 Problems
 
-A coordinate over 100 is an error. A pipeline for a component not declared before it is an
+A coordinate over 100 is an error, and so is a stage `@position` outside 0 to 1 or before
+the stage before it (the stages are then spaced evenly). A `size` outside 100 to 20000 is a
+warning, and the default size is used. A pipeline for a component not declared before it is an
 error. A link or `evolve` naming an unknown component is a warning, and it is left out. Tests:
 `problems`.
 

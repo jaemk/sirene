@@ -28,11 +28,34 @@ pub(super) fn priority_color(p: Priority) -> Color {
     })
 }
 
-/// A card as laid out: its label's lines, its ticket and assignee, and its height.
-struct CardBox<'a> {
+/// `s` cut short with `...` to fit `max` at `size` (just `...` when nothing more fits).
+fn fit(metrics: &impl TextMetrics, s: &str, size: f32, max: f32) -> String {
+    if metrics.width(s, size) <= max {
+        return s.to_owned();
+    }
+    let ends: Vec<usize> = s.char_indices().map(|(i, _)| i).skip(1).collect();
+    // The longest prefix that fits with `...`, by binary search over its end.
+    let (mut lo, mut hi) = (0, ends.len());
+    while lo < hi {
+        let mid = (lo + hi).div_ceil(2);
+        if metrics.width(&format!("{}...", &s[..ends[mid - 1]]), size) <= max {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    match lo {
+        0 => "...".to_owned(),
+        n => format!("{}...", &s[..ends[n - 1]]),
+    }
+}
+
+/// A card as laid out: its label's lines, its ticket and assignee (cut to share the card's
+/// width), and its height.
+struct CardBox {
     lines: Vec<Vec<Span>>,
-    ticket: Option<&'a str>,
-    assigned: Option<&'a str>,
+    ticket: Option<String>,
+    assigned: Option<String>,
     priority: Option<Priority>,
     h: f32,
 }
@@ -78,10 +101,25 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
                     let h = 2.0 * CARD_PAD
                         + px.text_size(&lines).1
                         + if meta { 4.0 + small_lh } else { 0.0 };
+                    // The ticket takes up to half the width when there is an assignee, which
+                    // takes the rest after a gap.
+                    let half = if card.assigned.is_some() {
+                        (text_w - 8.0) / 2.0
+                    } else {
+                        text_w
+                    };
+                    let ticket = card.ticket.as_deref().map(|t| fit(metrics, t, small, half));
+                    let used = ticket
+                        .as_deref()
+                        .map_or(0.0, |t| metrics.width(t, small) + 8.0);
+                    let assigned = card
+                        .assigned
+                        .as_deref()
+                        .map(|a| fit(metrics, a, small, text_w - used));
                     CardBox {
                         lines,
-                        ticket: card.ticket.as_deref(),
-                        assigned: card.assigned.as_deref(),
+                        ticket,
+                        assigned,
                         priority: card.priority,
                         h,
                     }
@@ -193,11 +231,11 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
                 p.lines(owner, one, Pt::new(b.x + CARD_PAD + w / 2.0, y), theme.text);
             }
             let meta_y = b.y + CARD_PAD + th + 4.0 + small_lh / 2.0;
-            if let Some(t) = c.ticket {
+            if let Some(t) = c.ticket.as_deref() {
                 let w = metrics.width(t, small);
                 text(&mut p, t, Pt::new(b.x + CARD_PAD + w / 2.0, meta_y), small);
             }
-            if let Some(a) = c.assigned {
+            if let Some(a) = c.assigned.as_deref() {
                 let w = metrics.width(a, small);
                 text(
                     &mut p,
