@@ -296,7 +296,7 @@ pub fn render(
         ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
         let image = image_path(md, out, n, ext);
         let written = render(&lowered).and_then(|bytes| {
-            std::fs::write(&image, bytes)
+            crate::write_file(&image, &bytes, false)
                 .map_err(|e| format!("cannot write {}: {e}", image.display()))
         });
         match written {
@@ -314,7 +314,7 @@ pub fn render(
     if link {
         let linked = with_links(&src, &links);
         if linked != src {
-            if let Err(e) = std::fs::write(md, linked) {
+            if let Err(e) = crate::write_file(md, linked.as_bytes(), true) {
                 eprintln!("error: cannot write {name}: {e}");
                 return false;
             }

@@ -66,6 +66,7 @@ impl Block {
             && self.body.end == src.len()
             && !src.ends_with('\n')
             && !code.ends_with('\n')
+            && !body.is_empty()
         {
             body.truncate(body.len() - newline.len());
         }
@@ -471,6 +472,7 @@ mod tests {
         let src = "```mermaid\ngraph TD";
         let block = &mermaid_blocks(src)[0];
         assert_eq!(block.replace_code(src, "graph LR"), "```mermaid\ngraph LR");
+        assert_eq!(block.replace_code(src, ""), "```mermaid\n");
         let src = "```mermaid";
         let block = &mermaid_blocks(src)[0];
         assert_eq!(

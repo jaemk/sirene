@@ -15,6 +15,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- CLI: images, `-o` files, and `--link` rewrites are written to a temporary file and renamed
+  into place, so a failed write keeps the old file; a symlinked output is replaced, not written
+  through. Inputs and stdin over 64 MiB are refused.
+- Markdown: replacing an unclosed block at the end of a text with empty code no longer panics.
 - PlantUML timing: at most 100 clocks, the rest left out with an error; each state label is
   measured once. Cynefin: many quoted items on one line are read in linear time.
 - Flowchart: at most 100000 edges; a `&` product past that is left out with one error. Long
