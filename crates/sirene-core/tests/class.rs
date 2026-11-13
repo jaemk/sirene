@@ -167,6 +167,73 @@ fn relations() {
     assert!(c.edges[0].start_label.is_none() && c.edges[0].label.is_none());
 }
 
+/// MCLASS-2: a relation's second class may follow its end with no space.
+#[test]
+fn relations_without_spaces() {
+    let c = chart("classDiagram\n  Duck-->Egg\n  A --|>B\n  C..>D\n  E--*F\n  G --oval\n");
+    use Arrow::*;
+    let got: Vec<_> = c
+        .edges
+        .iter()
+        .map(|e| (e.from.as_str(), e.to.as_str(), e.start, e.end))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            ("Duck", "Egg", None, Some(Point)),
+            ("A", "B", None, Some(Triangle)),
+            ("C", "D", None, Some(Point)),
+            ("E", "F", None, Some(Diamond)),
+            ("G", "oval", None, None),
+        ]
+    );
+}
+
+/// MCLASS-2: lollipop interfaces draw a circle at the `()` end.
+#[test]
+fn lollipops() {
+    let c = chart("classDiagram\n  Class01 --() bar\n  foo ()-- Class01\n");
+    assert_eq!(c.edges.len(), 2);
+    assert_eq!(
+        (c.edges[0].start, c.edges[0].end),
+        (None, Some(Arrow::Circle))
+    );
+    assert_eq!(
+        (c.edges[1].start, c.edges[1].end),
+        (Some(Arrow::Circle), None)
+    );
+    assert_eq!(
+        (c.edges[1].from.as_str(), c.edges[1].to.as_str()),
+        ("foo", "Class01")
+    );
+}
+
+/// MCLASS-1: a name in backticks may hold spaces and punctuation.
+#[test]
+fn backtick_names() {
+    let c = chart(
+        "classDiagram\n  class `Animal Class!`\n  `Animal Class!` --> Dog\n  note for `Animal Class!` \"n\"\n",
+    );
+    assert!(c.node("Animal Class!").is_some());
+    assert_eq!(c.nodes.len(), 2);
+    assert_eq!(c.edges[0].from, "Animal Class!");
+    assert_eq!(c.notes[0].target, "Animal Class!");
+}
+
+/// MCLASS-1: nested generics close as many levels as they open.
+#[test]
+fn nested_generics() {
+    let c = chart(
+        "classDiagram\n  class Grid~List~List~int~~~ {\n    +List~List~int~~ grid\n    +Map~string, List~int~~ m\n  }\n",
+    );
+    let g = c.node("Grid").unwrap();
+    assert_eq!(g.label.text, "Grid<List<List<int>>>");
+    assert_eq!(
+        rows(&g.sections[0]),
+        ["+List<List<int>> grid", "+Map<string, List<int>> m"]
+    );
+}
+
 /// MCLASS-3: the left class of `A <|-- B` ranks above the right one.
 #[test]
 fn superclasses_rank_above() {

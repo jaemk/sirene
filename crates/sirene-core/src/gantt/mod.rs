@@ -150,12 +150,19 @@ impl Gantt {
                 .excludes
                 .iter()
                 .any(|e| e != "weekends" && time::weekday_of(e).is_none());
-        let written = if dated {
-            time::format_dayjs(t, &self.date_format).to_lowercase()
+        // A date is matched as written in `dateFormat` and as `YYYY-MM-DD`, so a list of days
+        // works when the format also holds a time.
+        let (written, iso_date) = if dated {
+            (
+                time::format_dayjs(t, &self.date_format).to_lowercase(),
+                time::format_dayjs(t, "YYYY-MM-DD"),
+            )
         } else {
-            String::new()
+            (String::new(), String::new())
         };
-        if dated && self.includes.contains(&written) {
+        let listed =
+            |list: &[String]| dated && (list.contains(&written) || list.contains(&iso_date));
+        if listed(&self.includes) {
             return false;
         }
         // ISO weekday: Monday 1 to Sunday 7.
@@ -169,7 +176,7 @@ impl Gantt {
             return true;
         }
         let day = time::weekday_name(time::weekday(t)).to_lowercase();
-        self.excludes.contains(&day) || dated && self.excludes.contains(&written)
+        self.excludes.contains(&day) || listed(&self.excludes)
     }
 
     /// The axis ticks (MGANTT-4).
@@ -349,6 +356,18 @@ mod tests {
         g.includes = vec!["1970-01-03".to_owned()];
         assert!(!g.is_excluded(2 * time::DAY));
         assert!(g.is_excluded(3 * time::DAY));
+    }
+
+    #[test]
+    fn listed_days_match_with_a_time_in_the_format() {
+        // Day 2 is 1970-01-03, a Saturday; the format holds a time, the list a plain date.
+        let mut g = chart(14, &["1970-01-03"]);
+        g.date_format = "YYYY-MM-DD HH:mm".to_owned();
+        assert!(g.is_excluded(2 * time::DAY));
+        assert!(!g.is_excluded(time::DAY));
+        g.excludes = vec!["saturday".to_owned()];
+        g.includes = vec!["1970-01-03".to_owned()];
+        assert!(!g.is_excluded(2 * time::DAY));
     }
 
     #[test]

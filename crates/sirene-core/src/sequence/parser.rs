@@ -98,10 +98,36 @@ pub(crate) fn find_arrow(s: &str) -> Option<(usize, usize)> {
     })
 }
 
+/// Length up to the end of the statement: a newline, or a `;` that is not the end of an entity
+/// such as `#59;` (Mermaid reads a bare `;` as a newline).
+fn line_len(s: &str) -> usize {
+    let line = &s[..scan::line_len(s)];
+    let mut from = 0;
+    while let Some(i) = line[from..].find(';') {
+        let at = from + i;
+        let before = &line[..at];
+        let word = before.trim_end_matches(|c: char| c.is_alphanumeric() || c == '_');
+        if !(word.ends_with('#') && word.len() < before.len()) {
+            return at;
+        }
+        from = at + 1;
+    }
+    line.len()
+}
+
+impl Parser<'_> {
+    /// The rest of the statement as one `kind` token, without trailing whitespace.
+    fn text(&mut self, kind: crate::syntax::SyntaxKind) {
+        let r = self.rest();
+        let len = scan::trim_end_len(r, line_len(r));
+        self.token(kind, len);
+    }
+}
+
 /// The length of `s` up to ` as ` (any case) or `@{`, without trailing whitespace: a
 /// participant's name in its declaration.
 fn name_len(s: &str) -> usize {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..line_len(s)];
     let mut end = line.find("@{").unwrap_or(line.len());
     let lower = line.to_ascii_lowercase();
     let mut from = 0;
@@ -182,6 +208,7 @@ impl Parser<'_> {
             self.token(META_OPEN, 2);
             let r = self.rest();
             match r[..scan::line_len(r)].find('}') {
+                // Metadata is JSON and may hold `;`, so it runs to the end of the line.
                 Some(i) => {
                     self.token(META_BODY, i);
                     self.token(META_CLOSE, 1);
@@ -198,7 +225,7 @@ impl Parser<'_> {
         if r.len() >= 2 && r[..2].eq_ignore_ascii_case("as") && word_len(r) == 2 {
             self.token(AS_KW, 2);
             self.ws();
-            self.rest_of_line(TEXT);
+            self.text(TEXT);
         }
         self.end();
         self.finish();
@@ -232,7 +259,7 @@ impl Parser<'_> {
         self.start(ID_LIST);
         loop {
             let r = self.rest();
-            let line = &r[..scan::line_len(r)];
+            let line = &r[..line_len(r)];
             let stop = line.find([',', ':']).unwrap_or(line.len());
             let n = scan::trim_end_len(line, stop);
             if n == 0 {
@@ -253,7 +280,7 @@ impl Parser<'_> {
         if self.rest().starts_with(':') {
             self.token(COLON, 1);
             self.ws();
-            self.rest_of_line(TEXT);
+            self.text(TEXT);
         } else {
             self.fail("expected `:` and the note text");
         }
@@ -269,7 +296,7 @@ impl Parser<'_> {
             self.token(COLON, 1);
             self.ws();
         }
-        self.rest_of_line(TEXT);
+        self.text(TEXT);
         self.finish();
     }
 
@@ -283,7 +310,7 @@ impl Parser<'_> {
             "destroy" | "activate" | "deactivate" => {
                 self.ws();
                 let r = self.rest();
-                let n = scan::trim_end_len(r, scan::line_len(r));
+                let n = scan::trim_end_len(r, line_len(r));
                 if n == 0 {
                     self.fail("expected a participant name");
                 } else {
@@ -292,7 +319,7 @@ impl Parser<'_> {
             }
             _ => {
                 self.ws();
-                self.rest_of_line(TEXT);
+                self.text(TEXT);
             }
         }
         self.finish();
@@ -301,7 +328,7 @@ impl Parser<'_> {
     /// `FROM ARROW [+|-] TO [: TEXT]`. Consumes nothing when the line has no arrow.
     fn message(&mut self) {
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..line_len(r)];
         let head = &line[..line.find(':').unwrap_or(line.len())];
         let Some((at, len)) = find_arrow(head) else {
             return;
@@ -316,13 +343,14 @@ impl Parser<'_> {
         self.token(IDENT, from);
         self.ws();
         self.token(ARROW, len);
+        self.ws();
         let r = self.rest();
         if r.starts_with('+') || r.starts_with('-') {
             self.token(ACTIVATION, 1);
         }
         self.ws();
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..line_len(r)];
         let to = scan::trim_end_len(line, line.find(':').unwrap_or(line.len()));
         if to == 0 {
             self.fail("expected a participant after the arrow");
@@ -334,7 +362,7 @@ impl Parser<'_> {
         if self.rest().starts_with(':') {
             self.token(COLON, 1);
             self.ws();
-            self.rest_of_line(TEXT);
+            self.text(TEXT);
         }
         self.end();
         self.finish();

@@ -95,14 +95,14 @@ fn words_len(s: &str) -> usize {
 /// Length of a relationship at the start of `s`: symbols such as `||--o{`, or words such as
 /// `one or more to zero or many` (`optionally to` for a non-identifying one).
 pub(crate) fn relation_len(s: &str) -> usize {
-    let left = ["|o", "||", "}o", "}|"];
+    // Either spelling of a cardinality symbol is read on either side (`o{` and `}o`).
+    let end = ["|o", "o|", "||", "}o", "o{", "}|", "|{"];
     let line = ["--", "..", ".-", "-."];
-    let right = ["o|", "||", "o{", "|{"];
     if s.len() >= 6
         && s.is_char_boundary(6)
-        && left.contains(&&s[..2])
+        && end.contains(&&s[..2])
         && line.contains(&&s[2..4])
-        && right.contains(&&s[4..6])
+        && end.contains(&&s[4..6])
     {
         return 6;
     }

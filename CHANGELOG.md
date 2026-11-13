@@ -55,6 +55,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `--watch` on a missing Markdown file reports it; `--link` keeps CRLF line endings; a
   directory named `x.md` is rendered as a directory; `sirene check` on a Markdown file with no
   diagram blocks says so.
+- Mermaid class diagrams read a relation with no space before the second class
+  (`Duck-->Egg`, `A --|>B`), lollipop interfaces (`A --() B`, `A ()-- B`), class names in
+  backticks, and nested generics (`List~List~int~~` is `List<List<int>>`).
+- Mermaid sequence diagrams end a statement at `;` (`A->>B: hi; B->>A: yo`), and read
+  `A->> +B` as an activation of `B`.
+- Mermaid Gantt `excludes` and `includes` dates match as `YYYY-MM-DD` as well as in
+  `dateFormat`, so they apply when the format holds a time.
+- Mermaid ER diagrams read `o{`, `|{`, and `o|` on the left of a relationship and `}o`, `}|`,
+  and `|o` on the right.
 
 ## [0.3.0] - 2026-11-12
 

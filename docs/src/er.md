@@ -20,7 +20,7 @@ In the editor an ER diagram is read-only on the drawing side, as state and class
 |---|---|
 | `A`, `"Quoted name"`, `A[Alias]`, `A["Alias"]` | a box titled with the name or alias |
 | `A { type name PK, FK "comment" }` | one row per attribute, in columns of type, name, keys, and comment |
-| `\|o`, `\|\|`, `}o`, `}\|` (mirrored on the right: `o\|`, `\|\|`, `o{`, `\|{`) | zero or one, exactly one, zero or more, one or more |
+| `\|o`, `\|\|`, `}o`, `}\|` (`o\|`, `o{`, `\|{` mean the same, on either side) | zero or one, exactly one, zero or more, one or more |
 | `--` | a solid line (identifying) |
 | `..`, `.-`, `-.` | a dotted line (non-identifying) |
 | `one or more to zero or many`, `only one optionally to 1+`, ... | the same, in words; `optionally to` is dotted |

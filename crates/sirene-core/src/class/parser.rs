@@ -39,8 +39,14 @@ impl DerefMut for Parser<'_> {
 }
 
 /// Length of a class id at the start of `s`: up to whitespace, punctuation, or a relation's
-/// line (`--`, `..`).
+/// line (`--`, `..`). A name in backticks, such as `` `Animal Class!` ``, is one id.
 pub(crate) fn id_len(s: &str) -> usize {
+    if let Some(body) = s.strip_prefix('`')
+        && let Some(i) = body[..scan::line_len(body)].find('`')
+        && i > 0
+    {
+        return i + 2;
+    }
     let mut end = 0;
     for (i, c) in s.char_indices() {
         if c.is_whitespace()
@@ -71,6 +77,37 @@ pub(crate) fn id_len(s: &str) -> usize {
     end
 }
 
+/// Whether a `~` opens a type argument rather than closing one. With none open it opens; with
+/// some open it opens when an identifier character follows and closes otherwise, so
+/// `List~List~int~~` nests. `depth` is the number open before the `~`, `next` the character
+/// after it.
+pub(crate) fn opens(depth: usize, next: Option<char>) -> bool {
+    depth == 0 || next.is_some_and(|c| c.is_alphanumeric() || c == '_')
+}
+
+/// Length of the generic type at the start of `s` (`~T~`, `~List~int~~`), closed on its line.
+fn generic_len(s: &str) -> Option<usize> {
+    if !s.starts_with('~') {
+        return None;
+    }
+    let line = &s[..scan::line_len(s)];
+    let mut depth = 0;
+    for (i, c) in line.char_indices() {
+        if c != '~' {
+            continue;
+        }
+        if opens(depth, line[i + 1..].chars().next()) {
+            depth += 1;
+        } else {
+            depth -= 1;
+            if depth == 0 {
+                return Some(i + 1);
+            }
+        }
+    }
+    None
+}
+
 fn keyword(s: &str, kw: &str) -> bool {
     s.starts_with(kw) && id_len(s) == kw.len()
 }
@@ -78,7 +115,7 @@ fn keyword(s: &str, kw: &str) -> bool {
 /// Length of a relation at the start of `s`: an optional left end (`<|`, `*`, `o`, `<`), a line
 /// (`--` or `..`), and an optional right end (`|>`, `*`, `o`, `>`).
 pub(crate) fn relation_len(s: &str) -> usize {
-    let left = ["<|", "*", "o", "<"]
+    let left = ["<|", "()", "*", "o", "<"]
         .into_iter()
         .find(|l| {
             s.strip_prefix(l)
@@ -90,11 +127,16 @@ pub(crate) fn relation_len(s: &str) -> usize {
         return 0;
     }
     let r = &r[2..];
-    let right = ["|>", ">", "*", "o"]
+    // `o` is a marker only when whitespace or a quote follows, so `--oval` stays a line then a
+    // class; the other ends may touch the next class (`Duck-->Egg`).
+    let right = ["|>", ">", "*", "()", "o"]
         .into_iter()
         .find(|e| {
             r.strip_prefix(e).is_some_and(|after| {
-                after.is_empty() || after.starts_with(char::is_whitespace) || after.starts_with('"')
+                *e != "o"
+                    || after.is_empty()
+                    || after.starts_with(char::is_whitespace)
+                    || after.starts_with('"')
             })
         })
         .map_or(0, str::len);
@@ -290,11 +332,8 @@ impl Parser<'_> {
         }
         self.start(CLASS_REF);
         self.token(IDENT, n);
-        let r = self.rest();
-        if let Some(body) = r.strip_prefix('~')
-            && let Some(i) = body[..scan::line_len(body)].find('~')
-        {
-            self.token(GENERIC, i + 2);
+        if let Some(n) = generic_len(self.rest()) {
+            self.token(GENERIC, n);
         }
         if self.rest().starts_with(":::") {
             self.token(TRIPLE_COLON, 3);
@@ -386,6 +425,12 @@ mod tests {
             ("- B", 0),
             ("o B", 0),
             ("-->", 3),
+            ("-->Egg", 3),
+            ("--|>B", 4),
+            ("--*B", 3),
+            ("--oval", 2),
+            ("--() bar", 4),
+            ("()-- Foo", 4),
         ] {
             assert_eq!(relation_len(s), n, "{s}");
         }
@@ -399,5 +444,10 @@ mod tests {
         assert_eq!(id_len("List~T~"), 4);
         assert_eq!(id_len("A:::c"), 1);
         assert_eq!(id_len("a.b"), 3);
+        assert_eq!(id_len("`A B!` --> C"), 6);
+        assert_eq!(id_len("`unclosed"), 9);
+        assert_eq!(generic_len("~List~int~~ x"), Some(11));
+        assert_eq!(generic_len("~T~ x"), Some(3));
+        assert_eq!(generic_len("~T x"), None);
     }
 }

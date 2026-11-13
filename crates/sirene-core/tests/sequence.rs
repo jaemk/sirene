@@ -175,6 +175,33 @@ fn activations() {
     );
 }
 
+/// MSEQ-1: `;` ends a statement, as a newline does; the entity `#59;` is a literal `;`.
+#[test]
+fn semicolons_end_statements() {
+    let s = sequence("sequenceDiagram\n  participant A; participant B\n  A->>B: hi; B->>A: yo\n");
+    let ids: Vec<&str> = s.participants.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids, ["A", "B"]);
+    let m: Vec<_> = s.messages().collect();
+    assert_eq!(m.len(), 2);
+    assert_eq!(m[0].text, ["hi"]);
+    assert_eq!((m[1].from, m[1].to), (1, 0));
+    assert_eq!(m[1].text, ["yo"]);
+    let s = sequence("sequenceDiagram\n  A->>B: a#59;b\n  note over A: n; B->>A: c\n");
+    let m: Vec<_> = s.messages().collect();
+    assert_eq!(m.len(), 2);
+    assert_eq!(m[0].text, ["a;b"]);
+}
+
+/// MSEQ-2: whitespace may separate an arrow from its `+`/`-` activation.
+#[test]
+fn activation_after_space() {
+    let s = sequence("sequenceDiagram\n  A->> +B: a\n  B-->> -A: b\n");
+    let ids: Vec<&str> = s.participants.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids, ["A", "B"]);
+    let m: Vec<_> = s.messages().collect();
+    assert!(m[0].activate && m[1].deactivate);
+}
+
 /// MSEQ-1, MSEQ-2: blocks nest, dividers belong to their block, and every block is closed.
 #[test]
 fn blocks() {

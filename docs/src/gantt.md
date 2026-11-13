@@ -35,7 +35,7 @@ START, END`.
 | `dateFormat FORMAT` | how dates are written, as dayjs reads them (default `YYYY-MM-DD`) |
 | `axisFormat FORMAT` | how the axis labels are written, in d3's `%` codes (default `%Y-%m-%d`) |
 | `tickInterval 1week` | the axis step: a number and `millisecond`, `second`, `minute`, `hour`, `day`, `week`, or `month` |
-| `excludes weekends, friday, 2014-01-15` | days a duration skips, shaded grey |
+| `excludes weekends, friday, 2014-01-15` | days a duration skips, shaded grey; a date is matched as written in `dateFormat` and as `YYYY-MM-DD` |
 | `includes 2014-01-18` | days never excluded |
 | `weekend friday` | the weekend is Friday and Saturday (default `saturday`: Saturday and Sunday) |
 | `weekday monday` | the day weekly ticks fall on (default `sunday`) |
