@@ -164,13 +164,17 @@ pub fn render(timing: &Timing, options: &Options) -> String {
                             c.hline(a, b, bot, Line::Light);
                             c.vline(a, top, bot, Line::Light);
                             c.vline(b, top, bot, Line::Light);
-                            let label = match &g.value {
-                                Value::State(v) => lv.label(v).to_owned(),
-                                _ => "/".repeat((b - a - 1).max(0) as usize),
-                            };
                             let room = b - a - 1;
                             if room > 0 {
-                                let text: String = fit(&label, room);
+                                let slashes;
+                                let label = match &g.value {
+                                    Value::State(v) => lv.label(v),
+                                    _ => {
+                                        slashes = "/".repeat(room as usize);
+                                        &slashes
+                                    }
+                                };
+                                let text: String = fit(label, room);
                                 let at = a + 1 + (room - width(&text)) / 2;
                                 c.text(at, mid, &text);
                             }

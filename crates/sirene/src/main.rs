@@ -464,9 +464,7 @@ fn read(file: Option<PathBuf>) -> Result<(String, String), String> {
         }
         None => {
             log::debug!("reading <stdin>");
-            let mut src = Vec::new();
-            std::io::stdin()
-                .read_to_end(&mut src)
+            let src = read_capped(std::io::stdin().lock())
                 .map_err(|e| format!("cannot read <stdin>: {e}"))?;
             utf8(src)
                 .map(|src| ("<stdin>".to_owned(), src))
@@ -475,12 +473,69 @@ fn read(file: Option<PathBuf>) -> Result<(String, String), String> {
     }
 }
 
+/// The largest source read, in bytes.
+const MAX_INPUT: u64 = 64 << 20;
+
+/// Reads at most `MAX_INPUT` bytes from `r`, or an error past that.
+fn read_capped(r: impl Read) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    r.take(MAX_INPUT + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > MAX_INPUT {
+        return Err(format!("the text is over {} MiB", MAX_INPUT >> 20));
+    }
+    Ok(bytes)
+}
+
 /// Reads the file at `path` as UTF-8 text, with an error naming it.
 pub(crate) fn read_text(path: &Path) -> Result<String, String> {
-    std::fs::read(path)
+    std::fs::File::open(path)
         .map_err(|e| e.to_string())
+        .and_then(read_capped)
         .and_then(utf8)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))
+}
+
+/// Writes `bytes` to a temporary file beside `path`, then renames it over `path`, so a failed
+/// write leaves the old file whole. The file keeps its permissions. A symlink at `path` is
+/// replaced, not written through, unless `follow`, when its target is written instead. Anything
+/// other than a regular file, such as `/dev/stdout`, is written in place.
+pub(crate) fn write_file(path: &Path, bytes: &[u8], follow: bool) -> std::io::Result<()> {
+    let link = std::fs::symlink_metadata(path).ok();
+    let path = match &link {
+        Some(m) if m.file_type().is_symlink() && follow => std::fs::canonicalize(path)?,
+        _ => path.to_owned(),
+    };
+    let meta = std::fs::symlink_metadata(&path).ok();
+    if meta
+        .as_ref()
+        .is_some_and(|m| !m.is_file() && !m.file_type().is_symlink())
+    {
+        return std::fs::write(&path, bytes);
+    }
+    let name = path
+        .file_name()
+        .map_or_else(|| "file".into(), |n| n.to_string_lossy().into_owned());
+    let tmp = path.with_file_name(format!(".{name}.sirene-tmp"));
+    // A leftover temporary file, or anything planted there, is replaced, never written through.
+    let _ = std::fs::remove_file(&tmp);
+    let staged = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
+        if let Some(m) = meta.as_ref().filter(|m| m.is_file()) {
+            file.set_permissions(m.permissions())?;
+        }
+        file.write_all(bytes)?;
+        file.sync_all()
+    })();
+    let result = staged.and_then(|()| std::fs::rename(&tmp, &path));
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result
 }
 
 /// `bytes` as UTF-8, or an error naming UTF-16 (by its byte order mark) or the first bad byte.
@@ -740,7 +795,7 @@ fn render_one(
                     std::fs::create_dir_all(parent)
                         .map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
                 }
-                std::fs::write(path, bytes)
+                write_file(path, &bytes, false)
                     .map_err(|e| format!("cannot write {}: {e}", path.display()))
             }
             None => {
@@ -927,5 +982,53 @@ mod tests {
             ]
         );
         assert!(scan(&dir.join("missing"), dir, "png").is_empty());
+    }
+
+    #[test]
+    fn reads_are_capped() {
+        let big = std::io::repeat(b'a').take(MAX_INPUT + 1);
+        assert!(read_capped(big).unwrap_err().contains("over 64 MiB"));
+        assert_eq!(read_capped(&b"ab"[..]).unwrap(), b"ab");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn writes_replace_or_follow_links() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        let read = |p: &str| std::fs::read_to_string(dir.join(p)).unwrap();
+        // A new file, then over it, keeping its mode; no temporary file is left.
+        let out = dir.join("out.svg");
+        write_file(&out, b"1", false).unwrap();
+        std::fs::set_permissions(&out, std::fs::Permissions::from_mode(0o600)).unwrap();
+        write_file(&out, b"2", false).unwrap();
+        assert_eq!(read("out.svg"), "2");
+        let mode = std::fs::metadata(&out).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600);
+        assert!(!dir.join(".out.svg.sirene-tmp").exists());
+        // A symlinked output is replaced; its target is kept.
+        std::fs::write(dir.join("target"), "keep").unwrap();
+        std::os::unix::fs::symlink(dir.join("target"), dir.join("link.svg")).unwrap();
+        write_file(&dir.join("link.svg"), b"svg", false).unwrap();
+        assert_eq!(read("target"), "keep");
+        assert_eq!(read("link.svg"), "svg");
+        assert!(
+            !std::fs::symlink_metadata(dir.join("link.svg"))
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        // A followed link writes its target and stays a link.
+        std::os::unix::fs::symlink(dir.join("target"), dir.join("doc.md")).unwrap();
+        write_file(&dir.join("doc.md"), b"doc", true).unwrap();
+        assert_eq!(read("target"), "doc");
+        assert!(
+            std::fs::symlink_metadata(dir.join("doc.md"))
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
     }
 }

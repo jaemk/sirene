@@ -9,8 +9,8 @@ use super::lines::{self, Common, Cursor, Line};
 use crate::diagnostic::Diagnostic;
 use crate::syntax::SyntaxNode;
 use crate::timing::{
-    Change, Clock, Constraint, Highlight, MAX_PERIODS, Message, Note, Signal, SignalKind, Timing,
-    Value,
+    Change, Clock, Constraint, Highlight, MAX_CLOCKS, MAX_PERIODS, Message, Note, Signal,
+    SignalKind, Timing, Value,
 };
 
 pub(crate) const STATEMENT: &str = "expected a signal such as `robust \"Web\" as W`, a moment \
@@ -258,6 +258,13 @@ impl Lower {
         }
         let i = self.t.signals.len();
         if s.clock.is_some() {
+            if self.clocks.len() >= MAX_CLOCKS {
+                self.d.push(Diagnostic::new(
+                    line.range,
+                    format!("a timing diagram has at most {MAX_CLOCKS} clocks; leaving this out"),
+                ));
+                return;
+            }
             self.clocks.push((i, line.range));
         }
         self.ids.insert(s.id.clone(), i);
@@ -723,6 +730,17 @@ mod tests {
         let (_, d) = lower_src("clock C with period 1\nconcise A\n@0\nA is x\n@5000\nA is y");
         assert_eq!(d.len(), 1, "{d:?}");
         assert!(d[0].contains("more than 1000 periods of `C`"), "{d:?}");
+    }
+
+    #[test]
+    fn clocks_are_capped() {
+        let src: String = (0..MAX_CLOCKS + 2)
+            .map(|i| format!("clock C{i} with period 1\n"))
+            .collect();
+        let (t, d) = lower_src(&src);
+        assert_eq!(t.signals.len(), MAX_CLOCKS);
+        assert_eq!(d.len(), 2, "{d:?}");
+        assert!(d[0].contains("at most 100 clocks"), "{d:?}");
     }
 
     #[test]

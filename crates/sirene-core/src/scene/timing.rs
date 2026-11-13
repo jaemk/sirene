@@ -358,6 +358,8 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
                         }),
                     );
                 }
+                // Each state's label is measured once, however many segments show it.
+                let mut widths: HashMap<&str, f32> = HashMap::new();
                 for g in &segs {
                     let (a, b) = (x(g.start), x(g.end));
                     let d = SLANT.min((b - a) / 2.0);
@@ -385,7 +387,8 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
                             let fill = g.color.and_then(parse_color).unwrap_or(theme.node_fill);
                             p.path(shapes::polygon(&hex), Some(fill), Some(stroke));
                             let label = lv.label(v);
-                            if p.width(label, small) + 2.0 * d + 2.0 <= b - a {
+                            let w = *widths.entry(label).or_insert_with(|| p.width(label, small));
+                            if w + 2.0 * d + 2.0 <= b - a {
                                 p.text_c(label, (a + b) / 2.0, mid, small, ink(fill));
                             }
                         }

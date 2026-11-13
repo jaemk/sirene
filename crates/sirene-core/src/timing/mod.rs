@@ -233,6 +233,9 @@ pub struct Timing {
 /// The most clock periods drawn.
 pub(crate) const MAX_PERIODS: f64 = 1000.0;
 
+/// The most clocks a timing diagram draws, so their periods stay bounded in all.
+pub(crate) const MAX_CLOCKS: usize = 100;
+
 impl Timing {
     /// The span of time drawn: every change, message, constraint, and highlight, and at least
     /// one unit past the last change so its state shows.
