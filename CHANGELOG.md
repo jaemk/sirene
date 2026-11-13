@@ -6,6 +6,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `sirene ascii FILE.md` prints each diagram block of a Markdown file, with diagnostics at
+  positions in the file, instead of reading the whole file as one Mermaid diagram.
+
 ### Fixed
 
 - PlantUML component interface sockets and balls (`[A] -( I`, `I )- [A]`, `-(0-`) are read

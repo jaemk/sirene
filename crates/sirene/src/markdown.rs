@@ -1,8 +1,10 @@
-//! `sirene check`, and rendering the diagram blocks of Markdown files (CLI-11, CLI-12).
+//! `sirene check`, and rendering or printing the diagram blocks of Markdown files (CLI-11,
+//! CLI-12).
 
 use std::path::{Path, PathBuf};
 
 use sirene_core::Severity;
+use sirene_core::ascii::{Charset, Options};
 use sirene_core::diagram::{self, Lowered};
 use sirene_core::markdown::{self, Block};
 
@@ -189,7 +191,43 @@ pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
     out
 }
 
-/// Renders each flowchart block of Markdown file `md` with `render` to an image beside it (or
+/// Prints each diagram block of Markdown file `md` as text, a blank line between them, and
+/// their diagnostics. Returns whether the file was read and had no errors.
+pub fn print_ascii(md: &Path, charset: Charset) -> bool {
+    let name = md.display().to_string();
+    let src = match std::fs::read_to_string(md) {
+        Ok(src) => src,
+        Err(e) => {
+            eprintln!("error: cannot read {name}: {e}");
+            return false;
+        }
+    };
+    let blocks = markdown::mermaid_blocks(&src);
+    if blocks.is_empty() {
+        eprintln!("{name}: no diagram blocks");
+    }
+    let mut ok = true;
+    let mut out = String::new();
+    for (i, block) in blocks.iter().enumerate() {
+        let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
+        ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
+        if i > 0 {
+            out.push('\n');
+        }
+        out.push_str(&lowered.diagram.ascii(&Options { charset }));
+        if !out.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    use std::io::Write;
+    if let Err(e) = std::io::stdout().write_all(out.as_bytes()) {
+        eprintln!("error: cannot write the drawing: {e}");
+        return false;
+    }
+    ok
+}
+
+/// Renders each diagram block of Markdown file `md` with `render` to an image beside it (or
 /// in `out`), named by [`image_path`]; with `link`, adds an image link after each rendered
 /// block. Returns whether everything was read, written, and free of errors.
 pub fn render(

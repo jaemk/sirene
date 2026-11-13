@@ -2,7 +2,7 @@
 
 ```
 sirene [FILE...]              open each FILE in the editor, or a new document
-sirene ascii [FILE|-]         print a diagram as text
+sirene ascii [FILE|-]         print a diagram, or a Markdown file's diagrams, as text
 sirene svg [FILE|DIR|-]       print or write SVG
 sirene png [FILE|DIR|-]       write PNG
 sirene check [FILE|DIR|-]...  print diagnostics only
@@ -41,7 +41,8 @@ This exits with status 2, and no window opens.
 ## `sirene ascii`
 
 Prints the diagram with box-drawing characters. `--charset ascii` uses only ASCII
-(`+`, `-`, `|`, `>`).
+(`+`, `-`, `|`, `>`). A Markdown file prints each diagram block, with a blank line between
+them.
 
 ```
 $ printf 'flowchart TD\n  A --> B\n' | sirene ascii --charset ascii
