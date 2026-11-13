@@ -105,6 +105,27 @@ fn problems() {
         messages("railroad-ebnf-beta\na = b ;\na = c ;\n"),
         ["rule `a` is already defined; both are drawn"]
     );
+    // Unicode whitespace before an operator is not trivia, and does not split a character.
+    assert_eq!(
+        messages("railroad-ebnf-beta\na = b\u{a0}? ;\nc = d\u{3000}* ;\n").len(),
+        2
+    );
+    // Each operator nests the element: too many is an error, not a deep drawing.
+    let src = format!("railroad-ebnf-beta\na = b {} ;\n", "?".repeat(100_000));
+    let lowered = diagram::lower(&src);
+    let messages: Vec<&str> = lowered
+        .diagnostics
+        .iter()
+        .map(|d| d.message.as_str())
+        .collect();
+    assert_eq!(messages, ["operators nested more than 64 deep"]);
+    lowered.diagram.scene(&Approx, &Theme::LIGHT);
+    lowered.diagram.ascii(&Default::default());
+    let src = format!("railroad-ebnf-beta\na = b{} ;\n", " - c".repeat(100));
+    assert_eq!(
+        diagram::lower(&src).diagnostics[0].message,
+        "operators nested more than 64 deep"
+    );
 }
 
 /// MRAIL-3: a rule's name, its boxes, and its markers.
