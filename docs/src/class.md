@@ -30,7 +30,9 @@ In the editor a class diagram is read-only on the drawing side, as state diagram
 | `..>`, `..\|>`, `..` | the same, dotted |
 | `A --() B`, `A ()-- B` | a lollipop interface: a small circle at the `()` end |
 | `A "1" --> "*" B : label` | cardinalities beside each end, the label in the middle |
-| `namespace N { ... }` | a box around its classes |
+| `namespace N { ... }` | a box around the classes declared in it with `class` |
+| `link A "url"`, `click A href "url" "tip"` | a link, with an optional tooltip and target (`_blank`) |
+| `callback A "fn"`, `click A call fn(args)` | a callback, as in flowcharts |
 | `note for A "text"` | a note beside the class |
 | `note "text"` | a note on its own |
 | `direction`, `classDef`, `cssClass "A,B" name`, `A:::name`, `style` | as in flowcharts |
@@ -44,5 +46,5 @@ does.
 
 ## Not drawn
 
-These are warnings, and the rest of the diagram is drawn: `click`, `callback`, `link`, and
-styling of a class that does not exist.
+These are warnings, and the rest of the diagram is drawn: styling or a link of a class that
+does not exist, and a relation or `A : member` line inside a namespace (Mermaid rejects it).

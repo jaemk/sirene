@@ -8,8 +8,8 @@ use super::parser::opens;
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
 use crate::flowchart::{
-    Arrow, ClassDef, Direction, Edge, Flowchart, Label, Node, Note, NoteSide, Row, Shape, Stroke,
-    Style, Subgraph,
+    Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Node, Note, NoteSide, Row, Shape,
+    Stroke, Style, Subgraph,
 };
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
@@ -62,6 +62,108 @@ fn generics(s: &str) -> String {
     out
 }
 
+/// The pieces after a class id in a `click` line: `"strings"` (unquoted) and bare words.
+fn click_pieces(s: &str) -> Vec<(bool, &str)> {
+    let mut out = Vec::new();
+    let mut r = s.trim_start();
+    while !r.is_empty() {
+        if let Some(body) = r.strip_prefix('"') {
+            let end = body.find('"').unwrap_or(body.len());
+            out.push((true, &body[..end]));
+            r = body.get(end + 1..).unwrap_or("");
+        } else {
+            let end = r.find(char::is_whitespace).unwrap_or(r.len());
+            out.push((false, &r[..end]));
+            r = &r[end..];
+        }
+        r = r.trim_start();
+    }
+    out
+}
+
+/// The class id, action, and tooltip of a `click`, `link`, or `callback` line (MCLASS-6).
+fn parse_click(kw: &str, s: &str) -> Option<(String, Click, Option<String>)> {
+    let s = s.trim();
+    let (id, rest) = match s.strip_prefix('`') {
+        Some(t) => {
+            let end = t.find('`')?;
+            (&t[..end], &t[end + 1..])
+        }
+        None => s.split_at(s.find(char::is_whitespace).unwrap_or(s.len())),
+    };
+    if id.is_empty() {
+        return None;
+    }
+    let rest = rest.trim_start();
+    let first_word = rest.split_whitespace().next().unwrap_or("");
+    let link = |rest: &str| {
+        let pieces = click_pieces(rest);
+        let (true, url) = *pieces.first()? else {
+            return None;
+        };
+        let tooltip = pieces.iter().skip(1).find(|p| p.0).map(|p| p.1.to_owned());
+        let target = pieces
+            .iter()
+            .skip(1)
+            .find(|p| !p.0 && p.1.starts_with('_'))
+            .map(|p| p.1.to_owned());
+        Some((
+            Click::Link {
+                url: url.to_owned(),
+                target,
+            },
+            tooltip,
+        ))
+    };
+    let (click, tooltip) = match kw {
+        "link" => link(rest)?,
+        "callback" => {
+            let pieces = click_pieces(rest);
+            let (true, name) = *pieces.first()? else {
+                return None;
+            };
+            let tooltip = pieces.get(1).filter(|p| p.0).map(|p| p.1.to_owned());
+            let click = Click::Callback {
+                name: name.to_owned(),
+                args: Vec::new(),
+            };
+            (click, tooltip)
+        }
+        _ if first_word.eq_ignore_ascii_case("href") => link(&rest[4..])?,
+        _ => {
+            // `call fn(args)` or a bare `fn`, then an optional tooltip.
+            let call = rest
+                .get(..4)
+                .is_some_and(|w| w.eq_ignore_ascii_case("call"))
+                && first_word.len() == 4;
+            let r = if call { rest[4..].trim_start() } else { rest };
+            let name_end = r
+                .find(|c: char| c == '(' || c.is_whitespace())
+                .unwrap_or(r.len());
+            let (name, mut after) = r.split_at(name_end);
+            if name.is_empty() {
+                return None;
+            }
+            let mut args = Vec::new();
+            if let Some(inner) = after.strip_prefix('(') {
+                let close = inner.rfind(')')?;
+                args = text::callback_args(&inner[..close]);
+                after = &inner[close + 1..];
+            }
+            let tooltip = click_pieces(after)
+                .into_iter()
+                .find(|p| p.0)
+                .map(|p| p.1.to_owned());
+            let click = Click::Callback {
+                name: name.to_owned(),
+                args,
+            };
+            (click, tooltip)
+        }
+    };
+    Some((id.to_owned(), click, tooltip))
+}
+
 /// A class id without the backticks around it.
 fn unticked(id: &str) -> &str {
     id.strip_prefix('`')
@@ -74,7 +176,7 @@ fn unticked(id: &str) -> &str {
 pub(crate) fn member(raw: &str) -> (bool, Row) {
     let mut t = raw.trim().to_owned();
     let (mut underline, mut italic) = (false, false);
-    let mut take = |at: usize, t: &mut String| match t[at..].chars().next() {
+    let mut take = |at: usize, t: &mut String| match t.get(at..).and_then(|s| s.chars().next()) {
         Some('$') => {
             underline = true;
             t.remove(at);
@@ -134,8 +236,8 @@ impl Lowerer {
         self.diagnostics.push(Diagnostic::warning(range, message));
     }
 
-    /// The node for class `id`, created in `namespace` if new.
-    fn class(&mut self, id: &str, namespace: Option<usize>) -> usize {
+    /// The node for class `id`, created if new.
+    fn class(&mut self, id: &str) -> usize {
         if let Some(&i) = self.node_index.get(id) {
             return i;
         }
@@ -154,16 +256,22 @@ impl Lowerer {
         });
         self.classes.push(Class::default());
         self.node_index.insert(id.to_owned(), i);
-        if let Some(n) = namespace {
-            self.namespaces[n].members.push(id.to_owned());
-        }
         i
     }
 
+    /// Moves class `id` into namespace `n`, out of any other: a `class` declaration in a
+    /// namespace places it there, wherever the class was first mentioned.
+    fn join(&mut self, id: &str, n: usize) {
+        for s in &mut self.namespaces {
+            s.members.retain(|m| m != id);
+        }
+        self.namespaces[n].members.push(id.to_owned());
+    }
+
     /// The class a `CLASS_REF` names, with its generics and `:::` class.
-    fn reference(&mut self, r: &SyntaxNode, namespace: Option<usize>) -> Option<usize> {
+    fn reference(&mut self, r: &SyntaxNode) -> Option<usize> {
         let id = unticked(token(r, IDENT)?.text()).to_owned();
-        let i = self.class(&id, namespace);
+        let i = self.class(&id);
         self.chart.nodes[i].mentions.push(r.text_range());
         // Generics replace the label only while it is the id, not one from `class A["Label"]`.
         let label = &self.chart.nodes[i].label.text;
@@ -199,6 +307,13 @@ impl Lowerer {
 
     fn block(&mut self, parent: &SyntaxNode, namespace: Option<usize>) {
         for stmt in parent.children() {
+            if namespace.is_some() && matches!(stmt.kind(), RELATION_STMT | MEMBER_STMT) {
+                self.warning(
+                    stmt.text_range(),
+                    "a `namespace` holds `class` declarations, notes, and namespaces; this \
+                     line belongs outside it",
+                );
+            }
             match stmt.kind() {
                 DIRECTION_STMT => {
                     if let Some(d) = text_of(&stmt, DIR).and_then(|d| Direction::from_text(&d)) {
@@ -207,20 +322,18 @@ impl Lowerer {
                 }
                 CLASS_DECL => self.class_decl(&stmt, namespace),
                 MEMBER_STMT => {
-                    if let Some(i) =
-                        child(&stmt, CLASS_REF).and_then(|r| self.reference(&r, namespace))
-                    {
+                    if let Some(i) = child(&stmt, CLASS_REF).and_then(|r| self.reference(&r)) {
                         let raw = text_of(&stmt, MEMBER).unwrap_or_default();
                         self.add_member(i, &raw);
                     }
                 }
                 ANNOTATION_STMT => {
-                    let i = child(&stmt, CLASS_REF).and_then(|r| self.reference(&r, namespace));
+                    let i = child(&stmt, CLASS_REF).and_then(|r| self.reference(&r));
                     if let (Some(i), Some(a)) = (i, text_of(&stmt, STEREOTYPE)) {
                         self.classes[i].annotation = Some(a);
                     }
                 }
-                RELATION_STMT => self.relation(&stmt, namespace),
+                RELATION_STMT => self.relation(&stmt),
                 NAMESPACE => self.namespace(&stmt, namespace),
                 NOTE_STMT => self.note(&stmt),
                 CLASSDEF_STMT => self.class_def(&stmt),
@@ -228,22 +341,47 @@ impl Lowerer {
                 STYLE_STMT => self.style(&stmt),
                 ACC_TITLE_STMT => self.chart.acc_title = text_of(&stmt, ACC_TEXT),
                 ACC_DESCR_STMT => self.chart.acc_descr = text_of(&stmt, ACC_TEXT),
-                CLICK_STMT => {
-                    let kw = text_of(&stmt, CLICK_KW).unwrap_or_default();
-                    self.warning(
-                        stmt.text_range(),
-                        format!("`{kw}` is not supported in class diagrams; ignoring it"),
-                    );
-                }
+                CLICK_STMT => self.click(&stmt),
                 _ => {}
             }
         }
     }
 
-    fn class_decl(&mut self, stmt: &SyntaxNode, namespace: Option<usize>) {
-        let Some(i) = child(stmt, CLASS_REF).and_then(|r| self.reference(&r, namespace)) else {
+    /// `link A "url"`, `click A href "url"`, `callback A "fn"`, `click A call fn(args)`, or
+    /// `click A fn`, each with an optional tooltip string (and a link target for links).
+    fn click(&mut self, stmt: &SyntaxNode) {
+        let kw = text_of(stmt, CLICK_KW).unwrap_or_default();
+        let rest = text_of(stmt, TEXT).unwrap_or_default();
+        let Some((id, click, tooltip)) = parse_click(&kw.to_ascii_lowercase(), &rest) else {
+            self.warning(
+                stmt.text_range(),
+                format!("expected a class and a link or callback after `{kw}`; ignoring it"),
+            );
             return;
         };
+        match self.node_index.get(&id) {
+            Some(&i) => {
+                let node = &mut self.chart.nodes[i];
+                node.click = Some(click);
+                if tooltip.is_some() {
+                    node.tooltip = tooltip;
+                }
+            }
+            None => self.warning(
+                stmt.text_range(),
+                format!("`{kw}` refers to unknown class `{id}`"),
+            ),
+        }
+    }
+
+    fn class_decl(&mut self, stmt: &SyntaxNode, namespace: Option<usize>) {
+        let Some(i) = child(stmt, CLASS_REF).and_then(|r| self.reference(&r)) else {
+            return;
+        };
+        if let Some(n) = namespace {
+            let id = self.chart.nodes[i].id.clone();
+            self.join(&id, n);
+        }
         if let Some(s) = token(stmt, STRING) {
             self.chart.nodes[i].label = text::label(text::unquote(s.text()), false);
         }
@@ -256,15 +394,12 @@ impl Lowerer {
         }
     }
 
-    fn relation(&mut self, stmt: &SyntaxNode, namespace: Option<usize>) {
+    fn relation(&mut self, stmt: &SyntaxNode) {
         let refs: Vec<SyntaxNode> = stmt.children().filter(|n| n.kind() == CLASS_REF).collect();
         let (Some(rel), [from, to]) = (token(stmt, RELATION), refs.as_slice()) else {
             return;
         };
-        let (Some(a), Some(b)) = (
-            self.reference(from, namespace),
-            self.reference(to, namespace),
-        ) else {
+        let (Some(a), Some(b)) = (self.reference(from), self.reference(to)) else {
             return;
         };
         let rel = rel.text();
@@ -374,7 +509,7 @@ impl Lowerer {
             self.classes.push(Class::default());
             return;
         };
-        self.class(&target, None);
+        self.class(&target);
         self.chart.notes.push(Note {
             target,
             side: NoteSide::After,
@@ -494,6 +629,8 @@ mod tests {
             (false, "~List<int> items".into(), false, false)
         );
         assert_eq!(m("~run()"), (true, "~run()".into(), false, false));
+        assert_eq!(m("é"), (false, "é".into(), false, false));
+        assert_eq!(m("run()é"), (true, "run()é".into(), false, false));
         assert_eq!(m("  "), (false, String::new(), false, false));
     }
 }

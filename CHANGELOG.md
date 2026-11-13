@@ -10,8 +10,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `sirene ascii FILE.md` prints each diagram block of a Markdown file, with diagnostics at
   positions in the file, instead of reading the whole file as one Mermaid diagram.
+- Mermaid class diagrams: `link A "url"`, `click A href "url"`, `callback A "fn"`, and
+  `click A call fn(args)` set the class's link or callback, with an optional tooltip.
 
 ### Fixed
+
+- Mermaid class diagrams: a class belongs to the namespace that declares it with `class`, even
+  if mentioned earlier; relations and `A : member` lines inside a namespace are warnings and no
+  longer pull classes into it.
+- Mermaid sequence diagrams: a `box` holds only `participant`/`actor` declarations, and
+  declaring a participant in a second `box` is an error, as in Mermaid.
 
 - Mermaid architecture diagrams: when two items want the same side of a node, the second is
   placed beside the first instead of beyond it, and an edge turns in the gap between items

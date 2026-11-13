@@ -24,7 +24,7 @@ In the editor a sequence diagram is read-only on the drawing side.
 | `note left of A`, `note right of A`, `note over A,B` | a note beside or across lifelines |
 | `loop`, `alt`/`else`, `opt`, `par`/`and`, `critical`/`option`, `break` | a frame with its kind and label, and dashed dividers; frames nest |
 | `rect COLOR ... end` | a colored background (a dotted frame in text) |
-| `box COLOR Title ... end` | a group around the participants declared inside |
+| `box COLOR Title ... end` | a group around the participants declared inside; it holds only declarations |
 | `create participant B`, `destroy B` | a header where the participant is created, and a cross where its lifeline ends |
 | `autonumber`, `autonumber 10 5`, `autonumber off` | a numbered badge on each message (`1. ` before the label in text) |
 | `title text`, `accTitle`, `accDescr` | the title above (frontmatter `title` too) |

@@ -8,7 +8,9 @@ PlantUML sequence diagrams lower to the same model (PUML-3). Reference:
 
 - Participants: `participant A`, `actor A`, `participant A as Alice`, and the typed forms
   (`A@{ "type": "database" }`: boundary, control, entity, database, collections, queue);
-  `create participant` and `destroy A`; `box Color Title ... end`.
+  `create participant` and `destroy A`; `box Color Title ... end`, which holds only
+  declarations (anything else is an error, as in Mermaid); a participant stays in the first
+  `box` that declares it, and a declaration in another is an error. Test: `box_contents`.
 - Messages `A->>B: text` with arrows `->`, `-->`, `->>`, `-->>`, `-x`, `--x`, `-)`, `--)`,
   `<<->>`, `<<-->>`; `+` and `-` after the arrow activate and deactivate the target.
 - `activate A`, `deactivate A`; `autonumber`.
