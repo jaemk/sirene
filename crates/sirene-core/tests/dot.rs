@@ -928,6 +928,70 @@ fn syntax_errors() {
     assert!(errors("digraph {}").is_empty());
 }
 
+/// A repeated `strict` edge adds only its own attributes, not the current `edge` defaults.
+#[test]
+fn strict_repeat_ignores_defaults() {
+    let c = chart("strict digraph { edge [color=blue]  a -> b [color=red, label=x]  a -> b }");
+    assert_eq!(c.edges.len(), 1);
+    assert_eq!(style(&c.edges[0].styles, "stroke"), Some("#ff0000"));
+    assert_eq!(c.edges[0].label.as_ref().unwrap().text, "x");
+}
+
+/// `\G` in a cluster's label is the cluster's own name, even if it was renamed apart from a node.
+#[test]
+fn cluster_label_graph_name() {
+    let c = chart("digraph G { subgraph cluster_x { label=\"\\G here\"; a } }");
+    assert_eq!(c.subgraphs[0].title.text, "cluster_x here");
+    let c = chart("digraph G { subgraph cluster_x { label=\"\\G\"; a } cluster_x -> a }");
+    assert_eq!(c.subgraphs[0].id, "cluster_x_");
+    assert_eq!(c.subgraphs[0].title.text, "cluster_x");
+}
+
+/// `style=rounded` is not drawn on a cluster, so it is a warning.
+#[test]
+fn cluster_rounded_warns() {
+    let (_, d) = lowered("digraph { subgraph cluster_x { style=rounded; a } }");
+    assert_eq!(
+        d,
+        [(
+            Severity::Warning,
+            "the style `rounded` is not supported; ignored".to_owned()
+        )]
+    );
+}
+
+/// A named subgraph used as an operand stands for all its nodes so far.
+#[test]
+fn reopened_subgraph_operand() {
+    let c = chart("digraph { subgraph s { a }  x -> subgraph s { } }");
+    let pairs: Vec<_> = c
+        .edges
+        .iter()
+        .map(|e| (e.from.as_str(), e.to.as_str()))
+        .collect();
+    assert_eq!(pairs, [("x", "a")]);
+    let c = chart("digraph { subgraph s { a } subgraph s { b }  x -> subgraph s { } }");
+    assert_eq!(c.edges.len(), 2);
+}
+
+/// Quoted strings: an escaped backslash before a line break is not a join, and CRLF is one
+/// line break.
+#[test]
+fn quoted_string_escapes() {
+    let label = |src: &str| chart(src).nodes[0].label.text.clone();
+    assert_eq!(label("digraph { a [label=\"C:\\\\\nD\"] }"), "C:\\\nD");
+    assert_eq!(label("digraph { a [label=\"C:\\\nD\"] }"), "C:D");
+    assert_eq!(label("digraph { a [label=\"C:\\\r\nD\"] }"), "C:D");
+    assert_eq!(label("digraph { a [label=\"x\r\ny\"] }"), "x\ny");
+}
+
+/// A header ID may be a `+` concatenation of strings.
+#[test]
+fn detection_concatenated_name() {
+    assert_eq!(Kind::of("digraph \"a\" + \"b\" { a }"), Kind::Dot);
+    assert_eq!(Kind::of("digraph \"a\" + { a }"), Kind::Flowchart);
+}
+
 /// An unclosed string or HTML string runs to the end of the source and keeps all its text.
 #[test]
 fn unclosed_labels_keep_their_text() {

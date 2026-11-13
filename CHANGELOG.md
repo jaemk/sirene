@@ -13,6 +13,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- DOT: a repeated edge in a `strict` graph no longer takes the current `edge [...]` defaults
+  over the first edge's own attributes; `\G` in a cluster label is the cluster's name;
+  `style=rounded` on a cluster warns as it is not drawn; an edge to a reopened named
+  subgraph reaches all its nodes; `\\` before a line break and CRLF in a quoted string are
+  read correctly; `digraph "a" + "b" {` is detected as DOT.
 - `--charset ascii` writes stereotypes as `<<interface>>` and `<<include>>` instead of
   `«interface»` in class, requirement, use case, and PlantUML diagrams.
 - PlantUML component interface sockets and balls (`[A] -( I`, `I )- [A]`, `-(0-`) are read

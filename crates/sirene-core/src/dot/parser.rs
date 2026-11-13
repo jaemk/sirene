@@ -243,11 +243,19 @@ pub(crate) fn is_dot(src: &str) -> bool {
         return false;
     }
     next = it.next();
-    if next
+    if let Some((k, _)) = next
         .as_ref()
-        .is_some_and(|(k, _)| matches!(k, IDENT | NUMBER | STRING | HTML_STRING))
+        .filter(|(k, _)| matches!(k, IDENT | NUMBER | STRING | HTML_STRING))
     {
+        let quoted = *k == STRING;
         next = it.next();
+        // A quoted ID may continue as `"a" + "b"`.
+        while quoted && next.as_ref().is_some_and(|(k, _)| *k == PLUS) {
+            if !it.next().is_some_and(|(k, _)| k == STRING) {
+                return false;
+            }
+            next = it.next();
+        }
     }
     next.is_some_and(|(k, _)| k == L_BRACE)
 }

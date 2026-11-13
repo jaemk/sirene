@@ -143,6 +143,9 @@ struct Scope {
 }
 
 struct Cluster {
+    /// The subgraph's name as written, which `\G` in its label is; `id` may be renamed apart
+    /// from a node's.
+    name: String,
     id: String,
     parent: Option<usize>,
     attrs: Vec<Attr>,
@@ -163,6 +166,8 @@ struct PendingEdge {
     /// The ports written on the tail and head (`a:n -> b:p:s`).
     ports: [Option<Port>; 2],
     attrs: Vec<Attr>,
+    /// Where the edge's own `[...]` attributes start in `attrs`, after the scope's defaults.
+    own: usize,
     range: TextRange,
 }
 
@@ -183,6 +188,8 @@ struct Lowerer {
     edges: Vec<PendingEdge>,
     clusters: Vec<Cluster>,
     cluster_index: HashMap<String, usize>,
+    /// The nodes of each named subgraph over all its bodies.
+    subgraph_nodes: HashMap<String, Vec<usize>>,
     /// Nodes of each subgraph with a `rank`, its end (none for `same`), and the range of its
     /// `rank`.
     rank_groups: Vec<(Option<RankEnd>, Vec<usize>, TextRange)>,
@@ -217,10 +224,41 @@ fn unquote(s: &str) -> String {
         Some(n) if n == s.len() => inner.strip_suffix('"').unwrap_or(inner),
         _ => inner,
     };
-    inner
-        .replace("\\\r\n", "")
-        .replace("\\\n", "")
-        .replace("\\\"", "\"")
+    // One left-to-right scan, so an escaped backslash before a line break is not a join.
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => match chars.peek().copied() {
+                Some('\\') => {
+                    chars.next();
+                    out.push_str("\\\\");
+                }
+                Some('"') => {
+                    chars.next();
+                    out.push('"');
+                }
+                Some('\n') => {
+                    chars.next();
+                }
+                Some('\r') => {
+                    let mut ahead = chars.clone();
+                    ahead.next();
+                    if ahead.peek() == Some(&'\n') {
+                        chars.next();
+                        chars.next();
+                    } else {
+                        out.push('\\');
+                    }
+                }
+                _ => out.push('\\'),
+            },
+            // A raw CRLF in a string is one line break.
+            '\r' if chars.peek() == Some(&'\n') => {}
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn value(id: &SyntaxNode) -> Value {
@@ -942,6 +980,7 @@ impl Lowerer {
             }
         }
         let mut attrs = scope.edge.clone();
+        let own = attrs.len();
         attrs.extend(self.attr_lists(stmt, Target::Edge));
         for pair in operands.windows(2) {
             let ((from, tail, a), (to, head, b)) = (&pair[0], &pair[1]);
@@ -953,6 +992,7 @@ impl Lowerer {
                         to: t,
                         ports: [tail.clone(), head.clone()],
                         attrs: attrs.clone(),
+                        own,
                         range,
                     });
                 }
@@ -965,6 +1005,7 @@ impl Lowerer {
     /// it. Returns the nodes mentioned in it.
     fn subgraph(&mut self, sub: &SyntaxNode, parent: &Scope) -> Vec<usize> {
         let name = ids(sub).next().map(|id| value(&id).text);
+        let key = name.clone();
         let cluster = name.as_ref().is_some_and(|n| {
             n.get(..7)
                 .is_some_and(|p| p.eq_ignore_ascii_case("cluster"))
@@ -986,6 +1027,7 @@ impl Lowerer {
                     self.cluster_index.insert(id.clone(), c);
                     // A new cluster starts with the graph attributes set around it so far.
                     self.clusters.push(Cluster {
+                        name: id.clone(),
                         id,
                         parent: parent.cluster,
                         attrs: parent.graph.clone(),
@@ -996,7 +1038,17 @@ impl Lowerer {
             };
             scope.cluster = Some(c);
         }
-        let nodes = self.stmts(sub, &mut scope);
+        let mut nodes = self.stmts(sub, &mut scope);
+        // A named subgraph keeps the nodes of every body it has had.
+        if let Some(key) = key {
+            let known = self.subgraph_nodes.entry(key).or_default();
+            for &n in &nodes {
+                if !known.contains(&n) {
+                    known.push(n);
+                }
+            }
+            nodes = known.clone();
+        }
         if let Some(rank) = scope.rank.take() {
             self.rank(&rank, &nodes);
         }
@@ -1100,7 +1152,7 @@ impl Lowerer {
             }
         }
         for (c, members) in members.into_iter().enumerate() {
-            let sub = self.lower_cluster(c, &graph, members);
+            let sub = self.lower_cluster(c, members);
             chart.subgraphs.push(sub);
         }
         for (end, group, range) in std::mem::take(&mut self.rank_groups) {
@@ -1164,7 +1216,8 @@ impl Lowerer {
                 (e.to, e.from)
             };
             match seen.get(&key) {
-                Some(&k) => out[k].attrs.extend(e.attrs),
+                // A repeat adds only its own attributes: defaults apply when an edge is made.
+                Some(&k) => out[k].attrs.extend(e.attrs.into_iter().skip(e.own)),
                 None => {
                     seen.insert(key, out.len());
                     out.push(e);
@@ -1662,19 +1715,19 @@ impl Lowerer {
     }
 
     /// Cluster `c` with its member nodes and clusters.
-    fn lower_cluster(&mut self, c: usize, graph: &str, members: Vec<String>) -> Subgraph {
+    fn lower_cluster(&mut self, c: usize, members: Vec<String>) -> Subgraph {
         let attrs = std::mem::take(&mut self.clusters[c].attrs);
+        let name = self.clusters[c].name.clone();
         let title = get(&attrs, "label")
             .map(|a| a.value.clone())
-            .map(|v| self.label_text(&v, graph, ""))
+            .map(|v| self.label_text(&v, &name, ""))
             .unwrap_or_default();
         let words = Self::styles_of(&attrs);
+        // Clusters have no rounded corners.
         self.check_styles(
             &attrs,
             &words,
-            &[
-                "filled", "rounded", "dashed", "dotted", "bold", "solid", "invis",
-            ],
+            &["filled", "dashed", "dotted", "bold", "solid", "invis"],
         );
         let styles = self.shape_styles(&attrs, &words, true);
         Subgraph {
