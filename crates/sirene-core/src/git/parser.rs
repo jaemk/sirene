@@ -110,7 +110,7 @@ impl Parser<'_> {
             self.finish();
             return;
         }
-        self.attributes();
+        self.attributes(kw == "commit");
         self.finish();
     }
 
@@ -133,8 +133,9 @@ impl Parser<'_> {
         }
     }
 
-    /// `name: value` pairs up to the end of the line.
-    fn attributes(&mut self) {
+    /// `name: value` pairs up to the end of the line. With `message`, a bare `"..."` is an
+    /// attribute without a key: a commit's `msg:` is optional.
+    fn attributes(&mut self, message: bool) {
         loop {
             let n = scan::ws_len(self.rest());
             if lines::is_end(&self.rest()[n..]) {
@@ -142,6 +143,16 @@ impl Parser<'_> {
             }
             self.ws();
             let r = self.rest();
+            if message && r.starts_with('"') {
+                let Some(n) = self.string_len() else {
+                    self.fail("unclosed string: expected `\"`");
+                    return;
+                };
+                self.start(ATTR);
+                self.token(STRING, n);
+                self.finish();
+                continue;
+            }
             let key = word_len(r);
             let colon = key + scan::ws_len(&r[key..]);
             if !ATTRIBUTES.contains(&&r[..key]) || !r[colon..].starts_with(':') {

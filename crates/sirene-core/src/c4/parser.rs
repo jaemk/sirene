@@ -80,10 +80,13 @@ impl Parser<'_> {
         let ws = scan::ws_len(&self.rest()[word_len(self.rest())..]);
         let after = word_len(self.rest()) + ws;
         let r = self.rest();
-        // A `{` after the closing paren, on the same line, opens a boundary.
+        // A `{` after the closing paren, on the same line or the next, opens a boundary.
         let line = &r[..scan::line_len(r)];
         let close = args_end(&line[after..]).map(|n| after + n);
-        let braced = close.is_some_and(|c| line[c..].trim_start().starts_with('{'));
+        let same_line = close.is_some_and(|c| line[c..].trim_start().starts_with('{'));
+        let next_line = close.is_some_and(|c| line[c..].trim().is_empty())
+            && r[line.len()..].trim_start().starts_with('{');
+        let braced = same_line || next_line;
         if braced {
             self.start(COMPOSITE);
         }
@@ -129,7 +132,12 @@ impl Parser<'_> {
         }
         self.finish();
         if braced {
-            self.ws();
+            if next_line {
+                self.end();
+                self.trivia();
+            } else {
+                self.ws();
+            }
             self.token(L_BRACE, 1);
             self.end();
             Base::block(self, depth + 1, "boundary", STATEMENT, Parser::statement);

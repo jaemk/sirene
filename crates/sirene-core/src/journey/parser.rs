@@ -75,8 +75,19 @@ impl Parser<'_> {
         self.ws();
         let n = text_len(self.rest(), stops);
         self.token(TEXT, n);
-        self.end();
+        self.comment_end();
         self.finish();
+    }
+
+    /// The end of a statement, after an optional `# comment`, which Mermaid's journey lexer
+    /// skips anywhere on a line.
+    fn comment_end(&mut self) {
+        self.ws();
+        let r = self.rest();
+        if r.starts_with('#') {
+            self.token(COMMENT, scan::line_len(r));
+        }
+        self.end();
     }
 
     /// `name: score: actor, actor`, kept as the name and the data after the first `:`.
@@ -93,7 +104,7 @@ impl Parser<'_> {
             self.ws();
             let n = text_len(self.rest(), &['#', ';']);
             self.token(TASK_DATA, n);
-            self.end();
+            self.comment_end();
         } else {
             self.fail("expected `:` and a score after the task name");
         }
@@ -141,9 +152,11 @@ mod tests {
             tree("journey\n  Make tea\n").1,
             ["expected `:` and a score after the task name"]
         );
-        assert_eq!(
-            tree("journey\n  a: 5 # x\n").1,
-            ["expected the end of the line"]
+        // `#` starts a comment anywhere on a line.
+        assert!(
+            tree("journey\n  title T # c\n  section S#c\n  a: 5: Me # x\n")
+                .1
+                .is_empty()
         );
         assert_eq!(
             tree("journey\n  section a: b\n").1,

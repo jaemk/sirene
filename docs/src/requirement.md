@@ -42,8 +42,8 @@ Keywords, field names, and relationship types match in any case. A risk is shown
 
 An unknown relationship type, an unclosed `{`, and a field without `:` are errors. A field the
 type does not have (an element's `id`), an unknown risk or verify method, a class or style for an
-unknown name, and a relationship to a name that is never defined (drawn as a plain box) are
-warnings.
+unknown name, a relationship to a name that is never defined (drawn as a plain box), and a second
+definition of a name (skipped; the first is kept) are warnings.
 
 ## Not drawn
 

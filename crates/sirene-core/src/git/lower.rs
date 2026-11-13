@@ -127,14 +127,13 @@ impl Lowerer {
     fn attrs(&mut self, stmt: &SyntaxNode, kw: &str) -> Attrs {
         let mut out = Attrs::default();
         for a in stmt.children().filter(|n| n.kind() == ATTR) {
-            let (Some(key), Some(v)) = (
-                token(&a, ATTR_KEY),
-                tokens(&a).find(|t| matches!(t.kind(), STRING | IDENT | NUMBER)),
-            ) else {
+            let Some(v) = tokens(&a).find(|t| matches!(t.kind(), STRING | IDENT | NUMBER)) else {
                 continue;
             };
             let range = a.text_range();
-            let key = key.text();
+            // A commit's bare `"..."` is its message.
+            let key = token(&a, ATTR_KEY);
+            let key = key.as_ref().map_or("msg", |k| k.text());
             if !allowed(kw).contains(&key) {
                 self.error(range, format!("`{key}` does not apply to `{kw}`"));
                 continue;

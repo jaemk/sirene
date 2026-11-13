@@ -20,7 +20,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   longer pull classes into it.
 - Mermaid sequence diagrams: a `box` holds only `participant`/`actor` declarations, and
   declaring a participant in a second `box` is an error, as in Mermaid.
-
+- Mermaid git graphs: `commit "message"` (without `msg:`) is read as the message instead of
+  dropping the commit.
+- Mermaid user journeys: `# comment` after a title, section, or task is skipped instead of an
+  error.
+- Mermaid pie charts: a slice under 1% is left out and the others fill the circle, as in
+  Mermaid, instead of leaving an empty gap.
+- C4 diagrams: `UpdateRelStyle` finds a `Rel_Back` by its `from` and `to` as written; a
+  boundary's `{` may start the next line, as in Mermaid.
+- Mermaid requirement diagrams: a second definition of a name is a warning and skipped, as
+  Mermaid keeps the first, instead of adding its fields to the first.
 - Mermaid architecture diagrams: when two items want the same side of a node, the second is
   placed beside the first instead of beyond it, and an edge turns in the gap between items
   instead of running through one.

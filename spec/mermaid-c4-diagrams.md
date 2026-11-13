@@ -10,7 +10,8 @@ Code: `crates/sirene-core/src/c4/`; `diagram::lower` picks it by the header keyw
 
 - Headers: `C4Context`, `C4Container`, `C4Component`, `C4Dynamic`, `C4Deployment`.
 - Each statement is a macro call `Name(arg, ...)`; an argument is quoted or bare text, and may be
-  named as `$key=value`. A call followed by `{` on the same line opens a block closed by `}`.
+  named as `$key=value`. A call followed by `{` on the same line, or first on the next line,
+  opens a block closed by `}`.
 - `title`, `accTitle`, `accDescr`, comments, directives, and frontmatter `title`.
 
 The parser shares `crate::lines` with the other Mermaid parsers and is lossless. An unclosed
