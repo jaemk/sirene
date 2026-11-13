@@ -171,6 +171,42 @@ impl Lowerer {
             }
         }
         self.chart.nodes.retain(|n| !merged.contains(&n.id));
+        // An edge between a subgraph and one of its own descendants has no route: it is left
+        // out of the drawing (LAYOUT-2).
+        if !self.chart.lanes {
+            let inside = |inner: &str, outer: &str| {
+                let mut seen = HashSet::new();
+                let mut at = inner;
+                while let Some(owner) = self.owners.get(at) {
+                    if owner == outer {
+                        return true;
+                    }
+                    if !seen.insert(owner.as_str()) {
+                        break;
+                    }
+                    at = owner;
+                }
+                false
+            };
+            let nested: Vec<(TextRange, String)> = self
+                .chart
+                .edges
+                .iter()
+                .filter(|e| inside(&e.to, &e.from) || inside(&e.from, &e.to))
+                .map(|e| {
+                    (
+                        e.range,
+                        format!(
+                            "an edge between a subgraph and a node inside it is not drawn; ignoring `{} --> {}`",
+                            e.from, e.to
+                        ),
+                    )
+                })
+                .collect();
+            for (range, message) in nested {
+                self.warning(range, message);
+            }
+        }
         for sg in &mut self.subgraphs {
             sg.members.retain(|m| !self.globals.contains(m));
         }

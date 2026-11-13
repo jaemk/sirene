@@ -308,34 +308,30 @@ fn clusters_and_crossing_edges() {
 
 #[test]
 fn clusters_with_edges_inherit_direction() {
-    // `direction LR` is ignored because edges reach the subgraph from outside.
+    // Edges to the subgraph itself keep its `direction LR` (LAYOUT-3).
     assert_eq!(
         draw("flowchart TD\nsubgraph S\ndirection LR\nA --> B\nend\nX --> S\nS --> Y\n"),
         rows(&[
-            "┌───┐",
-            "│ X │",
-            "└─┬─┘",
-            "  │",
-            "  ▼",
-            "┌───── S ─┐",
-            "│         │",
-            "│ ┌───┐   │",
-            "│ │ A │   │",
-            "│ └─┬─┘   │",
-            "│   │     │",
-            "│   ▼     │",
-            "│ ┌───┐   │",
-            "│ │ B │   │",
-            "│ └───┘   │",
-            "│         │",
-            "└───┬─────┘",
-            "    │",
-            "    ▼",
-            "  ┌───┐",
-            "  │ Y │",
-            "  └───┘",
+            "        ┌───┐",
+            "        │ X │",
+            "        └─┬─┘",
+            "          │",
+            "          ▼",
+            "┌─ S ──────────────┐",
+            "│  ┌───┐    ┌───┐  │",
+            "│  │ A ├───►│ B │  │",
+            "│  └───┘    └───┘  │",
+            "└─────────┬────────┘",
+            "          │",
+            "          ▼",
+            "        ┌───┐",
+            "        │ Y │",
+            "        └───┘",
         ])
     );
+    // `direction LR` is ignored because an edge reaches a node inside the subgraph from outside.
+    let out = draw("flowchart TD\nsubgraph S\ndirection LR\nA --> B\nend\nX --> A\nB --> Y\n");
+    assert!(!out.contains("│ A ├"), "{out}");
 }
 
 #[test]

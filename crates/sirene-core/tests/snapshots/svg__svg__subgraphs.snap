@@ -2,43 +2,43 @@
 source: crates/sirene-core/tests/svg.rs
 expression: "flowchart LR\n    c1-->a2\n    subgraph one\n        a1-->a2\n    end\n    subgraph ide1 [titled one]\n        direction TB\n        subgraph inner[\"quoted title\"]\n            direction RL\n            i1 --> f1\n        end\n    end\n    subgraph Title With Spaces\n        x\n    end\n    subgraph \"Only a string\"\n        y\n    end\n    subgraph\n        z\n    end\n    one --> ide1 --> c1\n"
 ---
-<svg xmlns="http://www.w3.org/2000/svg" width="729" height="430" viewBox="0 0 729 430" font-family="trebuchet ms, verdana, arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="711" height="428" viewBox="0 0 711 428" font-family="trebuchet ms, verdana, arial, sans-serif">
 <rect width="100%" height="100%" fill="#ffffff"/>
-<path d="M482 44 L713 44 L713 180 L482 180 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
-<text x="546" y="57" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">titled one</text>
+<path d="M482 37 L695 37 L695 191 L482 191 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
+<text x="589" y="50" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">titled one</text>
 <path d="M252 16 L433 16 L433 127 L252 127 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
 <text x="287" y="29" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">one</text>
-<path d="M16 140 L203 140 L203 226 L16 226 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
-<text x="109.5" y="153" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">Title With Spaces</text>
-<path d="M507 82 L688 82 L688 168 L507 168 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
-<text x="579.5" y="95" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">quoted title</text>
-<path d="M32 247 L186 247 L186 333 L32 333 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
-<text x="109" y="260" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">Only a string</text>
-<path d="M68 354 L151 354 L151 414 L68 414 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
+<path d="M16 138 L203 138 L203 224 L16 224 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
+<text x="109.5" y="151" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">Title With Spaces</text>
+<path d="M498 84 L679 84 L679 170 L498 170 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
+<text x="570.5" y="97" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">quoted title</text>
+<path d="M32 245 L186 245 L186 331 L32 331 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
+<text x="109" y="258" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">Only a string</text>
+<path d="M68 352 L151 352 L151 412 L68 412 Z" fill="#ffffde" stroke="#aaaa33" stroke-width="1"/>
 <path d="M367 67 L358 71.5 L358 62.5 Z" fill="#333333"/>
-<path d="M130 96 L200 96 C214 96 214 76 226 76 L226 76 C238 76 238 58 252 58 L326 58 C340 58 340 67 354 67 L359 67" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M130 94 L200 94 C214 94 214 72 226 72 L226 72 C238 72 238 58 252 58 L326 58 C340 58 340 67 354 67 L359 67" fill="none" stroke="#333333" stroke-width="1.5"/>
 <path d="M367 77 L358 81.5 L358 72.5 Z" fill="#333333"/>
 <path d="M318 97 L318 97 C329 97 329 77 343 77 L359 77" fill="none" stroke="#333333" stroke-width="1.5"/>
-<path d="M573 138 L582 133.5 L582 142.5 Z" fill="#333333"/>
-<path d="M622 138 L581 138" fill="none" stroke="#333333" stroke-width="1.5"/>
-<path d="M482 119 L473 123.5 L473 114.5 Z" fill="#333333"/>
-<path d="M433 85 L436 85 A8 8 0 0 1 444 93 L444 111 A8 8 0 0 0 452 119 L474 119" fill="none" stroke="#333333" stroke-width="1.5"/>
-<path d="M130 106 L139 101.5 L139 110.5 Z" fill="#333333"/>
-<path d="M482 132 L482 132 C468 132 468 148 454 148 L252 148 C238 148 238 146 226 146 L222 146 A8 8 0 0 1 214 138 L214 114 A8 8 0 0 0 206 106 L138 106" fill="none" stroke="#333333" stroke-width="1.5"/>
-<path d="M89 83 L130 83 L130 119 L89 119 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="109.5" y="101" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">c1</text>
+<path d="M564 140 L573 135.5 L573 144.5 Z" fill="#333333"/>
+<path d="M613 140 L572 140" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M482 79 L473 83.5 L473 74.5 Z" fill="#333333"/>
+<path d="M433 85 L433 85 C444 85 444 79 458 79 L474 79" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M130 104 L139 99.5 L139 108.5 Z" fill="#333333"/>
+<path d="M482 148 L252 148 C238 148 238 147 226 147 L222 147 A8 8 0 0 1 214 139 L214 112 A8 8 0 0 0 206 104 L138 104" fill="none" stroke="#333333" stroke-width="1.5"/>
+<path d="M89 81 L130 81 L130 117 L89 117 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="109.5" y="99" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">c1</text>
 <path d="M367 54 L408 54 L408 90 L367 90 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
 <text x="387.5" y="72" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">a2</text>
 <path d="M277 79 L318 79 L318 115 L277 115 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
 <text x="297.5" y="97" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">a1</text>
-<path d="M622 120 L663 120 L663 156 L622 156 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="642.5" y="138" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">i1</text>
-<path d="M532 120 L573 120 L573 156 L532 156 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="552.5" y="138" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">f1</text>
-<path d="M93 178 L126 178 L126 214 L93 214 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="109.5" y="196" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">x</text>
-<path d="M92 285 L125 285 L125 321 L92 321 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="108.5" y="303" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">y</text>
-<path d="M93 366 L126 366 L126 402 L93 402 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
-<text x="109.5" y="384" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">z</text>
+<path d="M613 122 L654 122 L654 158 L613 158 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="633.5" y="140" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">i1</text>
+<path d="M523 122 L564 122 L564 158 L523 158 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="543.5" y="140" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">f1</text>
+<path d="M93 176 L126 176 L126 212 L93 212 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="109.5" y="194" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">x</text>
+<path d="M92 283 L125 283 L125 319 L92 319 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="108.5" y="301" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">y</text>
+<path d="M93 364 L126 364 L126 400 L93 400 Z" fill="#ececff" stroke="#9370db" stroke-width="1"/>
+<text x="109.5" y="382" font-size="14" text-anchor="middle" dominant-baseline="central" fill="#333333">z</text>
 </svg>

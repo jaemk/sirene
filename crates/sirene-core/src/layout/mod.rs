@@ -471,16 +471,9 @@ impl<'a> Builder<'a> {
                 } else {
                     let scope = if common == 0 { 0 } else { a[common - 1] + 1 };
                     self.scopes[scope].edges.push((e, from, to));
-                    let ends = [spec.from, spec.to].into_iter().filter_map(|i| match i {
-                        Item::Cluster(c) => Some(c),
-                        Item::Node(_) => None,
-                    });
-                    for c in a[common..]
-                        .iter()
-                        .copied()
-                        .chain(b[common..].iter().copied())
-                        .chain(ends)
-                    {
+                    // A cluster that is itself an endpoint keeps its direction; only the
+                    // clusters an edge enters or leaves from inside lose it.
+                    for c in a[common..].iter().chain(&b[common..]).copied() {
                         crossed[c] = true;
                     }
                     Class::Normal {
@@ -583,7 +576,12 @@ impl<'a> Builder<'a> {
                         key: sign * (i as i32 + 1),
                     });
                 }
-                if let Item::Cluster(c) = end {
+                // A cluster laid out in another direction than its parent has no port for the
+                // edge: the parent ends it in the middle of the side, clear of the title.
+                if let Item::Cluster(c) = end
+                    && self.directions[c + 1]
+                        == self.directions[self.cluster_parent[c].map_or(0, |p| p + 1)]
+                {
                     self.scopes[c + 1].proxies.push(Proxy {
                         edge: e,
                         side,
@@ -685,6 +683,21 @@ impl<'a> Builder<'a> {
             notes,
         }
     }
+}
+
+/// Moves a port at `off` from the center of a `width`-wide side off the columns of `title`
+/// (relative to the side's start), to the nearest free cell inside the corners; it stays when
+/// there is none.
+fn clear_of_title(off: i32, width: i32, title: Rect) -> i32 {
+    let cell = width / 2 + off;
+    if cell < title.x || cell > title.right() {
+        return off;
+    }
+    [title.x - 1, title.right() + 1]
+        .into_iter()
+        .filter(|c| (1..width - 1).contains(c))
+        .min_by_key(|c| (c - cell).abs())
+        .map_or(off, |c| c - width / 2)
 }
 
 /// Drops repeated points and the middle of straight runs. A run that turns back, as a flat
@@ -1263,6 +1276,17 @@ impl<'a, 'b> Placer<'a, 'b> {
                 }
                 _ => continue,
             };
+            // The title of a cluster sits on its real top border, and a port there must clear
+            // it (an edge ending at a cluster laid out in another direction has no proxy).
+            let title = match el.kind {
+                Kind::Item(Item::Cluster(c)) => self.placed[c + 1].as_ref().and_then(|p| p.title),
+                _ => None,
+            };
+            let top_side = match self.dir {
+                Direction::TopBottom => Some(Side::Top),
+                Direction::BottomTop => Some(Side::Bottom),
+                _ => None,
+            };
             // A compass port's part along the rank: 0 first, 1 none, 2 last.
             let bias = |edge: usize| -> u8 {
                 let Kind::Item(item @ Item::Node(_)) = el.kind else {
@@ -1336,7 +1360,13 @@ impl<'a, 'b> Placer<'a, 'b> {
                     let off = ports
                         .and_then(|p| p.get(&(edge, side)).copied())
                         .or_else(|| anchor(edge))
-                        .unwrap_or_else(|| self.spread(el.cross, k as i32, n));
+                        .unwrap_or_else(|| {
+                            let off = self.spread(el.cross, k as i32, n);
+                            match title.filter(|_| Some(side) == top_side) {
+                                Some(t) => clear_of_title(off, el.cross, t),
+                                None => off,
+                            }
+                        });
                     match end {
                         End::Segment(i) if downward => offsets[i].0 = off,
                         End::Segment(i) => offsets[i].1 = off,
@@ -1461,8 +1491,11 @@ impl<'a, 'b> Placer<'a, 'b> {
                 .max()
                 .unwrap_or(-1);
             let content = hi - lo + 1;
+            // An edge ending on the title's side of such a cluster needs a free cell beside the
+            // title (see `clear_of_title`).
+            let room = if self.endpoint_under_title() { 2 } else { 0 };
             let (min_main, cross_start) = side_title.map_or((0, 0), |t| {
-                (t.w + 2 * self.sp.cluster_main_pad, (t.h - 1).max(0))
+                (t.w + 2 * self.sp.cluster_main_pad + room, (t.h - 1).max(0))
             });
             let pad = if cluster.is_some() {
                 self.sp.cluster_cross_pad
@@ -1754,6 +1787,27 @@ impl<'a, 'b> Placer<'a, 'b> {
                 .push((k, real_rect(Rect::new(x, y, size.w, size.h))));
         }
         placed
+    }
+
+    /// Whether this is a horizontal cluster in a vertical container that an edge ends at: the
+    /// edge meets its real top border, where the title runs.
+    fn endpoint_under_title(&self) -> bool {
+        let Some(c) = self.s.checked_sub(1) else {
+            return false;
+        };
+        let parent = self.b.cluster_parent[c].map_or(0, |p| p + 1);
+        horizontal(self.dir)
+            && !horizontal(self.b.directions[parent])
+            && self
+                .b
+                .graph
+                .edges
+                .iter()
+                .zip(&self.b.classes)
+                .any(|(e, class)| {
+                    matches!(class, Class::Normal { .. })
+                        && (e.from == Item::Cluster(c) || e.to == Item::Cluster(c))
+                })
     }
 
     fn cluster_spec(&self) -> Option<&'a ClusterSpec> {

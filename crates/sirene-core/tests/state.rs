@@ -324,6 +324,18 @@ fn unsupported_is_a_warning() {
         .into_graph();
     assert!(c.edges.is_empty());
 
+    let src =
+        "stateDiagram-v2\n  state A {\n    a1 --> a2\n  }\n  A --> a1\n  a2 --> A\n  A --> B\n";
+    let w = warnings(src);
+    assert_eq!(w.len(), 2, "{w:?}");
+    assert!(
+        w[0].contains("a composite state and a state inside it"),
+        "{w:?}"
+    );
+    assert!(w[1].contains("`a2 --> A`"), "{w:?}");
+    let c = diagram::lower(src).diagram.into_graph();
+    assert_eq!(c.edges.len(), 2);
+
     for (src, want) in [
         (
             "stateDiagram-v2\n  click a \"x\"\n",
