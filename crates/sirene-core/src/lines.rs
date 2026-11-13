@@ -221,10 +221,17 @@ impl<'a> Base<'a> {
         self.error(start, start + len, message);
     }
 
-    /// Requires the statement to end here.
+    /// Requires the statement to end here, allowing a `%%` comment after whitespace.
     pub fn end(&mut self) {
         let n = scan::ws_len(self.rest());
-        if !is_end(&self.rest()[n..]) {
+        let after = &self.rest()[n..];
+        let spaced = n > 0 || self.src[..self.pos].ends_with([' ', '\t']);
+        if spaced && after.starts_with("%%") && !after.starts_with("%%{") {
+            self.token(WHITESPACE, n);
+            self.token(COMMENT, scan::line_len(self.rest()));
+            return;
+        }
+        if !is_end(after) {
             self.fail("expected the end of the line");
         }
     }
@@ -525,6 +532,11 @@ impl<'a> Base<'a> {
             if p.rest().starts_with('}') {
                 if depth > 0 {
                     p.token(R_BRACE, 1);
+                    let n = scan::ws_len(p.rest());
+                    let after = &p.rest()[n..];
+                    if after.starts_with("%%") && !after.starts_with("%%{") {
+                        p.end();
+                    }
                     return;
                 }
                 let start = p.pos;

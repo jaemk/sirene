@@ -222,7 +222,7 @@ impl Parser<'_> {
             }
         }
         let r = self.rest();
-        if r.len() >= 2 && r[..2].eq_ignore_ascii_case("as") && word_len(r) == 2 {
+        if r.get(..2).is_some_and(|w| w.eq_ignore_ascii_case("as")) && word_len(r) == 2 {
             self.token(AS_KW, 2);
             self.ws();
             self.text(TEXT);
@@ -248,7 +248,7 @@ impl Parser<'_> {
         self.ws();
         if word != "over" {
             let r = self.rest();
-            if !(r.len() >= 2 && r[..2].eq_ignore_ascii_case("of") && word_len(r) == 2) {
+            if !(r.get(..2).is_some_and(|w| w.eq_ignore_ascii_case("of")) && word_len(r) == 2) {
                 self.fail("expected `of`");
                 self.finish();
                 return;

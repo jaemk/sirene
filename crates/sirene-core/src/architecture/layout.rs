@@ -255,7 +255,15 @@ impl<'a> Ctx<'a> {
                     if at.contains_key(&n) {
                         continue;
                     }
-                    let p = free(&taken, (here.0 + d.0, here.1 + d.1), d);
+                    // A taken cell pushes the neighbor aside (down or right), not on along
+                    // the edge, which would run the edge through the item in the way.
+                    let want = (here.0 + d.0, here.1 + d.1);
+                    let p = if taken.contains_key(&want) {
+                        let aside = (d.1.abs(), d.0.abs());
+                        free(&taken, (want.0 + aside.0, want.1 + aside.1), aside)
+                    } else {
+                        want
+                    };
                     at.insert(n, p);
                     taken.insert(p, n);
                     col = col.max(p.0 + 1);
@@ -435,16 +443,45 @@ fn route(
     };
     let a = end(p.from, p.from_side, p.from_group);
     let b = end(p.to, p.to_side, p.to_group);
+    // Whether the segment from `u` to `v` (one axis) runs through a node other than the ends.
+    let blocked = |u: (f64, f64), v: (f64, f64)| {
+        let (x0, x1) = (u.0.min(v.0), u.0.max(v.0));
+        let (y0, y1) = (u.1.min(v.1), u.1.max(v.1));
+        placed.nodes.iter().enumerate().any(|(i, r)| {
+            i != p.from && i != p.to && x0 < r.right() && x1 > r.x && y0 < r.bottom() && y1 > r.y
+        })
+    };
+    // The middle turn, or one in the gap beside either end when the middle one runs through a
+    // node.
+    let turn = |mid: f64, near_a: f64, near_b: f64, path: &dyn Fn(f64) -> Vec<(f64, f64)>| {
+        [mid, near_a, near_b]
+            .into_iter()
+            .find(|&t| !path(t).windows(2).any(|w| blocked(w[0], w[1])))
+            .unwrap_or(mid)
+    };
+    let toward = |from: f64, to: f64, gap: f64| from + (to - from).signum() * gap / 2.0;
     let points = match (p.from_side.is_x(), p.to_side.is_x()) {
         (true, true) if a.1 == b.1 => vec![a, b],
         (true, true) => {
-            let mx = (a.0 + b.0) / 2.0;
-            vec![a, (mx, a.1), (mx, b.1), b]
+            let path = |mx: f64| vec![a, (mx, a.1), (mx, b.1), b];
+            let mx = turn(
+                (a.0 + b.0) / 2.0,
+                toward(a.0, b.0, s.gap_x),
+                toward(b.0, a.0, s.gap_x),
+                &path,
+            );
+            path(mx)
         }
         (false, false) if a.0 == b.0 => vec![a, b],
         (false, false) => {
-            let my = (a.1 + b.1) / 2.0;
-            vec![a, (a.0, my), (b.0, my), b]
+            let path = |my: f64| vec![a, (a.0, my), (b.0, my), b];
+            let my = turn(
+                (a.1 + b.1) / 2.0,
+                toward(a.1, b.1, s.gap_y),
+                toward(b.1, a.1, s.gap_y),
+                &path,
+            );
+            path(my)
         }
         (true, false) => vec![a, (b.0, a.1), b],
         (false, true) => vec![a, (a.0, b.1), b],
@@ -487,6 +524,24 @@ mod tests {
         assert_eq!(step(Side::Top, Side::Bottom), (0, -1));
         assert_eq!(step(Side::Top, Side::Left), (1, -1));
         assert_eq!(step(Side::Right, Side::Top), (1, 1));
+    }
+
+    /// Two neighbors wanted on the same side: the second goes below, and its edge turns in the
+    /// gap instead of running through the first.
+    #[test]
+    fn crowded_sides_are_routed_around() {
+        let (_, p) =
+            placed("architecture-beta\nservice a\nservice b\nservice c\nb:L -- R:a\na:R -- L:c\n");
+        let (a, b, c) = (p.nodes[0], p.nodes[1], p.nodes[2]);
+        assert_eq!(b.y, a.y);
+        assert!(c.y > a.y && c.x > a.x, "{c:?}");
+        let path = &p.edges[1].0;
+        for w in path.windows(2) {
+            let (x0, x1) = (w[0].0.min(w[1].0), w[0].0.max(w[1].0));
+            let (y0, y1) = (w[0].1.min(w[1].1), w[0].1.max(w[1].1));
+            let hits = x0 < b.right() && x1 > b.x && y0 < b.bottom() && y1 > b.y;
+            assert!(!hits, "{path:?} crosses {b:?}");
+        }
     }
 
     #[test]

@@ -98,6 +98,15 @@ fn rows(r: &[Row]) -> Vec<&str> {
     r.iter().map(|r| r.cells[0].as_str()).collect()
 }
 
+/// A label from `class A["Label"]` stays when a later mention has generics.
+#[test]
+fn labels_outlast_generics() {
+    let c = chart("classDiagram\n  class A[\"Pretty\"]\n  A~T~ --> B\n  C~T~ --> D~U~\n");
+    assert_eq!(c.node("A").unwrap().label.text, "Pretty");
+    assert_eq!(c.node("C").unwrap().label.text, "C<T>");
+    assert_eq!(c.node("D").unwrap().label.text, "D<U>");
+}
+
 /// MCLASS-1, MCLASS-2: members from a body and from `A : member`, split into attributes and
 /// methods, with static members underlined and abstract ones italic.
 #[test]

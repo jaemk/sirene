@@ -98,8 +98,7 @@ pub(crate) fn relation_len(s: &str) -> usize {
     // Either spelling of a cardinality symbol is read on either side (`o{` and `}o`).
     let end = ["|o", "o|", "||", "}o", "o{", "}|", "|{"];
     let line = ["--", "..", ".-", "-."];
-    if s.len() >= 6
-        && s.is_char_boundary(6)
+    if s.get(..6).is_some_and(|p| p.is_ascii())
         && end.contains(&&s[..2])
         && line.contains(&&s[2..4])
         && end.contains(&&s[4..6])
@@ -311,6 +310,8 @@ mod tests {
             ("zero or one to B", 0),
             ("onex to one", 0),
             ("many to manyx", 0),
+            ("日本", 0),
+            ("o日本", 0),
         ] {
             assert_eq!(relation_len(s), n, "{s}");
         }
