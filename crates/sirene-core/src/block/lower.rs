@@ -64,7 +64,16 @@ struct Lowerer {
     /// Each cell given a width: its group, its index there, the width, and where it was given.
     widths: Vec<(usize, usize, usize, TextRange)>,
     anonymous: usize,
+    /// Class names to indexes in the chart's classes.
+    class_index: HashMap<String, usize>,
+    /// Cells placed so far, across all groups.
+    cells: usize,
+    /// Whether the `MAX_CELLS` error was reported.
+    too_many: bool,
 }
+
+/// The most cells a block diagram holds before its `space` cells are left out.
+pub const MAX_CELLS: usize = 100_000;
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
     node.children_with_tokens().filter_map(|e| e.into_token())
@@ -211,6 +220,7 @@ impl Lowerer {
                     };
                     if m.id == "space" && m.shape.is_none() {
                         let n = m.width.map_or(1, |(w, _)| w.min(1000));
+                        let n = self.room(n, el.text_range());
                         for _ in 0..n {
                             self.block.groups[group].cells.push(Cell {
                                 kind: CellKind::Space,
@@ -272,6 +282,21 @@ impl Lowerer {
         }
     }
 
+    /// How many of `n` more cells fit under `MAX_CELLS`, counting them as placed. Reports the
+    /// limit once, at `range`.
+    fn room(&mut self, n: usize, range: TextRange) -> usize {
+        let fit = n.min(MAX_CELLS.saturating_sub(self.cells));
+        self.cells += fit;
+        if fit < n && !self.too_many {
+            self.too_many = true;
+            self.diagnostics.push(Diagnostic::new(
+                range,
+                format!("a block diagram has at most {MAX_CELLS} cells; leaving out more spaces"),
+            ));
+        }
+        fit
+    }
+
     /// Adds a cell to `group`, and to its subgraph's members.
     fn place(&mut self, group: usize, kind: CellKind, width: Option<(usize, TextRange)>, id: &str) {
         let w = match width {
@@ -289,6 +314,8 @@ impl Lowerer {
             }
             None => 1,
         };
+        // Blocks and groups are always placed; only spaces are left out past `MAX_CELLS`.
+        self.cells += 1;
         self.block.groups[group].cells.push(Cell { kind, width: w });
         if let Some(s) = self.block.groups[group].subgraph {
             self.block.chart.subgraphs[s].members.push(id.to_owned());
@@ -334,12 +361,16 @@ impl Lowerer {
         );
         for name in ids(stmt) {
             let classes = &mut self.block.chart.classes;
-            match classes.iter_mut().find(|c| c.name == name.text()) {
-                Some(c) => c.styles.extend(styles.iter().cloned()),
-                None => classes.push(ClassDef {
-                    name: name.text().to_owned(),
-                    styles: styles.clone(),
-                }),
+            match self.class_index.get(name.text()) {
+                Some(&i) => classes[i].styles.extend(styles.iter().cloned()),
+                None => {
+                    self.class_index
+                        .insert(name.text().to_owned(), classes.len());
+                    classes.push(ClassDef {
+                        name: name.text().to_owned(),
+                        styles: styles.clone(),
+                    });
+                }
             }
         }
     }

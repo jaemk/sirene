@@ -183,6 +183,42 @@ fn flowchart_edge_product() {
     );
 }
 
+/// Spaces past the block cell cap are left out, reported once.
+#[test]
+fn block_spaces() {
+    let src = format!("block-beta\ncolumns 1000\n{}", "space:1000\n".repeat(101));
+    check(
+        &src,
+        &["a block diagram has at most 100000 cells; leaving out more spaces"],
+    );
+}
+
+/// Unclosed strings and metadata on many lines do not each rescan the rest.
+#[test]
+fn unclosed_lines() {
+    let lower = |src: &str| diagram::lower(src).diagnostics.len();
+    let lines = |line: &str| format!("x\n{}", line.repeat(50_000));
+    assert!(lower(&format!("block-beta\n{}", lines("a[\"x\n"))) >= 1);
+    assert!(lower(&format!("block-beta\n{}", lines("a --\"x\n"))) >= 1);
+    assert!(lower(&format!("mindmap\n{}", lines("  a((\"`x\n"))) >= 1);
+    assert!(lower(&format!("mindmap\n{}", lines("  a@{\n"))) >= 1);
+}
+
+/// Branch lookups stay near linear.
+#[test]
+fn git_checkouts() {
+    let mut s = String::from("gitGraph\ncommit\n");
+    for i in 0..20_000 {
+        let _ = writeln!(s, "branch b{i}");
+    }
+    for _ in 0..20_000 {
+        s.push_str("checkout b0\n");
+    }
+    assert!(diagram::lower(&s).diagnostics.is_empty());
+    let order = format!("gitGraph\nbranch a order: {}\n", "9".repeat(400));
+    check(&order, &["`order` takes a whole number"]);
+}
+
 /// Member lookups stay near linear: one subgraph with many members, and many subgraphs each
 /// listed again by the next.
 #[test]

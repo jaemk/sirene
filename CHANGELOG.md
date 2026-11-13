@@ -20,6 +20,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   linear time.
 - ASCII output: a wide character written over part of another clears the rest of it, one that
   does not fit is left out, and title and git label widths match the canvas.
+- Block diagrams: `space` cells past 100000 are left out with one error; unclosed strings and
+  `classDef` lines are read in linear time. Mindmaps: unclosed markdown strings and `@{` on many
+  lines do not each rescan the rest. Git graphs: branches are looked up by name in constant time,
+  and an `order` too large for a number is an error.
 - SVG output: control characters XML does not allow are written as U+FFFD, and a NaN or infinite
   number as 0, so the file stays well-formed.
 - Layout: rank tightening visits only items next to one that moved and has a work cap, instead
