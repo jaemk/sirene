@@ -2,6 +2,9 @@
 /local
 !/local/.gitkeep
 /scripts/probe.sh
+/.claude/worktrees
+# Snapshot drafts insta writes for review.
+*.snap.new
 # Built and rendered by .github/workflows/pages.yml.
 /docs/book
 /docs/landing/hero.svg
