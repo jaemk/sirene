@@ -362,6 +362,29 @@ impl Lower {
             rest
         };
         let Some((short, id, label, rest)) = element(rest) else {
+            // An unnamed container: `cloud {` or `node #color {`.
+            let tail = rest.trim_start();
+            if !kw.is_empty() && (tail.starts_with('{') || tail.starts_with('#')) {
+                let decor = self.decor(line, tail, cursor);
+                if decor.open {
+                    let id = format!("__unnamed{}", self.chart.subgraphs.len());
+                    let i = self.chart.subgraphs.len();
+                    self.chart
+                        .subgraphs
+                        .push(Subgraph::new(&id, Label::plain(""), line.range));
+                    if let Some(c) = self.container() {
+                        self.chart.subgraphs[c].members.push(id.clone());
+                    }
+                    self.containers.insert(id, i);
+                    self.chart.subgraphs[i]
+                        .styles
+                        .extend(decor.fill.map(|value| Style {
+                            property: "fill".into(),
+                            value,
+                        }));
+                    return self.open(Some(i), line.range);
+                }
+            }
             let what = if kw.is_empty() {
                 STATEMENT.to_owned()
             } else {
