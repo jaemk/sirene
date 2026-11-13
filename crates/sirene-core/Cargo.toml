@@ -1,6 +1,6 @@
 [package]
 name = "sirene-core"
-description = "Mermaid flowchart parsing, layout, and ASCII/SVG/PNG rendering for sirene"
+description = "Mermaid, PlantUML, and Graphviz DOT parsing, layout, and ASCII/SVG/PNG rendering for sirene"
 readme = "README.md"
 version.workspace = true
 edition.workspace = true

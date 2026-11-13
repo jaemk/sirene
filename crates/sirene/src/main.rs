@@ -10,7 +10,7 @@ use sirene_core::diagram::{self, Lang, Lowered};
 use sirene_core::scene::png::{self, FontMetrics};
 use sirene_core::scene::{self, Approx, Theme};
 
-/// Mermaid diagram editor and viewer.
+/// Mermaid, PlantUML, and Graphviz DOT diagram editor and viewer.
 ///
 /// With no command, opens each FILE in an editor window, or a new document with a starter
 /// flowchart.
@@ -19,7 +19,7 @@ use sirene_core::scene::{self, Approx, Theme};
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
-    /// Mermaid files to edit.
+    /// Diagram or Markdown files to edit.
     files: Vec<PathBuf>,
     /// Print what each step does, with timings, to stderr.
     #[arg(short, long, global = true)]
@@ -35,7 +35,7 @@ enum LangArg {
     Mermaid,
     /// Graphviz DOT.
     Dot,
-    /// PlantUML sequence diagrams.
+    /// PlantUML.
     Plantuml,
 }
 
@@ -98,14 +98,14 @@ mod update;
 enum Command {
     /// Check diagrams for errors without drawing them; prints only diagnostics.
     Check {
-        /// Mermaid files, directories of them, or Markdown files (their mermaid blocks); `-`
+        /// Diagram files, directories of them, or Markdown files (their diagram blocks); `-`
         /// for stdin.
         #[arg(required = true)]
         files: Vec<PathBuf>,
     },
     /// Print a diagram as text.
     Ascii {
-        /// Mermaid file to read; stdin when omitted or `-`.
+        /// Diagram file to read; stdin when omitted or `-`.
         file: Option<PathBuf>,
         /// Characters to draw with.
         #[arg(long, value_enum, default_value_t = CharsetArg::Unicode)]
@@ -116,9 +116,9 @@ enum Command {
     },
     /// Print a diagram as SVG, or write one per diagram in a directory or Markdown file.
     Svg {
-        /// Mermaid file or directory to read; stdin when omitted or `-`. A directory's `.mmd`
-        /// and `.mermaid` files are written as `.svg` beside them, or under --output. A
-        /// Markdown file's mermaid blocks are written as NAME-1.svg, NAME-2.svg, ...
+        /// Diagram file or directory to read; stdin when omitted or `-`. A directory's diagram
+        /// files (`.mmd`, `.puml`, `.dot`, ...) are written as `.svg` beside them, or under
+        /// --output. A Markdown file's diagram blocks are written as NAME-1.svg, NAME-2.svg, ...
         file: Option<PathBuf>,
         /// Write again each time an input changes, until interrupted.
         #[arg(short, long)]
@@ -135,9 +135,9 @@ enum Command {
     },
     /// Write a diagram as a PNG image, or one per diagram in a directory or Markdown file.
     Png {
-        /// Mermaid file or directory to read; stdin when omitted or `-`. A directory's `.mmd`
-        /// and `.mermaid` files are written as `.png` beside them, or under --output. A
-        /// Markdown file's mermaid blocks are written as NAME-1.png, NAME-2.png, ...
+        /// Diagram file or directory to read; stdin when omitted or `-`. A directory's diagram
+        /// files (`.mmd`, `.puml`, `.dot`, ...) are written as `.png` beside them, or under
+        /// --output. A Markdown file's diagram blocks are written as NAME-1.png, NAME-2.png, ...
         file: Option<PathBuf>,
         /// Write again each time an input changes, until interrupted.
         #[arg(short, long)]
@@ -370,7 +370,7 @@ fn run(cli: Cli) -> ExitCode {
     }
 }
 
-/// Renders Markdown file `md`'s mermaid blocks (CLI-12); with `watch`, again whenever it changes,
+/// Renders Markdown file `md`'s diagram blocks (CLI-12); with `watch`, again whenever it changes,
 /// never returning.
 fn render_markdown(
     md: &Path,
@@ -580,13 +580,6 @@ fn stamp(path: &Path) -> Option<Stamp> {
     Some((meta.modified().ok()?, meta.len()))
 }
 
-/// The diagram files under `dir` (`.mmd`, `.mermaid`, `.dot`, `.gv`, `.puml`, `.plantuml`,
-/// `.pu`, and `.iuml`; LANGS-1), sorted, each with its output: the same path relative to `out`,
-/// with extension `ext`. Hidden entries and symlinked directories are skipped.
-pub(crate) const DIAGRAM_EXTENSIONS: &[&str] = &[
-    "mmd", "mermaid", "dot", "gv", "puml", "plantuml", "pu", "iuml",
-];
-
 /// The message for a directory with no diagram files.
 pub(crate) fn no_diagrams(dir: &Path) -> String {
     format!(
@@ -595,6 +588,10 @@ pub(crate) fn no_diagrams(dir: &Path) -> String {
     )
 }
 
+/// The diagram files under `dir` (`.mmd`, `.mermaid`, `.dot`, `.gv`, `.puml`, `.plantuml`,
+/// `.pu`, and `.iuml`, in any case; LANGS-1), sorted, each with its output: the same path
+/// relative to `out`, with extension `ext`. Hidden entries and symlinked directories are
+/// skipped.
 fn scan(dir: &Path, out: &Path, ext: &str) -> Vec<(PathBuf, PathBuf)> {
     let mut found = Vec::new();
     let mut stack = vec![dir.to_path_buf()];
@@ -613,11 +610,7 @@ fn scan(dir: &Path, out: &Path, ext: &str) -> Vec<(PathBuf, PathBuf)> {
             }
             if entry.file_type().is_ok_and(|t| t.is_dir()) {
                 stack.push(path);
-            } else if path.is_file()
-                && path
-                    .extension()
-                    .is_some_and(|x| DIAGRAM_EXTENSIONS.iter().any(|e| x == *e))
-            {
+            } else if path.is_file() && Lang::of_path(&path).is_some() {
                 let rel = path.strip_prefix(dir).expect("found under dir");
                 let target = out.join(rel).with_extension(ext);
                 found.push((path, target));
@@ -857,6 +850,7 @@ mod tests {
             ".git/d.mmd",
             "e.md",
             ".f.mmd",
+            "x/G.PUML",
         ] {
             std::fs::write(dir.join(f), "").unwrap();
         }
@@ -869,6 +863,7 @@ mod tests {
             rel,
             [
                 (PathBuf::from("b.mmd"), PathBuf::from("o/b.png")),
+                (PathBuf::from("x/G.PUML"), PathBuf::from("o/x/G.png")),
                 (PathBuf::from("x/a.mermaid"), PathBuf::from("o/x/a.png")),
                 (PathBuf::from("x/y/c.mmd"), PathBuf::from("o/x/y/c.png")),
             ]

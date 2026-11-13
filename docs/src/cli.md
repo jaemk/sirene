@@ -2,7 +2,7 @@
 
 ```
 sirene [FILE...]              open each FILE in the editor, or a new document
-sirene ascii [FILE|-]         print a flowchart as text
+sirene ascii [FILE|-]         print a diagram as text
 sirene svg [FILE|DIR|-]       print or write SVG
 sirene png [FILE|DIR|-]       write PNG
 sirene check [FILE|DIR|-]...  print diagnostics only
@@ -15,9 +15,11 @@ or `-`, they read stdin.
 ## Languages
 
 A diagram's language comes from its file extension (`.mmd` and `.mermaid` Mermaid, `.dot` and
-`.gv` [Graphviz DOT](dot.md)) or its Markdown block's name (`mermaid`, `dot`, `graphviz`). Stdin
-and other files are DOT when they start with a DOT graph header and Mermaid otherwise.
-`--lang mermaid|dot`, before or after the command, reads every diagram as that language:
+`.gv` [Graphviz DOT](dot.md), `.puml`, `.plantuml`, `.pu`, and `.iuml` [PlantUML](plantuml.md))
+or its Markdown block's name (`mermaid`, `dot`, `graphviz`, `plantuml`, `puml`). Stdin and other
+files are DOT when they start with a DOT graph header, PlantUML when they have an `@start` line,
+and Mermaid otherwise. `--lang mermaid|dot|plantuml`, before or after the command, reads every
+diagram as that language:
 
 ```
 printf 'digraph { a -> b }\n' | sirene ascii --lang dot
@@ -38,7 +40,7 @@ This exits with status 2, and no window opens.
 
 ## `sirene ascii`
 
-Prints the flowchart with box-drawing characters. `--charset ascii` uses only ASCII
+Prints the diagram with box-drawing characters. `--charset ascii` uses only ASCII
 (`+`, `-`, `|`, `>`).
 
 ```
@@ -74,8 +76,8 @@ sirene refuses to write a PNG to a terminal, or to overwrite the input file.
 
 ## Directories
 
-`sirene svg DIR` and `sirene png DIR` render every `.mmd`, `.mermaid`, `.dot`, and `.gv` file
-under DIR, skipping hidden entries and symlinked directories. Each output is written beside its diagram, or with
+`sirene svg DIR` and `sirene png DIR` render every diagram file (by the extensions above, in any
+case) under DIR, skipping hidden entries and symlinked directories. Each output is written beside its diagram, or with
 `-o OUTDIR` at the same relative path under OUTDIR:
 
 ```
@@ -88,13 +90,14 @@ same output (`a.mmd` beside `a.mermaid`), the first in path order wins and the o
 
 ## Markdown files
 
-`sirene svg FILE.md` and `sirene png FILE.md` (also `.markdown`) render each `mermaid`, `dot`, or `graphviz` code block
-to `STEM-N.svg` or `STEM-N.png` beside the file, N counting blocks from 1; `-o OUTDIR` writes
-them there instead.
+`sirene svg FILE.md` and `sirene png FILE.md` (also `.markdown`) render each `mermaid`, `dot`,
+`graphviz`, `plantuml`, or `puml` code block to `STEM-N.svg` or `STEM-N.png` beside the file, N
+counting blocks from 1; `-o OUTDIR` writes them there instead.
 
 The Markdown file is not changed unless `--link` is given. `--link` adds an image link on the
 line after each rendered block, and only when that line is not already the link, so running it
-again changes nothing. The blocks themselves are never changed or removed.
+again changes nothing. The link is relative to the Markdown file (`../img/guide-1.svg` for
+`sirene svg docs/guide.md -o img --link`). The blocks themselves are never changed or removed.
 
 ```
 $ sirene svg guide.md --link

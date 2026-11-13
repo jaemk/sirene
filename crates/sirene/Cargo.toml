@@ -1,6 +1,6 @@
 [package]
 name = "sirene"
-description = "Mermaid diagram editor and viewer"
+description = "Mermaid, PlantUML, and Graphviz DOT diagram editor and viewer"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

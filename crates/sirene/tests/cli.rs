@@ -24,7 +24,7 @@ fn prints_help() {
         .assert()
         .success()
         .stdout(predicate::str::contains(
-            "Mermaid diagram editor and viewer",
+            "Mermaid, PlantUML, and Graphviz DOT diagram editor and viewer",
         ));
 }
 
@@ -783,6 +783,30 @@ fn check() {
     sirene().arg("check").assert().failure();
 }
 
+/// `--link` with `-o` outside the Markdown file's directory links the images from that
+/// directory, not from the working directory.
+#[test]
+fn markdown_links_from_the_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    std::fs::create_dir(dir.join("docs")).unwrap();
+    std::fs::write(
+        dir.join("docs/guide.md"),
+        "```mermaid\nflowchart LR\n  A --> B\n```\n",
+    )
+    .unwrap();
+    sirene()
+        .current_dir(dir)
+        .args(["svg", "docs/guide.md", "-o", "img", "--link"])
+        .assert()
+        .success();
+    assert!(dir.join("img/guide-1.svg").exists());
+    assert_eq!(
+        std::fs::read_to_string(dir.join("docs/guide.md")).unwrap(),
+        "```mermaid\nflowchart LR\n  A --> B\n```\n![diagram 1](../img/guide-1.svg)\n"
+    );
+}
+
 /// `svg` and `png` on a Markdown file write one image per mermaid block and never change the
 /// blocks; `--link` adds a link after each, once.
 #[test]
@@ -864,7 +888,7 @@ fn markdown_images() {
         .arg(&md)
         .assert()
         .success()
-        .stderr(predicate::str::contains("no mermaid blocks"));
+        .stderr(predicate::str::contains("no diagram blocks"));
 }
 
 /// Watching a Markdown file renders its blocks again when it changes.
