@@ -19,6 +19,8 @@ fonts. Their copyright notices and licenses follow.
   crates/sirene-core/src/theme.rs): MIT
 * khroma (crates/sirene-core/src/theme.rs: HSL color adjustment): MIT
 * Noto Sans (crates/sirene-core/fonts/, embedded in PNG output): SIL Open Font License 1.1
+* JetBrains Mono (docs/landing/fonts/, served by the documentation site's landing page only):
+  SIL Open Font License 1.1
 
 ------------------------------------------------------------------------------
 
@@ -308,6 +310,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+
+------------------------------------------------------------------------------
+
+JetBrains Mono
+https://github.com/JetBrains/JetBrainsMono
+
+JetBrainsMono-Regular.woff2 (version 2.304): Copyright 2020 The JetBrains Mono Project Authors
+(https://github.com/JetBrains/JetBrainsMono)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1, the same license
+as Noto Sans below; the full text is also in docs/landing/fonts/OFL.txt beside the font.
 
 ------------------------------------------------------------------------------
 

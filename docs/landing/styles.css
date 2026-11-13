@@ -13,7 +13,16 @@
   --deep: #1e3a8a;
   --drawing-bg: #1e1e1e;
   --radius: 14px;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --mono: "JetBrains Mono Box", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Google Fonts serves JetBrains Mono without its arrows and box drawing, so `sirene ascii`
+   output would mix in a fallback font of another width. The full font fills those in. */
+@font-face {
+  font-family: "JetBrains Mono Box";
+  src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-display: swap;
+  unicode-range: U+2190-21FF, U+2500-25FF;
 }
 
 * { box-sizing: border-box; }
