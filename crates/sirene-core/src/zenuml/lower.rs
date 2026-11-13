@@ -1,6 +1,8 @@
 //! Lowers a ZenUML tree to the sequence diagram model (MZEN-2): sync calls activate their
 //! target for their body and reply to their caller; calls with no caller come from the starter.
 
+use std::collections::{HashMap, HashSet};
+
 use rowan::{TextRange, TextSize};
 
 use super::parser::unquote;
@@ -15,12 +17,14 @@ use crate::syntax::{SyntaxNode, SyntaxToken};
 
 /// `errors` are where the parser reported errors; a statement with one on its own line is
 /// skipped.
-pub(crate) fn lower(root: &SyntaxNode, errors: Vec<TextSize>) -> (Sequence, Vec<Diagnostic>) {
+pub(crate) fn lower(root: &SyntaxNode, mut errors: Vec<TextSize>) -> (Sequence, Vec<Diagnostic>) {
+    errors.sort();
     let mut l = Lower {
         errors,
         ..Lower::default()
     };
-    // The implicit starter; dropped at the end if nothing calls from it.
+    // The implicit starter, id "": dropped at the end if nothing calls from it.
+    l.ids.insert(String::new(), 0);
     l.seq.participants.push(Participant {
         id: String::new(),
         label: Vec::new(),
@@ -72,7 +76,12 @@ struct Lower {
     frames: Vec<Frame>,
     /// A pending `@return`, for the next async message.
     reply: Option<TextRange>,
+    /// The parser's error offsets, in order.
     errors: Vec<TextSize>,
+    /// Each participant's index by id.
+    ids: HashMap<String, usize>,
+    /// The participants a message or create event has named so far.
+    used: HashSet<usize>,
 }
 
 fn tokens(node: &SyntaxNode) -> Vec<SyntaxToken> {
@@ -117,7 +126,23 @@ impl Lower {
             .children_with_tokens()
             .find(|e| e.kind() == L_BRACE)
             .map_or(node.text_range().end(), |e| e.text_range().start());
-        self.errors.iter().any(|&e| start <= e && e <= end)
+        let i = self.errors.partition_point(|&e| e < start);
+        self.errors.get(i).is_some_and(|&e| e <= end)
+    }
+
+    /// Adds `e` to the events, noting the participants it names.
+    fn push(&mut self, e: Event) {
+        match &e {
+            Event::Message(m) => {
+                self.used.insert(m.from);
+                self.used.insert(m.to);
+            }
+            Event::Create(p) => {
+                self.used.insert(*p);
+            }
+            _ => {}
+        }
+        self.seq.events.push(e);
     }
 
     fn warning(&mut self, range: TextRange, message: impl Into<String>) {
@@ -125,9 +150,10 @@ impl Lower {
     }
 
     fn ensure(&mut self, id: &str) -> usize {
-        if let Some(i) = self.seq.participants.iter().position(|p| p.id == id) {
+        if let Some(&i) = self.ids.get(id) {
             return i;
         }
+        self.ids.insert(id.to_owned(), self.seq.participants.len());
         self.seq.participants.push(Participant {
             id: id.to_owned(),
             label: display(id),
@@ -255,7 +281,7 @@ impl Lower {
             .find(|t| t.kind() == TEXT)
             .map_or("", |t| t.text());
         let m = self.message(from, to, arrow, text);
-        self.seq.events.push(Event::Message(m));
+        self.push(Event::Message(m));
     }
 
     /// `[a =] [A->]B.method(args) [{ ... }]` or `[a =] new B(args) [{ ... }]`.
@@ -288,19 +314,12 @@ impl Lower {
                 None => method,
             }
         };
-        if new {
-            let used = self.seq.events.iter().any(|e| match e {
-                Event::Message(m) => m.from == target || m.to == target,
-                Event::Create(p) => *p == target,
-                _ => false,
-            });
-            if !used {
-                self.seq.events.push(Event::Create(target));
-            }
+        if new && !self.used.contains(&target) {
+            self.push(Event::Create(target));
         }
         let mut m = self.message(caller, target, SYNC, &text);
         m.activate = true;
-        self.seq.events.push(Event::Message(m));
+        self.push(Event::Message(m));
         self.frames.push(Frame {
             caller,
             target,
@@ -317,9 +336,9 @@ impl Lower {
                 let var = a.split_whitespace().last().unwrap_or_default().to_owned();
                 let mut m = self.message(target, caller, REPLY, &var);
                 m.deactivate = true;
-                self.seq.events.push(Event::Message(m));
+                self.push(Event::Message(m));
             }
-            _ => self.seq.events.push(Event::Deactivate(target)),
+            _ => self.push(Event::Deactivate(target)),
         }
     }
 
@@ -336,7 +355,7 @@ impl Lower {
             .find(|t| t.kind() == TEXT)
             .map_or(String::new(), |t| t.text().to_owned());
         let m = self.message(from, to, REPLY, &text);
-        self.seq.events.push(Event::Message(m));
+        self.push(Event::Message(m));
     }
 
     /// `if` / `else`, a loop, `opt`, `par`, or `try` / `catch` / `finally`.
@@ -376,10 +395,10 @@ impl Lower {
                 [ref w] if w == "finally" => "finally".to_owned(),
                 _ => cond,
             };
-            self.seq.events.push(Event::Divider(label));
+            self.push(Event::Divider(label));
             self.statements(b);
         }
-        self.seq.events.push(Event::End);
+        self.push(Event::End);
     }
 
     fn finish(mut self) -> (Sequence, Vec<Diagnostic>) {

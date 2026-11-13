@@ -197,20 +197,24 @@ fn inline_data(token: &str) -> Vec<String> {
 /// A data block's lines: those between its `{` and `}` lines, without their common indent or
 /// blank lines around them.
 fn block_data(token: &str) -> Vec<String> {
-    let mut lines: Vec<&str> = token.lines().collect();
-    // The `{` line and the `}` line.
-    lines.remove(0);
-    lines.pop();
-    while lines.first().is_some_and(|l| l.trim().is_empty()) {
-        lines.remove(0);
+    let all: Vec<&str> = token.lines().collect();
+    // Without the `{` line and the `}` line.
+    let mut lines = all.get(1..all.len().saturating_sub(1)).unwrap_or(&[]);
+    while let [first, rest @ ..] = lines
+        && first.trim().is_empty()
+    {
+        lines = rest;
     }
-    while lines.last().is_some_and(|l| l.trim().is_empty()) {
-        lines.pop();
+    while let [rest @ .., last] = lines
+        && last.trim().is_empty()
+    {
+        lines = rest;
     }
+    // The indent is spaces and tabs only, so it always ends on a char boundary.
     let indent = lines
         .iter()
         .filter(|l| !l.trim().is_empty())
-        .map(|l| l.len() - l.trim_start().len())
+        .map(|l| l.len() - l.trim_start_matches([' ', '\t']).len())
         .min()
         .unwrap_or(0);
     lines
@@ -452,5 +456,8 @@ mod tests {
             block_data("{\n\n    a: 1\n      b: 2\n\n  }"),
             ["a: 1", "  b: 2"]
         );
+        // A no-break space is text, not indent.
+        assert_eq!(block_data("{\n  \u{a0}a\n   b\n}"), ["\u{a0}a", " b"]);
+        assert!(block_data("{").is_empty());
     }
 }

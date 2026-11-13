@@ -368,12 +368,31 @@ impl Parser<'_> {
             _ => &[],
         };
         loop {
+            // The next branch may share the `}` line or start a later one, as ZenUML's grammar
+            // hides whitespace and line ends.
             let r = self.rest();
-            let ws = scan::ws_len(r);
+            let mut ws = 0;
+            loop {
+                let n = scan::ws_len(&r[ws..]) + scan::newline_len(&r[ws..]);
+                if n == 0 {
+                    break;
+                }
+                ws += n;
+            }
             let Some(kw) = next.iter().find(|k| keyword(&r[ws..], k)) else {
                 break;
             };
-            self.ws();
+            loop {
+                let r = self.rest();
+                let (w, nl) = (scan::ws_len(r), scan::newline_len(r));
+                if w > 0 {
+                    self.token(WHITESPACE, w);
+                } else if nl > 0 {
+                    self.token(NEWLINE, nl);
+                } else {
+                    break;
+                }
+            }
             let words: &[&str] = if *kw == "else" && keyword(r[ws + 4..].trim_start(), "if") {
                 &["else", "if"]
             } else {

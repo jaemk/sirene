@@ -6,7 +6,7 @@
 use super::canvas::{Canvas, Line, glyph};
 use super::{Charset, Options, draw_box, width};
 use crate::eventmodel::EventModel;
-use crate::layout::{Point, Rect};
+use crate::layout::Rect;
 
 /// The widest a name or data line runs before wrapping.
 const NAME_MAX: i32 = 28;
@@ -128,7 +128,6 @@ pub fn render(chart: &EventModel, options: &Options) -> String {
     }
 
     // Relations between lanes, as vertical arrows where one fits.
-    let occupied = |x: i32, y: i32| boxes.iter().any(|b| b.r.contains(Point::new(x, y)));
     let mut listed = Vec::new();
     for rel in &chart.relations {
         let (s, t) = (&boxes[rel.from], &boxes[rel.to]);
@@ -149,8 +148,18 @@ pub fn render(chart: &EventModel, options: &Options) -> String {
             };
             let hi = s.r.right().min(t.r.right()) - 1;
             let mid = (lo + hi) / 2;
+            // The columns a box between the two rows covers.
+            let mut blocked = vec![false; (hi - lo + 1).max(0) as usize];
+            for b in &boxes {
+                let r = b.r;
+                if y0 <= y1 && r.y <= y1 && r.bottom() >= y0 && r.x <= hi && r.right() >= lo {
+                    for c in r.x.max(lo)..=r.right().min(hi) {
+                        blocked[(c - lo) as usize] = true;
+                    }
+                }
+            }
             let column = (lo..=hi)
-                .filter(|&c| (y0..=y1).all(|y| !occupied(c, y)))
+                .filter(|&c| !blocked[(c - lo) as usize])
                 .min_by_key(|&c| (c - mid).abs());
             match column {
                 Some(c) if down => {
