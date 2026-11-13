@@ -95,13 +95,17 @@ impl XyChart {
         }
     }
 
-    /// The value axis's span: `y_range`, else the data's, widened by 1 each way when it is a
-    /// single value (or 0 to 1 with no data).
+    /// The value axis's span: `y_range`, else the drawn values' (not those past the last
+    /// category), widened by 1 each way when it is a single value (or 0 to 1 with no data).
     pub fn y_bounds(&self) -> (f64, f64) {
         if let Some(r) = self.y_range {
             return widen(r);
         }
-        let mut values = self.series.iter().flat_map(|s| s.values.iter().copied());
+        let n = self.positions();
+        let mut values = self
+            .series
+            .iter()
+            .flat_map(|s| s.values.iter().take(n).copied());
         let Some(first) = values.next() else {
             return (0.0, 1.0);
         };

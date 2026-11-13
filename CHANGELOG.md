@@ -15,6 +15,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `--link`: a path with spaces or parentheses is linked as `<...>`, the link is indented as the
+  fence (so it stays in a list item), and a link from an earlier run is replaced when a new block
+  shifts the numbering instead of a second link being added.
+- Mermaid XY charts: values past the last category no longer stretch the value axis, and on a
+  numeric x-axis each series spans the whole range by its own length, as in Mermaid.
+- Mermaid sankey diagrams: a value may have an exponent (`1e3`); a value over 1e30 is an error
+  instead of drawing the chart with NaN geometry.
+
 - Mermaid gantt charts: a huge duration is an error instead of overflowing, and `excludes` is
   not walked over a task longer than 1,000,000 days.
 - Mermaid timelines: a line starting with `#` is a comment, as in Mermaid, instead of a period.

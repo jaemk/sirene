@@ -115,12 +115,20 @@ fn links(s: &Sankey) -> Vec<(&str, &str, f64)> {
 #[test]
 fn model() {
     let (s, d) = lowered(
-        "---\ntitle: T\nconfig:\n  sankey:\n    width: 300\n    height: 200\n    linkColor: target\n    nodeAlignment: center\n    showValues: false\n    prefix: \"~\"\n    suffix: \" kg\"\n    nodeWidth: 4\n    nodePadding: 7\n---\nsankey\n  a b , \"c, \"\"d\"\"\" , 1.5\nx,a b,2\n",
+        "---\ntitle: T\nconfig:\n  sankey:\n    width: 300\n    height: 200\n    linkColor: target\n    nodeAlignment: center\n    showValues: false\n    prefix: \"~\"\n    suffix: \" kg\"\n    nodeWidth: 4\n    nodePadding: 7\n---\nsankey\n  a b , \"c, \"\"d\"\"\" , 1.5\nx,a b,2\ny,x,1e3\nz,x,2.5E-1\n",
     );
     assert!(d.is_empty(), "{d:?}");
     assert_eq!(s.title.as_deref(), Some("T"));
-    assert_eq!(s.nodes, ["a b", "c, \"d\"", "x"]);
-    assert_eq!(links(&s), [("a b", "c, \"d\"", 1.5), ("x", "a b", 2.0)]);
+    assert_eq!(s.nodes, ["a b", "c, \"d\"", "x", "y", "z"]);
+    assert_eq!(
+        links(&s),
+        [
+            ("a b", "c, \"d\"", 1.5),
+            ("x", "a b", 2.0),
+            ("y", "x", 1000.0),
+            ("z", "x", 0.25)
+        ]
+    );
     assert_eq!((s.width, s.height, s.node_width), (300.0, 200.0, 4.0));
     assert_eq!(
         (&s.link_color, s.align, s.show_values, s.padding()),
@@ -137,7 +145,7 @@ fn model() {
 #[test]
 fn errors() {
     let (s, d) = lowered(
-        "---\nconfig:\n  sankey:\n    nodeAlignment: middle\n---\nsankey\nA,B,10\nB,C,4\nC,A,1\nD,D,2\nE,F,-3\n",
+        "---\nconfig:\n  sankey:\n    nodeAlignment: middle\n---\nsankey\nA,B,10\nB,C,4\nC,A,1\nD,D,2\nE,F,-3\nG,H,1e40\n",
     );
     let e = |m: &str| (Severity::Error, m.to_owned());
     assert_eq!(
@@ -156,6 +164,7 @@ fn errors() {
                  ignoring it"
             ),
             e("`E` -> `F` has a negative value; ignoring it"),
+            e("`G` -> `H` has a value over 1e30; ignoring it"),
         ]
     );
     assert_eq!(s.nodes, ["A", "B", "C"]);

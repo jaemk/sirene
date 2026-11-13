@@ -123,8 +123,10 @@ read, a block has an error, or an image cannot be written.
 
 The Markdown file is never changed, except with `--link`: then, after each closed block that
 was written, a line `![diagram N](PATH)` (PATH relative to the Markdown file's directory, with
-`..` to leave it; an absolute `-o` outside that directory stays absolute) is inserted unless the
-line after the block already is that line, and `linked the images in NAME` is printed. The
+`..` to leave it; an absolute `-o` outside that directory stays absolute; in `<...>` when it holds
+a space or parenthesis), indented as the fence, is inserted unless the line after the block
+already is that line, and `linked the images in NAME` is printed. A `![diagram ...](...)` line
+there from an earlier run with another number is replaced. The
 diagram blocks themselves are never removed or changed. `--watch` renders again whenever the file changes; the links it adds do not count as
 a change. `sirene ascii FILE.md` prints the blocks instead (CLI-2). Tests: `markdown_images`, `markdown_links_from_the_file`, and `watch_markdown` in
 `crates/sirene/tests/cli.rs`, and

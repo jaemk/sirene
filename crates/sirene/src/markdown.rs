@@ -111,10 +111,17 @@ pub fn image_path(md: &Path, out: Option<&Path>, n: usize, ext: &str) -> PathBuf
 fn link_target(md: &Path, image: &Path) -> String {
     let dir = md.parent().unwrap_or(Path::new(""));
     let rel = relative(dir, image).filter(|rel| !image.is_absolute() || !rel.starts_with(".."));
-    rel.as_deref()
+    let target = rel
+        .as_deref()
         .unwrap_or(image)
         .to_string_lossy()
-        .replace('\\', "/")
+        .replace('\\', "/");
+    // A CommonMark link destination with spaces or parentheses goes in `<...>`.
+    if target.contains(|c: char| c.is_whitespace() || "()<>".contains(c)) {
+        format!("<{}>", target.replace('<', "\\<").replace('>', "\\>"))
+    } else {
+        target
+    }
 }
 
 /// The path from directory `from` to `to`, both read against the working directory with `.`
@@ -164,8 +171,10 @@ fn link_line(md: &Path, image: &Path, n: usize) -> String {
     format!("![diagram {n}]({})", link_target(md, image))
 }
 
-/// `src` with `lines[k]` (a link line for block `k`) after each block in `blocks` that is
-/// closed and not already followed by it. The blocks themselves are never changed.
+/// `src` with `lines[k]` (a link line for block `k`, at the fence's indentation) after each block
+/// in `blocks` that is closed and not already followed by it. A `![diagram ...](...)` line from
+/// an earlier run, numbered for another block, is replaced. The blocks themselves are never
+/// changed.
 pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
     let newline = if src.contains("\r\n") { "\r\n" } else { "\n" };
     let mut out = String::with_capacity(src.len());
@@ -187,9 +196,20 @@ pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
         if !out.ends_with('\n') {
             out.push_str(newline);
         }
+        out.push_str(&" ".repeat(block.indent));
         out.push_str(line);
         out.push_str(newline);
         at = block.end;
+        let old = next.trim();
+        if old.starts_with("![diagram ") && old.ends_with(')') {
+            let ending = &rest[next.len()..];
+            let ending = if ending.starts_with("\r\n") {
+                2
+            } else {
+                usize::from(ending.starts_with('\n'))
+            };
+            at += next.len() + ending;
+        }
     }
     out.push_str(&src[at..]);
     out
@@ -347,6 +367,37 @@ mod tests {
             image_path(Path::new("x.md"), None, 1, "svg"),
             Path::new("x-1.svg")
         );
+        // Spaces and parentheses need `<...>` to stay one link destination.
+        assert_eq!(
+            link_target(md, Path::new("docs/my img/a (1).svg")),
+            "<my img/a (1).svg>"
+        );
+        assert_eq!(
+            link_target(md, Path::new("docs/a<b>.svg")),
+            "<a\\<b\\>.svg>"
+        );
+    }
+
+    #[test]
+    fn links_renumber_and_indent() {
+        // A block that moved from 1 to 2 gets its link replaced, not a second one.
+        let src = "```mermaid\npie\n```\n```mermaid\ngraph TD\n```\n![diagram 1](a-1.svg)\nb\n";
+        let blocks = markdown::mermaid_blocks(src);
+        let lines = vec![
+            (blocks[0].clone(), Some("![diagram 1](a-1.svg)".to_owned())),
+            (blocks[1].clone(), Some("![diagram 2](a-2.svg)".to_owned())),
+        ];
+        assert_eq!(
+            with_links(src, &lines),
+            "```mermaid\npie\n```\n![diagram 1](a-1.svg)\n```mermaid\ngraph TD\n```\n![diagram 2](a-2.svg)\nb\n"
+        );
+        // A fence in a list item keeps the link inside it.
+        let src = "- item\n\n  ```mermaid\n  pie\n  ```\n";
+        let blocks = markdown::mermaid_blocks(src);
+        let lines = vec![(blocks[0].clone(), Some("![diagram 1](a-1.svg)".to_owned()))];
+        let once = with_links(src, &lines);
+        assert_eq!(once, format!("{src}  ![diagram 1](a-1.svg)\n"));
+        assert_eq!(with_links(&once, &lines), once);
     }
 
     #[test]

@@ -85,8 +85,10 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         };
         band / 2.0 + f * (cat_len - band)
     };
-    let position = |i: usize| match &chart.x_axis {
-        XAxis::Range { min, max } => x_along(XyChart::x_at(*min, *max, i, n), *min, *max),
+    // Position `i` of a series of `len` values: on a numeric axis each series spans the whole
+    // range, as in Mermaid.
+    let position = |i: usize, len: usize| match &chart.x_axis {
+        XAxis::Range { min, max } => x_along(XyChart::x_at(*min, *max, i, len), *min, *max),
         XAxis::Categories(_) => center(i),
     };
     let wrap_at = if chart.horizontal {
@@ -236,11 +238,12 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     let bar_w = (band * BAR_SHARE).min(BAR_MAX);
     for (k, s) in chart.series.iter().enumerate() {
         let color = series_color(theme, k);
+        let len = s.values.len().min(n);
         let values = s.values.iter().take(n).enumerate();
         match s.kind {
             SeriesKind::Bar => {
                 for (i, &v) in values {
-                    let c = position(i);
+                    let c = position(i, len);
                     let (a, b) = (at(c - bar_w / 2.0, 0.0), at(c + bar_w / 2.0, frac(v)));
                     let r = BoxF {
                         x: a.x.min(b.x),
@@ -254,7 +257,7 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
             SeriesKind::Line => {
                 let segments: Vec<Segment> = values
                     .map(|(i, &v)| {
-                        let pt = at(position(i), frac(v));
+                        let pt = at(position(i, len), frac(v));
                         if i == 0 {
                             Segment::Move(pt)
                         } else {
@@ -273,9 +276,10 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     }
     // Point labels, over every series.
     for s in &chart.series {
+        let len = s.values.len().min(n);
         for (i, (&v, label)) in s.values.iter().zip(&s.labels).take(n).enumerate() {
             let Some(l) = label else { continue };
-            let pt = at(position(i), frac(v));
+            let pt = at(position(i, len), frac(v));
             let w = metrics.width(l, small);
             let c = if chart.horizontal {
                 Pt::new(pt.x + 8.0 + w / 2.0, pt.y)

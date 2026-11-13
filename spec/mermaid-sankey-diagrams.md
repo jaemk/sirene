@@ -10,7 +10,7 @@ the corpus under `crates/sirene-core/tests/fixtures/sankey/` (LANGS-6).
 - Header: `sankey-beta` or `sankey`.
 - A row per line, `source,target,value`, as CSV: a name field is plain text (trimmed) or
   double-quoted, where `""` is a literal `"` and a quoted field may hold `,`; the value is a
-  number and the rest of the line.
+  number, with an optional exponent (`1e3`), and the rest of the line.
 - Blank lines, comments, directives, frontmatter `title` and `config.sankey`.
 
 The parser shares `crate::lines` with the other Mermaid parsers and is lossless. A row with a
@@ -28,7 +28,7 @@ unit tests.
 (unset: 25 with values shown, else 10, as `Sankey::padding` gives). A bad config value is a
 warning and ignored; an unknown key is ignored.
 
-A negative value, a link from a node to itself, and a link that closes a cycle (named in the
+A negative value, a value over 1e30, a link from a node to itself, and a link that closes a cycle (named in the
 message) are errors and the link is left out; a node that only such links named is not drawn.
 `Sankey::format_value` rounds to two decimals and adds the prefix and suffix. Tests: `model`,
 `errors`, and the module's unit tests.

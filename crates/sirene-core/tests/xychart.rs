@@ -262,6 +262,18 @@ fn drawing() {
     // The bars: b twice as tall as a, c empty, all up from the axis.
     let r = bars(&s);
     assert_eq!(r.len(), 3, "{r:?}");
+    // Values past the last category neither draw nor stretch the value axis.
+    let (c, _) = lowered("xychart\n  x-axis [a, b]\n  bar [1, 2, 1000]\n");
+    assert_eq!(c.y_bounds(), (1.0, 2.0));
+    // On a numeric axis each series spans the whole range, whatever its length.
+    let spread =
+        diagram::lower("xychart\n  x-axis 0 --> 10\n  bar [1, 2, 3, 4, 5]\n  bar [1, 5]\n")
+            .diagram
+            .scene(&Approx, &Theme::LIGHT);
+    let r2 = bars(&spread);
+    let mid = |k: usize| (r2[k].0 + r2[k].2) / 2.0;
+    assert_eq!(r2.len(), 7, "{r2:?}");
+    assert!((mid(0) - mid(5)).abs() < 0.01 && (mid(4) - mid(6)).abs() < 0.01);
     let h = |k: usize| r[k].3 - r[k].1;
     assert!((h(1) - 2.0 * h(0)).abs() < 0.01 && h(2) < 0.01);
     assert!((r[0].3 - zero.y).abs() < 0.01);

@@ -30,8 +30,9 @@ replaces an earlier one. A series that did not parse is left out.
 
 `XyChart::positions` is the number of categories, or with none the longest series' length.
 `x_labels` are the categories, else the positions numbered from 1, or on a numeric axis each
-position's value, the values spread evenly from `min` to `max`. `y_bounds` is the y range, else
-the data's least and greatest values, widened by 1 each way when they are equal. A range written
+position's value, the values spread evenly from `min` to `max`; each series is drawn spread over
+the whole range by its own length, as in Mermaid. `y_bounds` is the y range, else the least and
+greatest values drawn (none past the last category), widened by 1 each way when they are equal. A range written
 high to low is a warning and turned around; categories on the y-axis are an error; a series with
 more values than categories is a warning, and the extra values are not drawn. `xychart::ticks`
 picks round tick values as d3 does. Tests: `series`, `errors`, and the module's unit tests.
