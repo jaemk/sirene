@@ -257,6 +257,20 @@ fn endless_excludes() {
         assert_eq!(task(&g, "x").end, date(2014, 1, 12));
         assert_eq!(task(&g, "y").drawn_end, date(2014, 1, 11));
     }
+    // A task too long to walk keeps its end and leaves `excludes` on for the others.
+    let (g, d) = gantt::parse(
+        "gantt\n  excludes weekends\n  x : 2014-01-09, 2000000d\n  y : 2014-01-09, 2d\n",
+    )
+    .lower_at(NOW);
+    let messages: Vec<&str> = d.iter().map(|d| d.message.as_str()).collect();
+    assert_eq!(
+        messages,
+        ["this task is too long to apply `excludes` to; ignoring it here"]
+    );
+    assert_eq!(task(&g, "y").end, date(2014, 1, 13));
+    // A duration past the dates a JavaScript `Date` holds is an error, not an overflow.
+    let (_, d) = gantt::parse("gantt\n  x : 2014-01-09, 99999999999999999999d\n").lower_at(NOW);
+    assert_eq!(d.len(), 1);
     // Six weekdays and a run of dates still leave a day.
     let g = chart(
         "gantt\n  excludes monday tuesday wednesday thursday friday saturday 2014-01-12 2014-01-19\n  \

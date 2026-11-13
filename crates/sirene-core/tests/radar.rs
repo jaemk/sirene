@@ -103,7 +103,7 @@ fn lowered(src: &str) -> (Radar, Vec<(Severity, String)>) {
 #[test]
 fn model() {
     let (r, d) = lowered(
-        "---\ntitle: Front\nconfig:\n  radar:\n    width: 400\n    marginLeft: 10\n    axisLabelFactor: 1.2\n---\nradar-beta\n  accTitle: at\n  curve k[\"Keyed\"]{ y: 2, x: 1,\n    z: 3 }\n  axis x[\"Ex\"], y\n  axis z\n  curve l{4, 5, 6}\n  graticule polygon\n  ticks 4\n  min -1\n  max 10\n  showLegend false\n",
+        "---\ntitle: Front\nconfig:\n  radar:\n    width: 400\n    marginLeft: 10\n    axisLabelFactor: 1.2\n---\nradar-beta\n  accTitle: at\n  curve k[\"Keyed\"]{ y: 2, x: 1,\n    z: 3 }\n  axis x['E\\'x'], y\n  axis z\n  curve l{4, 5, 6}\n  graticule polygon, ticks 4\n  min -1, max 10\n  showLegend false\n",
     );
     assert!(d.is_empty(), "{d:?}");
     assert_eq!(r.title.as_deref(), Some("Front"));
@@ -113,7 +113,7 @@ fn model() {
         .iter()
         .map(|a| (a.id.as_str(), a.label.as_str()))
         .collect();
-    assert_eq!(axes, [("x", "Ex"), ("y", "y"), ("z", "z")]);
+    assert_eq!(axes, [("x", "E'x"), ("y", "y"), ("z", "z")]);
     let curves: Vec<(&str, &[f64])> = r
         .curves
         .iter()

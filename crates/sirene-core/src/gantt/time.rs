@@ -806,18 +806,30 @@ pub fn add_duration(t: Time, s: &str) -> Option<Time> {
         return None;
     }
     let v: f64 = num.parse().ok()?;
-    Some(match unit {
-        "ms" => t + v.round() as i64,
-        "s" => t + (v * SECOND as f64).round() as i64,
-        "m" => t + (v * MINUTE as f64).round() as i64,
-        "h" => t + (v * HOUR as f64).round() as i64,
-        "d" => t + v.round() as i64 * DAY,
-        "w" => t + (v * 7.0).round() as i64 * DAY,
-        "M" => add_months(t, v.trunc() as i64),
-        "y" => add_months(t, v.trunc() as i64 * 12),
+    let ms = match unit {
+        "ms" => v.round(),
+        "s" => (v * SECOND as f64).round(),
+        "m" => (v * MINUTE as f64).round(),
+        "h" => (v * HOUR as f64).round(),
+        "d" => v.round() * DAY as f64,
+        "w" => (v * 7.0).round() * DAY as f64,
+        "M" | "y" => {
+            let months = v.trunc() * if unit == "y" { 12.0 } else { 1.0 };
+            // More months than a date can span.
+            if months > LIMIT / (28 * DAY) as f64 {
+                return None;
+            }
+            return Some(add_months(t, months as i64)).filter(|t| t.abs() <= LIMIT as i64);
+        }
         _ => return None,
-    })
+    };
+    let end = t as f64 + ms;
+    (end.abs() <= LIMIT).then(|| t + ms as i64)
 }
+
+/// The latest time a JavaScript `Date` (and so dayjs) can hold, in milliseconds either side of
+/// 1970.
+const LIMIT: f64 = 8.64e15;
 
 #[cfg(test)]
 mod tests {
@@ -1099,7 +1111,21 @@ mod tests {
         assert_eq!(add_duration(t, "2m"), Some(t + 2 * MINUTE));
         assert_eq!(add_duration(t, "10s"), Some(t + 10 * SECOND));
         assert_eq!(add_duration(t, "500ms"), Some(t + 500));
-        for bad in ["d", "3", "3x", ".5d", "1.d", "1.2.3d", "-1d"] {
+        assert!(add_duration(t, "200000y").is_some());
+        for bad in [
+            "d",
+            "3",
+            "3x",
+            ".5d",
+            "1.d",
+            "1.2.3d",
+            "-1d",
+            "99999999999999999999d",
+            "100000000d",
+            "9000000000000000ms",
+            "99999999999999999999y",
+            "300000y",
+        ] {
             assert_eq!(add_duration(t, bad), None, "{bad}");
         }
     }

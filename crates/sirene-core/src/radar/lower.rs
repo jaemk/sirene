@@ -3,6 +3,7 @@
 use super::{Axis, Curve, Graticule, Radar};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
+use crate::lines::unquote_escaped;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -107,7 +108,7 @@ fn format(n: f64) -> String {
 /// An entry's id, and its label or else its id.
 fn id_label(e: &SyntaxNode) -> (String, String) {
     let id = token(e, IDENT).map_or(String::new(), |t| t.text().to_owned());
-    let label = token(e, STRING).map_or_else(|| id.clone(), |t| text::unquote(t.text()).to_owned());
+    let label = token(e, STRING).map_or_else(|| id.clone(), |t| unquote_escaped(t.text()));
     (id, label)
 }
 

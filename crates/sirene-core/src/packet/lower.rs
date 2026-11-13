@@ -3,6 +3,7 @@
 use super::{Field, MAX_BIT, Packet};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
+use crate::lines::unquote_escaped;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -107,7 +108,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Packet, Vec<Diagnostic>) {
                 p.fields.push(Field {
                     start,
                     end,
-                    label: text::unquote(label.text()).to_owned(),
+                    label: unquote_escaped(label.text()),
                 });
                 next = end + 1;
             }

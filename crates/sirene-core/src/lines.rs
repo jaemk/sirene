@@ -101,6 +101,37 @@ pub(crate) fn is_end(s: &str) -> bool {
     scan::is_stmt_end(s) || s.starts_with('}')
 }
 
+/// The length of a string in the langium diagrams' `STRING` terminal at the start of `s`:
+/// `"..."` or `'...'` on one line, where a backslash escapes the next character.
+pub(crate) fn quoted_len(s: &str) -> Option<usize> {
+    let quote = s.chars().next().filter(|c| matches!(c, '"' | '\''))?;
+    let mut chars = s.char_indices().skip(1);
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '\\' if !matches!(chars.next(), Some((_, '\n' | '\r'))) => {}
+            '\\' | '\n' | '\r' => return None,
+            c if c == quote => return Some(i + 1),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// A `quoted_len` string's text: without its quotes, and each escaped character as itself.
+pub(crate) fn unquote_escaped(s: &str) -> String {
+    let inner = s.get(1..s.len().saturating_sub(1)).unwrap_or_default();
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        out.push(if c == '\\' {
+            chars.next().unwrap_or(c)
+        } else {
+            c
+        });
+    }
+    out
+}
+
 /// The length of a number such as `3`, `-2.5`, or `.5` at the start of `s`, or 0.
 pub(crate) fn number_len(s: &str) -> usize {
     let sign = usize::from(s.starts_with('-'));
@@ -240,6 +271,17 @@ impl<'a> Base<'a> {
     pub fn rest_of_line(&mut self, kind: SyntaxKind) {
         let len = scan::trim_end_len(self.rest(), scan::line_len(self.rest()));
         self.token(kind, len);
+    }
+
+    /// A langium diagram's `title` text: the rest of the line up to a `%%` comment, without
+    /// trailing whitespace, then the end of the statement.
+    pub fn title_text(&mut self) {
+        let r = self.rest();
+        let line = &r[..scan::line_len(r)];
+        let end = line.find("%%").unwrap_or(line.len());
+        let n = scan::trim_end_len(line, end);
+        self.token(TEXT, n);
+        self.end();
     }
 
     /// The length of a `"..."` string at the cursor, closed on the same line.
@@ -570,6 +612,19 @@ mod tests {
         assert_eq!(brace_block_len("x \"a\n} y"), Some(5));
         assert_eq!(brace_block_len("a { b }"), None);
         assert_eq!(brace_block_len(""), None);
+    }
+
+    #[test]
+    fn quoted() {
+        assert_eq!(quoted_len("\"a b\" c"), Some(5));
+        assert_eq!(quoted_len("'a \"b\"' c"), Some(7));
+        assert_eq!(quoted_len(r#""a\"b" c"#), Some(6));
+        assert_eq!(quoted_len("'é'"), Some(4));
+        for bad in ["a", "\"a", "\"a\n\"", "\"a\\\n\"", "'a\\'", "\"a\\"] {
+            assert_eq!(quoted_len(bad), None, "{bad:?}");
+        }
+        assert_eq!(unquote_escaped(r#""a\"b\\""#), r#"a"b\"#);
+        assert_eq!(unquote_escaped("'é'"), "é");
     }
 
     #[test]

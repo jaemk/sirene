@@ -29,9 +29,12 @@ const PREFIXES: [&str; 17] = [
     "y", "z", "a", "f", "p", "n", "µ", "m", "", "k", "M", "G", "T", "P", "E", "Z", "Y",
 ];
 
+/// The widest padded value a specifier may ask for.
+const MAX_WIDTH: usize = 1000;
+
 impl Format {
-    /// Parses `spec`, or `None` when it is not a d3-format specifier. Mermaid's `$0,0` reads as
-    /// `$,`.
+    /// Parses `spec`, or `None` when it is not a d3-format specifier or its width is over
+    /// `MAX_WIDTH`. Mermaid's `$0,0` reads as `$,`.
     pub fn parse(spec: &str) -> Option<Format> {
         let spec = if spec == "$0,0" { "$," } else { spec };
         let c: Vec<char> = spec.chars().collect();
@@ -63,6 +66,10 @@ impl Format {
             (*i > start).then(|| c[start..*i].iter().collect::<String>().parse().ok())?
         };
         let width = digits(&mut i).unwrap_or(0);
+        // Wider than any label: the padding would only use memory.
+        if width > MAX_WIDTH {
+            return None;
+        }
         let comma = c.get(i) == Some(&',') && {
             i += 1;
             true
@@ -362,6 +369,8 @@ mod tests {
         assert!(Format::parse("abc").is_none());
         assert!(Format::parse(".f").is_none());
         assert!(Format::parse("$$").is_none());
+        assert!(Format::parse("99999999999999").is_none());
+        assert!(Format::parse("1000").is_some());
     }
 
     #[test]

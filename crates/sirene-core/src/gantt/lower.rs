@@ -415,15 +415,24 @@ fn date_tasks(g: &Gantt, raws: &[Raw], diagnostics: &mut Vec<Diagnostic>) -> Vec
             let moved = if manual || g.excludes.is_empty() || endless {
                 None
             } else {
-                let moved = skip_excluded(g, start, end);
-                if moved.is_none() {
-                    endless = true;
-                    diagnostics.push(Diagnostic::new(
-                        r.range,
-                        "`excludes` leaves no day to work on; ignoring it",
-                    ));
+                match skip_excluded(g, start, end) {
+                    Ok(moved) => Some(moved),
+                    Err(TooLong) => {
+                        diagnostics.push(Diagnostic::warning(
+                            r.range,
+                            "this task is too long to apply `excludes` to; ignoring it here",
+                        ));
+                        None
+                    }
+                    Err(Endless) => {
+                        endless = true;
+                        diagnostics.push(Diagnostic::new(
+                            r.range,
+                            "`excludes` leaves no day to work on; ignoring it",
+                        ));
+                        None
+                    }
                 }
-                moved
             };
             let (end, drawn) = moved.unwrap_or((end, end));
             Some((start, end, drawn))
@@ -458,11 +467,24 @@ fn until(end: &str) -> Option<Vec<String>> {
         .then(|| ids.split_whitespace().map(str::to_owned).collect())
 }
 
+/// Why `skip_excluded` left an end where it was.
+enum Unmoved {
+    /// The task spans more days than are walked.
+    TooLong,
+    /// Every day is excluded.
+    Endless,
+}
+use Unmoved::*;
+
 /// Mermaid's `fixTaskDates`: each excluded day after the start moves the end a day later; the
-/// bar ends at the last end that was not moved. Returns the end and the drawn end, or `None`
-/// when the end never stops moving: more days in a row are excluded than dates and weekdays
-/// can exclude unless every weekday is.
-fn skip_excluded(g: &Gantt, start: Time, mut end: Time) -> Option<(Time, Time)> {
+/// bar ends at the last end that was not moved. Returns the end and the drawn end, or why not:
+/// the end never stops moving (more days in a row are excluded than dates and weekdays can
+/// exclude unless every weekday is), or the task spans more days than are walked.
+fn skip_excluded(g: &Gantt, start: Time, mut end: Time) -> Result<(Time, Time), Unmoved> {
+    const MAX_DAYS: i64 = 1_000_000;
+    if (end - start) / time::DAY > MAX_DAYS {
+        return Err(TooLong);
+    }
     let longest = 7 * (g.excludes.len() + 1);
     let mut day = start + time::DAY;
     let mut excluded = false;
@@ -477,14 +499,14 @@ fn skip_excluded(g: &Gantt, start: Time, mut end: Time) -> Option<(Time, Time)> 
             end += time::DAY;
             run += 1;
             if run > longest {
-                return None;
+                return Err(Endless);
             }
         } else {
             run = 0;
         }
         day += time::DAY;
     }
-    Some((end, drawn))
+    Ok((end, drawn))
 }
 
 #[cfg(test)]

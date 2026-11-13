@@ -15,6 +15,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Mermaid gantt charts: a huge duration is an error instead of overflowing, and `excludes` is
+  not walked over a task longer than 1,000,000 days.
+- Mermaid timelines: a line starting with `#` is a comment, as in Mermaid, instead of a period.
+- Mermaid radar charts: `radar-beta:` is a header; options may share a line separated by `,`;
+  axis and curve ids may hold `-` and start with a digit; labels may use single quotes and `\`
+  escapes; a title runs past `#` and `;`.
+- Mermaid packet diagrams: labels may use single quotes and `\` escapes; a title runs past `#`
+  and `;`.
+- Mermaid treemaps: a `valueFormat` width over 1000 is a warning instead of padding the value
+  with that many characters.
 - Mermaid class diagrams: a class belongs to the namespace that declares it with `class`, even
   if mentioned earlier; relations and `A : member` lines inside a namespace are warnings and no
   longer pull classes into it.

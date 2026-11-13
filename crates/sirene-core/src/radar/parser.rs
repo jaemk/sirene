@@ -6,13 +6,13 @@ use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::scan;
-use crate::lines::{Base, number_len};
+use crate::lines::{Base, number_len, quoted_len};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
     let mut p = Parser(Base::new(src));
     p.start(ROOT);
-    p.header(HEADERS, "radar-beta", word_len);
+    p.header();
     Base::block(&mut p, 0, "block", STATEMENT, Parser::statement);
     p.finish();
     p.0.finish_tree()
@@ -49,16 +49,35 @@ fn keyword(s: &str, kw: &str) -> bool {
     s.starts_with(kw) && word_len(s) == kw.len()
 }
 
-/// An axis or curve id: a letter or `_`, then letters, digits, and `_`.
+/// An axis or curve id: letters, digits, and `_`, with `-` inside but not at either end.
 fn id_len(s: &str) -> usize {
-    if !s.starts_with(|c: char| c.is_alphabetic() || c == '_') {
+    let word = |c: char| c.is_alphanumeric() || c == '_';
+    if !s.starts_with(word) {
         return 0;
     }
-    s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
-        .unwrap_or(s.len())
+    let n = word_len(s);
+    s[..n].trim_end_matches('-').len()
 }
 
 impl Parser<'_> {
+    /// `radar-beta`, optionally followed by `:`.
+    fn header(&mut self) {
+        self.frontmatter();
+        self.trivia();
+        if !keyword(self.rest(), "radar-beta") {
+            self.fail("expected `radar-beta` header");
+            return;
+        }
+        self.start(HEADER);
+        self.token(GRAPH_KW, "radar-beta".len());
+        self.ws();
+        if self.rest().starts_with(':') {
+            self.token(COLON, 1);
+        }
+        self.end();
+        self.finish();
+    }
+
     fn statement(&mut self, _depth: usize) {
         let r = self.rest();
         if keyword(r, "accTitle") || keyword(r, "accDescr") {
@@ -67,28 +86,44 @@ impl Parser<'_> {
             self.start(TITLE_STMT);
             self.token(TITLE_KW, "title".len());
             self.ws();
-            let line = &self.rest()[..scan::line_len(self.rest())];
-            let end = line.find(['#', ';']).unwrap_or(line.len());
-            let n = scan::trim_end_len(line, end);
-            self.token(TEXT, n);
-            self.end();
+            self.title_text();
             self.finish();
         } else if keyword(r, "axis") {
             self.list(AXIS_STMT, AXIS_KW, "axis", false);
         } else if keyword(r, "curve") {
             self.list(SERIES_STMT, SERIES_KW, "curve", true);
-        } else if let Some(kw) = OPTIONS.iter().find(|kw| keyword(r, kw)) {
+        } else if OPTIONS.iter().any(|kw| keyword(r, kw)) {
+            self.options();
+        }
+    }
+
+    /// Options separated by `,`: `max 100, min 0`.
+    fn options(&mut self) {
+        loop {
+            let r = self.rest();
+            let Some(kw) = OPTIONS.iter().find(|kw| keyword(r, kw)) else {
+                self.fail(STATEMENT);
+                return;
+            };
             self.start(SETTING_STMT);
             self.token(SETTING_KW, kw.len());
             self.ws();
             let n = word_len(self.rest()).max(number_len(self.rest()));
             if n == 0 {
                 self.fail(&format!("expected a value after `{kw}`"));
-            } else {
-                self.token(TEXT, n);
+                self.finish();
+                return;
+            }
+            self.token(TEXT, n);
+            self.ws();
+            if !self.rest().starts_with(',') {
                 self.end();
+                self.finish();
+                return;
             }
             self.finish();
+            self.token(COMMA, 1);
+            self.ws();
         }
     }
 
@@ -125,7 +160,7 @@ impl Parser<'_> {
         if self.rest().starts_with('[') {
             self.token(L_BRACKET, 1);
             self.ws();
-            let Some(n) = self.string_len() else {
+            let Some(n) = quoted_len(self.rest()) else {
                 self.fail("expected a quoted label such as `\"Math\"`");
                 self.finish();
                 return false;
@@ -174,8 +209,11 @@ impl Parser<'_> {
         }
         loop {
             self.start(VALUE);
-            let n = id_len(self.rest());
-            if n > 0 {
+            // An id is one only before a `:`, as an id may start with a digit.
+            let r = self.rest();
+            let n = id_len(r);
+            let keyed = n > 0 && r[n..].trim_start_matches([' ', '\t']).starts_with(':');
+            if keyed || (n > 0 && number_len(r) == 0) {
                 self.token(IDENT, n);
                 self.ws();
                 if self.rest().starts_with(':') {
@@ -233,6 +271,15 @@ mod tests {
         assert_eq!(t.matches("VALUE@").count(), 5);
         assert_eq!(t.matches("SETTING_STMT@").count(), 3);
         assert!(t.contains("TITLE_STMT@"));
+        // A `:` after the header, options separated by `,`, `-` inside ids, single quotes,
+        // and a title running past `#` and `;`.
+        let (t, d) = tree(
+            "radar-beta:\n  title Grades #1; 2 %% c\n  axis my-axis['Math'], 1b[\"a\\\"b\"]\n  curve c{my-axis: 1, 1b: 2}\n  max 100, min 0, ticks 4\n",
+        );
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(t.matches("SETTING_STMT@").count(), 3);
+        assert!(t.contains("TEXT@") && t.contains("\"Grades #1; 2\""));
+        assert!(t.contains("\"my-axis\""));
     }
 
     #[test]
@@ -253,6 +300,8 @@ mod tests {
         assert_eq!(e("curve a{1 2}"), ["expected `,` or `}`"]);
         assert_eq!(e("max"), ["expected a value after `max`"]);
         assert_eq!(e("max 1 2"), ["expected the end of the line"]);
+        assert_eq!(e("max 1, radius 3"), [STATEMENT]);
+        assert_eq!(e("axis a-"), ["expected the end of the line"]);
         assert_eq!(e("radius 3"), [STATEMENT]);
     }
 }

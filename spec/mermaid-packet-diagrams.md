@@ -9,8 +9,9 @@ the corpus under `crates/sirene-core/tests/fixtures/packet/` (LANGS-6).
 
 - Header: `packet` or `packet-beta`.
 - A field: `START: "label"` (one bit), `START-END: "label"`, or `+BITS: "label"` (starting after
-  the field before). The label is a `"string"`.
-- `title TEXT`, the text stopping at `#` or `;`.
+  the field before). The label is in double or single quotes, where `\` escapes the next
+  character.
+- `title TEXT` to the end of the line or a `%%` comment.
 - Comments, directives, frontmatter `title` and `config.packet` (`bitsPerRow`, `showBits`,
   `bitOrder`), `accTitle`, `accDescr`.
 

@@ -13,7 +13,8 @@ the corpus under `crates/sirene-core/tests/fixtures/timeline/` (LANGS-6).
   events to the period before it. A `:` separates only when followed by whitespace or the end of
   the line, so `10:30 : standup` is the period `10:30`.
 - `<br>` in any text breaks the line.
-- Comments, directives, frontmatter `title`, `accTitle`, `accDescr`.
+- Comments (`%%`, and a line starting with `#` as in Mermaid's lexer), directives, frontmatter
+  `title`, `accTitle`, `accDescr`.
 
 The parser shares `crate::lines` with the other Mermaid parsers and is lossless. Tests:
 `snapshots`, `syntax_errors`.
