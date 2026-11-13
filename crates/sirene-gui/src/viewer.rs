@@ -386,6 +386,10 @@ impl Viewer {
     }
 
     pub fn set_zoom(&mut self, zoom: f32, cx: &mut Context<Self>) {
+        // A NaN zoom would stick, as every later zoom scales it.
+        if !zoom.is_finite() {
+            return;
+        }
         self.zoom = zoom.clamp(MIN_ZOOM, MAX_ZOOM);
         cx.notify();
     }

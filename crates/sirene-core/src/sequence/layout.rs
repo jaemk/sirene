@@ -277,13 +277,18 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
         }
     }
     pairs.extend(spans);
+    // Each column's pairs, by its right-hand participant.
+    let mut into: Vec<Vec<(usize, f32)>> = vec![Vec::new(); n];
+    for &(a, b, d) in &pairs {
+        if let Some(list) = into.get_mut(b) {
+            list.push((a, d));
+        }
+    }
     let mut x = vec![0.0; n];
     for b in 0..n {
         let mut v = s.margin + left[b];
-        for &(a, bb, d) in &pairs {
-            if bb == b {
-                v = v.max(x[a] + d);
-            }
+        for &(a, d) in &into[b] {
+            v = v.max(x[a] + d);
         }
         x[b] = v;
     }
@@ -479,8 +484,13 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
     let mut bottom = footer_y + footbox_h;
 
     let mut groups = Vec::new();
-    for g in 0..seq.groups.len() {
-        let members: Vec<usize> = (0..n).filter(|&i| grouped(i) == Some(g)).collect();
+    let mut by_group: Vec<Vec<usize>> = vec![Vec::new(); seq.groups.len()];
+    for i in 0..n {
+        if let Some(list) = grouped(i).and_then(|g| by_group.get_mut(g)) {
+            list.push(i);
+        }
+    }
+    for (g, members) in by_group.into_iter().enumerate() {
         if members.is_empty() {
             continue;
         }

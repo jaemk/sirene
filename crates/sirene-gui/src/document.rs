@@ -13,6 +13,9 @@ use sirene_core::theme::ThemeConfig;
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
 
+/// The largest file opened, in bytes.
+const MAX_FILE: u64 = 64 << 20;
+
 /// A diagnostic located by byte range and by 1-based line and column.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Problem {
@@ -250,9 +253,24 @@ impl Document {
         }
     }
 
-    /// The file's text, or an empty text and the read error.
+    /// The file's text, or an empty text and the read error. A file over `MAX_FILE` bytes is not
+    /// read.
     fn read_text(path: &Path) -> (String, Option<String>) {
-        match std::fs::read_to_string(path) {
+        use std::io::Read;
+
+        let read = std::fs::File::open(path).and_then(|file| {
+            let mut bytes = Vec::new();
+            file.take(MAX_FILE + 1).read_to_end(&mut bytes)?;
+            if bytes.len() as u64 > MAX_FILE {
+                return Err(std::io::Error::other(format!(
+                    "the file is over {} MiB",
+                    MAX_FILE >> 20
+                )));
+            }
+            String::from_utf8(bytes)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        });
+        match read {
             Ok(text) => (text, None),
             Err(e) => (
                 String::new(),
@@ -346,7 +364,7 @@ impl Document {
     /// (WYSIWY-4). On failure the document stays edited and records the error.
     pub fn save(&mut self) -> Result<(), String> {
         let result = match &self.path {
-            Some(path) => write_atomic(path, self.text())
+            Some(path) => write_atomic(path, self.text().as_bytes())
                 .map_err(|e| format!("cannot write {}: {e}", path.display())),
             None => Err("no file to save to".to_owned()),
         };
@@ -506,7 +524,7 @@ fn parse(
 /// followed, so the link stays and its target changes; the file keeps its permissions, owner, and
 /// group; and the text is on disk before the rename. A read-only file is refused. When the owner
 /// cannot be kept (another user's file), the file is written in place instead.
-fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+pub(crate) fn write_atomic(path: &Path, text: &[u8]) -> std::io::Result<()> {
     write_atomic_with(path, text, keep_owner)
 }
 
@@ -529,7 +547,7 @@ fn keep_owner(_: &std::fs::File, _: &std::fs::Metadata) -> std::io::Result<()> {
 
 fn write_atomic_with(
     path: &Path,
-    text: &str,
+    text: &[u8],
     keep_owner: impl Fn(&std::fs::File, &std::fs::Metadata) -> std::io::Result<()>,
 ) -> std::io::Result<()> {
     use std::io::Write;
@@ -561,7 +579,7 @@ fn write_atomic_with(
                 return Ok(false);
             }
         }
-        file.write_all(text.as_bytes())?;
+        file.write_all(text)?;
         file.sync_all()?;
         Ok(true)
     })();
@@ -584,14 +602,14 @@ fn write_atomic_with(
 }
 
 /// Overwrites `path` itself, keeping its inode and so its owner.
-fn write_in_place(path: &Path, text: &str) -> std::io::Result<()> {
+fn write_in_place(path: &Path, text: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
 
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .truncate(true)
         .open(path)?;
-    file.write_all(text.as_bytes())?;
+    file.write_all(text)?;
     file.sync_all()
 }
 
@@ -674,6 +692,17 @@ mod tests {
         assert!(d.read_error.is_some());
         assert!(d.status().starts_with("cannot read "));
         assert_eq!(d.poll(), Disk::Unchanged);
+
+        // A huge file is refused, not read.
+        let big = std::fs::File::create(&path).unwrap();
+        big.set_len(MAX_FILE + 1).unwrap();
+        let d = Document::open(&path);
+        assert!(d.source.is_empty());
+        assert!(
+            d.status().ends_with("the file is over 64 MiB"),
+            "{}",
+            d.status()
+        );
     }
 
     #[test]
@@ -804,13 +833,13 @@ mod tests {
         let refuse = |_: &std::fs::File, _: &std::fs::Metadata| {
             Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
         };
-        write_atomic_with(&path, "flowchart LR\nA\n", refuse).unwrap();
+        write_atomic_with(&path, b"flowchart LR\nA\n", refuse).unwrap();
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "flowchart LR\nA\n");
         assert_eq!(std::fs::metadata(&path).unwrap().ino(), inode);
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
 
         // A normal save replaces the inode, keeping the owner.
-        write_atomic(&path, "flowchart LR\nB\n").unwrap();
+        write_atomic(&path, b"flowchart LR\nB\n").unwrap();
         let meta = std::fs::metadata(&path).unwrap();
         assert_ne!(meta.ino(), inode);
         let dir_meta = std::fs::metadata(dir.path()).unwrap();
@@ -818,7 +847,7 @@ mod tests {
 
         // The in-place write's own failure is reported.
         let gone = dir.path().join("gone").join("a.mmd");
-        assert!(write_in_place(&gone, "x").is_err());
+        assert!(write_in_place(&gone, b"x").is_err());
     }
 
     #[test]

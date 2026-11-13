@@ -71,7 +71,7 @@ impl Viewer {
         let written = format
             .render(&self.doc, &self.theme(), Quality::Fine)
             .and_then(|bytes| {
-                std::fs::write(path, bytes)
+                crate::document::write_atomic(path, &bytes)
                     .map_err(|e| format!("cannot write {}: {e}", path.display()))
             });
         let ok = written.is_ok();

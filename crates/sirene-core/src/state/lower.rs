@@ -80,6 +80,8 @@ struct Lowerer {
     styling: Vec<(String, Styling, TextRange)>,
     /// The source range of each edge, for the region check.
     edge_ranges: Vec<TextRange>,
+    /// The index in `chart.classes` of each `classDef` name.
+    class_index: HashMap<String, usize>,
 }
 
 enum Styling {
@@ -191,14 +193,17 @@ impl Lowerer {
         let mut region = 0;
         let mut scope = container.to_owned();
         if regions {
-            scope = self.open_region(container, region, &stmts);
+            let first = stmts
+                .first()
+                .map_or_else(TextRange::default, |s| s.text_range());
+            scope = self.open_region(container, region, first);
         }
         let mut direction = None;
         for stmt in &stmts {
             match stmt.kind() {
                 REGION_STMT if regions => {
                     region += 1;
-                    scope = self.open_region(container, region, &stmts);
+                    scope = self.open_region(container, region, stmt.text_range());
                 }
                 DIRECTION_STMT => {
                     let dir = text_of(stmt, DIR).and_then(|d| Direction::from_text(&d));
@@ -230,21 +235,9 @@ impl Lowerer {
         direction
     }
 
-    /// Starts region `k` of `container` and returns its id.
-    fn open_region(&mut self, container: &str, k: usize, stmts: &[SyntaxNode]) -> String {
+    /// Starts region `k` of `container`, opened at `range`, and returns its id.
+    fn open_region(&mut self, container: &str, k: usize, range: TextRange) -> String {
         let id = format!("{container}:{k}");
-        let range = stmts
-            .iter()
-            .filter(|s| s.kind() == REGION_STMT)
-            .nth(k.saturating_sub(1))
-            .map_or_else(
-                || {
-                    stmts
-                        .first()
-                        .map_or_else(TextRange::default, |s| s.text_range())
-                },
-                |s| s.text_range(),
-            );
         self.push_subgraph(Subgraph {
             id: id.clone(),
             title: Label::default(),
@@ -489,12 +482,16 @@ impl Lowerer {
         let styles = self.styles(&style);
         for name in tokens(&names).filter(|t| t.kind() == IDENT) {
             let name = name.text();
-            match self.chart.classes.iter_mut().find(|c| c.name == name) {
-                Some(class) => class.styles.extend(styles.iter().cloned()),
-                None => self.chart.classes.push(ClassDef {
-                    name: name.to_owned(),
-                    styles: styles.clone(),
-                }),
+            match self.class_index.get(name) {
+                Some(&i) => self.chart.classes[i].styles.extend(styles.iter().cloned()),
+                None => {
+                    self.class_index
+                        .insert(name.to_owned(), self.chart.classes.len());
+                    self.chart.classes.push(ClassDef {
+                        name: name.to_owned(),
+                        styles: styles.clone(),
+                    });
+                }
             }
         }
     }

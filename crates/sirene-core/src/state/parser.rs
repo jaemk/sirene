@@ -211,7 +211,9 @@ impl Parser<'_> {
             None
         };
         if let Some(close) = close {
-            let len = r.find(close).map_or(scan::line_len(r), |i| i + 2);
+            // The close on this line, else the rest of the line.
+            let line = scan::line_len(r);
+            let len = r[..line].find(close).map_or(line, |i| i + 2);
             self.token(STEREOTYPE, len);
             self.builder.start_node_at(checkpoint, STATE_STMT.into());
             self.end();

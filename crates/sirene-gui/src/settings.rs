@@ -185,20 +185,29 @@ impl Settings {
         out
     }
 
-    /// Reads `file`, or the defaults when it is missing or unreadable; later saves go to it.
+    /// Reads `file`, or the defaults when it is missing or unreadable. Later saves go to it,
+    /// unless it exists but could not be read, so that it is never overwritten with defaults.
     pub fn load(file: PathBuf) -> Settings {
-        let mut s = match std::fs::read_to_string(&file) {
+        match std::fs::read_to_string(&file) {
             Ok(text) => {
                 log::debug!("read settings from {}", file.display());
-                Settings::parse(&text)
+                Settings {
+                    file: Some(file),
+                    ..Settings::parse(&text)
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                log::debug!("no settings at {}", file.display());
+                Settings {
+                    file: Some(file),
+                    ..Settings::default()
+                }
             }
             Err(e) => {
-                log::debug!("no settings read from {}: {e}", file.display());
+                log::warn!("cannot read settings from {}: {e}", file.display());
                 Settings::default()
             }
-        };
-        s.file = Some(file);
-        s
+        }
     }
 
     /// Writes the settings to their file, if they have one.
@@ -385,5 +394,17 @@ mod tests {
         assert_eq!(names, ["settings"]);
         assert!(Appearance::System.is_dark(true) && !Appearance::Light.is_dark(true));
         assert!(Appearance::Dark.is_dark(false));
+    }
+
+    #[test]
+    fn unreadable_file_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("settings");
+        std::fs::write(&file, b"appearance = light\n\xff\n").unwrap();
+        let mut s = Settings::load(file.clone());
+        assert_eq!(s.file, None);
+        s.appearance = Appearance::Dark;
+        s.save();
+        assert_eq!(std::fs::read(&file).unwrap(), b"appearance = light\n\xff\n");
     }
 }
