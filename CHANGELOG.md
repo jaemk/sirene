@@ -13,6 +13,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Mermaid architecture diagrams: when two items want the same side of a node, the second is
+  placed beside the first instead of beyond it, and an edge turns in the gap between items
+  instead of running through one.
 - DOT: a repeated edge in a `strict` graph no longer takes the current `edge [...]` defaults
   over the first edge's own attributes; `\G` in a cluster label is the cluster's name;
   `style=rounded` on a cluster warns as it is not drawn; an edge to a reopened named
