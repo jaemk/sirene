@@ -92,8 +92,14 @@ pub(crate) fn member(raw: &str) -> (bool, Row) {
     }
     while !t.is_empty() && take(t.len() - 1, &mut t) {}
     let method = t.contains('(');
+    // A leading `~` is package visibility, not a generic.
+    let t = t.trim();
+    let cell = match t.strip_prefix('~') {
+        Some(rest) => format!("~{}", generics(rest)),
+        None => generics(t),
+    };
     let row = Row {
-        cells: vec![generics(t.trim())],
+        cells: vec![cell],
         italic,
         underline,
     };
@@ -159,7 +165,12 @@ impl Lowerer {
         let id = unticked(token(r, IDENT)?.text()).to_owned();
         let i = self.class(&id, namespace);
         self.chart.nodes[i].mentions.push(r.text_range());
-        if let Some(g) = token(r, GENERIC) {
+        // Generics replace the label only while it is the id, not one from `class A["Label"]`.
+        let label = &self.chart.nodes[i].label.text;
+        let named = label == &id || label.starts_with(&format!("{id}<"));
+        if let Some(g) = token(r, GENERIC)
+            && named
+        {
             self.chart.nodes[i].label = Label::plain(format!("{id}{}", generics(g.text())));
         }
         let class = tokens(r)
@@ -477,6 +488,12 @@ mod tests {
             m("List~int~ items"),
             (false, "List<int> items".into(), false, false)
         );
+        assert_eq!(m("~int x"), (false, "~int x".into(), false, false));
+        assert_eq!(
+            m("~List~int~ items"),
+            (false, "~List<int> items".into(), false, false)
+        );
+        assert_eq!(m("~run()"), (true, "~run()".into(), false, false));
         assert_eq!(m("  "), (false, String::new(), false, false));
     }
 }

@@ -24,6 +24,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Mermaid sequence diagrams: non-ASCII text after `note left`, after participant metadata, or
   in a `box` title no longer panics; `autonumber OFF` ignores case.
 - Mermaid ER diagrams: non-ASCII text where a relationship may start no longer panics.
+- Mermaid class diagrams: a member's leading `~` (package visibility) is kept instead of read
+  as a generic; a label from `class A["Label"]` is kept when a later mention has generics.
 - DOT: a repeated edge in a `strict` graph no longer takes the current `edge [...]` defaults
   over the first edge's own attributes; `\G` in a cluster label is the cluster's name;
   `style=rounded` on a cluster warns as it is not drawn; an edge to a reopened named
