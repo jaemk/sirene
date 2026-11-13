@@ -122,6 +122,11 @@ fn commits_and_branches() {
     assert_eq!(c.kind, CommitType::Highlight);
     assert_eq!(c.tags, ["t1", "t2"]);
     assert_eq!(g.direction, Direction::LeftRight);
+    // `msg:` is optional before a commit's message.
+    let g = graph("gitGraph\n  commit \"hello\"\n  commit id: \"x\" \"bye\" tag: \"t\"\n");
+    assert_eq!(g.commits[0].message.as_deref(), Some("hello"));
+    assert_eq!(g.commits[1].message.as_deref(), Some("bye"));
+    assert_eq!(g.commits[1].parents, [0]);
     // Generated ids are stable and differ per commit.
     let g1 = graph("gitGraph\n  commit\n  commit\n");
     let g2 = graph("gitGraph\n  commit\n  commit\n");

@@ -20,7 +20,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   longer pull classes into it.
 - Mermaid sequence diagrams: a `box` holds only `participant`/`actor` declarations, and
   declaring a participant in a second `box` is an error, as in Mermaid.
-
+- Mermaid git graphs: `commit "message"` (without `msg:`) is read as the message instead of
+  dropping the commit.
+- Mermaid user journeys: `# comment` after a title, section, or task is skipped instead of an
+  error.
 - Mermaid architecture diagrams: when two items want the same side of a node, the second is
   placed beside the first instead of beyond it, and an edge turns in the gap between items
   instead of running through one.
