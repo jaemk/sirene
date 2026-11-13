@@ -2,6 +2,6 @@
 source: crates/sirene-core/tests/usecase.rs
 expression: "usecase-beta\nactor Customer\nCheckout\nPayment\nCustomer opens@-- \"starts checkout\" ---> Checkout\nCheckout payment@..> : include Payment\nclassDef emphasized stroke:#d33,stroke-width:3px\nclass opens,payment emphasized\nstyle opens stroke:#06c,stroke-width:4px\nopens@{ animation: fast }\npayment@{ animate: false }\n"
 ---
-+----------+                       .----------.             .---------.
-| Customer +----starts checkout--->( Checkout +..«include».>( Payment )
-+----------+                       '----------'             '---------'
++----------+                       .----------.               .---------.
+| Customer +----starts checkout--->( Checkout +..<<include>>.>( Payment )
++----------+                       '----------'               '---------'

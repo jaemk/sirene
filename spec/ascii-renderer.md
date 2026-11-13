@@ -15,7 +15,11 @@ Tests: `cuts_off_past_the_limit` in `ascii/canvas.rs`.
 ## ASCIIR-2 Charsets
 
 `unicode` (the default) draws with box-drawing characters. `ascii` uses only `-`, `|`, `+`, `.`,
-`'`, `:`, `=`, `/`, `\`, `<`, `>`, `(`, `)`, `^`, `v`, `x`, and `o`. Labels are printed as given.
+`'`, `:`, `=`, `/`, `\`, `<`, `>`, `(`, `)`, `^`, `v`, `x`, and `o`. Labels are printed as given,
+except that the stereotypes sirene adds (`«interface»`, `«include»`) are written `<<interface>>`
+and `<<include>>`, sized before layout. Tests: `fixture_prefixes_draw` in
+`crates/sirene-core/tests/prefixes.rs` (no drawing characters outside the source's own text) and
+the `ascii` snapshots.
 
 ## ASCIIR-3 Nodes
 

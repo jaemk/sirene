@@ -1484,11 +1484,12 @@ fn requirement_diagrams() {
         .assert()
         .success()
         .stdout(
-            "  +-----------+\n  | «Element» |\n  |     e     |\n  +-----------+\n  | Type: t   |\n  \
-             +-----+-----+\n        :\n   «satisfies»\n        v\n+---------------+\n\
-             | «Requirement» |\n|       r       |\n+---------------+\n| Id: 1         |\n\
-             +---------------+\n",
+            "  +-------------+\n  | <<Element>> |\n  |      e      |\n  +-------------+\n  \
+             | Type: t     |\n  +------+------+\n         :\n   <<satisfies>>\n         v\n\
+             +-----------------+\n| <<Requirement>> |\n|        r        |\n\
+             +-----------------+\n| Id: 1           |\n+-----------------+\n",
         );
+    // The SVG keeps the guillemets.
     sirene()
         .arg("svg")
         .write_stdin(src)

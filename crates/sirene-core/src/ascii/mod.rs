@@ -109,9 +109,72 @@ pub fn render(chart: &Flowchart, options: &Options) -> String {
     // Collapsed subgraphs (FLOWMO-15) are drawn folded into nodes.
     let folded = chart.collapsed();
     let chart = folded.as_ref().map_or(chart, |c| &c.chart);
+    // Stereotypes (`«interface»`) are written `<<interface>>` in plain ASCII, before layout so
+    // boxes fit the wider text.
+    let plain = (options.charset == Charset::Ascii)
+        .then(|| guillemets_to_ascii(chart))
+        .flatten();
+    let chart = plain.as_ref().unwrap_or(chart);
     let graph = chart.layout_graph(&Cells);
     let layout = layout::layout(&graph, &CONFIG);
     draw(chart, &layout, options)
+}
+
+/// `chart` with `«` and `»` in its text written `<<` and `>>`, or `None` when it has none.
+fn guillemets_to_ascii(chart: &Flowchart) -> Option<Flowchart> {
+    let has = |s: &str| s.contains(['«', '»']);
+    let labels = chart
+        .nodes
+        .iter()
+        .map(|n| &n.label)
+        .chain(chart.subgraphs.iter().map(|s| &s.title))
+        .chain(chart.notes.iter().map(|n| &n.label))
+        .chain(chart.edges.iter().flat_map(|e| {
+            [&e.label, &e.start_label, &e.end_label]
+                .into_iter()
+                .flatten()
+        }));
+    let rows = chart
+        .nodes
+        .iter()
+        .flat_map(|n| n.sections.iter().flatten())
+        .flat_map(|r| &r.cells);
+    let any = labels
+        .map(|l| l.text.as_str())
+        .chain(rows.map(String::as_str));
+    if !any.into_iter().any(has) && !chart.title.as_deref().is_some_and(has) {
+        return None;
+    }
+    let fix = |s: &mut String| {
+        if has(s) {
+            *s = s.replace('«', "<<").replace('»', ">>");
+        }
+    };
+    let mut chart = chart.clone();
+    if let Some(t) = &mut chart.title {
+        fix(t);
+    }
+    for n in &mut chart.nodes {
+        fix(&mut n.label.text);
+        for cell in n.sections.iter_mut().flatten().flat_map(|r| &mut r.cells) {
+            fix(cell);
+        }
+    }
+    for s in &mut chart.subgraphs {
+        fix(&mut s.title.text);
+    }
+    for n in &mut chart.notes {
+        fix(&mut n.label.text);
+    }
+    for e in &mut chart.edges {
+        for l in [&mut e.label, &mut e.start_label, &mut e.end_label]
+            .into_iter()
+            .flatten()
+        {
+            fix(&mut l.text);
+        }
+    }
+    Some(chart)
 }
 
 /// Draws `chart` placed by `layout`, in cells.

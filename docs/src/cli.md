@@ -41,7 +41,8 @@ This exits with status 2, and no window opens.
 ## `sirene ascii`
 
 Prints the diagram with box-drawing characters. `--charset ascii` uses only ASCII
-(`+`, `-`, `|`, `>`). A Markdown file prints each diagram block, with a blank line between
+(`+`, `-`, `|`, `>`), and writes stereotypes as `<<interface>>` rather than `«interface»`. A
+Markdown file prints each diagram block, with a blank line between
 them.
 
 ```

@@ -7152,6 +7152,7 @@ dependencies = [
  "proptest",
  "resvg 0.46.0",
  "rowan",
+ "roxmltree 0.21.2",
  "ttf-parser",
  "unicode-width",
 ]

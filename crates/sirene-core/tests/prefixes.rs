@@ -1,9 +1,10 @@
-//! Every fixture, cut short at each line and halfway through each line, still draws: an
-//! unfinished diagram (the editor's state while typing) never panics in any renderer.
+//! Every fixture, cut short at each line and halfway through each line, or with a line left
+//! out, still draws: an unfinished diagram (the editor's state while typing) never panics in any
+//! renderer. Whole, each draws with only ASCII characters under `Charset::Ascii` (ASCIIR-2).
 
 use std::path::{Path, PathBuf};
 
-use sirene_core::ascii::Options;
+use sirene_core::ascii::{Charset, Options};
 use sirene_core::diagram::{self, Lang};
 use sirene_core::scene::{Approx, Theme, svg};
 
@@ -52,10 +53,14 @@ fn fixture_prefixes_draw() {
             let run = std::panic::catch_unwind(|| {
                 let lowered = diagram::lower_as(text, lang);
                 let s = lowered.diagram.scene(&Approx, &Theme::LIGHT);
-                svg::write(&s);
                 lowered.diagram.ascii(&Options::default());
+                svg::write(&s)
             });
-            assert!(run.is_ok(), "{} {what}:\n{text}", path.display());
+            let doc = run.unwrap_or_else(|_| panic!("{} {what}:\n{text}", path.display()));
+            // The SVG is well-formed XML, whatever the labels hold.
+            if let Err(e) = roxmltree::Document::parse(&doc) {
+                panic!("{} {what}: {e}\n{text}\n{doc}", path.display());
+            }
         };
         for cut in cuts(&src) {
             draw(&src[..cut], &format!("cut at byte {cut}"));
@@ -70,5 +75,16 @@ fn fixture_prefixes_draw() {
                 .collect();
             draw(&text, &format!("without line {}", skip + 1));
         }
+        // With the ASCII charset, no drawing characters (box drawing, blocks, shapes, arrows,
+        // guillemets, dots) are used except those in the source's own text.
+        let text = diagram::lower_as(&src, lang).diagram.ascii(&Options {
+            charset: Charset::Ascii,
+        });
+        let drawing = |c: char| matches!(c, '\u{2190}'..='\u{21ff}' | '\u{2500}'..='\u{25ff}' | '«' | '»' | '·' | '…');
+        let stray: String = text
+            .chars()
+            .filter(|&c| drawing(c) && !src.contains(c))
+            .collect();
+        assert!(stray.is_empty(), "{}: {stray:?}\n{text}", path.display());
     }
 }
