@@ -120,6 +120,8 @@ fn path_data(segments: &[Segment]) -> String {
 
 /// A number with at most two decimals and no trailing zeros.
 fn num(v: f32) -> String {
+    // NaN and infinity are not SVG numbers.
+    let v = if v.is_finite() { v } else { 0.0 };
     let s = format!("{:.2}", v);
     let s = s.trim_end_matches('0').trim_end_matches('.');
     if s == "-0" {
@@ -137,8 +139,27 @@ fn escape(s: &str) -> String {
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
             '"' => out.push_str("&quot;"),
+            // Characters XML 1.0 does not allow.
+            '\t' | '\n' | '\r' => out.push(c),
+            '\0'..='\u{1f}' | '\u{fffe}' | '\u{ffff}' => out.push('\u{fffd}'),
             c => out.push(c),
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn xml_safe() {
+        assert_eq!(
+            escape("a<\u{1}\u{b}\t\u{ffff}>"),
+            "a&lt;\u{fffd}\u{fffd}\t\u{fffd}&gt;"
+        );
+        assert_eq!(num(f32::NAN), "0");
+        assert_eq!(num(f32::INFINITY), "0");
+        assert_eq!(num(1.50), "1.5");
+    }
 }
