@@ -197,12 +197,16 @@ impl Reader<'_> {
         };
         let body = &rest[body_at..];
         let mut end = None;
+        // Java nests classes, as in `[a[bc]]` and `[[:alpha:]]`.
+        let mut depth = 0usize;
         let mut chars = body.char_indices();
         while let Some((k, c)) = chars.next() {
             match c {
                 '\\' => {
                     chars.next();
                 }
+                '[' => depth += 1,
+                ']' if depth > 0 => depth -= 1,
                 ']' if k > 0 => {
                     end = Some(k);
                     break;
@@ -228,17 +232,20 @@ impl Reader<'_> {
         let inner = self.s[at..].strip_prefix('{')?;
         let close = inner.find('}')?;
         let spec = &inner[..close];
+        // Digits only: `{ 2 }` and `{+2}` are literal text, as in Java.
+        let number = |s: &str| -> Option<u32> {
+            s.bytes()
+                .all(|b| b.is_ascii_digit())
+                .then(|| s.parse().ok())
+                .flatten()
+        };
         let (min, max) = match spec.split_once(',') {
             Some((a, b)) => (
-                a.trim().parse().ok()?,
-                if b.trim().is_empty() {
-                    None
-                } else {
-                    Some(b.trim().parse().ok()?)
-                },
+                number(a)?,
+                if b.is_empty() { None } else { Some(number(b)?) },
             ),
             None => {
-                let n = spec.trim().parse().ok()?;
+                let n = number(spec)?;
                 (n, Some(n))
             }
         };
@@ -419,6 +426,13 @@ mod tests {
             ])
         );
         assert_eq!(ok("[^]x]"), nt("none of ]x"));
+        assert_eq!(ok("[[:alpha:]]"), nt("one of [:alpha:]"));
+        assert_eq!(ok("[a[bc]]"), nt("one of a[bc]"));
+        assert!(matches!(ok("a{2}"), Expr::Repeat { min: 2, .. }));
+        for literal in ["a{ 2 }", "a{2, 3}"] {
+            let (e, _, _) = regex(literal);
+            assert!(!format!("{e:?}").contains("Repeat"), "{literal}: {e:?}");
+        }
         assert_eq!(
             ok("(?:ab|c)*"),
             Expr::Repeat {

@@ -858,7 +858,10 @@ impl Lower {
         // hours.
         if self.g.axis_format == "%-j"
             && self.g.tick_interval.is_none()
-            && self.g.range().is_some_and(|(s, e)| e - s < 15 * time::DAY)
+            && self
+                .g
+                .range()
+                .is_some_and(|(s, e)| e.saturating_sub(s) < 15 * time::DAY)
         {
             self.g.tick_interval = Some(Interval {
                 unit: Unit::Day,
