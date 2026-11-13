@@ -301,10 +301,7 @@ fn run(cli: Cli) -> ExitCode {
                 CharsetArg::Unicode => Charset::Unicode,
                 CharsetArg::Ascii => Charset::Ascii,
             };
-            if let Some(md) = file
-                .as_ref()
-                .filter(|f| sirene_core::markdown::is_markdown(f))
-            {
+            if let Some(md) = markdown_file(&file) {
                 return markdown_blocks(md, watch, || markdown::print_ascii(md, charset));
             }
             convert(file, None, None, watch, |l| {
@@ -322,10 +319,7 @@ fn run(cli: Cli) -> ExitCode {
                 let scene = l.diagram.scene(&Approx, &l.theme.apply(&theme.theme()));
                 Ok(scene::svg::write(&scene).into_bytes())
             };
-            if let Some(md) = file
-                .as_ref()
-                .filter(|f| sirene_core::markdown::is_markdown(f))
-            {
+            if let Some(md) = markdown_file(&file) {
                 return markdown_blocks(md, watch, || {
                     markdown::render(md, output.as_deref(), "svg", link, &render)
                 });
@@ -350,10 +344,7 @@ fn run(cli: Cli) -> ExitCode {
                 let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
                 png::write(&scene, png::Options { scale, quality })
             };
-            if let Some(md) = file
-                .as_ref()
-                .filter(|f| sirene_core::markdown::is_markdown(f))
-            {
+            if let Some(md) = markdown_file(&file) {
                 return markdown_blocks(md, watch, || {
                     markdown::render(md, output.as_deref(), "png", link, &render)
                 });
@@ -380,6 +371,12 @@ fn run(cli: Cli) -> ExitCode {
     }
 }
 
+/// `file` when it names a Markdown file (a directory named like one is a directory).
+fn markdown_file(file: &Option<PathBuf>) -> Option<&PathBuf> {
+    file.as_ref()
+        .filter(|f| sirene_core::markdown::is_markdown(f) && !f.is_dir())
+}
+
 /// Runs `run` on Markdown file `md`'s diagram blocks (CLI-12); with `watch`, again whenever it
 /// changes, never returning.
 fn markdown_blocks(md: &Path, watch: bool, run: impl Fn() -> bool) -> ExitCode {
@@ -391,13 +388,14 @@ fn markdown_blocks(md: &Path, watch: bool, run: impl Fn() -> bool) -> ExitCode {
         };
     }
     eprintln!("watching {} (Ctrl-C to stop)", md.display());
+    // The first pass always runs, so a missing file is reported.
     let mut seen = None;
     loop {
         let now = stamp(md);
-        if now != seen {
+        if seen.as_ref() != Some(&now) {
             run();
             // Adding links changes the file; that is not a change to render again.
-            seen = stamp(md);
+            seen = Some(stamp(md));
         }
         std::thread::sleep(POLL);
     }

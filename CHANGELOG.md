@@ -28,6 +28,17 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to a Markdown file with none, use a `plantuml` or `dot` fence instead of `mermaid`.
 - The guide's introduction, quickstart, landing page, and the `sirene:render` skill describe
   PlantUML and DOT, and list every Mermaid kind drawn.
+- Editing a Markdown file's diagram in the editor: a fence typed in the code makes the block's
+  fences longer instead of ending the block early, and the block added to a file ending in an
+  open code block closes that block first, so later edits no longer add another block each.
+- The editor's Save As keeps the document's file when the write fails, asks before dropping a
+  Markdown file's unsaved edits to save one block, and reads the diagram as the new file's
+  language.
+- Diagnostic columns in Markdown blocks count each line's own indent when it is indented less
+  than the fence.
+- `--watch` on a missing Markdown file reports it; `--link` keeps CRLF line endings; a
+  directory named `x.md` is rendered as a directory; `sirene check` on a Markdown file with no
+  diagram blocks says so.
 
 ## [0.3.0] - 2026-11-12
 

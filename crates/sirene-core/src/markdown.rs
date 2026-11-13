@@ -12,8 +12,11 @@ pub struct Block {
     pub lang: Lang,
     /// The line of the block's first code line, from 1.
     pub line: usize,
-    /// The columns of indentation taken off each line.
+    /// The fence's indentation, the most taken off each code line.
     pub indent: usize,
+    /// The columns taken off each code line, in order: `indent`, or less for a line indented
+    /// less than the fence.
+    pub strips: Vec<usize>,
     /// The byte offset just after the closing fence's line (the end of the text when the block
     /// is not closed).
     pub end: usize,
@@ -27,14 +30,16 @@ pub struct Block {
 impl Block {
     /// Where a position in [`Block::code`] (line and column from 1) is in the Markdown.
     pub fn position(&self, line: usize, col: usize) -> (usize, usize) {
-        (self.line + line - 1, col + self.indent)
+        let strip = self.strips.get(line - 1).copied().unwrap_or(self.indent);
+        (self.line + line - 1, col + strip)
     }
 
     /// `src`, the Markdown this block was found in, with the block's code replaced by `code`:
     /// each line indented like the fence and ended like the Markdown's lines (`\r\n` or `\n`).
-    /// The fences and everything outside the block are kept.
+    /// Everything outside the block is kept, and so are the fences, except that both are made
+    /// longer when a line of `code` would otherwise close the block.
     pub fn replace_code(&self, src: &str, code: &str) -> String {
-        let newline = if src.contains("\r\n") { "\r\n" } else { "\n" };
+        let newline = newline(src);
         let pad = " ".repeat(self.indent);
         let mut body = String::with_capacity(code.len() + 8);
         for line in code.lines() {
@@ -48,16 +53,119 @@ impl Block {
         if !self.closed && !src.ends_with('\n') && !code.ends_with('\n') {
             body.truncate(body.len() - newline.len());
         }
+        // The opening fence: where its run of fence characters starts, the character, and the
+        // run's length, and the length the fences need around `body`.
+        let open = src[..self.body.start].trim_end_matches(['\n', '\r']);
+        let line_at = open.rfind('\n').map_or(0, |i| i + 1);
+        let line = &open[line_at..];
+        let bom = line.len() - line.trim_start_matches(crate::flowchart::scan::BOM).len();
+        let fence = opening(&line[bom..]).map(|(indent, c, len, _)| {
+            let need = fence_len(&body, c, len);
+            (line_at + bom + indent, c, len, need)
+        });
         let mut out = String::with_capacity(src.len() + body.len());
-        out.push_str(&src[..self.body.start]);
+        match fence {
+            Some((at, c, len, need)) if need > len => {
+                out.push_str(&src[..at]);
+                out.extend(std::iter::repeat_n(c, need));
+                out.push_str(&src[at + len..self.body.start]);
+            }
+            _ => out.push_str(&src[..self.body.start]),
+        }
         // The opening fence ends the text: the code starts a line of its own.
         if self.body.start == src.len() && !src.ends_with('\n') && !body.is_empty() {
             out.push_str(newline);
         }
         out.push_str(&body);
-        out.push_str(&src[self.body.end..]);
+        let rest = &src[self.body.end..];
+        match fence {
+            Some((_, c, _, need)) if self.closed => {
+                let indent = rest.len() - rest.trim_start_matches(' ').len();
+                let run = rest[indent..].len() - rest[indent..].trim_start_matches(c).len();
+                out.push_str(&rest[..indent]);
+                out.extend(std::iter::repeat_n(c, need.max(run)));
+                out.push_str(&rest[indent + run..]);
+            }
+            _ => out.push_str(rest),
+        }
         out
     }
+}
+
+/// The line ending of `src`'s lines: `\r\n` when it has one, else `\n`.
+fn newline(src: &str) -> &'static str {
+    if src.contains("\r\n") { "\r\n" } else { "\n" }
+}
+
+/// The length a fence of `c`, at least `len` long, needs so that no line of `code` closes it.
+fn fence_len(code: &str, c: char, len: usize) -> usize {
+    code.lines()
+        .filter(|l| closes(l, c, len))
+        .map(|l| {
+            let rest = l.trim_start_matches(' ');
+            rest.len() - rest.trim_start_matches(c).len() + 1
+        })
+        .fold(len, usize::max)
+}
+
+/// `src` with a block of `code` added at the end, fenced with backticks and named `info`
+/// (`mermaid`, `dot`, `plantuml`), after a blank line. A fenced block left open at the end of
+/// `src` is closed first, so the new block is not read as its code. Lines end like `src`'s.
+pub fn append_block(src: &str, info: &str, code: &str) -> String {
+    let newline = newline(src);
+    let mut out = src.to_owned();
+    if !out.is_empty() && !out.ends_with('\n') {
+        out.push_str(newline);
+    }
+    if let Some((c, len)) = open_fence(src) {
+        out.extend(std::iter::repeat_n(c, len));
+        out.push_str(newline);
+    }
+    if !out.is_empty() {
+        out.push_str(newline);
+    }
+    let fence = "`".repeat(fence_len(code, '`', 3));
+    out.push_str(&fence);
+    out.push_str(info);
+    out.push_str(newline);
+    for line in code.lines() {
+        out.push_str(line);
+        out.push_str(newline);
+    }
+    out.push_str(&fence);
+    out.push_str(newline);
+    out
+}
+
+/// The fence character and length of a fenced block (of any language) left open at the end
+/// of `src`.
+fn open_fence(src: &str) -> Option<(char, usize)> {
+    let mut open = None;
+    for (_, line) in lines(src) {
+        match open {
+            None => open = opening(line).map(|(_, c, len, _)| (c, len)),
+            Some((c, len)) if closes(line, c, len) => open = None,
+            Some(_) => {}
+        }
+    }
+    open
+}
+
+/// (byte offset, text without its line ending) for each line of `src`, with a byte order mark
+/// before the first line taken off it (LANGS-9).
+fn lines(src: &str) -> Vec<(usize, &str)> {
+    let mut lines = Vec::new();
+    let mut at = 0;
+    for raw in src.split_inclusive('\n') {
+        let text = if at == 0 {
+            raw.trim_start_matches(crate::flowchart::scan::BOM)
+        } else {
+            raw
+        };
+        lines.push((at, text.trim_end_matches(['\n', '\r'])));
+        at += raw.len();
+    }
+    lines
 }
 
 /// An opening fence on `line`: its indent, character, and length, and the diagram language
@@ -97,19 +205,7 @@ fn closes(line: &str, c: char, len: usize) -> bool {
 /// are skipped whole, so a diagram fence inside one is not a block.
 pub fn mermaid_blocks(src: &str) -> Vec<Block> {
     let mut blocks = Vec::new();
-    // (byte offset, line text without its newline) for each line.
-    let mut lines = Vec::new();
-    let mut at = 0;
-    for raw in src.split_inclusive('\n') {
-        // A byte order mark before the first line is not part of it (LANGS-9).
-        let text = if at == 0 {
-            raw.trim_start_matches(crate::flowchart::scan::BOM)
-        } else {
-            raw
-        };
-        lines.push((at, text.trim_end_matches(['\n', '\r'])));
-        at += raw.len();
-    }
+    let lines = lines(src);
     let mut i = 0;
     while i < lines.len() {
         let Some((indent, c, len, lang)) = opening(lines[i].1) else {
@@ -117,12 +213,14 @@ pub fn mermaid_blocks(src: &str) -> Vec<Block> {
             continue;
         };
         let mut code = String::new();
+        let mut strips = Vec::new();
         let mut j = i + 1;
         while j < lines.len() && !closes(lines[j].1, c, len) {
             let text = lines[j].1;
-            let strip = text.len() - text.trim_start_matches(' ').len();
-            code.push_str(&text[strip.min(indent)..]);
+            let strip = (text.len() - text.trim_start_matches(' ').len()).min(indent);
+            code.push_str(&text[strip..]);
             code.push('\n');
+            strips.push(strip);
             j += 1;
         }
         let end = lines.get(j + 1).map_or(src.len(), |(at, _)| *at);
@@ -134,6 +232,7 @@ pub fn mermaid_blocks(src: &str) -> Vec<Block> {
                 lang,
                 line: i + 2,
                 indent,
+                strips,
                 end,
                 closed: j < lines.len(),
                 body: start..stop.max(start),
@@ -215,6 +314,70 @@ mod tests {
             block.replace_code(src, "graph LR\n"),
             "```mermaid\ngraph LR\n"
         );
+    }
+
+    #[test]
+    fn positions_in_lines_indented_less_than_the_fence() {
+        let src = "   ```mermaid\n   graph TD\n A --> B\n```\n";
+        let block = &mermaid_blocks(src)[0];
+        assert_eq!(block.code, "graph TD\nA --> B\n");
+        assert_eq!(block.strips, [3, 1]);
+        assert_eq!(block.position(1, 1), (2, 4));
+        assert_eq!(block.position(2, 3), (3, 4));
+    }
+
+    #[test]
+    fn code_with_a_fence_lengthens_the_fences() {
+        let src = "a\n```mermaid\ngraph TD\n```\nb\n";
+        let block = &mermaid_blocks(src)[0];
+        let code = "graph TD\n```\n  A\n";
+        let out = block.replace_code(src, code);
+        assert_eq!(out, "a\n````mermaid\ngraph TD\n```\n  A\n````\nb\n");
+        assert_eq!(mermaid_blocks(&out)[0].code, code);
+        // Again with a longer run, from the longer fences; a fence that is not closed by the
+        // code is kept as it is.
+        let block = &mermaid_blocks(&out)[0];
+        let out = block.replace_code(&out, "graph TD\n`````\n");
+        assert_eq!(out, "a\n``````mermaid\ngraph TD\n`````\n``````\nb\n");
+        let block = &mermaid_blocks(&out)[0];
+        assert_eq!(
+            block.replace_code(&out, "graph TD\n"),
+            "a\n``````mermaid\ngraph TD\n``````\nb\n"
+        );
+        // Indented tildes, CRLF, and an unclosed block.
+        let src = "  ~~~ dot\r\n  digraph {}\r\n  ~~~\r\n";
+        let block = &mermaid_blocks(src)[0];
+        let out = block.replace_code(src, "digraph {}\n~~~\n");
+        assert_eq!(out, "  ~~~~ dot\r\n  digraph {}\r\n  ~~~\r\n  ~~~~\r\n");
+        assert_eq!(mermaid_blocks(&out)[0].code, "digraph {}\n~~~\n");
+        let src = "```mermaid\ngraph TD\n";
+        let block = &mermaid_blocks(src)[0];
+        let out = block.replace_code(src, "graph TD\n```\n");
+        assert_eq!(out, "````mermaid\ngraph TD\n```\n");
+        assert_eq!(mermaid_blocks(&out)[0].code, "graph TD\n```\n");
+    }
+
+    #[test]
+    fn appending_blocks() {
+        assert_eq!(
+            append_block("", "mermaid", "graph TD"),
+            "```mermaid\ngraph TD\n```\n"
+        );
+        assert_eq!(
+            append_block("# Doc", "dot", "digraph {}\n"),
+            "# Doc\n\n```dot\ndigraph {}\n```\n"
+        );
+        // A block left open is closed first, so the new block is found.
+        let out = append_block("# Doc\n\n````python\nx = 1\n", "mermaid", "graph TD\n");
+        assert_eq!(
+            out,
+            "# Doc\n\n````python\nx = 1\n````\n\n```mermaid\ngraph TD\n```\n"
+        );
+        assert_eq!(mermaid_blocks(&out)[0].code, "graph TD\n");
+        // Code with a fence, and CRLF.
+        let out = append_block("a\r\n", "mermaid", "graph TD\n```\n");
+        assert_eq!(out, "a\r\n\r\n````mermaid\r\ngraph TD\r\n```\r\n````\r\n");
+        assert_eq!(mermaid_blocks(&out)[0].code, "graph TD\n```\n");
     }
 
     #[test]

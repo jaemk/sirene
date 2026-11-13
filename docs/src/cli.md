@@ -9,8 +9,8 @@ sirene check [FILE|DIR|-]...  print diagnostics only
 sirene update                 replace sirene with the latest release
 ```
 
-`svg`, `png`, `ascii`, and `check` never open a window, and work in a build without the GUI. With no FILE,
-or `-`, they read stdin.
+`svg`, `png`, `ascii`, and `check` never open a window, and work in a build without the GUI. With
+`-`, they read stdin; `svg`, `png`, and `ascii` also read stdin with no FILE.
 
 ## Languages
 

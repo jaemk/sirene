@@ -166,6 +166,64 @@ fn save_as_converts() {
 }
 
 #[test]
+fn edits_stay_in_their_block() {
+    // A file ending in an open code block: the added block closes it first, and the next edit
+    // goes in the same block.
+    let mut d = Document::from_source(Some("open.md".into()), "# Doc\n\n```python\nx = 1\n".into());
+    assert!(d.set_source("flowchart TD\n  A\n".into()));
+    assert!(d.set_source("flowchart TD\n  A --> B\n".into()));
+    assert_eq!(
+        d.text(),
+        "# Doc\n\n```python\nx = 1\n```\n\n```mermaid\nflowchart TD\n  A --> B\n```\n"
+    );
+    assert_eq!(d.block_info(), Some((1, 1, 8)));
+
+    // A fence typed in the code makes the block's fences longer, so the code stays whole.
+    let mut d = Document::from_source(Some("notes.md".into()), MD.into());
+    let code = "flowchart LR\n```\n    A --> B\n";
+    assert!(d.set_source(code.into()));
+    assert!(d.set_source(format!("{code}    B --> C\n")));
+    let md = d.markdown.as_ref().unwrap();
+    assert_eq!(md.blocks.len(), 2);
+    assert_eq!(md.blocks[0].code, format!("{code}    B --> C\n"));
+    assert!(d.text().contains("\n````mermaid\n"), "{}", d.text());
+    assert!(d.text().ends_with("  ```\n\nEnd.\n"));
+}
+
+#[test]
+fn failed_save_as_keeps_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let md = write(dir.path(), "notes.md", MD);
+    let mut d = Document::open(&md);
+    d.set_source("flowchart LR\n    A --> C\n".into());
+    assert!(d.save_as_drops_edits(&dir.path().join("a.mmd")));
+    assert!(!d.save_as_drops_edits(&dir.path().join("a.md")));
+    // Saving into a missing directory fails: still the Markdown file, still edited.
+    assert!(d.save_as(dir.path().join("missing").join("a.mmd")).is_err());
+    assert_eq!(d.path.as_deref(), Some(md.as_path()));
+    assert!(d.markdown.is_some());
+    assert!(d.is_edited());
+    assert!(d.text().contains("A --> C"));
+    assert_eq!(d.poll(), sirene_gui::document::Disk::Unchanged);
+    d.save().unwrap();
+    assert_eq!(
+        std::fs::read_to_string(&md).unwrap(),
+        MD.replace("A --> B", "A --> C")
+    );
+}
+
+#[test]
+fn save_as_reads_the_new_language() {
+    let dir = tempfile::tempdir().unwrap();
+    // DOT text in a `.mmd` file is read as Mermaid; saved as `.dot`, it is read as DOT.
+    let mut d = Document::open(&write(dir.path(), "a.mmd", "digraph { a -> b }\n"));
+    assert!(!d.problems.is_empty());
+    d.save_as(dir.path().join("a.dot")).unwrap();
+    assert!(d.problems.is_empty(), "{:?}", d.problems);
+    assert_eq!(d.chart.nodes.len(), 2);
+}
+
+#[test]
 fn blocks_are_named_for_their_language() {
     let dir = tempfile::tempdir().unwrap();
     // A diagram saved as Markdown goes in a block its language names.
