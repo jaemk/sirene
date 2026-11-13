@@ -15,6 +15,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- PlantUML timing: at most 100 clocks, the rest left out with an error; each state label is
+  measured once. Cynefin: many quoted items on one line are read in linear time.
 - Flowchart: at most 100000 edges; a `&` product past that is left out with one error. Long
   labels, runs of `<` or `&`, and many `classDef`, `class` and `style` lines are read in near
   linear time.

@@ -56,11 +56,16 @@ fn domain_len(s: &str) -> usize {
 /// The length of a `"..."` or `'...'` string closed on the same line; `\` escapes a character.
 pub(crate) fn string_len(s: &str) -> Option<usize> {
     let quote = s.chars().next().filter(|c| matches!(c, '"' | '\''))?;
-    let line = &s[..scan::line_len(s)];
-    let mut chars = line.char_indices().skip(1);
+    // Stops at the end of the line rather than measuring it first, so many strings on one long
+    // line read in linear time.
+    let mut chars = s.char_indices().skip(1);
     while let Some((i, c)) = chars.next() {
-        if c == '\\' {
-            chars.next();
+        if c == '\n' {
+            return None;
+        } else if c == '\\' {
+            if chars.next().is_none_or(|(_, c)| c == '\n') {
+                return None;
+            }
         } else if c == quote {
             return Some(i + 1);
         }
@@ -272,6 +277,9 @@ mod tests {
         assert_eq!(string_len("\"a\\\"b\""), Some(6));
         assert_eq!(string_len("\"ab\nc\""), None);
         assert_eq!(string_len("ab"), None);
+        assert_eq!(string_len("\"a\\\nb\""), None);
+        assert_eq!(string_len("\"a\\"), None);
+        assert_eq!(string_len("\"a\r\n\""), None);
     }
 
     #[test]
