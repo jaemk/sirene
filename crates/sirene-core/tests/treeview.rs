@@ -80,6 +80,16 @@ fn model() {
     assert_eq!(b.icon.as_deref(), Some("logos:react"));
     assert_eq!(b.description.as_deref(), Some("main  thing"));
     assert!(!t.entries[1].directory);
+    // A huge size setting is capped, so a deep tree's drawing stays finite.
+    let t =
+        lowered("---\nconfig:\n  treeView:\n    rowIndent: 1e38\n---\ntreeView-beta\n  a\n    b\n");
+    assert_eq!(t.config.row_indent, 1000.0);
+    let s = diagram::lower(
+        "---\nconfig:\n  treeView:\n    rowIndent: 1e38\n---\ntreeView-beta\n  a\n    b\n",
+    )
+    .diagram
+    .scene(&Approx, &Theme::LIGHT);
+    assert!(s.width.is_finite() && s.height.is_finite());
 }
 
 /// MTREEV-3: a box-drawn tree with an indented line that has no branch.

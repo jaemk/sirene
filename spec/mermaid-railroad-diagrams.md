@@ -26,7 +26,10 @@ drawn as one syntax diagram per rule (LANGS-2, LANGS-3, MCHART-1). Reference: Me
 - `railroad-beta`: a rule's definition is one constructor call, `terminal`, `nonterminal`,
   `special` (a string argument) or `sequence`, `choice`, `optional`, `zeroOrMore`, `oneOrMore`
   (expression arguments, comma separated), with `/* */` comments.
-- A syntax error reports once and skips to the next `;`.
+- A syntax error reports once and skips to the next `;`. Groups nested more than 64 deep, or
+  more than 64 operators on one element (each `?`, `*`, `+`, or `- except` nests it once more),
+  are such an error. Whitespace is ASCII space, tab, and line breaks; other Unicode spaces are
+  not skipped.
 
 The parser is lossless. Tests: `snapshots` and the parser's unit tests.
 

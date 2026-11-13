@@ -435,7 +435,8 @@ impl<'a> Parser<'a> {
             let before = self.pos;
             let spaced = {
                 let r = self.rest();
-                r.starts_with(|c: char| c.is_whitespace())
+                // The whitespace `trivia` consumes, so a look past it is a consumable one.
+                r.starts_with([' ', '\t', '\r', '\n'])
                     || r.starts_with("%%")
                     || self.comment_len_peek(r)
             };
@@ -461,6 +462,11 @@ impl<'a> Parser<'a> {
                 _ => None,
             };
             let Some(op) = op else { return };
+            // Each operator nests the element once more, as a group does.
+            if self.depth + count >= MAX_DEPTH {
+                self.fail_here(&too_deep("operators", MAX_DEPTH));
+                return;
+            }
             // ISO EBNF's `{ a }-` is one or more `a`, with nothing to except after it.
             let one_or_more = op == '-' && !spaced && self.src[..before].ends_with('}');
             self.trivia(false);
@@ -492,7 +498,9 @@ impl<'a> Parser<'a> {
         let mut n = 0;
         loop {
             let s = &r[n..];
-            let ws = s.find(|c: char| !c.is_whitespace()).unwrap_or(s.len());
+            let ws = s
+                .find(|c: char| !matches!(c, ' ' | '\t' | '\r' | '\n'))
+                .unwrap_or(s.len());
             if ws > 0 {
                 n += ws;
                 continue;

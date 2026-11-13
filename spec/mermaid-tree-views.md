@@ -24,8 +24,8 @@ parser's unit tests.
 ## MTREEV-2 Model
 
 `treeview::parse(src).lower()` gives a `treeview::TreeView`: the title, the `treeView`
-frontmatter config (`rowIndent`, `paddingX`, `paddingY`, `lineThickness`, `showIcons`), and the
-entries. A name ending in `/` is a directory, without the `/`. As in Mermaid's db, each line's
+frontmatter config (`rowIndent`, `paddingX`, `paddingY`, `lineThickness`, `showIcons`; each
+size capped at 1000), and the entries. A name ending in `/` is a directory, without the `/`. As in Mermaid's db, each line's
 level is its indentation in characters, or in box-drawing input four times one more than its
 branch column divided by the segment width (the first branch column above 0, else 4), rounded;
 a line is a child of the nearest line above it with a lower level. `icon()` is `none`; when

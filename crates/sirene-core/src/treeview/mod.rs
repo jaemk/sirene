@@ -227,10 +227,18 @@ fn entry(n: &SyntaxNode) -> Option<Entry> {
     named.then_some(e)
 }
 
+/// The largest `treeView` size setting, in pixels.
+const MAX_CONFIG: f32 = 1000.0;
+
 /// Reads the `treeView` frontmatter config into `c`.
 fn config(c: &mut Config, block: &str) {
     for (k, v) in text::frontmatter_config(block, "treeView") {
-        let num = v.parse::<f32>().ok().filter(|n| n.is_finite() && *n >= 0.0);
+        // Capped so sizes summed over a deep tree stay finite.
+        let num = v
+            .parse::<f32>()
+            .ok()
+            .filter(|n| n.is_finite() && *n >= 0.0)
+            .map(|n| n.min(MAX_CONFIG));
         match (k.as_str(), num) {
             ("rowIndent", Some(n)) => c.row_indent = n,
             ("paddingX", Some(n)) => c.padding_x = n,

@@ -22,6 +22,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   or `evolve` declared again keeps its place.
 - Mermaid kanban boards: a long ticket or assignee is cut short with `...` instead of
   overlapping the other and the card's edge; in ASCII, a long word is broken to fit the card.
+- Mermaid railroad diagrams: a non-breaking or other Unicode space before an EBNF operator no
+  longer panics, and more than 64 operators on one element are an error instead of a stack
+  overflow.
+- Mermaid tree views: a huge `rowIndent`, `paddingX`, `paddingY`, or `lineThickness` is capped
+  at 1000 instead of drawing at infinite size.
 - `--link`: a path with spaces or parentheses is linked as `<...>`, the link is indented as the
   fence (so it stays in a list item), and a link from an earlier run is replaced when a new block
   shifts the numbering instead of a second link being added.
