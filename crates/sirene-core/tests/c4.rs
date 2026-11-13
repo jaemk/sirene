@@ -108,7 +108,7 @@ fn model() {
          Deployment_Node(n, \"Node\", \"k8s\") {\n    ComponentQueue(q, Queue)\n  }\n}\n\
          SystemDb(db, DB)\nBiRel(api, db, \"Reads\")\nRel_Back(q, api, \"Feeds\")\n\
          UpdateElementStyle(u, $bgColor=\"grey\")\nUpdateRelStyle(api, db, $lineColor=\"red\")\n\
-         UpdateLayoutConfig($c4ShapeInRow=\"2\", $c4BoundaryInRow=\"1\")\n",
+         UpdateRelStyle(q, api, $textColor=\"blue\")\nUpdateLayoutConfig($c4ShapeInRow=\"2\", $c4BoundaryInRow=\"1\")\n",
     );
     assert!(d.is_empty(), "{d:?}");
     let ch = &c.chart;
@@ -156,6 +156,8 @@ fn model() {
     );
     assert_eq!(c.rels[0].techn.as_deref(), Some("HTTPS"));
     assert_eq!(c.rels[1].colors.line.as_deref(), Some("red"));
+    // `UpdateRelStyle` names a `Rel_Back` as written, not as drawn.
+    assert_eq!(c.rels[2].colors.font.as_deref(), Some("blue"));
     assert_eq!((c.shapes_in_row, c.boundaries_in_row), (2, 1));
 }
 

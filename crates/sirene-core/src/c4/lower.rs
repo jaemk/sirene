@@ -41,6 +41,9 @@ struct Lowerer {
     boundaries: HashMap<String, usize>,
     /// Relations and style updates, read once every element is known.
     later: Vec<Call>,
+    /// Each relation's `from` and `to` as written, which `UpdateRelStyle` names; `Rel_Back`
+    /// draws its edge the other way.
+    written: Vec<(String, String)>,
 }
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
@@ -430,6 +433,7 @@ impl Lowerer {
         let (Some(mut from), Some(mut to)) = (from, to) else {
             return;
         };
+        self.written.push((from.clone(), to.clone()));
         if name == "Rel_Back" {
             std::mem::swap(&mut from, &mut to);
         }
@@ -495,8 +499,8 @@ impl Lowerer {
         let text = c.get(REL_STYLE, "textColor");
         let line = c.get(REL_STYLE, "lineColor");
         let mut any = false;
-        for (e, r) in self.c4.chart.edges.iter().zip(&mut self.c4.rels) {
-            if e.from == from && e.to == to {
+        for ((f, t), r) in self.written.iter().zip(&mut self.c4.rels) {
+            if *f == from && *t == to {
                 any = true;
                 if text.is_some() {
                     r.colors.font.clone_from(&text);

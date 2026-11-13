@@ -20,8 +20,8 @@ In the editor a pie chart is read-only on the drawing side.
 | `title text` | the title above, also on the header line (`pie title Pets`); frontmatter `title` too |
 | `"label" : 42.5` | a slice; single quotes work too |
 
-Each slice shows its share as a whole percent. A slice that rounds to `0%` is not drawn but stays
-in the legend.
+Each slice shows its share as a whole percent. As in Mermaid, a slice under 1% is not drawn (the
+others fill the circle) but stays in the legend.
 
 ## Errors
 

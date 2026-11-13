@@ -27,7 +27,8 @@ keeps the first. `Pie::ordered` gives the slices largest first (ties in source o
 ## MPIE-3 Drawing
 
 A circle cut into slices in `Pie::ordered` order, clockwise from twelve o'clock, each with the
-next of eight colors and its percentage inside it. A slice that rounds to `0%` is not drawn. A
+next of eight colors and its percentage of the whole total inside it. As in Mermaid, a slice under
+1% is not drawn and the others fill the circle. A
 legend to the right lists every slice in the same order with its color, and with `showData` its
 value in brackets (`Dogs [386]`). The title is centered above. When every value is zero the circle
 is drawn empty. Every element is owned by the diagram. Tests: `drawing`.

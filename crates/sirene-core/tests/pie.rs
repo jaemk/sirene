@@ -207,6 +207,15 @@ fn drawing() {
     assert!(t.iter().all(|(text, _)| text != "0%"));
     assert!(t.iter().any(|(text, _)| text == "Fish [0.001]"));
     assert_eq!(filled_paths(&s), 5);
+    // As in Mermaid, a slice under 1% is left out and the others fill the circle: one slice
+    // drawn whole (centered label), percentages still of the whole total.
+    let s = diagram::lower("pie\n  \"a\" : 995\n  \"b\" : 5\n")
+        .diagram
+        .scene(&Approx, &Theme::LIGHT);
+    let t = texts(&s);
+    assert!(t.iter().any(|(text, _)| text == "100%"), "{t:?}");
+    assert!(t.iter().all(|(text, _)| text != "1%"), "{t:?}");
+    assert_eq!(filled_paths(&s), 3);
     // Every value zero: only the outline and the swatches.
     let s = diagram::lower("pie\n  \"a\" : 0\n")
         .diagram
