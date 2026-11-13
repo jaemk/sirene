@@ -2,20 +2,7 @@
 
 sirene draws Mermaid user journeys (`journey`) as images and as text:
 
-```
-$ sirene ascii day.mmd
-         My working day
-
-Go to work
-  Make tea       ●●●●● 5  Me
-  Go upstairs    ●●●○○ 3  Me
-  Do work        ●○○○○ 1  Me, Cat
-Go home
-  Go downstairs  ●●●●● 5  Me
-  Sit down       ●●●●● 5  Me
-```
-
-```
+```mermaid
 journey
     title My working day
     section Go to work

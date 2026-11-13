@@ -2,29 +2,7 @@
 
 sirene draws Mermaid quadrant charts (`quadrantChart`) as images and as text:
 
-```
-$ sirene ascii campaigns.mmd
-                     Reach and engagement of campaigns
-
-                ┌────────────────────┬────────────────────┐
-                │  Need to promote   │  We should expand  │
-                │                    │                    │
-High Engagement │   Campaign F ●     │                    │
-                │                    │  ● Campaign C      │
-                │ Campaign A ●       │                    │
-                ├────────────────────┼────────────────────┤
-                │    Re-evaluate     │  May be improved   │
-                │     Campaign E ●   │          1         │
- Low Engagement │       Campaign B ● │                    │
-                │                    │                    │
-                │                    │                    │
-                └────────────────────┴────────────────────┘
-                       Low Reach           High Reach
-
-                1 Campaign D
-```
-
-```
+```mermaid
 quadrantChart
     title Reach and engagement of campaigns
     x-axis Low Reach --> High Reach

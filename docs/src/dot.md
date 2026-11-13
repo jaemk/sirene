@@ -2,30 +2,7 @@
 
 sirene draws Graphviz DOT graphs as images and as text, with its own layered layout:
 
-```
-$ sirene ascii classes.dot
-┌─────────────────┐   ╭─────────────────╮
-│       Dog       │   │       Cat       │
-├─────────────────┤   ├─────────────────┤
-│ + bark() : void │   │ + meow() : void │
-└────────┬────────┘   ╰────────┬────────╯
-         │                     │
-         └───┐              ┌──┘
-             │              │
-             │              │
-             └──┐       ┌───┘
-                ▽       ▽
-           ┌─────────────────┐
-           │     Animal      │
-           ├─────────────────┤
-           │ + name : string │
-           │ + age : int     │
-           ├─────────────────┤
-           │ + die() : void  │
-           └─────────────────┘
-```
-
-```
+```dot
 digraph classes {
   node [shape=record]
   Animal [label="{Animal|+ name : string\l+ age : int\l|+ die() : void\l}"]

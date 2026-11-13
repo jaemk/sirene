@@ -4,24 +4,7 @@ sirene draws Mermaid architecture diagrams (`architecture-beta`) as images and a
 names the side it leaves and enters by, and that places its ends on a grid; in text a service is
 a box with its icon name:
 
-```
-$ sirene ascii --charset ascii api.mmd
-+ API (cloud) -------------------------------------+
-|                                                  |
-| +-----------------+      +---------------------+ |
-| | Server (server) +------+ Database (database) | |
-| +--------+--------+      +----------+----------+ |
-|          |                          |            |
-|          |                          |            |
-|          |                          |            |
-|  +-------+--------+         +-------+--------+   |
-|  | Storage (disk) |         | Storage (disk) |   |
-|  +----------------+         +----------------+   |
-|                                                  |
-+--------------------------------------------------+
-```
-
-```
+```mermaid
 architecture-beta
     group api(cloud)[API]
 

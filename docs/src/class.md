@@ -3,26 +3,7 @@
 sirene draws Mermaid class diagrams (`classDiagram` and `classDiagram-v2`) with the same layout,
 themes, and outputs as flowcharts:
 
-```
-$ sirene ascii shapes.mmd
-┌────────────────┐
-│  «interface»   │
-│     Shape      │
-├────────────────┤
-├────────────────┤
-│ +area() double │
-└────────────────┘
-         △
-         ┆
-   ┌─────┴─────┐
-   │  Circle   │
-   ├───────────┤
-   │ +double r │
-   ├───────────┤
-   └───────────┘
-```
-
-```
+```mermaid
 classDiagram
   class Shape {
     <<interface>>

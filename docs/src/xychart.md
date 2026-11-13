@@ -2,28 +2,7 @@
 
 sirene draws Mermaid XY charts (`xychart-beta` and `xychart`) as images and as text:
 
-```
-$ sirene ascii sales.mmd
-                           Sales Revenue
-
-     bar 1                           line 1
-jan  ███▍                     5000      ●                     5000
-feb  ██████▉                  6000          ●                 6000
-mar  ████████████             7500               ●            7500
-apr  ██████████████▍          8200                 ●          8200
-may  ██████████████████▉      9500                     ●      9500
-jun  ██████████████████████▎  10500                       ●   10500
-jul  ████████████████████████ 11000                         ● 11000
-aug  █████████████████████▎   10200                      ●    10200
-sep  █████████████████▉       9200                    ●       9200
-oct  ███████████████▍         8500                  ●         8500
-nov  ██████████▎              7000             ●              7000
-dec  ██████▉                  6000          ●                 6000
-
-Revenue (in $): 4000 to 11000
-```
-
-```
+```mermaid
 xychart-beta
     title "Sales Revenue"
     x-axis [jan, feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec]

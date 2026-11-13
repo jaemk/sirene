@@ -2,20 +2,7 @@
 
 sirene draws Mermaid kanban boards (`kanban`) as images and as text:
 
-```
-$ sirene ascii board.mmd
-┌─ Backlog ────────────────────────┐ ┌─ In Review ──────────────────────┐ ┌─ Done ───────────────────────────┐
-│ ╭──────────────────────────────╮ │ │ ╭──────────────────────────────╮ │ │                                  │
-│ │ Draft onboarding guide       │ │ │ │ Fix login timeout            │ │ │                                  │
-│ │ ▼ Low @alex                  │ │ │ │ ▲▲ Very High BUG-101 @sam    │ │ │                                  │
-│ ╰──────────────────────────────╯ │ │ ╰──────────────────────────────╯ │ │                                  │
-│ ╭──────────────────────────────╮ │ │                                  │ │                                  │
-│ │ Quoted: card (with brackets) │ │ │                                  │ │                                  │
-│ ╰──────────────────────────────╯ │ │                                  │ │                                  │
-└──────────────────────────────────┘ └──────────────────────────────────┘ └──────────────────────────────────┘
-```
-
-```
+```mermaid
 kanban
   backlog[Backlog]
     item1[Draft onboarding guide]@{ assigned: 'alex', priority: 'Low' }

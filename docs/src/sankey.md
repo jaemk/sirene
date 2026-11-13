@@ -3,38 +3,7 @@
 sirene draws Mermaid sankey diagrams (`sankey-beta`) as images and as text. In text, each node
 lists its outgoing flows, with bars scaled to the largest flow:
 
-```
-$ sirene ascii budget.mmd
-                  Household budget
-
-Salary, net  $4200
-└─ Budget            $4200  ████████████████████████
-
-Side work  $600
-└─ Budget             $600  ███▍
-
-Budget  $4800
-├─ Rent              $1800  ██████████▎
-├─ Savings           $1200  ██████▉
-├─ Food               $700  ████
-└─ The "other" pile  $1100  ██████▎
-
-Rent  $1800
-
-Savings  $1200
-├─ Index fund         $900  █████▏
-└─ Cash               $300  █▊
-
-Food  $700
-
-The "other" pile  $1100
-
-Index fund  $900
-
-Cash  $300
-```
-
-```
+```mermaid
 ---
 title: Household budget
 config:

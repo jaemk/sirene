@@ -2,16 +2,7 @@
 
 sirene draws Mermaid pie charts (`pie`) as images and as text:
 
-```
-$ sirene ascii pets.mmd
-             Pets adopted by volunteers
-
-Dogs  ███████████████████████████████▊           79%
-Cats  ███████                                    17%
-Rats  █▎                                          3%
-```
-
-```
+```mermaid
 pie title Pets adopted by volunteers
     "Dogs" : 386
     "Cats" : 85

@@ -4,32 +4,7 @@ sirene draws Mermaid's event modeling diagrams (`eventmodeling`) as images and a
 processor, command, read model, and event frames along a timeline, in swimlanes, with relations
 between them.
 
-```
-$ sirene ascii cart.mmd
-┌─────────────────────────────────────────────────────┐
-│                                                     │
-│ UI/Automation        ┌ 01 ui ─┐                     │
-│                      │ CartUI │                     │
-│                      └──────┬─┘                     │
-│                             │                       │
-├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤
-│                             ▼                       │
-│ Command/Read Model        ┌ 02 cmd ─────────────┐   │
-│                           │       AddItem       │   │
-│                           ├─────────────────────┤   │
-│                           │ description: string │   │
-│                           └───────────────┬─────┘   │
-│                                           │         │
-├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┼┄┄┄┄┄┄┄┄┄┤
-│                                           ▼         │
-│ Events                               ┌ 03 evt ───┐  │
-│                                      │ ItemAdded │  │
-│                                      └───────────┘  │
-│                                                     │
-└─────────────────────────────────────────────────────┘
-```
-
-```
+```mermaid
 eventmodeling
   tf 01 ui CartUI
   tf 02 cmd AddItem { description: string }

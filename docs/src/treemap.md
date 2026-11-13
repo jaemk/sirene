@@ -3,20 +3,7 @@
 sirene draws Mermaid treemaps (`treemap-beta`) as images and as text. In text, the items are an
 outline, largest first, with each value and a bar for its share of the total:
 
-```
-$ sirene ascii budget.mmd
-Housing       $2,010.50  ██████████▎
-├─ Rent       $1,800.50  █████████▏
-└─ Utilities    $210.00  █▏
-
-Food          $1,820.00  █████████▎
-├─ Dining     $1,180.00  ██████
-└─ Groceries    $640.00  ███▎
-
-Savings         $900.00  ████▋
-```
-
-```
+```mermaid
 ---
 config:
   treemap:

@@ -2,27 +2,7 @@
 
 sirene draws Mermaid sequence diagrams (`sequenceDiagram`) as images and as text:
 
-```
-$ sirene ascii hello.mmd
-┌───────┐                 ┌───────┐
-│ Alice │                 │ John  │
-└───┬───┘                 └───┬───┘
-    │                         │
-    │Hello John, how are you? │
-    ├────────────────────────►│
-    │                         │
-    │         Great!          │
-    │◄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤
-    │                         │
-    │     See you later!      │
-    ├────────────────────────>│
-    │                         │
-┌───┴───┐                 ┌───┴───┐
-│ Alice │                 │ John  │
-└───────┘                 └───────┘
-```
-
-```
+```mermaid
 sequenceDiagram
     Alice->>John: Hello John, how are you?
     John-->>Alice: Great!

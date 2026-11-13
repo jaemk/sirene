@@ -2,26 +2,7 @@
 
 sirene draws PlantUML diagrams as images and as text, with its own layouts:
 
-```
-$ sirene ascii login.puml
-  o
- /|\    ┌─────────┐
- / \    │ Server  │
-User    └────┬────┘
-  │          │
-  │  log in  │
-  ├─────────►│
-  │          │
-  │  token   │
-  │◄┄┄┄┄┄┄┄┄┄┤
-  │          │
-  o     ┌────┴────┐
- /|\    │ Server  │
- / \    └─────────┘
-User
-```
-
-```
+```plantuml
 @startuml
 actor User
 participant Server

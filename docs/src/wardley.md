@@ -3,38 +3,7 @@
 sirene draws Mermaid's Wardley maps (`wardley-beta`) as images and as text. Components are
 placed by visibility (up) and evolution (across):
 
-```
-$ sirene ascii pipeline.mmd
-                         Storage Options
-
-Visibility
-│                ┆               ┆              ┆
-│                ┆               ┆           ◆ App
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-│                ┆               ┆     ■ Database
-│                ● File System   ● SQL DB    ● NoSQL   ● Cloud DB
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-│                ┆               ┆              ┆
-└─────────────────────────────────────────────────────────────────
-     Genesis       Custom Built      Product       Commodity
-                            Evolution
-
-Links:
-  App -- Database
-
-Pipelines:
-  Database: File System, SQL DB, NoSQL, Cloud DB
-```
-
-```
+```mermaid
 wardley-beta
 title Storage Options
 anchor App [0.95, 0.70]

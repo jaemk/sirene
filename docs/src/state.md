@@ -3,23 +3,11 @@
 sirene draws Mermaid state diagrams (`stateDiagram` and `stateDiagram-v2`) with the same layout,
 themes, and outputs as flowcharts:
 
-```
-$ printf 'stateDiagram-v2\n  [*] --> Still\n  Still --> Moving : push\n  Moving --> [*]\n' | sirene ascii
-     ●
-     │
-     ▼
- ╭───────╮
- │ Still │
- ╰───┬───╯
-     │
-   push
-     ▼
-╭────────╮
-│ Moving │
-╰────┬───╯
-     │
-     ▼
-     ◉
+```mermaid
+stateDiagram-v2
+  [*] --> Still
+  Still --> Moving : push
+  Moving --> [*]
 ```
 
 In the editor a state diagram is read-only on the drawing side: select, zoom, export, and copy

@@ -3,23 +3,7 @@
 sirene draws Mermaid entity relationship diagrams (`erDiagram`) with the same layout, themes, and
 outputs as flowcharts:
 
-```
-$ sirene ascii shop.mmd
-    ┌──────────┐
-    │ CUSTOMER │
-    └──────────┘
-          1
-       places
-          *
-┌──────────────────┐
-│      ORDER       │
-├──────────────────┤
-│ int    id     PK │
-│ string status    │
-└──────────────────┘
-```
-
-```
+```mermaid
 erDiagram
   CUSTOMER ||--o{ ORDER : places
   ORDER {

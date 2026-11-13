@@ -2,23 +2,7 @@
 
 sirene draws Mermaid timelines (`timeline`) as images and as text:
 
-```
-$ sirene ascii social.mmd
-         History of Social Media Platform
-
-┌──────────┐ ┌──────────┐ ┌─────────┐ ┌─────────┐
-│   2002   │ │   2004   │ │  2005   │ │  2006   │
-└─────┬────┘ └─────┬────┘ └────┬────┘ └────┬────┘
-──────┼────────────┼───────────┼───────────┼──────►
-┌─────┴────┐ ┌─────┴────┐ ┌────┴────┐ ┌────┴────┐
-│ LinkedIn │ │ Facebook │ │ YouTube │ │ Twitter │
-└──────────┘ └─────┬────┘ └─────────┘ └─────────┘
-             ┌─────┴────┐
-             │  Google  │
-             └──────────┘
-```
-
-```
+```mermaid
 timeline
     title History of Social Media Platform
     2002 : LinkedIn

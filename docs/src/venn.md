@@ -3,20 +3,7 @@
 sirene draws Mermaid's venn diagrams (`venn-beta`) as images and as text. Each `set` is a circle,
 and each `union` is where circles overlap:
 
-```
-$ sirene ascii teams.mmd
-       Team overlap
-
-Frontend
-  - React
-  - Design Systems
-Backend
-  - API
-Frontend & Backend: Shared
-  - OpenAPI
-```
-
-```
+```mermaid
 venn-beta
   title "Team overlap"
   set A["Frontend"]:20
