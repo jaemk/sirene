@@ -517,7 +517,12 @@ impl Lower {
                 let sections = class.sections.get_or_insert_with(|| {
                     let mut first = std::mem::take(&mut class.fields);
                     first.append(&mut class.methods);
-                    vec![first]
+                    // A body that opens with a separator has no first compartment.
+                    if first.is_empty() {
+                        vec![]
+                    } else {
+                        vec![first]
+                    }
                 });
                 let mut next = Vec::new();
                 if let Some(title) = title {

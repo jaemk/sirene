@@ -18,6 +18,17 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `style=rounded` on a cluster warns as it is not drawn; an edge to a reopened named
   subgraph reaches all its nodes; `\\` before a line break and CRLF in a quoted string are
   read correctly; `digraph "a" + "b" {` is detected as DOT.
+- PlantUML sequence messages from a sender named like a participant keyword (`Database -->
+  Server`), notes closed by `end hnote` or `end rnote`, and `autoactivate on` with `return`
+  are read instead of erroring; frame and `else` labels drop leading `#color` words with a
+  warning.
+- PlantUML unnamed containers (`cloud {`) and lollipop `()` link ends are read, and a quoted
+  name with parentheses in a message (`"Web (Chrome)" -> Server`) no longer makes the
+  document a use case diagram.
+- PlantUML activity `if (c) is (red) then` and `elseif` put the `is` label on the branch, and
+  nodes before the first `|Lane|` join that lane.
+- PlantUML class bodies that open with a separator (`.. getters ..`) have no empty first
+  compartment.
 - `--charset ascii` writes stereotypes as `<<interface>>` and `<<include>>` instead of
   `«interface»` in class, requirement, use case, and PlantUML diagrams.
 - PlantUML component interface sockets and balls (`[A] -( I`, `I )- [A]`, `-(0-`) are read

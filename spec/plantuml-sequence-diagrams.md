@@ -56,6 +56,9 @@ not supported yet").
   `!!` destroys it, and `++` with a `--` (`++--`, in either order) does both.
 - `return text` is a dashed message from the participant activated last to the one whose
   message activated it, and deactivates it; with nothing active it is an error.
+- `autoactivate on` makes each following message activate its target, as `++` does (except
+  one with `!!`), until `autoactivate off`; `return` then closes the activation. Any other
+  argument is an error.
 - `activate A`, `deactivate A`; activation colors (`activate A #red`) are a warning.
 - `autonumber [start] [step]` numbers the following messages; `autonumber stop` and
   `autonumber resume [step]` pause and continue; a format string is a warning and ignored.
@@ -64,11 +67,12 @@ not supported yet").
 
 - `note left`, `note right` (of the previous message's source or target, as PlantUML places
   them), `note left of A`, `note right of A`, `note over A[, B]`, and `note across` (over every
-  participant), each with `: text` on one line or the following lines up to `end note`.
-  `hnote` and `rnote` are notes. A `#color` is a warning.
+  participant), each with `: text` on one line or the following lines up to `end note`
+  (`end hnote` and `end rnote` for those keywords). `hnote` and `rnote` are notes. A `#color` is a warning.
 - `alt`, `else`, `opt`, `loop`, `par`, `break`, `critical`, and `group` open frames, each
   closed by `end` (MSEQ-2 blocks); `group A [B]` is labeled `A`, with `B` after it. `else` is
-  the only divider, in any frame, as PlantUML allows.
+  the only divider, in any frame, as PlantUML allows. Leading `#color` words on a frame or
+  `else` label (`alt#Gold #LightBlue text`) are a warning and left out of the label.
 - `== text ==` is a separator: a rule across the diagram with the text in the middle.
 - `...` is a delay: a gap with dotted lifelines; `... text ...` labels it.
 - `|||` is a blank row; `||N||` is `N` pixels of space, at least one row in ASCII.
@@ -91,7 +95,7 @@ a `ref` tab. Done: tests `plantuml_events` in `crates/sirene-core/tests/sequence
 
 `title text`, and `title` ... `end title`, is the diagram's title. These are warnings and
 ignored: `header`, `footer`, `caption`, and `legend` ... `endlegend`; `skinparam` and `!theme` (PUML-4); colors and stereotypes;
-`newpage` (everything is on one page); `autoactivate`; `!pragma`; creole and HTML markup in
+`newpage` (everything is on one page); `!pragma`; creole and HTML markup in
 text, which is drawn as written. `!include`, `!includeurl`, and `!import` are errors (PUML-4);
 `!define`, `!function`, variables, and conditionals are a warning and their lines ignored.
 Unknown lines are errors, as in Mermaid (LANGS-6).

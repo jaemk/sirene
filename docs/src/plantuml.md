@@ -49,7 +49,9 @@ Syntax a kind does not read is an error on its line; a construct that is read bu
 `!include`, `!includeurl`, `!includesub`, `!include_many`, `!include_once`, and `!import` are
 errors, since sirene reads no other files; other `!` lines (`!define`, `!theme`, ...) are
 warnings and skipped. `skinparam` lines are warnings, except `skinparam actorStyle` in use case
-diagrams. A second `@start` block in a file is a warning.
+diagrams. A second `@start` block in a file is a warning. A `#color` before a sequence frame or
+`else` label (`alt#Gold text`) is a warning and left out of the label. In sequence diagrams
+`autoactivate on` activates the target of each message until `autoactivate off`.
 
 ## Not drawn
 
