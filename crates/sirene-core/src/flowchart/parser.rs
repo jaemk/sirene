@@ -18,6 +18,7 @@ pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
         builder: GreenNodeBuilder::new(),
         diagnostics: Vec::new(),
         agentflow: false,
+        stop: None,
     };
     p.root();
     (p.builder.finish(), p.diagnostics)
@@ -31,6 +32,9 @@ struct Parser<'a> {
     /// An `agentflow-beta` diagram (MAGF-1): `flow` containers, `global` blocks,
     /// `connector` declarations, and only `-->`, `--x`, and `-.-` edges.
     agentflow: bool,
+    /// `(from, at)`: the first label stop character at or after `from` is at `at`, so labels
+    /// starting in between need not scan again (a stop may be far ahead of many labels).
+    stop: Option<(usize, usize)>,
 }
 
 /// Mermaid's other diagram types, by the keyword that starts them.
@@ -442,12 +446,28 @@ impl<'a> Parser<'a> {
         self.finish();
     }
 
+    /// Where the first label stop character at or after the cursor is, or the end of input.
+    fn next_stop(&mut self) -> usize {
+        if let Some((from, at)) = self.stop
+            && (from..=at).contains(&self.pos)
+        {
+            return at;
+        }
+        let at = self.pos
+            + self.src[self.pos..]
+                .bytes()
+                .position(scan::is_label_stop)
+                .unwrap_or(self.src.len() - self.pos);
+        self.stop = Some((self.pos, at));
+        at
+    }
+
     fn shape(&mut self, open_len: usize, opener: Opener) {
         self.start(SHAPE);
         let open = self.pos;
         self.token(SHAPE_OPEN, open_len);
         self.label(
-            |r| scan::shape_text_len(r, opener),
+            |r, stop| scan::shape_text_len_at(r, stop, opener),
             |r| scan::shape_close(r, opener).is_some(),
         );
         match scan::shape_close(self.rest(), opener) {
@@ -467,7 +487,9 @@ impl<'a> Parser<'a> {
     /// FLOWCH-8. A quoted label is a string with optional surrounding whitespace; an unquoted
     /// label is a single `TEXT` token of `text_len` bytes, cut at the end of its line when
     /// `closes` does not hold where it stops.
-    fn label(&mut self, text_len: impl Fn(&str) -> usize, closes: impl Fn(&str) -> bool) {
+    ///
+    /// `text_len` gets the rest and the offset in it of the first `scan::is_label_stop`.
+    fn label(&mut self, text_len: impl Fn(&str, usize) -> usize, closes: impl Fn(&str) -> bool) {
         self.start(LABEL);
         let r = self.rest();
         if r[scan::ws_len(r)..].starts_with('"') {
@@ -475,7 +497,9 @@ impl<'a> Parser<'a> {
             self.string();
             self.ws();
         } else {
-            let mut len = text_len(r);
+            let stop = self.next_stop() - self.pos;
+            let r = self.rest();
+            let mut len = text_len(r, stop);
             if !closes(&r[len..]) {
                 len = len.min(scan::line_len(r));
             }
@@ -547,7 +571,7 @@ impl<'a> Parser<'a> {
                     self.start(EDGE_LABEL);
                     let open = self.pos;
                     self.token(PIPE, 1);
-                    self.label(|r| scan::text_len(r, &[]), |r| r.starts_with('|'));
+                    self.label(|_, stop| stop, |r| r.starts_with('|'));
                     if self.rest().starts_with('|') {
                         self.token(PIPE, 1);
                     } else {
@@ -561,7 +585,7 @@ impl<'a> Parser<'a> {
                 self.token(STROKE_OPEN, n);
                 self.start(EDGE_LABEL);
                 self.label(
-                    |r| scan::inline_edge_text_len(r, kind),
+                    |r, _| scan::inline_edge_text_len(r, kind),
                     |r| scan::closing_stroke(r, kind).is_some(),
                 );
                 self.finish();

@@ -68,6 +68,11 @@ impl Canvas {
         }
     }
 
+    /// The columns kept, after any cut.
+    pub fn width(&self) -> i32 {
+        self.width
+    }
+
     fn cell(&mut self, x: i32, y: i32) -> Option<&mut Cell> {
         if x < 0 || y < 0 || x >= self.width || y >= self.height {
             return None;
@@ -128,26 +133,48 @@ impl Canvas {
     }
 
     /// Writes text from `(x, y)`; wide characters take two cells and zero-width ones are
-    /// dropped. Returns the next column.
+    /// dropped. A wide character that does not fit whole is left out. Returns the next column.
     pub fn text(&mut self, mut x: i32, y: i32, s: &str) -> i32 {
         for ch in s.chars() {
             let w = ch.width().unwrap_or(0) as i32;
             if w == 0 {
                 continue;
             }
-            if let Some(c) = self.cell(x, y) {
-                c.text = Some(ch);
-                c.tail = false;
+            let fits = x >= 0 && x.saturating_add(w) <= self.width;
+            if fits {
+                for k in 0..w {
+                    self.release(x + k, y);
+                }
+                if let Some(c) = self.cell(x, y) {
+                    c.text = Some(ch);
+                    c.tail = false;
+                }
+                if w == 2
+                    && let Some(c) = self.cell(x + 1, y)
+                {
+                    c.text = None;
+                    c.tail = true;
+                }
             }
-            if w == 2
-                && let Some(c) = self.cell(x + 1, y)
-            {
-                c.text = None;
-                c.tail = true;
-            }
-            x += w;
+            x = x.saturating_add(w);
         }
         x
+    }
+
+    /// Splits the wide character covering `(x, y)`, if any, so the cell can be written alone:
+    /// its other half becomes a space.
+    fn release(&mut self, x: i32, y: i32) {
+        let Some(c) = self.cell(x, y) else {
+            return;
+        };
+        let (tail, head) = (c.tail, c.text.is_some_and(|t| t.width() == Some(2)));
+        if tail && let Some(h) = self.cell(x - 1, y) {
+            h.text = Some(' ');
+        }
+        if head && let Some(t) = self.cell(x + 1, y) {
+            t.tail = false;
+            t.text = Some(' ');
+        }
     }
 
     pub fn render(&self, charset: Charset) -> String {
@@ -348,8 +375,23 @@ mod tests {
         c.add(-1, 0, LEFT, Line::Light);
         c.glyph(9, 9, glyph('x', 'x'));
         c.arrow(9, 9, glyph('x', 'x'));
+        // A wide character that does not fit whole is left out.
         assert_eq!(c.text(3, 0, "日"), 5);
-        assert_eq!(c.render(Charset::Unicode), "a日日\n");
+        assert_eq!(c.text(-1, 0, "日"), 1);
+        assert_eq!(c.render(Charset::Unicode), "a日►\n");
+    }
+
+    /// Writing over half of a wide character keeps every row its width.
+    #[test]
+    fn overwriting_wide_characters() {
+        let mut c = Canvas::new(6, 1);
+        c.text(0, 0, "日本語");
+        c.text(1, 0, "x");
+        assert_eq!(c.render(Charset::Unicode), " x本語\n");
+        c.text(3, 0, "月");
+        assert_eq!(c.render(Charset::Unicode), " x 月\n");
+        c.text(2, 0, "y");
+        assert_eq!(c.render(Charset::Unicode), " xy月\n");
     }
 
     #[test]

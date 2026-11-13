@@ -145,7 +145,14 @@ struct Lowerer {
     lost: Vec<String>,
     /// Ids in agentflow `global` blocks, which belong to no `flow` (MAGF-2).
     globals: Ids,
+    /// The index in `chart.classes` of each `classDef` name.
+    class_index: HashMap<String, usize>,
+    /// Whether `MAX_EDGES` has been reported.
+    too_many_edges: bool,
 }
+
+/// The most edges a flowchart has.
+pub const MAX_EDGES: usize = 100_000;
 
 /// The id of the untitled lane that holds a swimlane diagram's nodes outside every lane.
 pub const DEFAULT_LANE: &str = "__swimlane_default__";
@@ -524,6 +531,18 @@ impl Lowerer {
             }
             Some(id)
         });
+        // `a & b --> c & d` makes every pair, so a few long `&` lists could make billions.
+        let pairs = from.len().saturating_mul(to.len());
+        if self.chart.edges.len().saturating_add(pairs) > MAX_EDGES {
+            if !self.too_many_edges {
+                self.too_many_edges = true;
+                self.diagnostics.push(Diagnostic::new(
+                    syntax.text_range(),
+                    format!("a flowchart has at most {MAX_EDGES} edges; leaving out the rest"),
+                ));
+            }
+            return;
+        }
         for (i, f) in from.iter().enumerate() {
             for (j, t) in to.iter().enumerate() {
                 let id = if i + 1 == from.len() && j == 0 {
@@ -707,12 +726,16 @@ impl Lowerer {
         let styles = self.styles(&style);
         for name in tokens(&names).filter(|t| t.kind() == IDENT) {
             let name = name.text();
-            match self.chart.classes.iter_mut().find(|c| c.name == name) {
-                Some(class) => class.styles.extend(styles.iter().cloned()),
-                None => self.chart.classes.push(ClassDef {
-                    name: name.to_owned(),
-                    styles: styles.clone(),
-                }),
+            match self.class_index.get(name) {
+                Some(&i) => self.chart.classes[i].styles.extend(styles.iter().cloned()),
+                None => {
+                    self.class_index
+                        .insert(name.to_owned(), self.chart.classes.len());
+                    self.chart.classes.push(ClassDef {
+                        name: name.to_owned(),
+                        styles: styles.clone(),
+                    });
+                }
             }
         }
     }
@@ -734,8 +757,8 @@ impl Lowerer {
                 self.chart.edges[e].classes.push(class.clone());
                 found = true;
             }
-            if let Some(sg) = self.subgraphs.iter_mut().find(|s| s.id == id) {
-                sg.classes.push(class.clone());
+            if let Some(&s) = self.subgraph_index.get(id) {
+                self.subgraphs[s].classes.push(class.clone());
                 found = true;
             }
             if !found {
@@ -756,8 +779,8 @@ impl Lowerer {
         let name = id.text();
         if let Some(&i) = self.node_index.get(name) {
             self.chart.nodes[i].styles.extend(styles);
-        } else if let Some(sg) = self.subgraphs.iter_mut().find(|s| s.id == name) {
-            sg.styles.extend(styles);
+        } else if let Some(&s) = self.subgraph_index.get(name) {
+            self.subgraphs[s].styles.extend(styles);
         } else if let Some(&e) = self.edge_ids.get(name) {
             self.chart.edges[e].styles.extend(styles);
         } else {
