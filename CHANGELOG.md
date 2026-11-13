@@ -21,6 +21,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `state X:::class` (with or without `{`) sets the class; `[[fork]]`, `[[join]]` and
   `[[choice]]` work like `<<fork>>`, and both forms ignore case. A trailing `%%` comment is
   also accepted in the other line-based Mermaid diagrams.
+- Mermaid sequence diagrams: non-ASCII text after `note left`, after participant metadata, or
+  in a `box` title no longer panics; `autonumber OFF` ignores case.
 - DOT: a repeated edge in a `strict` graph no longer takes the current `edge [...]` defaults
   over the first edge's own attributes; `\G` in a cluster label is the cluster's name;
   `style=rounded` on a cluster warns as it is not drawn; an edge to a reopened named

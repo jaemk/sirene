@@ -93,7 +93,7 @@ fn display(s: &str) -> Text {
 /// The color and title of `box TEXT`: a leading CSS color, if any, then the title.
 fn group(s: &str) -> Group {
     let s = s.trim();
-    let color_len = if s.len() >= 3 && s[..3].eq_ignore_ascii_case("rgb") {
+    let color_len = if s.get(..3).is_some_and(|w| w.eq_ignore_ascii_case("rgb")) {
         s.find(')').map_or(0, |i| i + 1)
     } else {
         let word = s.find(char::is_whitespace).unwrap_or(s.len());
@@ -392,7 +392,7 @@ impl Lower {
             words.get(i).map_or(Some(default), |w| w.parse().ok())
         };
         match words.as_slice() {
-            ["off"] => self.numbering = None,
+            [off] if off.eq_ignore_ascii_case("off") => self.numbering = None,
             _ if words.len() <= 2 => match (number(0, 1), number(1, 1)) {
                 (Some(start), Some(step)) => self.numbering = Some((start, step)),
                 _ => self.error(range, "expected `off`, or a start number and a step"),

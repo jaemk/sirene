@@ -109,6 +109,20 @@ fn errors(src: &str) -> Vec<(Severity, String)> {
         .collect()
 }
 
+/// Non-ASCII where a keyword may follow is an error or a name, not a panic; `autonumber OFF`
+/// ignores case.
+#[test]
+fn non_ascii_and_keyword_case() {
+    for src in [
+        "sequenceDiagram\nnote left 日本: x\n",
+        "sequenceDiagram\nparticipant A@{\"type\":\"actor\"} 日本\n",
+        "sequenceDiagram\nbox é日\nparticipant A\nend\n",
+    ] {
+        diagram::lower(src);
+    }
+    sequence("sequenceDiagram\nautonumber\nA->>B: x\nautonumber OFF\nA->>B: y\n");
+}
+
 /// MSEQ-1, MSEQ-2: participants in order of declaration or first mention, with aliases and
 /// kinds.
 #[test]
