@@ -1,9 +1,10 @@
-//! Every fixture, cut short at each line and halfway through each line, still draws: an
-//! unfinished diagram (the editor's state while typing) never panics in any renderer.
+//! Every fixture, cut short at each line and halfway through each line, or with a line left
+//! out, still draws: an unfinished diagram (the editor's state while typing) never panics in any
+//! renderer. Whole, each draws with only ASCII characters under `Charset::Ascii` (ASCIIR-2).
 
 use std::path::{Path, PathBuf};
 
-use sirene_core::ascii::Options;
+use sirene_core::ascii::{Charset, Options};
 use sirene_core::diagram::{self, Lang};
 use sirene_core::scene::{Approx, Theme, svg};
 
@@ -70,5 +71,16 @@ fn fixture_prefixes_draw() {
                 .collect();
             draw(&text, &format!("without line {}", skip + 1));
         }
+        // With the ASCII charset, no drawing characters (box drawing, blocks, shapes, arrows,
+        // guillemets, dots) are used except those in the source's own text.
+        let text = diagram::lower_as(&src, lang).diagram.ascii(&Options {
+            charset: Charset::Ascii,
+        });
+        let drawing = |c: char| matches!(c, '\u{2190}'..='\u{21ff}' | '\u{2500}'..='\u{25ff}' | '«' | '»' | '·' | '…');
+        let stray: String = text
+            .chars()
+            .filter(|&c| drawing(c) && !src.contains(c))
+            .collect();
+        assert!(stray.is_empty(), "{}: {stray:?}\n{text}", path.display());
     }
 }

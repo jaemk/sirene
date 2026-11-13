@@ -13,6 +13,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `--charset ascii` writes stereotypes as `<<interface>>` and `<<include>>` instead of
+  `«interface»` in class, requirement, use case, and PlantUML diagrams.
 - PlantUML component interface sockets and balls (`[A] -( I`, `I )- [A]`, `-(0-`) are read
   as links with a warning instead of errors, and a quoted element name may run over several
   lines up to its closing `"`.

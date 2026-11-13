@@ -3,16 +3,16 @@ source: crates/sirene-core/tests/requirement.rs
 expression: "requirementDiagram\n\n    requirement test_req {\n    id: 1\n    text: the test text.\n    risk: high\n    verifymethod: test\n    }\n\n    element test_entity {\n    type: simulation\n    }\n\n    test_entity - satisfies -> test_req\n"
 ---
       +------------------+
-      |    «Element»     |
+      |   <<Element>>    |
       |   test_entity    |
       +------------------+
       | Type: simulation |
       +---------+--------+
                 :
-           «satisfies»
+          <<satisfies>>
                 v
 +------------------------------+
-|        «Requirement»         |
+|       <<Requirement>>        |
 |           test_req           |
 +------------------------------+
 | Id:           1              |
