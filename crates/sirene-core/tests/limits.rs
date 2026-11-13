@@ -166,6 +166,23 @@ fn flowchart_chain() {
     check(&s, &[]);
 }
 
+/// A `&` product past the edge cap is left out, reported once.
+#[test]
+fn flowchart_edge_product() {
+    let side = |p: &str| {
+        (0..400)
+            .map(|i| format!("{p}{i}"))
+            .collect::<Vec<_>>()
+            .join(" & ")
+    };
+    let line = format!("{} --> {}\n", side("a"), side("b"));
+    let src = format!("flowchart TD\n{line}{line}");
+    check(
+        &src,
+        &["a flowchart has at most 100000 edges; leaving out the rest"],
+    );
+}
+
 /// Member lookups stay near linear: one subgraph with many members, and many subgraphs each
 /// listed again by the next.
 #[test]

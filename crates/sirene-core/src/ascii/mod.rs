@@ -55,7 +55,7 @@ pub use venn::render as venn;
 pub use wardley::render as wardley;
 pub use xychart::render as xychart;
 
-use unicode_width::UnicodeWidthStr;
+use unicode_width::UnicodeWidthChar;
 
 use crate::flowchart::{
     Arrow, Edge, Flowchart, Label, Measure, Node, Row, Shape, Stroke, Subgraph, clean,
@@ -254,7 +254,9 @@ fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String
     let title = chart.title.as_deref().map(clean);
     match title.as_deref().map(str::trim) {
         Some(t) if !t.is_empty() => {
-            let pad = ((layout.size.w - width(t)).max(0) / 2) as usize;
+            // Centered over the columns kept, so a cut drawing's title stays small.
+            let w = layout.size.w.min(canvas.width());
+            let pad = ((w - width(t)).max(0) / 2) as usize;
             format!("{}{t}\n\n{body}", " ".repeat(pad))
         }
         _ => body,
@@ -329,8 +331,12 @@ impl Measure for Cells {
     }
 }
 
+/// The columns `Canvas::text` gives `s`: each character's own width, so emoji sequences that
+/// a string width would join measure as drawn.
 fn width(s: &str) -> i32 {
-    UnicodeWidthStr::width(s) as i32
+    s.chars()
+        .map(|c| UnicodeWidthChar::width(c).unwrap_or(0) as i32)
+        .sum()
 }
 
 /// Display lines of a label, with markdown emphasis markers dropped (ASCIIR-3).

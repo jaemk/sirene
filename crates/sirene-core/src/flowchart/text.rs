@@ -51,11 +51,12 @@ const DROPPED_TAGS: &[&str] = &[
 
 /// Length and name (lower case) of an HTML tag at the start of `s`, and whether it closes.
 fn tag(s: &str) -> Option<(usize, String, bool)> {
-    let end = s.find('>')?;
-    let inner = &s[1..end];
-    if inner.contains('<') {
+    // The `>` before any other `<`, so a run of `<` is looked at once.
+    let end = 1 + s.get(1..)?.find(['<', '>'])?;
+    if s.as_bytes()[end] != b'>' {
         return None;
     }
+    let inner = &s[1..end];
     let (closing, inner) = match inner.strip_prefix('/') {
         Some(rest) => (true, rest),
         None => (false, inner),
@@ -76,6 +77,10 @@ fn replace_html(s: &str, html: bool) -> (String, bool) {
     let mut emphasis = false;
     // Open emphasis tags: bold, italic.
     let mut open = [0usize; 2];
+    // Where the last closing bold and italic tags start, to tell whether one follows a point.
+    let lower = s.to_ascii_lowercase();
+    let last_close = [["</b>", "</strong>"], ["</i>", "</em>"]]
+        .map(|partners| partners.iter().filter_map(|p| lower.rfind(p)).max());
     let mut rest = s;
     while let Some(i) = rest.find('<') {
         out.push_str(&rest[..i]);
@@ -104,9 +109,8 @@ fn replace_html(s: &str, html: bool) -> (String, bool) {
                     }
                     Some(k) => {
                         // Only a tag with a partner after it is emphasis.
-                        let later = tail[n..].to_ascii_lowercase();
-                        let partners = [["</b>", "</strong>"], ["</i>", "</em>"]][k];
-                        if partners.iter().any(|p| later.contains(p)) {
+                        let after = s.len() - tail.len() + n;
+                        if last_close[k].is_some_and(|c| c >= after) {
                             open[k] += 1;
                             emphasis = true;
                             out.push_str(["**", "*"][k]);
@@ -163,6 +167,10 @@ fn entity(code: &str, numeric: bool) -> Option<char> {
     super::entities::lookup(code)
 }
 
+/// The longest entity code read, in bytes: HTML's longest name is 31, and a code point is at
+/// most 7 digits after `#` or `#x`, so this leaves room for leading zeros.
+const MAX_ENTITY: usize = 40;
+
 fn decode(s: &str, marks: &[char]) -> String {
     let mut out = String::with_capacity(s.len());
     let mut rest = s;
@@ -170,7 +178,9 @@ fn decode(s: &str, marks: &[char]) -> String {
         out.push_str(&rest[..i]);
         let mark = &rest[i..i + 1];
         let tail = &rest[i + 1..];
-        let decoded = tail.find(';').and_then(|end| {
+        // Entity names and codes are short, so `;` is looked for only a little way ahead.
+        let window = &tail.as_bytes()[..tail.len().min(MAX_ENTITY + 1)];
+        let decoded = window.iter().position(|&b| b == b';').and_then(|end| {
             let code = &tail[..end];
             let c = match (mark, code.strip_prefix('#')) {
                 ("&", Some(num)) => match num.strip_prefix(['x', 'X']) {
@@ -633,6 +643,22 @@ mod tests {
         assert_eq!(decode_html_entities("&eacute;&euro;"), "\u{e9}\u{20ac}");
         // A numeral after `&` needs its `#`.
         assert_eq!(decode_entities("&9829;"), "&9829;");
+    }
+
+    #[test]
+    fn long_runs_are_kept() {
+        assert_eq!(tag("<<<<"), None);
+        assert_eq!(tag("<b<b>"), None);
+        let lt = "<".repeat(10_000);
+        assert_eq!(label(&lt, false).text, lt);
+        let open = "<b>".repeat(1000) + "x";
+        assert_eq!(label(&open, false).text, "x");
+        assert_eq!(label("<b>a</b><b>b</b>", false).text, "**a****b**");
+        let amp = "&".repeat(10_000);
+        assert_eq!(decode_entities(&amp), amp);
+        let long = format!("&{};", "a".repeat(MAX_ENTITY + 5));
+        assert_eq!(decode_entities(&long), long);
+        assert_eq!(decode_entities("&amp;&amp;"), "&&");
     }
 
     #[test]

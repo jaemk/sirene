@@ -222,26 +222,46 @@ pub(crate) fn shape_close(s: &str, opener: Opener) -> Option<usize> {
         .map(|c| c.len())
 }
 
+/// Whether unquoted label text (FLOWCH-8) stops at byte `b`: `[](){}|"`.
+pub(crate) fn is_label_stop(b: u8) -> bool {
+    matches!(b, b'[' | b']' | b'(' | b')' | b'{' | b'}' | b'|' | b'"')
+}
+
 /// Length of unquoted label text (FLOWCH-8) inside a shape opened by `opener`.
 pub(crate) fn shape_text_len(s: &str, opener: Opener) -> usize {
+    let stop = s.bytes().position(is_label_stop).unwrap_or(s.len());
+    shape_text_len_at(s, stop, opener)
+}
+
+/// `shape_text_len` given `stop`, the offset of the first `is_label_stop` in `s`.
+pub(crate) fn shape_text_len_at(s: &str, stop: usize, opener: Opener) -> usize {
     let extra: &[&str] = match opener {
         Opener::Ellipse => &["-)"],
         Opener::Slash | Opener::Backslash => &["/]", "\\]"],
         _ => &[],
     };
-    text_len(s, extra)
+    text_len_at(s, stop, extra)
 }
 
 /// Length of unquoted label text: stops at `[](){}|"` or any of `extra_stops`.
+#[cfg(test)]
 pub(crate) fn text_len(s: &str, extra_stops: &[&str]) -> usize {
-    for (i, c) in s.char_indices() {
-        if matches!(c, '[' | ']' | '(' | ')' | '{' | '}' | '|' | '"')
-            || extra_stops.iter().any(|stop| s[i..].starts_with(stop))
-        {
-            return i;
-        }
+    let stop = s.bytes().position(is_label_stop).unwrap_or(s.len());
+    text_len_at(s, stop, extra_stops)
+}
+
+/// `text_len` given `stop`, the offset of the first `is_label_stop` in `s`. Each extra stop is
+/// a character then a stop character, so it can only start just before `stop`.
+fn text_len_at(s: &str, stop: usize, extra_stops: &[&str]) -> usize {
+    debug_assert!(
+        extra_stops
+            .iter()
+            .all(|e| e.len() == 2 && is_label_stop(e.as_bytes()[1]))
+    );
+    match stop.checked_sub(1).and_then(|i| s.get(i..)) {
+        Some(r) if extra_stops.iter().any(|e| r.starts_with(e)) => stop - 1,
+        _ => stop,
     }
-    s.len()
 }
 
 /// Stroke family of an inline-label edge (FLOWCH-9). Invisible edges have no inline form.

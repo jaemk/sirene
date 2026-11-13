@@ -15,6 +15,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Flowchart: at most 100000 edges; a `&` product past that is left out with one error. Long
+  labels, runs of `<` or `&`, and many `classDef`, `class` and `style` lines are read in near
+  linear time.
+- ASCII output: a wide character written over part of another clears the rest of it, one that
+  does not fit is left out, and title and git label widths match the canvas.
 - SVG output: control characters XML does not allow are written as U+FFFD, and a NaN or infinite
   number as 0, so the file stays well-formed.
 - Layout: rank tightening visits only items next to one that moved and has a work cap, instead

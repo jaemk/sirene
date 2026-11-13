@@ -1,9 +1,8 @@
 //! Git graphs as text, one commit per row (MGIT-5).
 
-use unicode_width::UnicodeWidthStr;
-
 use super::Options;
 use super::canvas::{Canvas, Glyph, Line, glyph};
+use super::width as columns;
 use crate::git::{Commit, CommitType, Direction, GitGraph};
 
 fn commit_glyph(c: &Commit) -> Glyph {
@@ -36,13 +35,8 @@ pub fn render(graph: &GitGraph, options: &Options) -> String {
         .branches
         .iter()
         .enumerate()
-        .map(|(k, b)| x(k) + b.name.width() as i32)
-        .chain(
-            graph
-                .commits
-                .iter()
-                .map(|c| text_x + caption(c).width() as i32),
-        )
+        .map(|(k, b)| x(k) + columns(&b.name))
+        .chain(graph.commits.iter().map(|c| text_x + columns(&caption(c))))
         .max()
         .unwrap_or(0);
     let height = lanes + rows;
@@ -94,7 +88,7 @@ pub fn render(graph: &GitGraph, options: &Options) -> String {
     {
         // The title centered above, as for flowcharts.
         Some(t) => {
-            let pad = (width - t.width() as i32).max(0) / 2;
+            let pad = (width - columns(t)).max(0) / 2;
             format!("{}{t}\n\n{body}", " ".repeat(pad as usize))
         }
         None => body,
