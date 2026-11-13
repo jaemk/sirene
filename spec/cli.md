@@ -110,25 +110,26 @@ positions in the Markdown file. Every FILE is checked. The exit status is 1 when
 
 ## CLI-12 Markdown files
 
-`sirene svg FILE.md` and `sirene png FILE.md` (or `.markdown`) write each mermaid block
+`sirene svg FILE.md` and `sirene png FILE.md` (or `.markdown`) write each diagram block
 (MARKDO-1) of the file as its own image, `STEM-N.svg` or `STEM-N.png` beside it, where N counts
-the file's mermaid blocks from 1; `-o DIR` writes them into DIR instead (created as needed; an
+the file's diagram blocks from 1; `-o DIR` writes them into DIR instead (created as needed; an
 existing file there is `error: DIR is not a directory; a Markdown file renders one image per
-block into one`). Each image written is reported as `wrote PATH`; a file with no mermaid blocks
-prints `NAME: no mermaid blocks`. Diagnostics have positions in the Markdown file. The exit status is 1 when the file cannot be
+block into one`). Each image written is reported as `wrote PATH`; a file with no diagram blocks
+prints `NAME: no diagram blocks`. Diagnostics have positions in the Markdown file. The exit status is 1 when the file cannot be
 read, a block has an error, or an image cannot be written.
 
 The Markdown file is never changed, except with `--link`: then, after each closed block that
-was written, a line `![diagram N](PATH)` (PATH relative to the Markdown file's directory when
-the image is under it) is inserted unless the line after the block already is that line, and
-`linked the images in NAME` is printed. The mermaid blocks themselves are never removed or
-changed. `--watch` renders again whenever the file changes; the links it adds do not count as
-a change. Tests: `markdown_images` and `watch_markdown` in `crates/sirene/tests/cli.rs`, and
+was written, a line `![diagram N](PATH)` (PATH relative to the Markdown file's directory, with
+`..` to leave it; an absolute `-o` outside that directory stays absolute) is inserted unless the
+line after the block already is that line, and `linked the images in NAME` is printed. The
+diagram blocks themselves are never removed or changed. `--watch` renders again whenever the file changes; the links it adds do not count as
+a change. Tests: `markdown_images`, `markdown_links_from_the_file`, and `watch_markdown` in
+`crates/sirene/tests/cli.rs`, and
 the unit tests in `crates/sirene/src/markdown.rs`.
 
 ## CLI-13 `--lang`
 
-`--lang mermaid|dot`, a global option given before or after the command, reads every diagram
+`--lang mermaid|dot|plantuml`, a global option given before or after the command, reads every diagram
 `check`, `ascii`, `svg`, and `png` read (files, directory entries, Markdown blocks, and stdin)
 as that language. Without it, a file's extension or a block's info string picks the language,
 and other sources are detected (LANGS-1, DOT-5). Tests: `forced_languages` in

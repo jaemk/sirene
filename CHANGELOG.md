@@ -11,6 +11,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - PlantUML component interface sockets and balls (`[A] -( I`, `I )- [A]`, `-(0-`) are read
   as links with a warning instead of errors, and a quoted element name may run over several
   lines up to its closing `"`.
+- `sirene svg FILE.md -o DIR --link` links images from the Markdown file's directory
+  (`../img/a-1.svg`), not from the working directory.
+- `sirene svg DIR` and `sirene png DIR` find diagram files whatever the case of their extension
+  (`A.MMD`), as single files already were.
+- `--help`, the crate descriptions, and the messages for Markdown files name PlantUML and DOT
+  diagrams, not only Mermaid ones; a Markdown file with none prints `no diagram blocks`.
 
 ## [0.3.0] - 2026-11-12
 

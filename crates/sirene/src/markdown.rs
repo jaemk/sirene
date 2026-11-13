@@ -1,4 +1,4 @@
-//! `sirene check`, and rendering the mermaid blocks of Markdown files (CLI-11, CLI-12).
+//! `sirene check`, and rendering the diagram blocks of Markdown files (CLI-11, CLI-12).
 
 use std::path::{Path, PathBuf};
 
@@ -30,7 +30,7 @@ pub fn report(
     errors
 }
 
-/// Checks `path`'s diagrams, printing their diagnostics: a Markdown file's mermaid blocks, every
+/// Checks `path`'s diagrams, printing their diagnostics: a Markdown file's diagram blocks, every
 /// diagram under a directory, or one diagram (stdin for `-`). Returns whether all were read
 /// and had no errors.
 pub fn check(path: &Path) -> bool {
@@ -101,11 +101,57 @@ pub fn image_path(md: &Path, out: Option<&Path>, n: usize, ext: &str) -> PathBuf
     dir.join(format!("{stem}-{n}.{ext}"))
 }
 
-/// How `md` refers to `image` in a link: relative to `md`'s directory when under it.
+/// How `md` refers to `image` in a link: relative to `md`'s directory (`../img/a-1.svg` for
+/// `docs/a.md` and `img/a-1.svg`), except an absolute `image` outside it, which is kept.
 fn link_target(md: &Path, image: &Path) -> String {
     let dir = md.parent().unwrap_or(Path::new(""));
-    let rel = image.strip_prefix(dir).unwrap_or(image);
-    rel.to_string_lossy().replace('\\', "/")
+    let rel = relative(dir, image).filter(|rel| !image.is_absolute() || !rel.starts_with(".."));
+    rel.as_deref()
+        .unwrap_or(image)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+/// The path from directory `from` to `to`, both read against the working directory with `.`
+/// and `..` resolved by name. `None` when they share no root, as on two Windows drives.
+fn relative(from: &Path, to: &Path) -> Option<PathBuf> {
+    use std::ffi::OsString;
+    use std::path::Component;
+    /// The root (a drive prefix and root, or just the root) and the names below it.
+    fn parts(p: &Path) -> Option<(OsString, Vec<OsString>)> {
+        let p = if p.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            p
+        };
+        let abs = std::path::absolute(p).ok()?;
+        let mut root = OsString::new();
+        let mut names: Vec<OsString> = Vec::new();
+        for c in abs.components() {
+            match c {
+                Component::Prefix(_) | Component::RootDir => root.push(c.as_os_str()),
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    names.pop();
+                }
+                Component::Normal(s) => names.push(s.to_owned()),
+            }
+        }
+        Some((root, names))
+    }
+    let ((from_root, from), (to_root, to)) = (parts(from)?, parts(to)?);
+    if from_root != to_root {
+        return None;
+    }
+    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
+    let mut rel = PathBuf::new();
+    for _ in common..from.len() {
+        rel.push("..");
+    }
+    for name in &to[common..] {
+        rel.push(name);
+    }
+    Some(rel)
 }
 
 /// The line `--link` puts after block `n`.
@@ -176,7 +222,7 @@ pub fn render(
     }
     let blocks = markdown::mermaid_blocks(&src);
     if blocks.is_empty() {
-        eprintln!("{name}: no mermaid blocks");
+        eprintln!("{name}: no diagram blocks");
     }
     let mut ok = true;
     let mut links = Vec::new();
@@ -232,6 +278,28 @@ mod tests {
         assert_eq!(
             link_target(md, Path::new("/elsewhere/a.png")),
             "/elsewhere/a.png"
+        );
+        // An image outside the Markdown file's directory is linked from that directory.
+        assert_eq!(
+            link_target(md, Path::new("img/guide-1.png")),
+            "../img/guide-1.png"
+        );
+        assert_eq!(
+            link_target(Path::new("a/b/c.md"), Path::new("a/x/../d/c-1.svg")),
+            "../d/c-1.svg"
+        );
+        assert_eq!(
+            link_target(Path::new("./c.md"), Path::new("c-1.svg")),
+            "c-1.svg"
+        );
+        let abs = std::path::absolute("docs/img/guide-1.png").unwrap();
+        assert_eq!(link_target(md, &abs), "img/guide-1.png");
+        // From above the working directory, through its name.
+        let cwd = std::env::current_dir().unwrap();
+        let here = cwd.file_name().unwrap().to_string_lossy();
+        assert_eq!(
+            link_target(Path::new("../c.md"), Path::new("out/c-1.svg")),
+            format!("{here}/out/c-1.svg")
         );
         assert_eq!(
             image_path(Path::new("x.md"), None, 1, "svg"),
