@@ -92,6 +92,9 @@ pub(crate) fn relationship(rel: &str) -> (Arrow, Stroke, Arrow) {
             .find(|(w, _)| s.trim() == *w)
             .map_or(Arrow::One, |(_, sym)| marker(sym))
     };
+    // The words may be separated by any whitespace.
+    let rel = rel.split_whitespace().collect::<Vec<_>>().join(" ");
+    let rel = rel.as_str();
     let (sep, stroke) = if rel.contains(" optionally to ") {
         (" optionally to ", Stroke::Dotted)
     } else {
@@ -106,6 +109,8 @@ struct Lowerer {
     chart: Flowchart,
     diagnostics: Vec<Diagnostic>,
     node_index: HashMap<String, usize>,
+    /// Class names to indexes in the chart's classes.
+    class_index: HashMap<String, usize>,
     /// `:::`, `class`, and `style`, applied once every entity exists.
     styling: Vec<(String, Styling, TextRange)>,
 }
@@ -252,12 +257,16 @@ impl Lowerer {
         let styles = self.styles(&style);
         for n in tokens(&names).filter(|t| t.kind() == IDENT) {
             let n = n.text();
-            match self.chart.classes.iter_mut().find(|c| c.name == n) {
-                Some(class) => class.styles.extend(styles.iter().cloned()),
-                None => self.chart.classes.push(ClassDef {
-                    name: n.to_owned(),
-                    styles: styles.clone(),
-                }),
+            match self.class_index.get(n) {
+                Some(&i) => self.chart.classes[i].styles.extend(styles.iter().cloned()),
+                None => {
+                    self.class_index
+                        .insert(n.to_owned(), self.chart.classes.len());
+                    self.chart.classes.push(ClassDef {
+                        name: n.to_owned(),
+                        styles: styles.clone(),
+                    });
+                }
             }
         }
     }
@@ -336,6 +345,14 @@ mod tests {
         );
         assert_eq!(
             relationship("1 optionally to many(1)"),
+            (One, Stroke::Dotted, OneMany)
+        );
+        assert_eq!(
+            relationship("one or more\tto  zero or many"),
+            (OneMany, Stroke::Normal, ZeroMany)
+        );
+        assert_eq!(
+            relationship("1\toptionally to\tmany(1)"),
             (One, Stroke::Dotted, OneMany)
         );
     }

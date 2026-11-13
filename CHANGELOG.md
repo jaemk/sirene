@@ -24,6 +24,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `classDef` lines are read in linear time. Mindmaps: unclosed markdown strings and `@{` on many
   lines do not each rescan the rest. Git graphs: branches are looked up by name in constant time,
   and an `order` too large for a number is an error.
+- C4: boundaries are placed and `UpdateRelStyle` finds its relations in linear time. ER and
+  requirement diagrams: `classDef` lines are read in linear time. ER: tabs around `to` and
+  `optionally to` read the same as spaces.
 - SVG output: control characters XML does not allow are written as U+FFFD, and a NaN or infinite
   number as 0, so the file stays well-formed.
 - Layout: rank tightening visits only items next to one that moved and has a work cap, instead

@@ -49,18 +49,22 @@ struct Ctx<'a> {
     c4: &'a C4,
     s: &'a Sizes<'a>,
     placed: Placed,
+    /// The elements and boundaries in each container: the diagram at 0, boundary `g` at `g + 1`.
+    nodes: Vec<Vec<usize>>,
+    groups: Vec<Vec<usize>>,
+}
+
+/// The slot of `container` in `Ctx::nodes` and `Ctx::groups`.
+fn slot(container: Option<usize>) -> usize {
+    container.map_or(0, |g| g + 1)
 }
 
 impl Ctx<'_> {
     /// Places the contents of `container` with its top-left at `(x, y)`; returns their size.
     fn place(&mut self, container: Option<usize>, x: f64, y: f64) -> (f64, f64) {
         let c4 = self.c4;
-        let nodes: Vec<usize> = (0..c4.chart.nodes.len())
-            .filter(|&n| c4.node_parent[n] == container)
-            .collect();
-        let groups: Vec<usize> = (0..c4.chart.subgraphs.len())
-            .filter(|&g| c4.boundary_parent[g] == container && Some(g) != container)
-            .collect();
+        let nodes = std::mem::take(&mut self.nodes[slot(container)]);
+        let groups = std::mem::take(&mut self.groups[slot(container)]);
         let (mut w, mut cy) = (0.0f64, y);
         let mut first_row = true;
         for row in nodes.chunks(c4.shapes_in_row.max(1)) {
@@ -129,7 +133,17 @@ pub fn layout(c4: &C4, s: &Sizes) -> Placed {
             boundaries: vec![Rect::default(); c4.chart.subgraphs.len()],
             ..Placed::default()
         },
+        nodes: vec![Vec::new(); c4.chart.subgraphs.len() + 1],
+        groups: vec![Vec::new(); c4.chart.subgraphs.len() + 1],
     };
+    for (n, &parent) in c4.node_parent.iter().enumerate() {
+        ctx.nodes[slot(parent)].push(n);
+    }
+    for (g, &parent) in c4.boundary_parent.iter().enumerate() {
+        if parent != Some(g) {
+            ctx.groups[slot(parent)].push(g);
+        }
+    }
     let (w, h) = ctx.place(None, 0.0, 0.0);
     ctx.placed.width = w;
     ctx.placed.height = h;

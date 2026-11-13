@@ -204,6 +204,39 @@ fn unclosed_lines() {
     assert!(lower(&format!("mindmap\n{}", lines("  a@{\n"))) >= 1);
 }
 
+/// C4 boundaries and relation styles, and ER and requirement classes, are looked up near
+/// linearly.
+#[test]
+fn c4_er_requirement_lookups() {
+    let mut s = String::from("C4Context\n");
+    for i in 0..5_000 {
+        let _ = writeln!(s, "Boundary(b{i}, \"B\") {{\nPerson(p{i}, \"P\")\n}}");
+    }
+    check(&s, &[]);
+    let mut s = String::from("C4Context\nPerson(a, \"A\")\nPerson(b, \"B\")\n");
+    for _ in 0..5_000 {
+        s.push_str("Rel(a, b, \"r\")\n");
+    }
+    for _ in 0..5_000 {
+        s.push_str("UpdateRelStyle(a, b, $lineColor=\"red\")\n");
+    }
+    check(&s, &[]);
+    let names = (0..20_000)
+        .map(|i| format!("c{i}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert!(
+        diagram::lower(&format!("erDiagram\nA\nclassDef {names} fill:#f00\n"))
+            .diagnostics
+            .is_empty()
+    );
+    assert!(
+        diagram::lower(&format!("requirementDiagram\nclassDef {names} fill:#f00\n"))
+            .diagnostics
+            .is_empty()
+    );
+}
+
 /// Branch lookups stay near linear.
 #[test]
 fn git_checkouts() {

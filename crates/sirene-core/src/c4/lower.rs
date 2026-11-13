@@ -41,9 +41,9 @@ struct Lowerer {
     boundaries: HashMap<String, usize>,
     /// Relations and style updates, read once every element is known.
     later: Vec<Call>,
-    /// Each relation's `from` and `to` as written, which `UpdateRelStyle` names; `Rel_Back`
+    /// The relations by `from` and `to` as written, which `UpdateRelStyle` names; `Rel_Back`
     /// draws its edge the other way.
-    written: Vec<(String, String)>,
+    written: HashMap<(String, String), Vec<usize>>,
 }
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
@@ -433,7 +433,10 @@ impl Lowerer {
         let (Some(mut from), Some(mut to)) = (from, to) else {
             return;
         };
-        self.written.push((from.clone(), to.clone()));
+        self.written
+            .entry((from.clone(), to.clone()))
+            .or_default()
+            .push(self.c4.rels.len());
         if name == "Rel_Back" {
             std::mem::swap(&mut from, &mut to);
         }
@@ -498,22 +501,21 @@ impl Lowerer {
         };
         let text = c.get(REL_STYLE, "textColor");
         let line = c.get(REL_STYLE, "lineColor");
-        let mut any = false;
-        for ((f, t), r) in self.written.iter().zip(&mut self.c4.rels) {
-            if *f == from && *t == to {
-                any = true;
-                if text.is_some() {
-                    r.colors.font.clone_from(&text);
-                }
-                if line.is_some() {
-                    r.colors.line.clone_from(&line);
-                }
+        let key = (from, to);
+        let rels = self.written.get(&key).map_or(&[][..], Vec::as_slice);
+        for &i in rels {
+            let r = &mut self.c4.rels[i];
+            if text.is_some() {
+                r.colors.font.clone_from(&text);
+            }
+            if line.is_some() {
+                r.colors.line.clone_from(&line);
             }
         }
-        if !any {
+        if rels.is_empty() {
             self.diagnostics.push(Diagnostic::warning(
                 c.node.text_range(),
-                format!("no relation from `{from}` to `{to}`; ignoring this"),
+                format!("no relation from `{}` to `{}`; ignoring this", key.0, key.1),
             ));
         }
     }
