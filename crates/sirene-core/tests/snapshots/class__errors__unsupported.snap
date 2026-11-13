@@ -2,9 +2,6 @@
 source: crates/sirene-core/tests/class.rs
 expression: "classDiagram\n    class A\n    click A href \"https://example.com\"\n    callback A \"callbackFunction\"\n    link A \"https://example.com\"\n    note \"a floating note\"\n    style Nowhere fill:#f00\n    cssClass \"A,Gone\" x\n"
 ---
-3:5: warning: `click` is not supported in class diagrams; ignoring it
-4:5: warning: `callback` is not supported in class diagrams; ignoring it
-5:5: warning: `link` is not supported in class diagrams; ignoring it
 7:11: warning: unknown class `Nowhere`
 8:14: warning: unknown class `Gone`
 

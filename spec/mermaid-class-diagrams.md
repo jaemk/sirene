@@ -49,5 +49,18 @@ its own: a box with a folded corner in the note colors (`╮` in ASCII). Tests:
 
 ## MCLASS-4 Unsupported
 
-`click`, `callback`, `link`, and styling of an unknown class are
+Styling of an unknown class, and `click`, `callback`, or `link` naming an unknown class, are
 warnings (LANGS-6). Tests: `unsupported_is_a_warning`.
+
+## MCLASS-5 Namespace membership
+
+A class belongs to the namespace whose body declares it with `class`, wherever it was first
+mentioned; a later declaration in another namespace moves it. A relation or `A : member` line
+inside a namespace body is a warning (Mermaid rejects it) and places nothing in the namespace.
+Tests: `namespace_membership`.
+
+## MCLASS-6 Links and callbacks
+
+`link A "url"` and `click A href "url"` set the class's link, `callback A "fn"`, `click A call
+fn(args)`, and `click A fn` its callback (`Node::click`, as FLOWMO-14), each with an optional
+tooltip string after; a link may name a target (`_blank`). Tests: `links_and_callbacks`.

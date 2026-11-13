@@ -31,6 +31,12 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sequence, Vec<Diagnostic>) {
         if l.skipped > 0 && stmt.kind() != SEQ_STMT {
             continue;
         }
+        if matches!(l.stack.last(), Some(Open::Group(_))) && !in_box(&stmt) {
+            l.error(
+                stmt.text_range(),
+                "a `box` holds only `participant` and `actor` declarations",
+            );
+        }
         match stmt.kind() {
             PARTICIPANT_STMT => l.participant(&stmt),
             MESSAGE_STMT => l.message(&stmt),
@@ -43,6 +49,17 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sequence, Vec<Diagnostic>) {
         }
     }
     l.finish()
+}
+
+/// Whether `stmt` may be in a `box`: a declaration without `create`, or the closing `end`. A
+/// nested `box` has its own error.
+fn in_box(stmt: &SyntaxNode) -> bool {
+    let kw = token(stmt, SEQ_KW).map(|k| k.text().to_ascii_lowercase());
+    match stmt.kind() {
+        PARTICIPANT_STMT => kw.as_deref() != Some("create"),
+        SEQ_STMT => matches!(kw.as_deref(), Some("end" | "box")),
+        _ => false,
+    }
 }
 
 /// A `box` or block waiting for its `end`.
@@ -139,10 +156,10 @@ impl Lower {
     }
 
     fn current_group(&self) -> Option<usize> {
-        match self.stack.last() {
-            Some(Open::Group(_)) => Some(self.seq.groups.len() - 1),
-            _ => None,
-        }
+        self.stack
+            .iter()
+            .any(|o| matches!(o, Open::Group(_)))
+            .then(|| self.seq.groups.len() - 1)
     }
 
     fn participant(&mut self, stmt: &SyntaxNode) {
@@ -187,6 +204,15 @@ impl Lower {
         }
         let group = self.current_group();
         let i = self.ensure(&id);
+        if let (Some(old), Some(new)) = (self.seq.participants[i].group, group)
+            && old != new
+        {
+            self.error(
+                stmt.text_range(),
+                format!("`{id}` is already in another `box`"),
+            );
+            return;
+        }
         let p = &mut self.seq.participants[i];
         p.kind = kind;
         if let Some(label) = label {

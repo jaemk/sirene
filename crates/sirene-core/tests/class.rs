@@ -7,7 +7,7 @@ use std::path::Path;
 
 use sirene_core::ascii::{self, Charset, Options};
 use sirene_core::diagram::{self, Kind, Lowered};
-use sirene_core::flowchart::{Arrow, Direction, Flowchart, NoteSide, Row, Shape, Stroke};
+use sirene_core::flowchart::{Arrow, Click, Direction, Flowchart, NoteSide, Row, Shape, Stroke};
 use sirene_core::scene::{self, Approx, Primitive, Theme};
 use sirene_core::{Severity, class};
 
@@ -96,6 +96,65 @@ fn chart(src: &str) -> Flowchart {
 
 fn rows(r: &[Row]) -> Vec<&str> {
     r.iter().map(|r| r.cells[0].as_str()).collect()
+}
+
+/// MCLASS-5: a `class` declaration in a namespace places the class there; relations and member
+/// lines in a namespace are warnings and place nothing.
+#[test]
+fn namespace_membership() {
+    let src = "classDiagram\n  A --> B\n  namespace N {\n    class A\n  }\n  namespace M {\n    \
+               class B\n    class A\n  }\n";
+    let c = chart(src);
+    assert!(c.subgraph("N").unwrap().members.is_empty());
+    assert_eq!(c.subgraph("M").unwrap().members, ["B", "A"]);
+    let src = "classDiagram\n  namespace N {\n    class A\n    A --> Out\n    Out : +x\n  }\n";
+    let lowered = diagram::lower(src);
+    let warnings: Vec<_> = lowered
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Warning)
+        .collect();
+    assert_eq!(warnings.len(), 2, "{warnings:?}");
+    let c = lowered.diagram.into_graph();
+    assert_eq!(c.subgraph("N").unwrap().members, ["A"]);
+    assert!(c.node("Out").is_some());
+}
+
+/// MCLASS-6: links and callbacks, with tooltips and targets.
+#[test]
+fn links_and_callbacks() {
+    let c = chart(
+        "classDiagram\n  class A\n  class B\n  class C\n  class D\n  class E\n  \
+         link A \"https://a\" \"tip a\" _blank\n  click B href \"https://b\"\n  \
+         callback C \"onC\" \"tip c\"\n  click D call onD(1, \"two\") \"tip d\"\n  click E onE\n",
+    );
+    let click = |id: &str| {
+        let n = c.node(id).unwrap();
+        (n.click.clone(), n.tooltip.clone())
+    };
+    let link = |url: &str, target: Option<&str>| {
+        Some(Click::Link {
+            url: url.into(),
+            target: target.map(Into::into),
+        })
+    };
+    let call = |name: &str, args: &[&str]| {
+        Some(Click::Callback {
+            name: name.into(),
+            args: args.iter().map(|a| a.to_string()).collect(),
+        })
+    };
+    assert_eq!(
+        click("A"),
+        (link("https://a", Some("_blank")), Some("tip a".into()))
+    );
+    assert_eq!(click("B"), (link("https://b", None), None));
+    assert_eq!(click("C"), (call("onC", &[]), Some("tip c".into())));
+    assert_eq!(
+        click("D"),
+        (call("onD", &["1", "two"]), Some("tip d".into()))
+    );
+    assert_eq!(click("E"), (call("onE", &[]), None));
 }
 
 /// A label from `class A["Label"]` stays when a later mention has generics.
@@ -334,13 +393,12 @@ fn unsupported_is_a_warning() {
     for (src, want) in [
         (
             "classDiagram\n  click A href \"x\"\n",
-            "`click` is not supported",
+            "`click` refers to unknown class `A`",
         ),
         (
-            "classDiagram\n  callback A \"f\"\n",
-            "`callback` is not supported",
+            "classDiagram\n  class A\n  link A\n",
+            "expected a class and a link or callback after `link`",
         ),
-        ("classDiagram\n  link A \"x\"\n", "`link` is not supported"),
         ("classDiagram\n  style X fill:#f00\n", "unknown class `X`"),
     ] {
         let d = diagram::lower(src).diagnostics;

@@ -256,6 +256,29 @@ fn blocks() {
     assert_eq!(s.events.last(), Some(&Event::End));
 }
 
+/// A `box` holds only declarations, and a participant stays in its first `box`.
+#[test]
+fn box_contents() {
+    let only = "a `box` holds only `participant` and `actor` declarations".to_owned();
+    assert_eq!(
+        errors("sequenceDiagram\n  box X\n  participant A\n  A->>B: hi\n  loop l\n  end\n  end\n"),
+        [(Severity::Error, only.clone()), (Severity::Error, only)]
+    );
+    assert_eq!(
+        errors(
+            "sequenceDiagram\n  box X\n  participant A\n  end\n  box Y\n  participant A\n  end\n"
+        ),
+        [(
+            Severity::Error,
+            "`A` is already in another `box`".to_owned()
+        )]
+    );
+    let s =
+        sequence("sequenceDiagram\n  box X\n  participant A\n  end\n  participant A as Alice\n");
+    assert_eq!(s.participants[0].group, Some(0));
+    assert_eq!(s.participants[0].label, ["Alice"]);
+}
+
 /// MSEQ-1: notes, `autonumber`, `box`, `create`, `destroy`, and the title.
 #[test]
 fn statements() {
