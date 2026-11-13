@@ -127,6 +127,11 @@ fn points() {
         .map(|p| (p.name.as_str(), p.x, p.y))
         .collect();
     assert_eq!(pts, [("A", 0.3, 0.6), ("B: c", 1.0, 0.0)]);
+    // An arrow with no high label joins the low one, as Mermaid's `$2.text += " ⟶ "`.
+    let q = chart("quadrantChart\n  x-axis Low -->\n  y-axis \"Bottom\" -->  \n");
+    assert_eq!(q.x_axis.low.as_deref(), Some("Low ⟶"));
+    assert_eq!(q.x_axis.high, None);
+    assert_eq!(q.y_axis.low.as_deref(), Some("Bottom ⟶"));
     // Frontmatter gives the title when there is no `title`; a later statement replaces an
     // earlier one.
     let q = chart("---\ntitle: Front\n---\nquadrantChart\n  quadrant-1 a\n  quadrant-1 b\n");

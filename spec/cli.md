@@ -38,7 +38,8 @@ When FILE cannot be read, sirene prints `error: cannot read FILE: REASON` to std
 `sirene svg [FILE]` reads a diagram as `sirene ascii` does and prints it to stdout as a
 standalone SVG document (`display-list.md`), with text measured by the monospace estimate.
 `--theme light|dark` picks the colors; the default is `light`. `-o, --output PATH` writes the
-SVG to PATH instead of stdout; a PATH that is FILE itself is refused before anything is read
+SVG to PATH instead of stdout, and `-o -` is stdout (refused, exit 2, for a directory or
+Markdown FILE); a PATH that is FILE itself is refused before anything is read
 (`error: refusing to overwrite the input FILE; use --output`, exit 1). Diagnostics and exit
 status follow CLI-3 and CLI-4.
 
@@ -49,8 +50,8 @@ status follow CLI-3 and CLI-4.
 for `sirene svg`; `--quality draft|normal|fine` (default `fine`) picks the detail (DISPLA-12),
 drawn at that quality's scale, shrunk to fit when the image would be too large; `--scale N` sets
 pixels per diagram unit instead, and a scale too large is an error. The PNG goes to
-`-o, --output PATH`; without it, to FILE with its extension replaced by `.png`, or to stdout
-when reading stdin. Writing a PNG to a terminal, or over FILE (as for `sirene svg`), is
+`-o, --output PATH` (`-o -` is stdout, as for `sirene svg`); without it, to FILE with its
+extension replaced by `.png`, or to stdout when reading stdin. Writing a PNG to a terminal, or over FILE (as for `sirene svg`), is
 refused. Diagnostics and exit status follow CLI-3 and CLI-4; a write or render failure prints
 `error: ...` and exits 1.
 

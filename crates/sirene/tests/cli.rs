@@ -199,8 +199,16 @@ fn ascii_read_failures() {
         .arg("ascii")
         .write_stdin(vec![0xff, 0xfe])
         .assert()
-        .failure()
-        .stderr(predicate::str::starts_with("error: cannot read <stdin>: "));
+        .code(1)
+        .stderr("error: cannot read <stdin>: the text is UTF-16; sirene reads UTF-8\n");
+    sirene()
+        .arg("ascii")
+        .write_stdin(vec![b'p', b'i', b'e', 0xe9])
+        .assert()
+        .code(1)
+        .stderr(
+            "error: cannot read <stdin>: the text is not UTF-8 (an invalid byte at offset 3)\n",
+        );
 }
 
 #[test]
@@ -297,6 +305,38 @@ fn svg_to_a_file() {
         svg.starts_with("<svg ") && svg.ends_with("</svg>\n"),
         "{svg}"
     );
+}
+
+/// `-o -` is stdout, not a file named `-`; it is refused for a Markdown FILE (CLI-5, CLI-6).
+#[test]
+fn output_dash_is_stdout() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("d.mmd");
+    std::fs::write(&src, "flowchart\nA\n").unwrap();
+    sirene()
+        .current_dir(tmp.path())
+        .args(["svg", "d.mmd", "-o", "-"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("<svg"));
+    let out = sirene()
+        .current_dir(tmp.path())
+        .args(["png", "d.mmd", "-o", "-"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    png_size(&out);
+    assert!(!tmp.path().join("-").exists());
+    assert!(!tmp.path().join("d.png").exists());
+    std::fs::write(tmp.path().join("g.md"), "```mermaid\nflowchart\nA\n```\n").unwrap();
+    sirene()
+        .current_dir(tmp.path())
+        .args(["svg", "g.md", "-o", "-"])
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("`--output -` writes one diagram"));
 }
 
 #[test]

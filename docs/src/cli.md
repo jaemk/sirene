@@ -60,7 +60,7 @@ $ printf 'flowchart TD\n  A --> B\n' | sirene ascii --charset ascii
 ## `sirene svg`
 
 Prints a standalone SVG document. `--theme light|dark` picks the colors (default `light`), and
-`-o, --output PATH` writes to PATH instead of stdout.
+`-o, --output PATH` writes to PATH instead of stdout (`-o -` is stdout).
 
 ## `sirene png`
 
@@ -69,7 +69,7 @@ machine.
 
 | Option | Meaning |
 |---|---|
-| `-o, --output PATH` | where to write; default FILE with `.png`, or stdout when reading stdin |
+| `-o, --output PATH` | where to write (`-` is stdout); default FILE with `.png`, or stdout when reading stdin |
 | `--theme light\|dark` | the colors (default `light`) |
 | `--quality draft\|normal\|fine` | the detail (default `fine`); large drawings are shrunk to fit |
 | `--scale N` | pixels per diagram unit, instead of `--quality` |
@@ -94,7 +94,8 @@ same output (`a.mmd` beside `a.mermaid`), the first in path order wins and the o
 
 `sirene svg FILE.md` and `sirene png FILE.md` (also `.markdown`) render each `mermaid`, `dot`,
 `graphviz`, `plantuml`, or `puml` code block to `STEM-N.svg` or `STEM-N.png` beside the file, N
-counting blocks from 1; `-o OUTDIR` writes them there instead.
+counting blocks from 1; `-o OUTDIR` writes them there instead. Blocks inside blockquotes and
+list items count, and the name may be in any case or in braces (`{.mermaid}`, `{mermaid}`).
 
 The Markdown file is not changed unless `--link` is given. `--link` adds an image link on the
 line after each rendered block, and only when that line is not already the link, so running it
@@ -138,7 +139,8 @@ Replaces the running binary with the latest release, or the one `--to VERSION` n
 asking (`--yes` skips the question). `--check` only reports. The download is the same
 `sirene-VERSION-TARGET.tar.gz` the install script uses, for the running build's target, so a GUI
 build stays a GUI build. It is checked against the release's `SHA256SUMS`, and against its build
-provenance when `gh` is installed, before anything is replaced.
+provenance when `gh` is installed, before anything is replaced. When `gh` cannot reach GitHub
+for the provenance check, the update stops; run it again once the network is back.
 
 ```
 $ sirene update --check
@@ -165,7 +167,8 @@ wrote docs/a.png
 
 Problems are printed to stderr as `NAME:LINE:COL: error: MESSAGE` (or `warning:`), with LINE and
 COL counting from 1. The diagram is still drawn when there are errors. The exit status is 1 when
-there is an error (in the diagram, or reading or writing a file) and 0 otherwise.
+there is an error (in the diagram, or reading or writing a file) and 0 otherwise. Input is read
+as UTF-8; UTF-16 or other text is an error that says so (exit 1).
 
 ```
 $ printf 'flowchart TD\n  A -->\n' | sirene ascii

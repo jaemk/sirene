@@ -48,8 +48,8 @@ Before anything is extracted, the archive's SHA-256 must match its entry in the 
 `SHA256SUMS`; a missing entry or a mismatch aborts with the binary unchanged. When `gh` is on the
 PATH, `gh attestation verify ARCHIVE --repo jaemk/sirene` then checks its build provenance
 (WORKSP-9): success prints `build provenance verified`; a `gh` that cannot run the check (an old
-`gh`, not logged in, no network) prints a note and continues; any other failure, including no
-attestation found, aborts. Without `gh` the check is skipped silently, as `bin/install.sh` does.
+`gh`, or not logged in) prints a note and continues; any other failure, including no attestation
+found and not reaching GitHub (so the network cannot skip the check), aborts. Without `gh` the check is skipped silently, as `bin/install.sh` does.
 
 ## UPDATE-6 Inputs
 
