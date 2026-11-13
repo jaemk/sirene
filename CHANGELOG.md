@@ -15,6 +15,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- PlantUML regex diagrams: a class nested in a class, as in `[[:alpha:]]`, is read as one class,
+  and `{ 2 }` with spaces is literal text instead of a repeat, as in Java.
 - Mermaid ZenUML: `else`, `catch`, and `finally` may start the line after a branch's `}`; long
   diagrams no longer lower in quadratic time.
 - Mermaid use case diagrams: a JSON `\u` surrogate pair is one character, `\u` takes exactly four
