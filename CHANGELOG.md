@@ -17,6 +17,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`A.MMD`), as single files already were.
 - `--help`, the crate descriptions, and the messages for Markdown files name PlantUML and DOT
   diagrams, not only Mermaid ones; a Markdown file with none prints `no diagram blocks`.
+- The editor's Save As of a PlantUML or DOT diagram to a Markdown file, and the block it adds
+  to a Markdown file with none, use a `plantuml` or `dot` fence instead of `mermaid`.
+- The guide's introduction, quickstart, landing page, and the `sirene:render` skill describe
+  PlantUML and DOT, and list every Mermaid kind drawn.
 
 ## [0.3.0] - 2026-11-12
 

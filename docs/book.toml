@@ -1,6 +1,6 @@
 [book]
 title = "sirene"
-description = "A local WYSIWYG editor and viewer for Mermaid flowcharts, with SVG, PNG, and terminal ASCII output."
+description = "A local WYSIWYG editor and viewer for Mermaid, PlantUML, and Graphviz DOT diagrams, with SVG, PNG, and terminal ASCII output."
 authors = ["James Kominick"]
 language = "en"
 src = "src"

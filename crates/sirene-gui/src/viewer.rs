@@ -282,7 +282,7 @@ impl Viewer {
         self.load_source(window, cx);
     }
 
-    /// Shows mermaid block `i` of a Markdown file (WYSIWY-20).
+    /// Shows diagram block `i` of a Markdown file (WYSIWY-20).
     pub fn show_block(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         if self.doc.show_block(i) {
             log::debug!("showing diagram {} of {}", i + 1, self.doc.name());

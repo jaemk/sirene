@@ -1,4 +1,4 @@
-//! Editing a Markdown file's mermaid blocks (WYSIWY-20).
+//! Editing a Markdown file's diagram blocks (WYSIWY-20).
 
 mod common;
 
@@ -117,7 +117,7 @@ fn a_file_without_blocks_gets_one(cx: &mut TestAppContext) {
     assert_eq!(source(&viewer, cx), "");
     assert_eq!(
         status(&viewer, cx),
-        "empty.md has no mermaid blocks; editing adds one at the end"
+        "empty.md has no diagram blocks; editing adds one at the end"
     );
     assert!(cx.debug_bounds("next-diagram").is_none());
     cx.update(|window, cx| {
@@ -163,4 +163,38 @@ fn save_as_converts() {
     assert!(!d.show_block(0));
     assert!(!d.show_block(5));
     assert!(!Document::untitled().show_block(0));
+}
+
+#[test]
+fn blocks_are_named_for_their_language() {
+    let dir = tempfile::tempdir().unwrap();
+    // A diagram saved as Markdown goes in a block its language names.
+    for (name, src, info) in [
+        ("a.puml", "@startuml\nA -> B\n@enduml\n", "plantuml"),
+        ("b.dot", "digraph { a -> b }\n", "dot"),
+        ("c.gv", "flowchart LR\n  A --> B\n", "dot"),
+    ] {
+        let mut d = Document::open(&write(dir.path(), name, src));
+        let md = dir.path().join(format!("{name}.md"));
+        d.save_as(md.clone()).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&md).unwrap(),
+            format!("```{info}\n{src}```\n"),
+            "{name}"
+        );
+        assert_eq!(d.lang(), Document::open(&dir.path().join(name)).lang());
+    }
+    // The block a file without one gets is named for the source typed in.
+    let empty = write(dir.path(), "empty.md", "");
+    let mut d = Document::open(&empty);
+    assert_eq!(
+        d.status(),
+        "empty.md has no diagram blocks; editing adds one at the end"
+    );
+    assert!(d.set_source("digraph { a -> b }\n".into()));
+    d.save().unwrap();
+    assert_eq!(
+        std::fs::read_to_string(&empty).unwrap(),
+        "```dot\ndigraph { a -> b }\n```\n"
+    );
 }

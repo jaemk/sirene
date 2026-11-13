@@ -39,5 +39,24 @@ and statement order are kept. See [The editor](editor.md).
 sirene png --watch docs/
 ```
 
-writes a `.png` beside each diagram file (`.mmd`, `.mermaid`, `.dot`, `.gv`) under `docs/`, then writes it
-again each time one changes. See [Command line](cli.md).
+writes a `.png` beside each diagram file (`.mmd`, `.puml`, `.dot`, and the other
+[extensions](cli.md#languages)) under `docs/`, then writes it again each time one changes. See
+[Command line](cli.md).
+
+## Other languages
+
+PlantUML and Graphviz DOT files render the same way, with the drawing read-only in the editor:
+
+```plantuml
+@startuml
+Alice -> Bob : hello
+Bob --> Alice : hi
+@enduml
+```
+
+```
+sirene ascii hello.puml
+printf 'digraph { a -> b -> c }\n' | sirene ascii
+```
+
+See [PlantUML](plantuml.md) and [Graphviz DOT](dot.md).

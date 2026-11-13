@@ -272,7 +272,7 @@ Tests: `crates/sirene-gui/tests/refusals.rs`.
 
 ## WYSIWY-20 Markdown files
 
-A `.md` or `.markdown` file opens as its mermaid blocks (MARKDO-1), one at a time. The source pane
+A `.md` or `.markdown` file opens as its diagram blocks (MARKDO-1), one at a time. The source pane
 shows the shown block's code, and the drawing draws it; every edit to it, from the pane or the
 drawing, goes back into that block (MARKDO-3), so the rest of the file is never changed. The
 document is edited while the whole file differs from the text last read or saved; Save writes
@@ -282,10 +282,12 @@ the whole file, and disk changes and Reload work on the whole file, keeping the 
   block's first code line. View > Next Diagram (secondary-shift-]) and Previous Diagram
   (secondary-shift-[) do the same, wrapping around. Showing another block clears the selection
   and the drawing's undo history, and fits the drawing.
-- A file with no mermaid blocks shows an empty source and says so in the status bar; the first
-  edit adds a block at the end of the file.
-- Save As to a diagram file (`.mmd`) writes the shown block alone and edits that file from then
-  on; Save As of a diagram to a Markdown file writes it in a mermaid block.
+- A file with no diagram blocks shows an empty source and says so in the status bar; the first
+  edit adds a block at the end of the file, named `dot`, `plantuml`, or `mermaid` for the
+  language the edit's text is detected as.
+- Save As to a diagram file (`.mmd`, `.puml`, `.dot`, ...) writes the shown block alone and
+  edits that file from then on; Save As of a diagram to a Markdown file writes it in a block
+  named for the diagram's language (its file extension's, or else detected).
 - Export suggests `STEM-N.png` or `.svg`, as `sirene png FILE.md` names block N.
 
 Tests: `crates/sirene-gui/tests/markdown.rs`.

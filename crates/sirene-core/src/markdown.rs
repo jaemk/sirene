@@ -2,7 +2,8 @@
 
 use crate::diagram::Lang;
 
-/// A fenced code block whose info string starts with `mermaid`, `dot`, or `graphviz`.
+/// A fenced code block whose info string starts with a diagram language's name (`mermaid`,
+/// `dot`, `graphviz`, `plantuml`, or `puml`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     /// The block's text, with the fence's indentation taken off each line.
@@ -60,7 +61,7 @@ impl Block {
 }
 
 /// An opening fence on `line`: its indent, character, and length, and the diagram language
-/// the info string's first word names, if any: `mermaid`, or `dot` or `graphviz` (LANGS-1).
+/// the info string's first word names, if any (LANGS-1).
 fn opening(line: &str) -> Option<(usize, char, usize, Option<Lang>)> {
     let indent = line.len() - line.trim_start_matches(' ').len();
     if indent > 3 {
@@ -92,8 +93,8 @@ fn closes(line: &str, c: char, len: usize) -> bool {
     run >= len && rest[run..].trim().is_empty()
 }
 
-/// The diagram blocks in `src` (`mermaid`, `dot`, and `graphviz`), in order. Other fenced
-/// blocks are skipped whole, so a mermaid fence inside one is not a block.
+/// The diagram blocks in `src` (see [`Block`]), in order, despite the name. Other fenced blocks
+/// are skipped whole, so a diagram fence inside one is not a block.
 pub fn mermaid_blocks(src: &str) -> Vec<Block> {
     let mut blocks = Vec::new();
     // (byte offset, line text without its newline) for each line.
