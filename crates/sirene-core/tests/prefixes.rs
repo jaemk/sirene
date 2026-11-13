@@ -53,10 +53,14 @@ fn fixture_prefixes_draw() {
             let run = std::panic::catch_unwind(|| {
                 let lowered = diagram::lower_as(text, lang);
                 let s = lowered.diagram.scene(&Approx, &Theme::LIGHT);
-                svg::write(&s);
                 lowered.diagram.ascii(&Options::default());
+                svg::write(&s)
             });
-            assert!(run.is_ok(), "{} {what}:\n{text}", path.display());
+            let doc = run.unwrap_or_else(|_| panic!("{} {what}:\n{text}", path.display()));
+            // The SVG is well-formed XML, whatever the labels hold.
+            if let Err(e) = roxmltree::Document::parse(&doc) {
+                panic!("{} {what}: {e}\n{text}\n{doc}", path.display());
+            }
         };
         for cut in cuts(&src) {
             draw(&src[..cut], &format!("cut at byte {cut}"));
