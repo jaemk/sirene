@@ -134,13 +134,27 @@ impl Reader<'_> {
                         'r' => out.push('\r'),
                         't' => out.push('\t'),
                         'u' => {
-                            let hex: String =
-                                (0..4).filter_map(|_| chars.next()).map(|x| x.1).collect();
-                            let Some(code) = u32::from_str_radix(&hex, 16)
-                                .ok()
-                                .filter(|_| hex.len() == 4)
-                            else {
+                            let Some(code) = hex4(&mut chars) else {
                                 return self.err("four hex digits after `\\u`");
+                            };
+                            // A high surrogate joins a following `\uDC00`-`\uDFFF`.
+                            let code = if (0xd800..0xdc00).contains(&code) {
+                                let mut ahead = chars.clone();
+                                let low = match (ahead.next(), ahead.next()) {
+                                    (Some((_, '\\')), Some((_, 'u'))) => {
+                                        hex4(&mut ahead).filter(|l| (0xdc00..0xe000).contains(l))
+                                    }
+                                    _ => None,
+                                };
+                                match low {
+                                    Some(l) => {
+                                        chars = ahead;
+                                        0x10000 + ((code - 0xd800) << 10) + (l - 0xdc00)
+                                    }
+                                    None => code,
+                                }
+                            } else {
+                                code
                             };
                             out.push(char::from_u32(code).unwrap_or('\u{fffd}'));
                         }
@@ -175,6 +189,7 @@ impl Reader<'_> {
     fn object(&mut self) -> Result<Value, String> {
         self.pos += 1;
         let mut entries: Vec<(String, Value)> = Vec::new();
+        let mut index: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         if self.eat('}') {
             return Ok(Value::Object(entries));
         }
@@ -188,9 +203,12 @@ impl Reader<'_> {
                 return self.err("`:`");
             }
             let v = self.value()?;
-            match entries.iter_mut().find(|(k, _)| *k == key) {
-                Some(e) => e.1 = v,
-                None => entries.push((key, v)),
+            match index.get(&key) {
+                Some(&i) => entries[i].1 = v,
+                None => {
+                    index.insert(key.clone(), entries.len());
+                    entries.push((key, v));
+                }
             }
             if self.eat('}') {
                 return Ok(Value::Object(entries));
@@ -202,6 +220,14 @@ impl Reader<'_> {
     }
 }
 
+/// Four hex digits, as in a `\u` escape.
+fn hex4(chars: &mut std::str::CharIndices) -> Option<u32> {
+    (0..4).try_fold(0, |n, _| Some(n * 16 + chars.next()?.1.to_digit(16)?))
+}
+
+/// The most key and value bytes the rows of one table may hold, since each row repeats its path.
+const MAX_ROW_BYTES: usize = 1 << 24;
+
 fn scalar(v: &Value) -> Option<String> {
     match v {
         Value::Null => Some("null".into()),
@@ -212,30 +238,52 @@ fn scalar(v: &Value) -> Option<String> {
     }
 }
 
-fn flatten(prefix: &str, v: &Value, rows: &mut Vec<(String, String)>) {
-    match v {
-        Value::Object(entries) if entries.is_empty() => rows.push((prefix.into(), "{}".into())),
-        Value::Object(entries) => {
-            for (k, v) in entries {
-                let key = if prefix.is_empty() {
-                    k.clone()
-                } else {
-                    format!("{prefix}.{k}")
-                };
-                flatten(&key, v, rows);
-            }
+struct Rows {
+    rows: Vec<(String, String)>,
+    bytes: usize,
+}
+
+impl Rows {
+    fn push(&mut self, key: String, value: String) -> Result<(), String> {
+        self.bytes += key.len() + value.len();
+        if self.bytes > MAX_ROW_BYTES {
+            return Err(format!(
+                "a JSON table's rows may hold at most {MAX_ROW_BYTES} bytes"
+            ));
         }
-        Value::Array(items) if items.is_empty() => rows.push((prefix.into(), "[]".into())),
-        Value::Array(items) => {
-            for (i, item) in items.iter().enumerate() {
-                match scalar(item) {
-                    // A list of values puts the key on its first row only.
-                    Some(s) => rows.push((if i == 0 { prefix.into() } else { String::new() }, s)),
-                    None => flatten(&format!("{prefix}[{i}]"), item, rows),
+        self.rows.push((key, value));
+        Ok(())
+    }
+
+    fn flatten(&mut self, prefix: &str, v: &Value) -> Result<(), String> {
+        match v {
+            Value::Object(entries) if entries.is_empty() => self.push(prefix.into(), "{}".into()),
+            Value::Object(entries) => {
+                for (k, v) in entries {
+                    let key = if prefix.is_empty() {
+                        k.clone()
+                    } else {
+                        format!("{prefix}.{k}")
+                    };
+                    self.flatten(&key, v)?;
                 }
+                Ok(())
             }
+            Value::Array(items) if items.is_empty() => self.push(prefix.into(), "[]".into()),
+            Value::Array(items) => {
+                for (i, item) in items.iter().enumerate() {
+                    match scalar(item) {
+                        // A list of values puts the key on its first row only.
+                        Some(s) => {
+                            self.push(if i == 0 { prefix.into() } else { String::new() }, s)?
+                        }
+                        None => self.flatten(&format!("{prefix}[{i}]"), item)?,
+                    }
+                }
+                Ok(())
+            }
+            v => self.push(prefix.into(), scalar(v).unwrap_or_default()),
         }
-        v => rows.push((prefix.into(), scalar(v).unwrap_or_default())),
     }
 }
 
@@ -254,9 +302,12 @@ pub(crate) fn rows(src: &str) -> Result<Vec<(String, String)>, String> {
     if !matches!(v, Value::Object(_)) {
         return Err("a JSON table must be an object".into());
     }
-    let mut out = Vec::new();
-    flatten("", &v, &mut out);
-    Ok(out)
+    let mut out = Rows {
+        rows: Vec::new(),
+        bytes: 0,
+    };
+    out.flatten("", &v)?;
+    Ok(out.rows)
 }
 
 #[cfg(test)]
@@ -296,6 +347,22 @@ mod tests {
     }
 
     #[test]
+    fn surrogates() {
+        let pair = ["{\"s\": \"\\", "ud83d\\", "ude00\"}"].concat();
+        assert_eq!(pairs(&pair), [p("s", "\u{1f600}")]);
+        let lone = ["{\"s\": \"\\", "ud83dx\"}"].concat();
+        assert_eq!(pairs(&lone), [p("s", "\u{fffd}x")]);
+    }
+
+    #[test]
+    fn row_bytes_are_bounded() {
+        let key = "k".repeat(1 << 16);
+        let inner: Vec<String> = (0..300).map(|i| format!("\"{i}\": 1")).collect();
+        let src = format!("{{\"{key}\": {{{}}}}}", inner.join(","));
+        assert!(rows(&src).unwrap_err().contains("at most"));
+    }
+
+    #[test]
     fn rejects() {
         for bad in [
             "{a: 1}",
@@ -306,6 +373,8 @@ mod tests {
             "[1]",
             "{\"a\": \"\\q\"}",
             "{\"a\": tru}",
+            "{\"a\": \"\\u+041\"}",
+            "{\"a\": \"\\u00\"}",
         ] {
             assert!(rows(bad).is_err(), "{bad}");
         }

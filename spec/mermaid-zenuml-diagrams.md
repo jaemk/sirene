@@ -14,7 +14,7 @@ the corpus under `crates/sirene-core/tests/fixtures/zenuml/` (LANGS-6).
   an optional `{` ... `}` body on the following lines; `return text`.
 - Fragments: `if(c) {` with `} else if(c) {` and `} else {`; `while`, `for`, `forEach`,
   `foreach`, and `loop` with an optional condition; `opt {`; `par {`; `try {` with
-  `} catch(e) {` and `} finally {`. A branch's `}` and the next keyword share a line.
+  `} catch(e) {` and `} finally {`. The next keyword may follow a branch's `}` on its line or start a later one.
 - `title`, `// comment` lines, Mermaid comments and directives, and frontmatter `title`.
 
 The parser shares `crate::lines` with the other Mermaid parsers and is lossless. An unclosed

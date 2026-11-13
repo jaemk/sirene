@@ -220,6 +220,30 @@ fn fragments() {
     assert_eq!(BlockKind::Try.keyword(), "try");
 }
 
+/// MZEN-1: the next keyword may start the line after a branch's `}`.
+#[test]
+fn next_keyword_on_later_line() {
+    let (s, d) = lowered(
+        "zenuml\nif(a) {\n  A->B: 1\n}\nelse if(b) {\n}\n\n  else {\n}\n\
+         try {\n}\ncatch(E) {\n}\nfinally {\n}\n",
+    );
+    assert!(d.is_empty(), "{d:?}");
+    assert_eq!(
+        events(&s),
+        [
+            "alt a",
+            "A>B:1",
+            "divider b",
+            "divider ",
+            "end",
+            "try ",
+            "divider catch E",
+            "divider finally",
+            "end",
+        ]
+    );
+}
+
 /// MZEN-2: what is drawn as near as it can be, with a diagnostic.
 #[test]
 fn errors() {

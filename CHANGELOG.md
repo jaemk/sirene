@@ -15,6 +15,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Mermaid ZenUML: `else`, `catch`, and `finally` may start the line after a branch's `}`; long
+  diagrams no longer lower in quadratic time.
+- Mermaid use case diagrams: a JSON `\u` surrogate pair is one character, `\u` takes exactly four
+  hex digits, and a JSON table whose rows would hold more than 16 MiB is an error.
+- Mermaid event modeling: a data block line indented with a no-break space keeps its text, and
+  the ASCII relation arrows no longer take quadratic time per relation.
 - Mermaid venn diagrams: a union of more than 8 sets, and a size over 1e100, are errors instead
   of a slow layout or NaN geometry.
 - Mermaid Wardley maps: a stage `@position` outside 0 to 1 or out of order is an error instead

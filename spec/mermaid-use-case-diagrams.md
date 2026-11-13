@@ -64,8 +64,9 @@ A note is a flowchart note beside its actor or use case; a note for anything els
 A JSON table is a rectangle titled by its id, with one two-column row per leaf of its strict JSON
 object: nested keys as `a.b` and `items[0].name`, a list of values with the key on its first row
 only, `{}` and `[]` for empty ones, JSON spelling for `null`, booleans, and numbers, and the last
-value of a repeated key in its first place. Invalid JSON is a warning. Tests:
-`notes_tables_boundaries`.
+value of a repeated key in its first place. A `\u` surrogate pair is one character; a lone
+surrogate is U+FFFD. Invalid JSON, and rows holding more than 16 MiB of keys and values, are a
+warning. Tests: `notes_tables_boundaries` and the unit tests in `usecase/json.rs`.
 
 ## MUSE-6 System boundaries
 

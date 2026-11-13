@@ -872,24 +872,44 @@ impl Lowerer {
                 }
             }
         }
+        // Each id's first node, else subgraph, else edge.
+        enum Target {
+            Node(usize),
+            Subgraph(usize),
+            Edge(usize),
+        }
+        let mut targets: HashMap<String, Target> = HashMap::new();
+        for (i, e) in self.chart.edges.iter().enumerate().rev() {
+            if let Some(id) = &e.id {
+                targets.insert(id.clone(), Target::Edge(i));
+            }
+        }
+        for (i, s) in self.chart.subgraphs.iter().enumerate().rev() {
+            targets.insert(s.id.clone(), Target::Subgraph(i));
+        }
+        for (i, n) in self.chart.nodes.iter().enumerate().rev() {
+            targets.insert(n.id.clone(), Target::Node(i));
+        }
         for (id, styling, range) in std::mem::take(&mut self.styling) {
-            let (classes, styles) =
-                if let Some(n) = self.chart.nodes.iter_mut().find(|n| n.id == id) {
+            let (classes, styles) = match targets.get(&id) {
+                Some(&Target::Node(i)) => {
+                    let n = &mut self.chart.nodes[i];
                     (&mut n.classes, &mut n.styles)
-                } else if let Some(s) = self.chart.subgraphs.iter_mut().find(|s| s.id == id) {
+                }
+                Some(&Target::Subgraph(i)) => {
+                    let s = &mut self.chart.subgraphs[i];
                     (&mut s.classes, &mut s.styles)
-                } else if let Some(e) = self
-                    .chart
-                    .edges
-                    .iter_mut()
-                    .find(|e| e.id.as_deref() == Some(id.as_str()))
-                {
+                }
+                Some(&Target::Edge(i)) => {
+                    let e = &mut self.chart.edges[i];
                     (&mut e.classes, &mut e.styles)
-                } else {
+                }
+                None => {
                     let m = format!("unknown actor, use case, system boundary, or edge `{id}`");
                     self.diagnostics.push(Diagnostic::warning(range, m));
                     continue;
-                };
+                }
+            };
             match styling {
                 Styling::Class(c) => {
                     if !classes.contains(&c) {
