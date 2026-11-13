@@ -5,8 +5,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, quoted_len};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -59,11 +58,7 @@ impl Parser<'_> {
             self.start(TITLE_STMT);
             self.token(TITLE_KW, "title".len());
             self.ws();
-            let line = &self.rest()[..scan::line_len(self.rest())];
-            let end = line.find(['#', ';']).unwrap_or(line.len());
-            let n = scan::trim_end_len(line, end);
-            self.token(TEXT, n);
-            self.end();
+            self.title_text();
             self.finish();
         } else if r.starts_with('+') || digits(r) > 0 {
             self.field();
@@ -103,7 +98,7 @@ impl Parser<'_> {
         }
         self.token(COLON, 1);
         self.ws();
-        match self.string_len() {
+        match quoted_len(self.rest()) {
             Some(n) => {
                 self.token(STRING, n);
                 self.end();
@@ -138,6 +133,10 @@ mod tests {
         assert_eq!(t.matches("FIELD@").count(), 4);
         assert_eq!(t.matches("NUMBER@").count(), 6);
         assert!(t.contains("PLUS@") && t.contains("DASH@") && t.contains("TITLE_STMT@"));
+        let (t, d) = tree("packet\n  title TCP #1; v2\n  0-7: 'Source Port'\n  8: \"a\\\"b\"\n");
+        assert!(d.is_empty(), "{d:?}");
+        assert!(t.contains("\"TCP #1; v2\""));
+        assert_eq!(t.matches("FIELD@").count(), 2);
     }
 
     #[test]

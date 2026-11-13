@@ -7,14 +7,15 @@ the corpus under `crates/sirene-core/tests/fixtures/radar/` (LANGS-6).
 
 ## MRADAR-1 Syntax
 
-- Header: `radar-beta`.
-- `axis ID["label"], ID, ...`: one or more axes, each an id (a letter or `_`, then letters,
-  digits, and `_`) with an optional quoted label in brackets.
+- Header: `radar-beta`, optionally followed by `:`.
+- `axis ID["label"], ID, ...`: one or more axes, each an id (letters, digits, and `_`, with `-`
+  inside) with an optional label in brackets, in double or single quotes where `\` escapes the
+  next character.
 - `curve ID["label"]{VALUES}, ...`: one or more curves, each with listed values (`{1, 2.5, -3}`)
   or keyed values (`{a: 1, b: 2}`). Inside the braces values may span lines.
 - Options, one value each: `showLegend true|false`, `max N`, `min N`, `graticule circle|polygon`,
-  and `ticks N`.
-- `title TEXT`, the text stopping at `#` or `;`.
+  and `ticks N`, several on a line separated by `,` (`max 100, min 0`).
+- `title TEXT` to the end of the line or a `%%` comment.
 - Comments, directives, frontmatter `title` and `config.radar`, `accTitle`, `accDescr`.
 
 The parser shares `crate::lines` with the other Mermaid parsers and is lossless. A missing id,

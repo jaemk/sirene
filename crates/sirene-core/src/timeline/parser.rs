@@ -85,6 +85,9 @@ impl Parser<'_> {
             self.keyword_line(TITLE_STMT, TITLE_KW, "title");
         } else if keyword(r, "section") {
             self.keyword_line(SECTION_STMT, SECTION_KW, "section");
+        } else if r.starts_with('#') {
+            // Mermaid's lexer skips `#` comments.
+            self.token(COMMENT, scan::line_len(r));
         } else if r.starts_with(':') {
             self.start(EVENTS_STMT);
             self.events();
@@ -144,9 +147,10 @@ mod tests {
     #[test]
     fn statements() {
         let (t, d) = tree(
-            "timeline TD\n  title T\n  section S\n  2002 : A : B\n       : C\n  10:30 : stand:up\n  x :\n",
+            "timeline TD\n  title T\n  # note\n  section S\n  2002 : A : B\n       : C\n  10:30 : stand:up\n  x :\n",
         );
         assert!(d.is_empty(), "{d:?}");
+        assert!(t.contains("COMMENT"));
         assert_eq!(t.matches("PERIOD_STMT").count(), 3);
         assert_eq!(t.matches("EVENTS_STMT").count(), 1);
         assert_eq!(t.matches("EVENT@").count(), 4);
