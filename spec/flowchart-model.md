@@ -72,8 +72,13 @@ A label is text plus a markdown flag.
 - Unquoted and quoted text is trimmed, and each line is trimmed.
 - `` "`...`" `` strings are markdown; other labels are plain.
 - `<br>`, `<br/>`, and `<br />` (any case) become line breaks.
-- Entity codes are decoded: `#quot;`, `#amp;`, `#lt;`, `#gt;`, `#apos;`, `#nbsp;`, and decimal
-  `#NNN;`, and the same as HTML entities (`&nbsp;`, `&#9829;`). Unknown codes are kept verbatim.
+- In a label that is not markdown, a `<b>` or `<strong>` with a closing tag after it is bold and
+  `<i>` or `<em>` italic (the label becomes markdown, with `**` and `*` around the text), and
+  `<a>`, `<span>`, `<u>`, and the other presentational tags listed in `DROPPED_TAGS` (text.rs) are
+  dropped. Other `<...>` text is kept. `fa:` icons are text. Tests: `reads_html_tags`.
+- Entity codes are decoded: the HTML 4 names (`#copy;`, `#hearts;`, ...) and `apos`, and decimal
+  `#NNN;`, and the same as HTML entities (`&nbsp;`, `&rarr;`, `&#9829;`, `&#x2665;`). Unknown
+  codes are kept verbatim. Tests: `decodes_entities`, `has_the_html4_set`.
 - `Label::spans` gives each line as styled spans. In markdown, `**bold**` and `__bold__` are bold
   and `*italic*` and `_italic_` italic; a marker without a partner on its line stays as text, and
   `_` marks only at a word edge (`snake_case` is text). `Label::lines` is the spans' text.

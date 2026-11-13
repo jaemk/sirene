@@ -3,6 +3,7 @@
 mod agentflow;
 mod collapse;
 pub mod edit;
+mod entities;
 mod graph;
 pub(crate) mod lower;
 mod model;

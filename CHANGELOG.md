@@ -64,6 +64,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dateFormat`, so they apply when the format holds a time.
 - Mermaid ER diagrams read `o{`, `|{`, and `o|` on the left of a relationship and `}o`, `}|`,
   and `|o` on the right.
+- A flowchart or state subgraph that an edge links to directly keeps its `direction`; only an
+  edge to a node inside it drops the direction, as in Mermaid.
+- A flowchart or state edge between a subgraph or composite state and a node inside it warns
+  that it is not drawn, instead of vanishing silently.
+- Flowchart labels decode all HTML 4 named entities (`#copy;`, `&hearts;`, `&mdash;`), draw
+  `<b>`/`<strong>` and `<i>`/`<em>` as bold and italic, and drop other HTML tags such as `<span>`.
+- The guide says `animate`, `animation`, `curve`, and `interpolate` are parsed but not drawn,
+  `fa:` icons stay as text, and shows `rgb(255\,0\,0)` with an escaped comma in `style`.
 
 ## [0.3.0] - 2026-11-12
 
