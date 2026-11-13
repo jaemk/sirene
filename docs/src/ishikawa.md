@@ -3,18 +3,7 @@
 sirene draws Mermaid's ishikawa (fishbone) diagrams (`ishikawa-beta`) as images and as text. The
 first line is the effect, and the indented lines under it are its causes:
 
-```
-$ sirene ascii --charset ascii delivery.mmd
-Late delivery
-+-- People
-|   `-- Short staffed
-|       `-- Holidays
-+-- Methods
-`-- Machines
-    `-- Broken scanner
-```
-
-```
+```mermaid
 ishikawa-beta
     Late delivery
     People

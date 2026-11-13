@@ -2,7 +2,7 @@
 
 Write a flowchart:
 
-```
+```mermaid
 flowchart LR
     A[Start] --> B{Ok?}
     B -->|yes| C[Done]

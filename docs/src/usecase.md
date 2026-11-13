@@ -3,26 +3,7 @@
 sirene draws Mermaid's use case diagrams (`usecase-beta`) as images and as text: actors, use
 cases, system boundaries, and the relationships between them.
 
-```
-$ sirene ascii shop.mmd
-                  ┌─ Storefront ──────────────────────────────────────┐
-                  │                             ╭──────────────────╮  │
-                ┌─┼────────────────────────────►( Browse catalogue )  │
-┌──────────┐ ┌──┘ │                           ┌►(                  )  │
-│          ├─┘    │  ╭──────────╮ ┌┄«include»┄┘ ╰──────────────────╯  │
-│ Customer ├──────┼─►( Checkout ├┄┘                                   │
-│          ├─┐    │  ╰──────────╯                                     │
-└──────────┘ │    └───────────────────────────────────────────────────┘
-             │
-             └──┐               ┌─ Fulfilment ─────────┐
-                │               │  ╭────────────────╮  │
-                └───────────────┼─►( Track delivery )  │
-┌─────────┐     ┌───────────────┼─►(                )  │
-│ Support ├─────┘               │  ╰────────────────╯  │
-└─────────┘                     └──────────────────────┘
-```
-
-```
+```mermaid
 usecase-beta
 direction LR
 actor Customer

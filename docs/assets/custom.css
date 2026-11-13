@@ -75,6 +75,50 @@ html.navy,
 /* Rendered diagrams sit on their own dark background. */
 .content img { max-width: 100%; border: 1px solid var(--quote-border); border-radius: 10px; }
 
+/* A diagram block's drawing and `sirene ascii` text, added by samples.py; styled like the
+   landing page's editor window. */
+.sirene-sample {
+  margin: -8px 0 20px;
+  border: 1px solid #1d3557;
+  border-radius: 10px;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+.sirene-sample-bar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  background: #10233d;
+  border-bottom: 1px solid #1d3557;
+}
+.sirene-view {
+  padding: 3px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: #8ba3c4;
+  font: 500 12px var(--mono-font);
+  cursor: pointer;
+}
+.sirene-view:hover { color: #dbeafe; }
+.sirene-view.is-active { color: #dbeafe; border-color: #1d3557; background: #0d1d33; }
+.sirene-pane[hidden] { display: none; }
+.sirene-drawing { display: flex; justify-content: center; padding: 16px; }
+.content .sirene-drawing img { max-width: 100%; height: auto; border: 0; border-radius: 0; }
+.navy .content pre.sirene-ascii,
+.content pre.sirene-ascii {
+  margin: 0;
+  padding: 16px 18px;
+  color: #d4d4d4;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font: 12px/1.25 var(--mono-font);
+  font-variant-ligatures: none;
+  overflow-x: auto;
+  white-space: pre;
+}
+
 .navy .chapter li.chapter-item a { border-radius: 7px; padding-left: 8px; }
 .navy .chapter li.chapter-item a:hover { background: var(--theme-hover); }
 .navy .chapter li.chapter-item a.active {

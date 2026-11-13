@@ -5,6 +5,11 @@ authors = ["James Kominick"]
 language = "en"
 src = "src"
 
+# Draws each diagram block and adds its drawing and `sirene ascii` text; see samples.py.
+[preprocessor.samples]
+command = "python3 samples.py"
+after = ["links"]
+
 [output.html]
 default-theme = "navy"
 preferred-dark-theme = "navy"

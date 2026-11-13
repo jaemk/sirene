@@ -3,21 +3,7 @@
 sirene draws Mermaid's agentflow diagrams (`agentflow-beta`) as images and as text: a flowchart
 of `flow` containers with agentflow's shapes and edges.
 
-```
-$ sirene ascii research.mmd
-              ┌─ Planner ────────────────────────────────────┐         ┌─ Workers ───────────────────────┐
-              │                       ╱───────────────────╲  │         │  ┌┬────────────┬┐    ┌───────┐  │
-              │  ┌───────────────┐    │ Split into tasks? ├──┼───yes───┼─►││ Web search │├───►│ Notes ├┄┄┼┄┐
-╭──────╮    ┌─┼─►╱ Read the goal ├───►│                   ├──┼─┐       │  └┴────────────┴┘    └───────┘  │ └┄┄┐ ╭─────────────╮
-│ User ├────┘ │  └───────────────┘    ╲───────────────────╱  │ └─no──┐ │                                 │    └┄┤ Message bus │
-│      │x┐    └──────────────────────────────────────────────┘       │ │  ╱──────────────╲               │    ┌─┤             │
-╰──────╯ │                                                           └─┼─►< Draft answer >               │ ┌──┘ ╰─────────────╯
-         └─────────────────────────────────────────────────────────────┼──┤              >◄──────────────┼─┘
-                                                                       │  ╲──────────────╱               │
-                                                                       └─────────────────────────────────┘
-```
-
-```
+```mermaid
 agentflow-beta LR
   global
     user["User"]

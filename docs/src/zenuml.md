@@ -4,29 +4,7 @@ sirene draws ZenUML sequence diagrams (`zenuml`) as images and as text, the same
 [sequence diagrams](sequence.md). A call such as `A.method()` activates `A` for its body, and a
 call with no caller comes in from the left:
 
-```
-$ sirene ascii --charset ascii order.mmd
-           Order service
-
-      +---------------+   +-------+
-      | OrderService  |   | Repo  |
-      +-------+-------+   +---+---+
-              |               |
- create(item) |               |
-------------->|               |
-              |               |
-              |  save(item)   |
-              +-------------->|
-              |               |
-     order    |               |
- <............+               |
-              |               |
-      +-------+-------+   +---+---+
-      | OrderService  |   | Repo  |
-      +---------------+   +-------+
-```
-
-```
+```mermaid
 zenuml
     title Order service
     order = OrderService.create(item) {

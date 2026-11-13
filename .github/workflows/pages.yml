@@ -1,23 +1,31 @@
 name: docs
 
-# Pages source is GitHub Actions. Renders the examples and the landing page's diagram with
-# sirene, builds the mdBook, and deploys on changes to the docs or examples.
+# Pages source is GitHub Actions. Builds sirene, renders the landing page's diagram, and builds
+# the mdBook, whose samples.py preprocessor draws every diagram block with that build. Deploys on
+# pushes to main; a pull request only builds, so a doc example sirene rejects fails the check.
 on:
   push:
     branches: [main]
     paths:
       - 'docs/**'
       - 'examples/**'
+      - 'crates/**'
+      - 'Cargo.lock'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'examples/**'
+      - 'crates/**'
+      - 'Cargo.lock'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -34,10 +42,9 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - name: Build sirene
         run: cargo build --locked --release -p sirene --no-default-features
-      - name: Render diagrams
+      - name: Render the landing diagram
         run: |
           sirene=target/release/sirene
-          "$sirene" svg --theme dark examples -o docs/src/examples
           "$sirene" svg --theme dark docs/landing/hero.mmd -o docs/landing/hero.svg
           "$sirene" ascii docs/landing/hero.mmd > docs/landing/hero.txt
       - name: Install mdBook
@@ -47,21 +54,27 @@ jobs:
           curl -sSL "$url" | tar -xz -C "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Build
-        run: mdbook build docs
+        run: SIRENE="$PWD/target/release/sirene" mdbook build docs
       - name: Assemble site
         # Landing page at the root, mdBook docs under /guide/.
         run: |
           mkdir -p _site/guide
           cp -r docs/landing/. _site/
           cp -r docs/book/. _site/guide/
-      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}

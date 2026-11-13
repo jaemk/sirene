@@ -2,29 +2,7 @@
 
 sirene draws Mermaid requirement diagrams (`requirementDiagram`) as images and as text:
 
-```
-$ sirene ascii reqs.mmd
-      ┌──────────────────┐
-      │    «Element»     │
-      │   test_entity    │
-      ├──────────────────┤
-      │ Type: simulation │
-      └─────────┬────────┘
-                ┆
-           «satisfies»
-                ▼
-┌──────────────────────────────┐
-│        «Requirement»         │
-│           test_req           │
-├──────────────────────────────┤
-│ Id:           1              │
-│ Text:         the test text. │
-│ Risk:         High           │
-│ Verification: Test           │
-└──────────────────────────────┘
-```
-
-```
+```mermaid
 requirementDiagram
 
     requirement test_req {

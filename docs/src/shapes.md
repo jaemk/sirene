@@ -3,7 +3,7 @@
 A node's shape comes from the delimiters around its label, or from `@{ shape: NAME }`, which
 takes every Mermaid shape name and alias:
 
-```
+```mermaid
 flowchart LR
     A[Process] --> B{Decision} --> C[(Database)]
     D@{ shape: doc, label: "Report" }

@@ -2,17 +2,7 @@
 
 sirene draws Mermaid git graphs (`gitGraph`) as images and as text:
 
-```
-$ sirene ascii release.mmd
-main
-│ develop
-● │  init
-├─●  feature [beta]
-● │  hotfix
-◉─┘  release [v1.0]
-```
-
-```
+```mermaid
 gitGraph
   commit id: "init"
   branch develop

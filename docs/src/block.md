@@ -3,18 +3,7 @@
 sirene draws Mermaid block diagrams (`block-beta`) as images and as text. Blocks fill a grid of
 columns in order; in text the edges are listed below the grid:
 
-```
-$ sirene ascii --charset ascii plain.mmd
-+---+  +---+  +---+
-| a |  | b |  | c |
-+---+  +---+  +---+
-
-+----------+  +---+
-|    d     |  | e |
-+----------+  +---+
-```
-
-```
+```mermaid
 block-beta
   columns 3
   a b c

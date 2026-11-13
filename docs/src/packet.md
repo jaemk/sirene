@@ -3,22 +3,7 @@
 sirene draws Mermaid packet diagrams (`packet`) as images and as text, in the layout of RFC
 header diagrams:
 
-```
-$ sirene ascii udp.mmd
-                              UDP Packet
-
-    0                   1                   2                   3
-    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-   ┌───────────────────────────────┬───────────────────────────────┐
-0  │          Source Port          │       Destination Port        │
-   ├───────────────────────────────┼───────────────────────────────┤
-32 │            Length             │           Checksum            │
-   ├───────────────────────────────┴───────────────────────────────┤
-64 │                    Data (variable length)                     │
-   └───────────────────────────────────────────────────────────────┘
-```
-
-```
+```mermaid
 packet
 title UDP Packet
 +16: "Source Port"

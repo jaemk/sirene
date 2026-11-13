@@ -3,19 +3,7 @@
 sirene draws Mermaid's tree views (`treeView-beta`) as images and as text. Entries nest by
 indentation, or by box-drawing characters as `tree` prints them:
 
-```
-$ sirene ascii project.mmd
-/
-└── my-project/
-    ├── src/
-    │   ├── App.tsx   main component
-    │   └── index.js  entry point
-    ├── .env          environment variables
-    ├── Dockerfile
-    └── package.json
-```
-
-```
+```mermaid
 treeView-beta
     my-project/
         src/

@@ -2,21 +2,7 @@
 
 sirene draws Mermaid gantt charts (`gantt`) as images and as text:
 
-```
-$ sirene ascii plan.mmd
-                                  A Gantt Diagram
-
-Section
-  A task           ████████████████████████████████████
-  Another task                                         ████████████████████████
-Another
-  Task in Another               ███████████████
-  another task                                 ████████████████████████████
-                   ─────┬───────┬────────┬───────┬───────┬────────┬───────┬─────
-                        2014-01-05       2014-01-19      2014-02-02       2014-02-16
-```
-
-```
+```mermaid
 gantt
     title A Gantt Diagram
     dateFormat YYYY-MM-DD

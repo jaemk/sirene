@@ -3,36 +3,7 @@
 sirene draws Mermaid's Cynefin diagrams (`cynefin-beta`) as images and as text: items placed in
 the five domains of the Cynefin framework, with transitions between domains.
 
-```
-$ sirene ascii strategy.mmd
-                   Strategy Categorization
-
-┌───────────────────────────┬────────────────────────────────┐
-│          Complex          ┆           Complicated          │
-│  Probe → Sense → Respond  ┆    Sense → Analyse → Respond   │
-│    Emergent Practices     ┆         Good Practices         │
-│                           ┆                                │
-│      Market research      ┆      Competitive analysis      │
-│                           ┆                                │
-│                     ┌─────┴─────┐                          │
-│                     │ Confusion │                          │
-├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤ Disorder  ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┤
-│                     └─────┬─────┘                          │
-│                           ┃                                │
-│          Chaotic          ┃              Clear             │
-│   Act → Sense → Respond   ┃  Sense → Categorise → Respond  │
-│      Novel Practices      ┃         Best Practices         │
-│                           ┃                                │
-│     Crisis management     ┃        Standard pricing        │
-└───────────────────────────┴────────────────────────────────┘
-
-Complex → Complicated: Pattern identified
-Complicated → Clear: Best practice codified
-Clear → Chaotic: Complacency
-Chaotic → Complex: Stabilized
-```
-
-```
+```mermaid
 cynefin-beta
   title Strategy Categorization
 

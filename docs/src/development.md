@@ -39,12 +39,17 @@ The guide is an [mdBook](https://rust-lang.github.io/mdBook/) in `docs/`, and th
 `docs/landing/`. To preview:
 
 ```
-cargo run -p sirene --no-default-features -- svg --theme dark examples -o docs/src/examples
+cargo build -p sirene --no-default-features
 mdbook serve docs
 ```
 
-`.github/workflows/pages.yml` builds and publishes both on each push to `main` that changes
-`docs/` or `examples/`.
+The `docs/samples.py` preprocessor (Python 3) draws each `mermaid`, `plantuml`, or `dot` code
+block with that build and adds the drawing and `sirene ascii` text below it. A block sirene
+reports an error for fails the build; ```` ```mermaid no-render ```` leaves a block as source only.
+Untagged blocks are not drawn.
+
+`.github/workflows/pages.yml` builds both on pull requests and publishes them on each push to
+`main` that changes `docs/`, `examples/`, or `crates/`.
 
 ## Packaging
 

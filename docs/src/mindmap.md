@@ -2,22 +2,7 @@
 
 sirene draws Mermaid mindmaps (`mindmap`) as images and as text:
 
-```
-$ sirene ascii ideas.mmd
-((mindmap))
-├── Origins
-│   ├── Long history
-│   └── Popularisation
-├── Research
-│   ├── On effectiveness
-│   │   and features
-│   └── On Automatic creation
-└── Tools
-    ├── Pen and paper
-    └── Mermaid
-```
-
-```
+```mermaid
 mindmap
   root((mindmap))
     Origins

@@ -4,30 +4,7 @@ sirene draws Mermaid's railroad diagrams as images and as text: one syntax diagr
 rule, written in EBNF (`railroad-ebnf-beta`), ABNF (`railroad-abnf-beta`), PEG
 (`railroad-peg-beta`), or Mermaid's constructor notation (`railroad-beta`).
 
-```
-$ sirene ascii identifiers.mmd
-                                             ┌────────────┐
-               ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┄┐  ┌────────┐  │ ┌────────┐ │
-Identifier = ●─┤ ? !Keyword ? ├──┤ Letter ├──┼─┤ Letter ├─┼─●
-               └┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘  └────────┘  │ └────────┘ │
-                                             └──────◄─────┘
-
-              ╭────╮
-Keyword = ●─┬─┤ if ├────┬─●
-            │ ╰────╯    │
-            │ ╭──────╮  │
-            ├─┤ else ├──┤
-            │ ╰──────╯  │
-            │ ╭───────╮ │
-            └─┤ while ├─┘
-              ╰───────╯
-
-        ┌┄┄┄┄┄┄┄┄┄┄┄┄┄┐  ┌┄┄┄┄┄┄┄┐
-Any = ●─┤ ? &Letter ? ├──┤ ? . ? ├─●
-        └┄┄┄┄┄┄┄┄┄┄┄┄┄┘  └┄┄┄┄┄┄┄┘
-```
-
-```
+```mermaid
 railroad-peg-beta
 # keywords excluded
 Identifier <- !Keyword Letter Letter* ;

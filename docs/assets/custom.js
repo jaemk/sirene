@@ -10,9 +10,31 @@
     a.textContent = "<- sirene home";
     scroll.insertBefore(a, scroll.firstChild);
   }
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", addHomeLink);
-  } else {
+  // The drawing / `sirene ascii` tabs samples.py adds below each diagram block.
+  function sampleTabs() {
+    document.querySelectorAll(".sirene-sample").forEach(function (sample) {
+      var views = sample.querySelectorAll(".sirene-view");
+      views.forEach(function (view) {
+        view.addEventListener("click", function () {
+          views.forEach(function (v) {
+            var on = v === view;
+            v.classList.toggle("is-active", on);
+            v.setAttribute("aria-selected", on ? "true" : "false");
+          });
+          sample.querySelectorAll(".sirene-pane").forEach(function (pane) {
+            pane.hidden = pane.dataset.pane !== view.dataset.view;
+          });
+        });
+      });
+    });
+  }
+  function init() {
     addHomeLink();
+    sampleTabs();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
   }
 })();

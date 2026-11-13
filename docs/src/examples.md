@@ -1,93 +1,71 @@
 # Examples
 
 The diagrams in [`examples/`](https://github.com/jaemk/sirene/tree/main/examples), drawn by
-`sirene svg --theme dark` when this site was built. Open one in the editor with
+`sirene svg --theme dark` and `sirene ascii` when this site was built. Open one in the editor with
 `sirene examples/architecture.mmd`.
 
 ## Architecture
 
-![architecture](examples/architecture.svg)
-
-```
+```mermaid
 {{#include ../../examples/architecture.mmd}}
 ```
 
 ## Build graph (DOT)
 
-![build-graph](examples/build-graph.svg)
-
-```
+```dot
 {{#include ../../examples/build-graph.dot}}
 ```
 
 ## Checkout (PlantUML)
 
-![checkout](examples/checkout.svg)
-
-```
+```plantuml
 {{#include ../../examples/checkout.puml}}
 ```
 
 ## CI pipeline
 
-![ci-pipeline](examples/ci-pipeline.svg)
-
-```
+```mermaid
 {{#include ../../examples/ci-pipeline.mmd}}
 ```
 
 ## Fulfillment (PlantUML)
 
-![fulfillment](examples/fulfillment.svg)
-
-```
+```plantuml
 {{#include ../../examples/fulfillment.puml}}
 ```
 
 ## Login
 
-![login](examples/login.svg)
-
-```
+```mermaid
 {{#include ../../examples/login.mmd}}
 ```
 
 ## Order lifecycle
 
-![order-lifecycle](examples/order-lifecycle.svg)
-
-```
+```mermaid
 {{#include ../../examples/order-lifecycle.mmd}}
 ```
 
 ## Request timing (PlantUML)
 
-![request-timing](examples/request-timing.svg)
-
-```
+```plantuml
 {{#include ../../examples/request-timing.puml}}
 ```
 
 ## Shapes
 
-![shapes](examples/shapes.svg)
-
-```
+```mermaid
 {{#include ../../examples/shapes.mmd}}
 ```
 
 ## Shop model (PlantUML)
 
-![shop-model](examples/shop-model.svg)
-
-```
+```plantuml
 {{#include ../../examples/shop-model.puml}}
 ```
 
 ## Styling
 
-![styling](examples/styling.svg)
-
-```
+```mermaid
 {{#include ../../examples/styling.mmd}}
 ```

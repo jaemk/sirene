@@ -3,27 +3,7 @@
 sirene draws Mermaid radar charts (`radar-beta`) as images and as text. In text, each axis gets
 a bar per curve, scaled from the minimum to the maximum:
 
-```
-$ sirene ascii grades.mmd
-                   Grades
-
-Math       Alice  ████████████████████▍    85
-           Bob    ████████████████▊        70
-Science    Alice  █████████████████████▋   90
-           Bob    ██████████████████       75
-English    Alice  ███████████████████▎     80
-           Bob    ████████████████████▍    85
-History    Alice  ████████████████▊        70
-           Bob    ███████████████████▎     80
-Geography  Alice  ██████████████████       75
-           Bob    █████████████████████▋   90
-Art        Alice  █████████████████████▋   90
-           Bob    ████████████████████▍    85
-
-0 to 100
-```
-
-```
+```mermaid
 ---
 title: "Grades"
 ---
