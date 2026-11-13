@@ -32,6 +32,10 @@ pub(crate) struct Link<'a> {
 
 const LEFT_HEADS: &[u8] = b"<|*o#x}{+^";
 const RIGHT_HEADS: &[u8] = b">|*o#x{}+^";
+/// Interface sockets and balls, read but not drawn, longest first.
+const SOCKETS_LEFT: &[&str] = &["(0)", "0)", ")", "0"];
+const SOCKETS_RIGHT: &[&str] = &["(0)", "(0", "(", "0"];
+const SOCKETS_INSIDE: &[&str] = &["(0)", "(0", "0)", "0"];
 
 fn left_head(h: &str) -> Option<Option<Arrow>> {
     Some(match h {
@@ -209,12 +213,33 @@ pub(crate) fn link(s: &str) -> Option<Link<'_>> {
     while left < p && matches!(b[left], b'o' | b'x') && (left == 0 || !gap(Some(b[left - 1]))) {
         left += 1;
     }
+    // An interface socket or ball before the shaft (`I )- [C]`), after a gap.
+    if left == p
+        && let Some(t) = SOCKETS_LEFT
+            .iter()
+            .find(|t| s[..p].ends_with(**t) && p > t.len() && gap(Some(b[p - t.len() - 1])))
+    {
+        left -= t.len();
+    }
     // The shaft: dashes or dots, one `[options]`, and direction words between them.
     let mut q = p;
     let (mut dashes, mut dots, mut bold) = (0u8, false, false);
     let mut options = None;
     let mut direction = None;
+    let mut inside = None;
     while q < b.len() {
+        // A socket or ball between two parts of the shaft (`-(0-`).
+        if q > p
+            && inside.is_none()
+            && let Some(t) = SOCKETS_INSIDE.iter().find(|t| {
+                s[q..].starts_with(**t)
+                    && matches!(b.get(q + t.len()), Some(b'-' | b'.' | b'=' | b'~'))
+            })
+        {
+            inside = Some(*t);
+            q += t.len();
+            continue;
+        }
         match b[q] {
             b'-' => dashes = dashes.saturating_add(1),
             b'.' | b'~' => {
@@ -261,7 +286,18 @@ pub(crate) fn link(s: &str) -> Option<Link<'_>> {
     {
         right -= 1;
     }
+    // An interface socket or ball after the shaft (`[C] -( I`), before a gap.
+    if right == q
+        && let Some(t) = SOCKETS_RIGHT.iter().find(|t| {
+            s[q..].starts_with(**t) && q + t.len() < b.len() && gap(b.get(q + t.len()).copied())
+        })
+    {
+        right += t.len();
+    }
     let mut unknown = Vec::new();
+    if let Some(t) = inside {
+        unknown.push(format!("head `{t}`"));
+    }
     let head = |h: &str, f: fn(&str) -> Option<Option<Arrow>>, unknown: &mut Vec<String>| {
         f(h).unwrap_or_else(|| {
             unknown.push(format!("head `{h}`"));
@@ -430,6 +466,36 @@ mod tests {
         let l = link("A ::: B").map(|l| l.from);
         assert_eq!(l, None);
         assert_eq!(link("A::x --> B").map(|l| l.from), Some("A::x"));
+    }
+
+    #[test]
+    fn interface_sockets_are_read_not_drawn() {
+        type Parts<'a> = (&'a str, &'a str, Option<Arrow>, Option<Arrow>, Vec<String>);
+        fn parts(s: &str) -> Parts<'_> {
+            let l = link(s).unwrap();
+            (l.from, l.to, l.start, l.end, l.unknown)
+        }
+        let none = None::<Arrow>;
+        assert_eq!(
+            parts("[A] -( [D]"),
+            ("[A]", "[D]", none, none, vec!["head `(`".to_owned()])
+        );
+        assert_eq!(
+            parts("[B] --(0 [C]"),
+            ("[B]", "[C]", none, none, vec!["head `(0`".to_owned()])
+        );
+        assert_eq!(
+            parts("I )- [B]"),
+            ("I", "[B]", none, none, vec!["head `)`".to_owned()])
+        );
+        assert_eq!(parts("[A] 0)-- [B]").4, ["head `0)`"]);
+        assert_eq!(parts("[A] -(0- [B]").4, ["head `(0`"]);
+        assert_eq!(parts("[A] -(0)-> [B]").3, Some(Arrow::Point));
+        // Names and use cases next to a shaft are not sockets.
+        assert_eq!(parts("(Use)-- B").0, "(Use)");
+        assert_eq!(parts("A -- (Use)").1, "(Use)");
+        assert_eq!(parts("A -- 0").1, "0");
+        assert_eq!(parts("Node0 -- B").0, "Node0");
     }
 
     #[test]

@@ -340,6 +340,27 @@ impl Lower {
         shape: Option<Shape>,
         cursor: &mut Cursor,
     ) {
+        // A quoted name may run over lines up to its closing `"`.
+        let joined;
+        let rest = if rest.matches('"').count() % 2 == 1 {
+            let mut text = rest.to_owned();
+            let mut closed = false;
+            while let Some(next) = cursor.next() {
+                text.push('\n');
+                text.push_str(&next.text);
+                if next.text.contains('"') {
+                    closed = true;
+                    break;
+                }
+            }
+            if !closed {
+                return self.error(line.range, "the quoted name has no closing `\"`");
+            }
+            joined = text;
+            joined.as_str()
+        } else {
+            rest
+        };
         let Some((short, id, label, rest)) = element(rest) else {
             let what = if kw.is_empty() {
                 STATEMENT.to_owned()
@@ -641,6 +662,25 @@ mod tests {
         assert!(d.is_empty(), "{d:?}");
         assert!(g.edges.is_empty());
         assert_eq!(g.notes.len(), 1);
+    }
+
+    #[test]
+    fn quoted_names_over_lines() {
+        let (g, d) = lower_src("usecase U as \"one\ntwo\"\nactor A\nA --> U");
+        assert!(d.is_empty(), "{d:?}");
+        let u = g.nodes.iter().find(|n| n.id == "U").unwrap();
+        assert_eq!(u.label.text, "one\ntwo");
+        assert_eq!(g.edges.len(), 1);
+        let (_, d) = lower_src("usecase U as \"one\ntwo");
+        assert_eq!(d, ["the quoted name has no closing `\"`"]);
+    }
+
+    #[test]
+    fn socket_links_warn() {
+        let (g, d) = lower_src("[A] -( [B]\nI )- [A]");
+        assert_eq!(g.edges.len(), 2);
+        assert_eq!(d.len(), 2, "{d:?}");
+        assert!(d[0].contains("head `(` is not drawn"), "{d:?}");
     }
 
     #[test]
