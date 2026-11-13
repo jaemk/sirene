@@ -26,8 +26,14 @@ are treated as top level.
 
 Each container is laid out top to bottom and then rotated or flipped into its direction. A
 cluster with an explicit direction uses it only when no edge reaches it from outside (an edge
-with one endpoint outside and the other being the cluster or inside it); otherwise it inherits
-its parent's direction, as in mermaid. A cluster without a direction inherits.
+with one endpoint outside and the other inside it, at any depth; an edge to the cluster itself
+does not count); otherwise it inherits its parent's direction, as in mermaid. A cluster without
+a direction inherits. An edge ending at a cluster laid out in another direction than its
+container meets the middle of the side facing the edge, moved off the title if it sits there. An
+edge between a cluster and one of its own descendants has no route and is not drawn; lowering
+warns about it. Tests: `cluster_direction_survives_an_edge_to_the_cluster`,
+`nested_cluster_directions_are_kept`, `edge_to_titled_cluster_clears_the_title`,
+`edge_to_own_descendant_is_unroutable`.
 
 ## LAYOUT-4 Ranks
 

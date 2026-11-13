@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use rowan::TextRange;
 
+use super::parser::opens;
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::text;
 use crate::flowchart::{
@@ -45,16 +46,27 @@ fn text_of(node: &SyntaxNode, kind: SyntaxKind) -> Option<String> {
 /// `~T~` generics as `<T>`.
 fn generics(s: &str) -> String {
     let mut out = String::new();
-    let mut open = false;
-    for c in s.chars() {
-        if c == '~' {
-            out.push(if open { '>' } else { '<' });
-            open = !open;
-        } else {
+    let mut depth = 0usize;
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c != '~' {
             out.push(c);
+        } else if opens(depth, chars.peek().copied()) {
+            out.push('<');
+            depth += 1;
+        } else {
+            out.push('>');
+            depth -= 1;
         }
     }
     out
+}
+
+/// A class id without the backticks around it.
+fn unticked(id: &str) -> &str {
+    id.strip_prefix('`')
+        .and_then(|s| s.strip_suffix('`'))
+        .unwrap_or(id)
 }
 
 /// A member line: whether it is a method, and its row (MCLASS-1). `$` marks a static member and
@@ -144,7 +156,7 @@ impl Lowerer {
 
     /// The class a `CLASS_REF` names, with its generics and `:::` class.
     fn reference(&mut self, r: &SyntaxNode, namespace: Option<usize>) -> Option<usize> {
-        let id = token(r, IDENT)?.text().to_owned();
+        let id = unticked(token(r, IDENT)?.text()).to_owned();
         let i = self.class(&id, namespace);
         self.chart.nodes[i].mentions.push(r.text_range());
         if let Some(g) = token(r, GENERIC) {
@@ -251,6 +263,7 @@ impl Lowerer {
             "*" => Some(Arrow::Diamond),
             "o" => Some(Arrow::HollowDiamond),
             "<" | ">" => Some(Arrow::Point),
+            "()" => Some(Arrow::Circle),
             _ => None,
         };
         let (start, end) = (marker(&rel[..line_at]), marker(&rel[line_at + 2..]));
@@ -331,7 +344,7 @@ impl Lowerer {
         let Some(body) = body else {
             return;
         };
-        let Some(target) = text_of(stmt, IDENT) else {
+        let Some(target) = text_of(stmt, IDENT).map(|t| unticked(&t).to_owned()) else {
             // A note on its own is a node that no relation can name: `:` never appears in a
             // class name.
             let id = format!("note:{}", self.chart.nodes.len());

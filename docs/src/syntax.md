@@ -30,9 +30,12 @@ F:::important
 - A node is created where it is first mentioned, and a node without a label shows its id.
 - A later mention with a shape replaces the shape and label.
 - `"..."` labels may hold any character but `"`; use `#quot;` for it. Entity codes such as
-  `#amp;`, `#lt;`, and `#9829;` are decoded, as are HTML entities such as `&nbsp;`.
+  `#amp;`, `#lt;`, and `#9829;` are decoded, as are HTML entities such as `&nbsp;`. Named codes
+  are the HTML 4 set (`#copy;`, `&hearts;`, `&rarr;`, `&mdash;`, ...).
 - `` "`...`" `` labels are markdown: `**bold**`, `__bold__`, `*italic*`, and `_italic_`.
-- `<br>` is a line break.
+- `<br>` is a line break. In a label that is not markdown, `<b>`/`<strong>` and `<i>`/`<em>`
+  pairs are bold and italic, and other HTML tags (`<span>`, `<u>`, ...) are dropped. Font Awesome
+  icons (`fa:fa-car`) are not drawn: they stay as text.
 - `:::name` adds a class.
 - `end` is reserved and cannot be a node id.
 
@@ -86,7 +89,9 @@ api --> db
 ```
 
 A subgraph's members are the nodes mentioned in its body. A node already in an earlier subgraph
-stays there. Edges may start or end at a subgraph.
+stays there. Edges may start or end at a subgraph. An edge between a subgraph and a node inside
+it is not drawn and is a warning. A subgraph with a `direction` keeps it when an edge links to the
+subgraph itself; an edge between a node inside it and a node outside drops it, as in Mermaid.
 
 `api@{ view: collapsed }` after a subgraph's `end` draws it as one node: its title over a dashed
 rule and three dots. Edges to anything inside it end at that node, and edges wholly inside it are
@@ -105,7 +110,8 @@ linkStyle default stroke:#888
 
 These properties are drawn: `fill`, `stroke`, `stroke-width`, `stroke-dasharray`, and `color`
 (text). Others are ignored. Colors may be `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()`,
-`rgba()`, a CSS color name, `none`, or `transparent`.
+`rgba()`, a CSS color name, `none`, or `transparent`. Declarations are split at commas, so
+escape the commas inside a function: `style A fill:rgb(255\,0\,0)`. `\,` is a literal comma.
 
 Precedence, lowest first: `classDef default` (nodes) or `linkStyle default` (edges), then the
 item's classes in order, then its own `style` or `linkStyle`. A filled node without a `color`
@@ -120,8 +126,21 @@ A@{ shape: cyl, label: "Orders" }
 e1@{ animate: true }
 ```
 
-An `@{ ... }` block is a flat mapping of `key: value` entries. Nodes read `shape` and `label`;
-edges read `animate`, `animation`, and `curve`. Other keys are kept but have no effect.
+An `@{ ... }` block is a flat mapping of `key: value` entries, separated by commas on one line.
+Over several lines, each entry starts a line, so a comma is text, and `label: |` takes the
+indented lines after it as a multi-line label:
+
+```
+B@{
+  label: |
+    Hello, world
+    second line
+}
+```
+
+Nodes read `shape` and `label`;
+edges read `animate`, `animation`, and `curve`, and `linkStyle` reads `interpolate`. Those four
+are parsed but not drawn. Other keys are kept but have no effect.
 
 ## Click and accessibility
 

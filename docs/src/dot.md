@@ -29,7 +29,7 @@ drawing side. Only the first graph in a file is drawn.
 | `subgraph cluster_x { ... }` | a cluster titled by its `label`, filled by `bgcolor`; other subgraphs only scope defaults |
 | `rankdir`, `label`, `bgcolor` | the direction, the title, and the background |
 | `shape` | the nearest sirene shape; `record` and `Mrecord` as compartments |
-| `style` | `filled`, `rounded`, `dashed`, `dotted`, `bold`, `invis` |
+| `style` | `filled`, `rounded` (nodes only; clusters stay square, with a warning), `dashed`, `dotted`, `bold`, `invis` |
 | `color`, `fillcolor`, `fontcolor`, `penwidth` | border, fill, text color, line width |
 | `label`, `headlabel`, `taillabel` | labels, with `\n`, `\l`, `\N`, `\G`, `\E`, `\T`, `\H` |
 | `arrowhead`, `arrowtail`, `dir`, `minlen` | end markers, which ends have them, and rank span |

@@ -48,6 +48,7 @@ with a `╮` corner joined by `┄`; a note on a composite state sits beside the
 ## MSTATE-4 Unsupported
 
 `click`, floating notes (which Mermaid 12.3 parses and does not draw), other stereotypes (such as `<<history>>`,
-drawn as a plain state), `--` outside a composite state, and transitions between states in two
-regions of one composite state are warnings on their span (LANGS-6). Tests:
+drawn as a plain state), `--` outside a composite state, transitions between states in two
+regions of one composite state, and transitions between a composite state and a state inside it
+are warnings on their span (LANGS-6). Tests:
 `unsupported_is_a_warning`.

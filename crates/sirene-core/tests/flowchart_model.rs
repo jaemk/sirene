@@ -571,6 +571,21 @@ fn subgraph_direction() {
     assert_eq!(c.subgraph("t").unwrap().direction, None);
 }
 
+/// An edge between a subgraph and a node inside it is not drawn, and is a warning.
+#[test]
+fn edge_to_own_descendant_warns() {
+    let lowered = lower("flowchart TD\nsubgraph A\n a1 --> a2\nend\nA --> a1\na2 --> A\nA --> B\n");
+    let warnings: Vec<_> = lowered
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity == Severity::Warning)
+        .map(|d| d.message.as_str())
+        .collect();
+    assert_eq!(warnings.len(), 2, "{warnings:?}");
+    assert!(warnings[0].contains("`A --> a1`"), "{warnings:?}");
+    assert!(warnings[1].contains("`a2 --> A`"), "{warnings:?}");
+}
+
 #[test]
 fn nested_membership() {
     let c = chart(
@@ -635,7 +650,11 @@ fn repeated_subgraph_id_cannot_contain_its_ancestor() {
 
 #[test]
 fn subgraph_is_not_its_own_member() {
-    let c = chart("flowchart\nsubgraph s\ns --> A\nend\n");
+    // The edge from `s` to its own member is not drawn, and says so.
+    let lowered = lower("flowchart\nsubgraph s\ns --> A\nend\n");
+    assert_eq!(lowered.diagnostics.len(), 1);
+    assert!(lowered.diagnostics[0].message.contains("`s --> A`"));
+    let c = lowered.flowchart;
     assert_eq!(c.subgraph("s").unwrap().members, ["A"]);
     assert!(c.node("s").is_none());
 }

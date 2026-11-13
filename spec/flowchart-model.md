@@ -72,17 +72,25 @@ A label is text plus a markdown flag.
 - Unquoted and quoted text is trimmed, and each line is trimmed.
 - `` "`...`" `` strings are markdown; other labels are plain.
 - `<br>`, `<br/>`, and `<br />` (any case) become line breaks.
-- Entity codes are decoded: `#quot;`, `#amp;`, `#lt;`, `#gt;`, `#apos;`, `#nbsp;`, and decimal
-  `#NNN;`, and the same as HTML entities (`&nbsp;`, `&#9829;`). Unknown codes are kept verbatim.
+- In a label that is not markdown, a `<b>` or `<strong>` with a closing tag after it is bold and
+  `<i>` or `<em>` italic (the label becomes markdown, with `**` and `*` around the text), and
+  `<a>`, `<span>`, `<u>`, and the other presentational tags listed in `DROPPED_TAGS` (text.rs) are
+  dropped. Other `<...>` text is kept. `fa:` icons are text. Tests: `reads_html_tags`.
+- Entity codes are decoded: the HTML 4 names (`#copy;`, `#hearts;`, ...) and `apos`, and decimal
+  `#NNN;`, and the same as HTML entities (`&nbsp;`, `&rarr;`, `&#9829;`, `&#x2665;`). Unknown
+  codes are kept verbatim. Tests: `decodes_entities`, `has_the_html4_set`.
 - `Label::spans` gives each line as styled spans. In markdown, `**bold**` and `__bold__` are bold
   and `*italic*` and `_italic_` italic; a marker without a partner on its line stays as text, and
   `_` marks only at a word edge (`snake_case` is text). `Label::lines` is the spans' text.
 
 ## FLOWMO-7 Metadata
 
-An `@{ ... }` body is a flat YAML mapping: `key: value` entries separated by commas or newlines.
-Values may be plain, double-quoted (with `\"` and `\\` escapes), or single-quoted (with `''`
-escape). Every entry is kept in order as a string pair; later entries replace earlier ones with
+An `@{ ... }` body is a flat YAML mapping of `key: value` entries, read as Mermaid reads it. A
+body on one line is a flow mapping: entries are separated by commas outside quotes. A body over
+several lines is a block mapping: each entry starts a line, a comma is text, and lines indented
+more than an entry's continue its value (joined with spaces), or after `|` keep their line
+breaks and after `>` are folded, without the final line break. Values may be plain,
+double-quoted (with `\"` and `\\` escapes), or single-quoted (with `''` escape). Every entry is kept in order as a string pair; later entries replace earlier ones with
 the same key. An entry without `:` is an error.
 
 Interpreted node keys: `shape` (FLOWMO-5) and `label` (a markdown label unless `labelType` is

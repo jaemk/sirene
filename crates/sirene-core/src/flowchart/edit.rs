@@ -309,7 +309,10 @@ fn label_text(label: &SyntaxNode) -> String {
     if tokens(label).any(|t| matches!(t.kind(), STRING | MD_STRING)) {
         return label.text().to_string().trim().to_owned();
     }
-    label_source(&text::label(&label.text().to_string(), false).text, false)
+    label_source(
+        &text::plain_label(&label.text().to_string(), false).text,
+        false,
+    )
 }
 
 /// An edge's label as source text for `|...|`, when it has one.

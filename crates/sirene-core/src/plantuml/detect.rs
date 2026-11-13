@@ -164,6 +164,24 @@ const WEAK: &[(&str, Kind)] = &[
 /// Whether a link line has a use case `(name)` or a component `[name]` end before its text.
 fn description_link(line: &str) -> bool {
     let head = line.split(':').next().unwrap_or(line);
+    // Quoted text is a name, so its parentheses and brackets are not ends.
+    let masked;
+    let head = if head.contains('"') {
+        let mut quoted = false;
+        masked = head
+            .chars()
+            .map(|c| {
+                let quote = c == '"';
+                if quote {
+                    quoted = !quoted;
+                }
+                if quote || quoted { 'q' } else { c }
+            })
+            .collect::<String>();
+        masked.as_str()
+    } else {
+        head
+    };
     if !["--", "->", "<-", ".."].iter().any(|a| head.contains(a)) {
         return false;
     }

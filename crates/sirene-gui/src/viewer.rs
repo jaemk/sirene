@@ -523,6 +523,27 @@ impl Viewer {
                 return false;
             };
             log::debug!("save as {}", path.display());
+            // A Markdown file's block saved alone leaves the file's other edits unsaved.
+            let answer = this
+                .update_in(cx, |v, window, cx| {
+                    v.doc.save_as_drops_edits(&path).then(|| {
+                        window.prompt(
+                            PromptLevel::Warning,
+                            &format!("Save only the shown diagram, without {}?", v.doc.name()),
+                            Some("The unsaved edits to the Markdown file will be lost."),
+                            &["Save Diagram", "Cancel"],
+                            cx,
+                        )
+                    })
+                })
+                .ok()
+                .flatten();
+            if let Some(answer) = answer
+                && !matches!(answer.await, Ok(0))
+            {
+                log::debug!("save as cancelled");
+                return false;
+            }
             this.update_in(cx, |v, window, cx| {
                 let saved = v.doc.save_as(path.clone()).is_ok();
                 if saved {

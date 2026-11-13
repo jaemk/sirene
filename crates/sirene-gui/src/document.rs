@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use sirene_core::Severity;
 use sirene_core::diagram::{self, Diagram, Kind, Lang};
 use sirene_core::flowchart::Flowchart;
-use sirene_core::markdown::{Block, is_markdown, mermaid_blocks};
+use sirene_core::markdown::{Block, append_block, is_markdown, mermaid_blocks};
 use sirene_core::scene::{Scene, TextMetrics, Theme};
 use sirene_core::theme::ThemeConfig;
 
@@ -271,19 +271,7 @@ impl Document {
             // The code goes back in its block; a file with no block gets one at the end.
             md.text = match md.blocks.get(md.block) {
                 Some(block) => block.replace_code(&md.text, &source),
-                None => {
-                    let mut text = md.text.clone();
-                    if !text.is_empty() && !text.ends_with('\n') {
-                        text.push('\n');
-                    }
-                    if !text.is_empty() {
-                        text.push('\n');
-                    }
-                    let code = source.trim_end_matches('\n');
-                    let info = fence_info(&source, None);
-                    text.push_str(&format!("```{info}\n{code}\n```\n"));
-                    text
-                }
+                None => append_block(&md.text, fence_info(&source, None), &source),
             };
             md.blocks = mermaid_blocks(&md.text);
             md.block = md.block.min(md.blocks.len().saturating_sub(1));
@@ -380,24 +368,46 @@ impl Document {
 
     /// Saves to `path`, which the document then shows. Saving a diagram as Markdown writes it in
     /// a block named for its language; saving a Markdown file's block as a diagram writes the
-    /// block alone.
+    /// block alone. On failure the document keeps its file and records the error.
     pub fn save_as(&mut self, path: PathBuf) -> Result<(), String> {
-        match (&self.markdown, is_markdown(&path)) {
-            (Some(_), false) => self.markdown = None,
+        let markdown = match (&self.markdown, is_markdown(&path)) {
+            (Some(_), false) => None,
             (None, true) => {
-                let code = self.source.trim_end_matches('\n');
                 let info = fence_info(&self.source, self.lang());
-                let text = format!("```{info}\n{code}\n```\n");
-                self.markdown = Some(Markdown {
+                let text = append_block("", info, &self.source);
+                Some(Markdown {
                     blocks: mermaid_blocks(&text),
                     text,
                     block: 0,
-                });
+                })
             }
-            _ => {}
+            (markdown, _) => markdown.clone(),
+        };
+        let lang = self.lang();
+        let mut next = Self {
+            path: Some(path),
+            markdown,
+            ..self.clone()
+        };
+        let result = next.save();
+        match &result {
+            Ok(()) => {
+                // The new file's extension may read the diagram as another language.
+                if next.lang() != lang {
+                    (next.chart, next.other, next.problems, next.theme) =
+                        parse(&next.source, next.lang());
+                }
+                *self = next;
+            }
+            Err(e) => self.write_error = Some(e.clone()),
         }
-        self.path = Some(path);
-        self.save()
+        result
+    }
+
+    /// Whether saving as `path` drops unsaved edits: a Markdown file's block saved as a diagram
+    /// leaves the rest of the Markdown file behind.
+    pub fn save_as_drops_edits(&self, path: &Path) -> bool {
+        self.markdown.is_some() && !is_markdown(path) && self.is_edited()
     }
 
     /// The file name, or `Untitled`.
@@ -821,7 +831,10 @@ mod tests {
         assert!(err.starts_with("cannot write "), "{err}");
         assert!(d.is_edited());
         assert_eq!(d.status(), err);
-        assert_eq!(d.title(), "a.mmd (edited)");
+        // The document keeps its file (none), so a poll finds nothing.
+        assert_eq!(d.title(), "Untitled (edited)");
+        assert_eq!(d.poll(), Disk::Unchanged);
+        assert_eq!(d.source, "flowchart LR\nA --> B\n");
     }
 
     #[test]

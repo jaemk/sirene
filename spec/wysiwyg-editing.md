@@ -283,11 +283,13 @@ the whole file, and disk changes and Reload work on the whole file, keeping the 
   (secondary-shift-[) do the same, wrapping around. Showing another block clears the selection
   and the drawing's undo history, and fits the drawing.
 - A file with no diagram blocks shows an empty source and says so in the status bar; the first
-  edit adds a block at the end of the file, named `dot`, `plantuml`, or `mermaid` for the
-  language the edit's text is detected as.
+  edit adds a block at the end of the file (MARKDO-4), named `dot`, `plantuml`, or `mermaid` for
+  the language the edit's text is detected as.
 - Save As to a diagram file (`.mmd`, `.puml`, `.dot`, ...) writes the shown block alone and
-  edits that file from then on; Save As of a diagram to a Markdown file writes it in a block
-  named for the diagram's language (its file extension's, or else detected).
+  edits that file from then on, after asking when the Markdown file has unsaved edits; Save As
+  of a diagram to a Markdown file writes it in a block named for the diagram's language (its
+  file extension's, or else detected). After Save As the diagram is read as the new file's
+  language; a Save As that fails leaves the document on its old file, still edited.
 - Export suggests `STEM-N.png` or `.svg`, as `sirene png FILE.md` names block N.
 
 Tests: `crates/sirene-gui/tests/markdown.rs`.

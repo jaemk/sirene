@@ -95,6 +95,8 @@ struct Lower {
     /// Warnings given once.
     told_o: bool,
     told_style: bool,
+    /// Whether `autoactivate on` makes each message activate its target.
+    autoactivate: bool,
 }
 
 fn tokens(node: &SyntaxNode, kind: SyntaxKind) -> Vec<SyntaxToken> {
@@ -228,6 +230,22 @@ fn group(s: &str) -> (Group, bool) {
         title: (!title.is_empty()).then_some(title),
     };
     (g, bad_color)
+}
+
+/// `text` without its leading `#color` words, and those words.
+fn split_colors(text: &str) -> (String, String) {
+    let mut rest = text.trim_start();
+    let mut colors: Vec<&str> = Vec::new();
+    while let Some(word) = rest.split_whitespace().next()
+        && word.len() > 1
+        && word.starts_with('#')
+        && word[1..].chars().all(|c| c.is_ascii_alphanumeric())
+        && (parse_color(word).is_some() || word[1..].starts_with(|c: char| c.is_ascii_alphabetic()))
+    {
+        colors.push(word);
+        rest = rest[word.len()..].trim_start();
+    }
+    (rest.to_owned(), colors.join(" "))
 }
 
 impl Lower {
@@ -462,8 +480,9 @@ impl Lower {
             self.seq.events.push(Event::Destroy(to));
         }
         let deactivate = modifiers.contains("--") && self.deactivate(from, range);
-        let activate = modifiers.contains("++") && self.activate(to, range);
-        if modifiers.contains("++") {
+        let opens = modifiers.contains("++") || self.autoactivate && !modifiers.contains("!!");
+        let activate = opens && self.activate(to, range);
+        if opens {
             self.call(to, from);
         }
         let number = self.number();
@@ -573,6 +592,19 @@ impl Lower {
             "critical" => Some(BlockKind::Critical),
             "group" => Some(BlockKind::Group),
             _ => None,
+        };
+        // Colors before a frame or divider label are not drawn: `alt#Gold #LightBlue text`.
+        let label = if kind.is_some() || kw == "else" {
+            let (rest, colors) = split_colors(&label);
+            if !colors.is_empty() && self.skipped == 0 {
+                self.warning(
+                    range,
+                    format!("frame colors are not drawn; ignoring `{colors}`"),
+                );
+            }
+            rest
+        } else {
+            label
         };
         if self.skipped > 0 {
             if kind.is_some() {
@@ -699,6 +731,11 @@ impl Lower {
                 self.last_message = Some(self.seq.events.len() - 1);
             }
             "autonumber" => self.autonumber(&label, range),
+            "autoactivate" => match label.trim().to_ascii_lowercase().as_str() {
+                "on" => self.autoactivate = true,
+                "off" => self.autoactivate = false,
+                _ => self.error(range, "expected `on` or `off` after `autoactivate`"),
+            },
             "box" => {
                 if self.stack.iter().any(|o| matches!(o, Open::Block(..))) {
                     self.error(range, "a `box` cannot be inside a frame");

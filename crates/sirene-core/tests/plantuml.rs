@@ -451,3 +451,178 @@ fn activity_lanes_and_errors() {
     assert_eq!(d.len(), 2, "{d:?}");
     assert!(d.iter().all(|(s, _)| *s == Severity::Error), "{d:?}");
 }
+
+/// PSEQ-3: a sender named like a participant keyword is a message, not a declaration.
+#[test]
+fn keyword_named_senders() {
+    let (s, d) =
+        lowered("@startuml\nDatabase --> Server : rows\nQueue -> Server : event\n@enduml\n");
+    assert!(d.is_empty(), "{d:?}");
+    assert_eq!(ids(&s), ["Database", "Server", "Queue"]);
+    assert_eq!(events(&s), ["Database~>Server:rows", "Queue>Server:event"]);
+}
+
+/// PUML-3: quoted text with parentheses in a message does not make a use case diagram.
+#[test]
+fn quoted_parentheses_stay_sequence() {
+    let (s, d) = lowered("@startuml\n\"Web Browser (Chrome)\" -> Server : GET /\n@enduml\n");
+    assert!(d.is_empty(), "{d:?}");
+    assert_eq!(s.participants[0].id, "Web Browser (Chrome)");
+}
+
+/// PSEQ-4: `hnote` and `rnote` blocks close with their own `end` words.
+#[test]
+fn note_kind_closers() {
+    let (s, d) = lowered(
+        "@startuml\nA -> B\nhnote over A\none\nend hnote\nrnote over B\ntwo\nendrnote\n\
+         note over A\nthree\nend note\nhnote over B\nfour\nendhnote\nrnote over A\nfive\nend rnote\n\
+         @enduml\n",
+    );
+    assert!(d.is_empty(), "{d:?}");
+    let notes = s
+        .events
+        .iter()
+        .filter(|e| matches!(e, Event::Note(_)))
+        .count();
+    assert_eq!(notes, 5);
+}
+
+/// PSEQ-4: leading `#color` words on a frame or `else` label are a warning, not label text.
+#[test]
+fn frame_colors_are_not_labels() {
+    let (s, d) = lowered(
+        "@startuml\nalt#Gold #LightBlue Successful case\nA -> B\nelse #Pink Failure\nA -> C\nend\n@enduml\n",
+    );
+    assert_eq!(
+        events(&s)[0..4],
+        ["alt Successful case", "A>B:", "divider Failure", "A>C:"]
+    );
+    assert_eq!(d.len(), 2, "{d:?}");
+    assert!(
+        d.iter()
+            .all(|(sev, m)| *sev == Severity::Warning && m.contains("colors"))
+    );
+    // A `#` that is not a color stays text.
+    let (s, d) = lowered("@startuml\nloop #1 attempt\nA -> B\nend\n@enduml\n");
+    assert!(d.is_empty(), "{d:?}");
+    assert_eq!(events(&s)[0], "loop #1 attempt");
+}
+
+/// PSEQ-3: `autoactivate on` activates each message's target, and `return` closes it.
+#[test]
+fn autoactivate() {
+    let (s, d) = lowered(
+        "@startuml\nautoactivate on\nAlice -> Bob : hello\nBob -> Carol : ask\nreturn answer\nreturn ok\n\
+         autoactivate off\nAlice -> Bob : plain\n@enduml\n",
+    );
+    assert!(d.is_empty(), "{d:?}");
+    assert_eq!(
+        events(&s),
+        [
+            "Alice>Bob:hello *",
+            "Bob>Carol:ask *",
+            "Carol~>Bob:answer -",
+            "Bob~>Alice:ok -",
+            "Alice>Bob:plain",
+        ]
+    );
+    let d = diags("@startuml\nautoactivate maybe\nA -> B\n@enduml\n");
+    assert_eq!(d.len(), 1, "{d:?}");
+    assert_eq!(d[0].0, Severity::Error);
+}
+
+/// PDSC-4: a container with no name is a cluster with an empty title.
+#[test]
+fn unnamed_containers() {
+    let (g, d) =
+        graph("@startuml\ncloud {\n[A]\n}\nnode #red {\n[B]\npackage {\n[C]\n}\n}\n@enduml\n");
+    assert!(d.is_empty(), "{d:?}");
+    assert_eq!(g.subgraphs.len(), 3);
+    assert!(g.subgraphs.iter().all(|s| s.title.text.is_empty()));
+    let ids: Vec<&str> = g.subgraphs.iter().map(|s| s.id.as_str()).collect();
+    assert_eq!(ids.len(), 3);
+    assert!(ids[0] != ids[1] && ids[1] != ids[2] && ids[0] != ids[2]);
+    assert_eq!(g.subgraphs[0].members, ["A"]);
+    assert_eq!(g.subgraphs[1].members[0], "B");
+    assert_eq!(g.subgraphs[1].members[1], g.subgraphs[2].id);
+    assert_eq!(g.subgraphs[1].styles.len(), 1);
+}
+
+/// PDSC-5: a lollipop `()` end names no element and gives a warning.
+#[test]
+fn lollipop_link_ends() {
+    let (g, d) = graph("@startuml\nclass Bar\nBar --() IFace\nIFace2 ()-- Bar\n@enduml\n");
+    assert!(
+        g.nodes
+            .iter()
+            .all(|n| !n.id.contains(')') && !n.id.contains('(')),
+        "{:?}",
+        g.nodes.iter().map(|n| &n.id).collect::<Vec<_>>()
+    );
+    assert!(g.node("IFace").is_some() && g.node("IFace2").is_some());
+    assert!(d.iter().all(|(s, _)| *s == Severity::Warning), "{d:?}");
+    assert_eq!(d.len(), 2, "{d:?}");
+}
+
+/// PACT-4: the `is` label names the yes branch of `if` and `elseif`.
+#[test]
+fn if_is_labels() {
+    let (g, d) = graph(
+        "@startuml\nstart\nif (color?) is (red) then\n:a;\nelseif (more?) is (blue) then\n:b;\n\
+         else (other)\n:c;\nendif\nstop\n@enduml\n",
+    );
+    assert!(d.is_empty(), "{d:?}");
+    let f = flow(&g);
+    assert!(f.contains(&"color?>a:red".to_owned()), "{f:?}");
+    assert!(f.contains(&"more?>b:blue".to_owned()), "{f:?}");
+    assert!(g.nodes.iter().any(|n| n.label.text == "color?"));
+    let (g, _) = graph("@startuml\nstart\nif (c) is (red) then (yes)\n:a;\nendif\n@enduml\n");
+    assert!(flow(&g).contains(&"c>a:yes".to_owned()));
+}
+
+/// PACT-7: nodes and groups before the first lane join it; groups stay boxes inside it.
+#[test]
+fn nodes_before_first_lane() {
+    let (g, d) =
+        graph("@startuml\nstart\npartition P {\n:p;\n}\n|Lane1|\n:x;\n|Lane2|\n:y;\n@enduml\n");
+    assert!(d.is_empty(), "{d:?}");
+    let lane = |t: &str| g.subgraphs.iter().find(|s| s.title.text == t).unwrap();
+    let p = lane("P");
+    let l1 = lane("Lane1");
+    assert!(l1.members.contains(&p.id), "{:?}", l1.members);
+    let start = g
+        .nodes
+        .iter()
+        .find(|n| n.label.text.is_empty() || n.shape != Shape::Rounded);
+    assert!(start.is_none_or(|n| g.subgraphs.iter().any(|s| s.members.contains(&n.id))));
+    // Every node is in some subgraph.
+    for n in &g.nodes {
+        assert!(
+            g.subgraphs.iter().any(|s| s.members.contains(&n.id)),
+            "{} is in no lane",
+            n.id
+        );
+    }
+    // Only the lanes are top-level.
+    let top: Vec<&str> = g
+        .subgraphs
+        .iter()
+        .filter(|s| !g.subgraphs.iter().any(|o| o.members.contains(&s.id)))
+        .map(|s| s.title.text.as_str())
+        .collect();
+    assert_eq!(top, ["Lane1", "Lane2"]);
+}
+
+/// PCLS-3: a body that opens with a separator has no empty first compartment.
+#[test]
+fn class_body_opening_with_separator() {
+    let lowered =
+        diagram::lower("@startuml\nclass A {\n.. getters ..\n+x()\n== more ==\n+y()\n}\n@enduml\n");
+    let Diagram::Graph(g) = lowered.diagram else {
+        panic!("not a graph");
+    };
+    let sections = &g.node("A").unwrap().sections;
+    assert_eq!(sections.len(), 2, "{sections:?}");
+    assert_eq!(sections[0][0].cells, ["getters"]);
+    assert_eq!(sections[0].len(), 2);
+}

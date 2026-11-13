@@ -131,6 +131,31 @@ fn relationships() {
     );
 }
 
+/// MER-1: either spelling of a cardinality symbol is read on either side.
+#[test]
+fn mirrored_symbols() {
+    let c = chart(
+        "erDiagram\n  \"Order Item\" o{--|| ORDER : part\n  A |{--o| B\n  C o|--}| D\n  E |o--|{ F\n  G }o--o{ H\n",
+    );
+    use Arrow::*;
+    let got: Vec<_> = c
+        .edges
+        .iter()
+        .map(|e| (e.start.unwrap(), e.end.unwrap()))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (ZeroMany, One),
+            (OneMany, ZeroOne),
+            (ZeroOne, OneMany),
+            (ZeroOne, OneMany),
+            (ZeroMany, ZeroMany),
+        ]
+    );
+    assert_eq!(c.edges[0].from, "Order Item");
+}
+
 /// MER-2: attributes are one section of rows of type, name, keys, and comment.
 #[test]
 fn attributes() {

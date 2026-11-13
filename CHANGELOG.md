@@ -13,6 +13,22 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- DOT: a repeated edge in a `strict` graph no longer takes the current `edge [...]` defaults
+  over the first edge's own attributes; `\G` in a cluster label is the cluster's name;
+  `style=rounded` on a cluster warns as it is not drawn; an edge to a reopened named
+  subgraph reaches all its nodes; `\\` before a line break and CRLF in a quoted string are
+  read correctly; `digraph "a" + "b" {` is detected as DOT.
+- PlantUML sequence messages from a sender named like a participant keyword (`Database -->
+  Server`), notes closed by `end hnote` or `end rnote`, and `autoactivate on` with `return`
+  are read instead of erroring; frame and `else` labels drop leading `#color` words with a
+  warning.
+- PlantUML unnamed containers (`cloud {`) and lollipop `()` link ends are read, and a quoted
+  name with parentheses in a message (`"Web (Chrome)" -> Server`) no longer makes the
+  document a use case diagram.
+- PlantUML activity `if (c) is (red) then` and `elseif` put the `is` label on the branch, and
+  nodes before the first `|Lane|` join that lane.
+- PlantUML class bodies that open with a separator (`.. getters ..`) have no empty first
+  compartment.
 - `--charset ascii` writes stereotypes as `<<interface>>` and `<<include>>` instead of
   `«interface»` in class, requirement, use case, and PlantUML diagrams.
 - PlantUML component interface sockets and balls (`[A] -( I`, `I )- [A]`, `-(0-`) are read
@@ -28,6 +44,37 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to a Markdown file with none, use a `plantuml` or `dot` fence instead of `mermaid`.
 - The guide's introduction, quickstart, landing page, and the `sirene:render` skill describe
   PlantUML and DOT, and list every Mermaid kind drawn.
+- Editing a Markdown file's diagram in the editor: a fence typed in the code makes the block's
+  fences longer instead of ending the block early, and the block added to a file ending in an
+  open code block closes that block first, so later edits no longer add another block each.
+- The editor's Save As keeps the document's file when the write fails, asks before dropping a
+  Markdown file's unsaved edits to save one block, and reads the diagram as the new file's
+  language.
+- Diagnostic columns in Markdown blocks count each line's own indent when it is indented less
+  than the fence.
+- `--watch` on a missing Markdown file reports it; `--link` keeps CRLF line endings; a
+  directory named `x.md` is rendered as a directory; `sirene check` on a Markdown file with no
+  diagram blocks says so.
+- Mermaid class diagrams read a relation with no space before the second class
+  (`Duck-->Egg`, `A --|>B`), lollipop interfaces (`A --() B`, `A ()-- B`), class names in
+  backticks, and nested generics (`List~List~int~~` is `List<List<int>>`).
+- Mermaid sequence diagrams end a statement at `;` (`A->>B: hi; B->>A: yo`), and read
+  `A->> +B` as an activation of `B`.
+- Mermaid Gantt `excludes` and `includes` dates match as `YYYY-MM-DD` as well as in
+  `dateFormat`, so they apply when the format holds a time.
+- Mermaid ER diagrams read `o{`, `|{`, and `o|` on the left of a relationship and `}o`, `}|`,
+  and `|o` on the right.
+- A flowchart or state subgraph that an edge links to directly keeps its `direction`; only an
+  edge to a node inside it drops the direction, as in Mermaid.
+- A flowchart or state edge between a subgraph or composite state and a node inside it warns
+  that it is not drawn, instead of vanishing silently.
+- Flowchart labels decode all HTML 4 named entities (`#copy;`, `&hearts;`, `&mdash;`), draw
+  `<b>`/`<strong>` and `<i>`/`<em>` as bold and italic, and drop other HTML tags such as `<span>`.
+- A flowchart `@{ ... }` body over several lines is read as Mermaid reads it, a YAML block
+  mapping: commas are text (`label: Hello, world`), and `|` and `>` take the indented lines
+  after them.
+- The guide says `animate`, `animation`, `curve`, and `interpolate` are parsed but not drawn,
+  `fa:` icons stay as text, and shows `rgb(255\,0\,0)` with an escaped comma in `style`.
 
 ## [0.3.0] - 2026-11-12
 

@@ -55,7 +55,8 @@ referred to by its bracketed text or its alias.
 
 An element keyword followed by `{` (`package`, `node`, `rectangle`, `frame`, `cloud`, and so
 on) opens a container, drawn as a titled cluster around the elements declared in it until `}`;
-containers nest, and opening one again adds to it. `together {` groups without a cluster. A
+containers nest, and opening one again adds to it. A container may have no name (`cloud {`,
+`node #color {`): it is a cluster with an empty title. `together {` groups without a cluster. A
 `#color` fills the container. Links and notes may name a container.
 
 ## PDSC-5 Links

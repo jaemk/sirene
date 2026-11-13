@@ -779,6 +779,21 @@ fn check() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("error: cannot read"));
+    // Lines indented less than the fence are placed by their own indent.
+    std::fs::write(&md, "   ```mermaid\n   flowchart TD\n A -->\n```\n").unwrap();
+    sirene()
+        .arg("check")
+        .arg(&md)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("doc.md:3:7: error"));
+    std::fs::write(&md, "# Doc\n").unwrap();
+    sirene()
+        .arg("check")
+        .arg(&md)
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("doc.md: no diagram blocks"));
     // `check` needs a file.
     sirene().arg("check").assert().failure();
 }
@@ -926,6 +941,12 @@ fn markdown_images() {
         .assert()
         .success()
         .stderr(predicate::str::contains("no diagram blocks"));
+    // A directory named like a Markdown file is a directory.
+    let named = dir.join("site.md");
+    std::fs::create_dir(&named).unwrap();
+    std::fs::write(named.join("a.mmd"), "flowchart\n  In\n").unwrap();
+    sirene().arg("svg").arg(&named).assert().success();
+    assert!(svg("site.md/a.svg").contains(">In</text>"));
 }
 
 /// Watching a Markdown file renders its blocks again when it changes.
@@ -951,6 +972,22 @@ fn watch_markdown() {
     });
     std::fs::write(&md, "```mermaid\nflowchart\n  Two\n```\n").unwrap();
     eventually("the second image", || svg().contains(">Two</text>"));
+
+    // A missing file is reported on the first pass.
+    let log = tmp.path().join("log.txt");
+    let child = std::process::Command::new(assert_cmd::cargo::cargo_bin("sirene"))
+        .args(["svg", "--watch"])
+        .arg(tmp.path().join("missing.md"))
+        .stdout(std::process::Stdio::null())
+        .stderr(std::fs::File::create(&log).unwrap())
+        .spawn()
+        .unwrap();
+    let _child = Running(child);
+    eventually("the read error", || {
+        std::fs::read_to_string(&log)
+            .unwrap_or_default()
+            .contains("error: cannot read")
+    });
 }
 
 #[cfg(not(feature = "gui"))]

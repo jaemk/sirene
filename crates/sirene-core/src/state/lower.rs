@@ -546,12 +546,21 @@ impl Lowerer {
                 .zip(&b)
                 .find(|(x, y)| x != y)
                 .is_some_and(|(x, y)| self.regions.contains(x) && self.regions.contains(y));
-            keep.push(!split);
+            let nested = e.from != e.to && (a.contains(&e.to) || b.contains(&e.from));
+            keep.push(!split && !nested);
             if split {
                 self.diagnostics.push(Diagnostic::warning(
                     *range,
                     format!(
                         "transitions between concurrent regions are not supported; ignoring `{} --> {}`",
+                        e.from, e.to
+                    ),
+                ));
+            } else if nested {
+                self.diagnostics.push(Diagnostic::warning(
+                    *range,
+                    format!(
+                        "transitions between a composite state and a state inside it are not supported; ignoring `{} --> {}`",
                         e.from, e.to
                     ),
                 ));

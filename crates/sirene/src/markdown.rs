@@ -66,6 +66,9 @@ pub fn check(path: &Path) -> bool {
         };
         let blocks = markdown::mermaid_blocks(&src);
         log::debug!("{name}: {} diagram block(s)", blocks.len());
+        if blocks.is_empty() {
+            eprintln!("{name}: no diagram blocks");
+        }
         let mut ok = true;
         for block in &blocks {
             let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
@@ -164,6 +167,7 @@ fn link_line(md: &Path, image: &Path, n: usize) -> String {
 /// `src` with `lines[k]` (a link line for block `k`) after each block in `blocks` that is
 /// closed and not already followed by it. The blocks themselves are never changed.
 pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
+    let newline = if src.contains("\r\n") { "\r\n" } else { "\n" };
     let mut out = String::with_capacity(src.len());
     let mut at = 0;
     for (block, line) in blocks {
@@ -181,10 +185,10 @@ pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
         }
         out.push_str(&src[at..block.end]);
         if !out.ends_with('\n') {
-            out.push('\n');
+            out.push_str(newline);
         }
         out.push_str(line);
-        out.push('\n');
+        out.push_str(newline);
         at = block.end;
     }
     out.push_str(&src[at..]);
@@ -374,5 +378,13 @@ mod tests {
         let blocks = markdown::mermaid_blocks(src);
         let lines = vec![(blocks[0].clone(), Some("![d](x.svg)".to_owned()))];
         assert_eq!(with_links(src, &lines), src);
+        // CRLF lines stay CRLF.
+        let src = "```mermaid\r\ngraph TD\r\n```\r\nb\r\n";
+        let blocks = markdown::mermaid_blocks(src);
+        let lines = vec![(blocks[0].clone(), Some("![d](x.svg)".to_owned()))];
+        assert_eq!(
+            with_links(src, &lines),
+            "```mermaid\r\ngraph TD\r\n```\r\n![d](x.svg)\r\nb\r\n"
+        );
     }
 }

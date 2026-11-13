@@ -14,9 +14,22 @@ pub(crate) fn unquote(token: &str) -> &str {
     s.strip_suffix(close).unwrap_or(s)
 }
 
-/// Decodes label text (FLOWMO-6): `<br>` line breaks, trimmed lines, and entity codes.
+/// Decodes label text (FLOWMO-6): `<br>` line breaks, trimmed lines, and entity codes. In a
+/// label that is not markdown, `<b>`/`<strong>` and `<i>`/`<em>` pairs become markdown bold and
+/// italic (making the label markdown), and other HTML tags are dropped.
 pub(crate) fn label(raw: &str, markdown: bool) -> Label {
-    let text = replace_br(raw)
+    let (text, emphasis) = replace_html(raw, !markdown);
+    decode_lines(&text, markdown || emphasis)
+}
+
+/// Like [`label`], but `<br>` is the only tag read: the label's text as written.
+pub(crate) fn plain_label(raw: &str, markdown: bool) -> Label {
+    let (text, _) = replace_html(raw, false);
+    decode_lines(&text, markdown)
+}
+
+fn decode_lines(text: &str, markdown: bool) -> Label {
+    let text = text
         .trim()
         .lines()
         .map(str::trim)
@@ -28,17 +41,83 @@ pub(crate) fn label(raw: &str, markdown: bool) -> Label {
     }
 }
 
-fn replace_br(s: &str) -> String {
+/// HTML tags dropped from a label (the emphasis tags `b`, `strong`, `i`, and `em` are read
+/// separately).
+const DROPPED_TAGS: &[&str] = &[
+    "a", "abbr", "big", "center", "cite", "code", "del", "div", "font", "h1", "h2", "h3", "h4",
+    "h5", "h6", "ins", "kbd", "li", "mark", "ol", "p", "pre", "q", "s", "samp", "small", "span",
+    "strike", "sub", "sup", "table", "td", "th", "tr", "tt", "u", "ul", "var",
+];
+
+/// Length and name (lower case) of an HTML tag at the start of `s`, and whether it closes.
+fn tag(s: &str) -> Option<(usize, String, bool)> {
+    let end = s.find('>')?;
+    let inner = &s[1..end];
+    if inner.contains('<') {
+        return None;
+    }
+    let (closing, inner) = match inner.strip_prefix('/') {
+        Some(rest) => (true, rest),
+        None => (false, inner),
+    };
+    let name_len = inner
+        .find(|c: char| !c.is_ascii_alphanumeric())
+        .unwrap_or(inner.len());
+    let (name, after) = inner.split_at(name_len);
+    // Attributes follow after a space; anything else glued to the name is not a tag.
+    let ok = after.is_empty() || after.starts_with([' ', '\t', '/', '\n']);
+    (ok && !name.is_empty()).then(|| (end + 1, name.to_ascii_lowercase(), closing))
+}
+
+/// Replaces `<br>` with a line break. With `html`, also turns `<b>`/`<strong>` and `<i>`/`<em>`
+/// pairs into `**` and `*` markers (and reports whether it did) and drops [`DROPPED_TAGS`].
+fn replace_html(s: &str, html: bool) -> (String, bool) {
     let mut out = String::with_capacity(s.len());
+    let mut emphasis = false;
+    // Open emphasis tags: bold, italic.
+    let mut open = [0usize; 2];
     let mut rest = s;
     while let Some(i) = rest.find('<') {
         out.push_str(&rest[..i]);
         let tail = &rest[i..];
-        match br_len(tail) {
-            Some(n) => {
-                out.push('\n');
-                rest = &tail[n..];
-            }
+        if let Some(n) = br_len(tail) {
+            out.push('\n');
+            rest = &tail[n..];
+            continue;
+        }
+        let known = html
+            .then(|| tag(tail))
+            .flatten()
+            .and_then(|(n, name, closing)| {
+                let kind = match name.as_str() {
+                    "b" | "strong" => Some(0),
+                    "i" | "em" => Some(1),
+                    _ => None,
+                };
+                match kind {
+                    Some(k) if closing => {
+                        if open[k] > 0 {
+                            open[k] -= 1;
+                            out.push_str(["**", "*"][k]);
+                        }
+                        Some(n)
+                    }
+                    Some(k) => {
+                        // Only a tag with a partner after it is emphasis.
+                        let later = tail[n..].to_ascii_lowercase();
+                        let partners = [["</b>", "</strong>"], ["</i>", "</em>"]][k];
+                        if partners.iter().any(|p| later.contains(p)) {
+                            open[k] += 1;
+                            emphasis = true;
+                            out.push_str(["**", "*"][k]);
+                        }
+                        Some(n)
+                    }
+                    None => DROPPED_TAGS.contains(&name.as_str()).then_some(n),
+                }
+            });
+        match known {
+            Some(n) => rest = &tail[n..],
             None => {
                 out.push('<');
                 rest = &tail[1..];
@@ -46,7 +125,7 @@ fn replace_br(s: &str) -> String {
         }
     }
     out.push_str(rest);
-    out
+    (out, emphasis)
 }
 
 /// Length of a `<br>`, `<br/>`, or `<br />` tag (any case) at the start of `s`.
@@ -78,18 +157,10 @@ pub(crate) fn decode_html_entities(s: &str) -> String {
 
 /// The character a named entity, or (with `numeric`) a decimal code, stands for.
 fn entity(code: &str, numeric: bool) -> Option<char> {
-    match code {
-        "quot" => Some('"'),
-        "amp" => Some('&'),
-        "lt" => Some('<'),
-        "gt" => Some('>'),
-        "apos" => Some('\''),
-        "nbsp" => Some('\u{a0}'),
-        _ if numeric && !code.is_empty() && code.bytes().all(|b| b.is_ascii_digit()) => {
-            code.parse().ok().and_then(char::from_u32)
-        }
-        _ => None,
+    if numeric && !code.is_empty() && code.bytes().all(|b| b.is_ascii_digit()) {
+        return code.parse().ok().and_then(char::from_u32);
     }
+    super::entities::lookup(code)
 }
 
 fn decode(s: &str, marks: &[char]) -> String {
@@ -197,7 +268,7 @@ fn split_unquoted(s: &str, is_sep: impl Fn(char) -> bool, single: bool) -> Vec<&
 pub(crate) fn metadata(body: &str) -> (Vec<(String, String)>, Vec<String>) {
     let mut entries: Vec<(String, String)> = Vec::new();
     let mut invalid = Vec::new();
-    for part in split_unquoted(body, |c| c == ',' || c == '\n', true) {
+    for part in metadata_parts(body) {
         let part = part.trim();
         if part.is_empty() {
             continue;
@@ -207,7 +278,7 @@ pub(crate) fn metadata(body: &str) -> (Vec<(String, String)>, Vec<String>) {
             continue;
         };
         let key = key.trim().to_owned();
-        let value = yaml_scalar(value.trim());
+        let value = yaml_value(value);
         match entries.iter_mut().find(|(k, _)| *k == key) {
             Some(entry) => entry.1 = value,
             None => entries.push((key, value)),
@@ -229,7 +300,7 @@ pub(crate) struct MetaEntry {
 /// The `key: value` entries of a metadata body in source order, each with where it is.
 pub(crate) fn metadata_entries(body: &str) -> Vec<MetaEntry> {
     let base = body.as_ptr() as usize;
-    split_unquoted(body, |c| c == ',' || c == '\n', true)
+    metadata_parts(body)
         .into_iter()
         .filter_map(|part| {
             let start = part.as_ptr() as usize - base;
@@ -247,6 +318,110 @@ pub(crate) fn metadata_entries(body: &str) -> Vec<MetaEntry> {
             })
         })
         .collect()
+}
+
+/// The entries of a metadata body, as Mermaid reads it: a body on one line is a YAML flow
+/// mapping, split at commas outside quotes; a body over several lines is a block mapping, split
+/// at lines, where lines indented more than an entry's (and blank lines among them) continue its
+/// value.
+fn metadata_parts(body: &str) -> Vec<&str> {
+    if !body.contains('\n') {
+        return split_unquoted(body, |c| c == ',', true);
+    }
+    let mut parts = Vec::new();
+    // A body that starts with an entry (trimmed by the caller) does not show that entry's
+    // indent: it is taken as the next entry line's.
+    let indent_of = |l: &str| l.len() - l.trim_start().len();
+    let first = body.lines().next().unwrap_or("");
+    let first_indent = if first.trim().is_empty() {
+        0
+    } else {
+        body.lines()
+            .skip(1)
+            .find(|l| {
+                let key = l.trim_start().split(':').next().unwrap_or("");
+                l.contains(':')
+                    && !key.is_empty()
+                    && key
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+            })
+            .map_or(indent_of(first), indent_of)
+    };
+    // The current entry's start and indent, and the end of its last non-blank line.
+    let mut entry: Option<(usize, usize)> = None;
+    let mut end = 0;
+    let mut at = 0;
+    for line in body.split_inclusive('\n') {
+        let text = line.trim_end_matches(['\n', '\r']);
+        let indent = if at == 0 {
+            first_indent
+        } else {
+            indent_of(text)
+        };
+        let blank = text.trim().is_empty();
+        match entry {
+            _ if blank => {}
+            Some((_, base)) if indent > base => {}
+            _ => {
+                if let Some((start, _)) = entry {
+                    parts.push(&body[start..end]);
+                }
+                entry = Some((at, indent));
+            }
+        }
+        if !blank {
+            end = at + text.len();
+        }
+        at += line.len();
+    }
+    if let Some((start, _)) = entry {
+        parts.push(&body[start..end]);
+    }
+    parts
+}
+
+/// A metadata value, the text after its key's `:`: a `|` (literal) or `>` (folded) block
+/// scalar from the lines after it, without the final line break; or a scalar whose lines are
+/// joined with spaces.
+fn yaml_value(v: &str) -> String {
+    let mut lines = v.lines();
+    let head = lines.next().unwrap_or("").trim();
+    let Some(style) = head.chars().next().filter(|c| *c == '|' || *c == '>') else {
+        let folded: Vec<&str> = v.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+        return yaml_scalar(&folded.join(" "));
+    };
+    let lines: Vec<&str> = lines.collect();
+    let indent = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.len() - l.trim_start().len())
+        .min()
+        .unwrap_or(0);
+    let lines: Vec<&str> = lines
+        .into_iter()
+        .map(|l| l.get(indent..).unwrap_or("").trim_end())
+        .collect();
+    let mut out = String::new();
+    if style == '|' {
+        out = lines.join("\n");
+    } else {
+        // Folded: lines join with a space; a blank line is a line break.
+        let mut gap = false;
+        for line in lines {
+            if line.is_empty() {
+                out.push('\n');
+                gap = true;
+            } else {
+                if !out.is_empty() && !gap {
+                    out.push(' ');
+                }
+                out.push_str(line);
+                gap = false;
+            }
+        }
+    }
+    out.trim_end_matches('\n').to_owned()
 }
 
 /// A YAML scalar: double-quoted (with `\` escapes), single-quoted (with `''`), or plain.
@@ -356,26 +531,32 @@ mod tests {
 
     #[test]
     fn metadata_entry_ranges() {
-        let body = r#" shape: doc ,label: "a, b"
-  bad
-  x:1"#;
-        let entries = metadata_entries(body);
-        let parts: Vec<(&str, &str, &str)> = entries
-            .iter()
-            .map(|e| {
-                (
-                    e.key.as_str(),
-                    &body[e.entry.clone()],
-                    &body[e.value.clone()],
-                )
-            })
-            .collect();
+        fn parts(body: &str) -> Vec<(&str, &str, &str)> {
+            metadata_entries(body)
+                .into_iter()
+                .map(|e| (&body[e.entry.clone()], &body[e.value.clone()]))
+                .map(|(entry, value)| (entry.split(':').next().unwrap().trim(), entry, value))
+                .collect()
+        }
         assert_eq!(
-            parts,
+            parts(r#" shape: doc ,label: "a, b", bad,x:1"#),
             [
                 ("shape", "shape: doc", "doc"),
                 ("label", r#"label: "a, b""#, r#""a, b""#),
                 ("x", "x:1", "1"),
+            ]
+        );
+        // Over several lines, an entry runs on through the lines indented more.
+        assert_eq!(
+            parts("\n  shape: doc\n  label: |\n    one\n\n    two\n  x: 1\n"),
+            [
+                ("shape", "shape: doc", "doc"),
+                (
+                    "label",
+                    "label: |\n    one\n\n    two",
+                    "|\n    one\n\n    two"
+                ),
+                ("x", "x: 1", "1"),
             ]
         );
         assert!(metadata_entries("").is_empty());
@@ -396,9 +577,38 @@ mod tests {
         assert_eq!(label("a<br>b<BR/>c<br />d", false).text, "a\nb\nc\nd");
         assert_eq!(label("a <br> b", false).text, "a\nb");
         assert_eq!(label("one\n    two\n", true).text, "one\ntwo");
-        assert_eq!(label("a<b>c</b> <br", false).text, "a<b>c</b> <br");
+        assert_eq!(label("a<b>c</b> <br", false).text, "a**c** <br");
         assert_eq!(label("<bx>", false).text, "<bx>");
         assert!(label("x", true).markdown);
+        assert!(!label("x", false).markdown);
+    }
+
+    #[test]
+    fn reads_html_tags() {
+        let l = label("<b>bold</b> and <i>it</i>", false);
+        assert_eq!(l.text, "**bold** and *it*");
+        assert!(l.markdown);
+        assert_eq!(l.lines(), ["bold and it"]);
+        let spans = &l.spans()[0];
+        assert!(spans[0].bold && spans[2].italic);
+
+        let l = label("<STRONG>a</Strong><em>b</em>", false);
+        assert_eq!(l.text, "**a***b*");
+        // Other tags are dropped, with their attributes.
+        let l = label("x<span style=\"color:red\">y</span><u>z</u>", false);
+        assert_eq!(l.text, "xyz");
+        assert!(!l.markdown);
+        // Without a partner, an emphasis tag is dropped; unknown tags are kept as written.
+        assert_eq!(label("<b>x", false).text, "x");
+        assert_eq!(label("a</b>", false).text, "a");
+        assert!(!label("<b>x", false).markdown);
+        assert_eq!(label("List<T> a < b > c", false).text, "List<T> a < b > c");
+        // Markdown labels keep their text.
+        assert_eq!(label("<b>x</b>", true).text, "<b>x</b>");
+        // Escaped tags are text.
+        assert_eq!(label("#lt;b#gt;", false).text, "<b>");
+        // The editor reads only `<br>`.
+        assert_eq!(plain_label("<b>x</b><br>y", false).text, "<b>x</b>\ny");
     }
 
     #[test]
@@ -415,6 +625,12 @@ mod tests {
             decode_entities("&#x2665;&#X41;&#x;&#xZ;"),
             "\u{2665}A&#x;&#xZ;"
         );
+        // The HTML 4 names, in both forms.
+        assert_eq!(
+            decode_entities("#copy; 2024 #hearts; &rarr; &mdash; &Alpha;&alpha;"),
+            "\u{a9} 2024 \u{2665} \u{2192} \u{2014} \u{391}\u{3b1}"
+        );
+        assert_eq!(decode_html_entities("&eacute;&euro;"), "\u{e9}\u{20ac}");
         // A numeral after `&` needs its `#`.
         assert_eq!(decode_entities("&9829;"), "&9829;");
     }
@@ -468,6 +684,34 @@ mod tests {
             ]
         );
         assert_eq!(invalid, ["bad"]);
+
+        // Over several lines (a YAML block mapping), commas are text, and `|` and `>` read the
+        // lines after them.
+        let (entries, invalid) = metadata(
+            "\n  label: Hello, world\n  a: |\n    one\n      two\n\n    three\n  b: >\n    one\n    two\n\n    three\n  c: long\n    plain\n",
+        );
+        assert_eq!(
+            entries,
+            [
+                ("label".to_owned(), "Hello, world".to_owned()),
+                ("a".to_owned(), "one\n  two\n\nthree".to_owned()),
+                ("b".to_owned(), "one two\nthree".to_owned()),
+                ("c".to_owned(), "long plain".to_owned()),
+            ]
+        );
+        assert!(invalid.is_empty());
+        // A body trimmed before it is read: the first entry is at the next one's level.
+        let (entries, _) = metadata("a: 1\n      b: 2\n      c: |\n        x\n    ");
+        assert_eq!(
+            entries,
+            [
+                ("a".to_owned(), "1".to_owned()),
+                ("b".to_owned(), "2".to_owned()),
+                ("c".to_owned(), "x".to_owned()),
+            ]
+        );
+        let (entries, _) = metadata("label: |\n  one\n  two");
+        assert_eq!(entries, [("label".to_owned(), "one\ntwo".to_owned())]);
 
         let (entries, _) = metadata(r#"a: "x\ny\tz\"#);
         assert_eq!(entries, [("a".to_owned(), r#""x\ny\tz\"#.to_owned())]);

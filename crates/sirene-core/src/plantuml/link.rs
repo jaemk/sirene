@@ -33,9 +33,9 @@ pub(crate) struct Link<'a> {
 const LEFT_HEADS: &[u8] = b"<|*o#x}{+^";
 const RIGHT_HEADS: &[u8] = b">|*o#x{}+^";
 /// Interface sockets and balls, read but not drawn, longest first.
-const SOCKETS_LEFT: &[&str] = &["(0)", "0)", ")", "0"];
-const SOCKETS_RIGHT: &[&str] = &["(0)", "(0", "(", "0"];
-const SOCKETS_INSIDE: &[&str] = &["(0)", "(0", "0)", "0"];
+const SOCKETS_LEFT: &[&str] = &["()", "(0)", "0)", ")", "0"];
+const SOCKETS_RIGHT: &[&str] = &["()", "(0)", "(0", "(", "0"];
+const SOCKETS_INSIDE: &[&str] = &["()", "(0)", "(0", "0)", "0"];
 
 fn left_head(h: &str) -> Option<Option<Arrow>> {
     Some(match h {

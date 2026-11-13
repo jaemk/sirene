@@ -56,7 +56,9 @@ warning.
 - `partition`, `package`, `rectangle`, `card`, `folder`, and `frame` name `{` ... `}` and
   `group name` ... `end group` draw the nodes inside them in a titled cluster.
 - `|Lane|` (or `|#color|Lane|`) puts the following nodes in a swimlane; lanes are columns in
-  first-use order.
+  first-use order. Nodes and groups before the first `|Lane|` go in that lane.
+- `if (c) is (red) then`: the `is` label names the yes branch when `then` has no label; the
+  same for `elseif`.
 
 ## PACT-8 Notes
 

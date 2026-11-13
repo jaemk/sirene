@@ -79,6 +79,168 @@ fn directions() {
     assert_eq!(l.edges[0].as_ref().unwrap().points, pts(&[(7, 1), (4, 1)]));
 }
 
+fn cluster(parent: Option<usize>, direction: Option<Direction>) -> ClusterSpec {
+    ClusterSpec {
+        parent,
+        direction,
+        title: Size::default(),
+        lane: false,
+    }
+}
+
+fn member(parent: usize) -> NodeSpec {
+    NodeSpec {
+        size: Size::new(5, 3),
+        parent: Some(parent),
+    }
+}
+
+/// LAYOUT-3, Mermaid's "Limitation" example: an edge to the subgraph itself keeps its
+/// direction, and an edge to a node inside it drops the direction.
+#[test]
+fn cluster_direction_survives_an_edge_to_the_cluster() {
+    // Nodes 0-1 in cluster 0, 2-3 in cluster 1, 4 outside; every cluster is top to bottom.
+    let g = |to_inner: bool| Graph {
+        direction: Direction::LeftRight,
+        nodes: vec![member(0), member(0), member(1), member(1), node(5, 3)],
+        clusters: vec![
+            cluster(None, Some(Direction::TopBottom)),
+            cluster(None, Some(Direction::TopBottom)),
+        ],
+        edges: vec![
+            edge(0, 1),
+            edge(2, 3),
+            EdgeSpec {
+                to: Item::Cluster(0),
+                ..edge(4, 0)
+            },
+            EdgeSpec {
+                to: if to_inner {
+                    Item::Node(2)
+                } else {
+                    Item::Cluster(1)
+                },
+                ..edge(4, 2)
+            },
+        ],
+        ..Graph::default()
+    };
+    let stacked = |l: &Layout, a: usize, b: usize| l.nodes[a].x == l.nodes[b].x;
+    let l = layout(&g(false), &CONFIG);
+    assert!(stacked(&l, 0, 1) && stacked(&l, 2, 3), "{:?}", l.nodes);
+    let l = layout(&g(true), &CONFIG);
+    assert!(stacked(&l, 0, 1), "{:?}", l.nodes);
+    assert!(!stacked(&l, 2, 3), "{:?}", l.nodes);
+}
+
+/// LAYOUT-3, Mermaid's "Direction in subgraphs" example: clusters linked to as a whole keep
+/// theirs.
+#[test]
+fn nested_cluster_directions_are_kept() {
+    // Cluster 0 is top to bottom and holds cluster 1 (right to left) and 2 (bottom to top).
+    let g = Graph {
+        direction: Direction::LeftRight,
+        nodes: vec![
+            member(1),
+            member(1),
+            member(2),
+            member(2),
+            node(5, 3),
+            node(5, 3),
+        ],
+        clusters: vec![
+            cluster(None, Some(Direction::TopBottom)),
+            cluster(Some(0), Some(Direction::RightLeft)),
+            cluster(Some(0), Some(Direction::BottomTop)),
+        ],
+        edges: vec![
+            edge(0, 1),
+            edge(2, 3),
+            EdgeSpec {
+                to: Item::Cluster(0),
+                ..edge(4, 0)
+            },
+            EdgeSpec {
+                from: Item::Cluster(0),
+                to: Item::Node(5),
+                ..edge(0, 0)
+            },
+            EdgeSpec {
+                from: Item::Cluster(1),
+                to: Item::Cluster(2),
+                ..edge(0, 0)
+            },
+        ],
+        ..Graph::default()
+    };
+    let l = layout(&g, &CONFIG);
+    let (b1, b2) = (l.clusters[1], l.clusters[2]);
+    // TOP is top to bottom: B1 above B2.
+    assert!(b1.bottom() <= b2.y, "{b1:?} {b2:?}");
+    // B1 runs right to left, B2 bottom to top.
+    assert!(l.nodes[1].x < l.nodes[0].x && l.nodes[1].y == l.nodes[0].y);
+    assert!(l.nodes[3].y < l.nodes[2].y && l.nodes[3].x == l.nodes[2].x);
+}
+
+/// An edge ending at a titled cluster does not run over the title, whatever the cluster's
+/// direction.
+#[test]
+fn edge_to_titled_cluster_clears_the_title() {
+    for direction in [
+        None,
+        Some(Direction::TopBottom),
+        Some(Direction::BottomTop),
+        Some(Direction::LeftRight),
+        Some(Direction::RightLeft),
+    ] {
+        let mut c = cluster(None, direction);
+        c.title = Size::new(1, 1);
+        let g = Graph {
+            nodes: vec![node(3, 3)],
+            clusters: vec![c],
+            edges: vec![EdgeSpec {
+                to: Item::Cluster(0),
+                ..edge(0, 0)
+            }],
+            ..Graph::default()
+        };
+        let l = layout(&g, &CONFIG);
+        let title = l.titles[0].unwrap();
+        let route = l.edges[0].as_ref().unwrap();
+        assert!(
+            route.points.iter().all(|&p| !title.contains(p)),
+            "{direction:?}: {title:?} {:?}",
+            route.points
+        );
+    }
+}
+
+/// An edge between a cluster and one of its descendants has no route.
+#[test]
+fn edge_to_own_descendant_is_unroutable() {
+    let g = Graph {
+        nodes: vec![member(0), member(0)],
+        clusters: vec![cluster(None, None)],
+        edges: vec![
+            edge(0, 1),
+            EdgeSpec {
+                from: Item::Cluster(0),
+                to: Item::Node(0),
+                ..edge(0, 0)
+            },
+            EdgeSpec {
+                from: Item::Node(1),
+                to: Item::Cluster(0),
+                ..edge(0, 0)
+            },
+        ],
+        ..Graph::default()
+    };
+    let l = layout(&g, &CONFIG);
+    assert!(l.edges[0].is_some());
+    assert!(l.edges[1].is_none() && l.edges[2].is_none());
+}
+
 #[test]
 fn bad_cluster_parents_are_top_level() {
     let cluster = |parent| ClusterSpec {
