@@ -129,7 +129,8 @@ enum Command {
         /// Colors to draw with.
         #[arg(long, value_enum, default_value_t = ThemeArg::Light)]
         theme: ThemeArg,
-        /// Write the SVG here instead of stdout; for a directory, the directory to write into.
+        /// Write the SVG here instead of stdout (`-` is stdout); for a directory, the directory to
+        /// write into.
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
@@ -154,8 +155,8 @@ enum Command {
         /// Pixels per diagram unit, instead of the quality's own.
         #[arg(long)]
         scale: Option<f32>,
-        /// Where to write the PNG; defaults to FILE with a .png extension, or stdout for stdin.
-        /// For a directory, the directory to write into.
+        /// Where to write the PNG (`-` is stdout); defaults to FILE with a .png extension, or
+        /// stdout for stdin. For a directory, the directory to write into.
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
@@ -247,27 +248,37 @@ fn misspelled_command(files: &[PathBuf]) -> Option<(String, &'static str)> {
     if first.exists() || name.contains(['/', '\\', '.']) {
         return None;
     }
-    let near = |cmd: &str| {
-        let (a, b): (Vec<char>, Vec<char>) = (name.chars().collect(), cmd.chars().collect());
-        // Levenshtein distance, one row at a time.
-        let mut row: Vec<usize> = (0..=b.len()).collect();
-        for (i, ca) in a.iter().enumerate() {
-            let mut prev = row[0];
-            row[0] = i + 1;
-            for (j, cb) in b.iter().enumerate() {
-                let next = (prev + usize::from(ca != cb))
-                    .min(row[j] + 1)
-                    .min(row[j + 1] + 1);
-                prev = row[j + 1];
-                row[j + 1] = next;
-            }
-        }
-        row[b.len()] <= 2
-    };
+    // One edit from a short command (so `pdf` is not `png`), two from a longer one.
     ["ascii", "svg", "png", "check", "update", "help"]
         .into_iter()
-        .find(|cmd| near(cmd))
+        .find(|cmd| edits(name, cmd) <= if cmd.len() < 5 { 1 } else { 2 })
         .map(|cmd| (name.to_owned(), cmd))
+}
+
+/// The edits between `a` and `b`: insertions, deletions, substitutions, and swaps of two
+/// neighbors (optimal string alignment distance).
+fn edits(a: &str, b: &str) -> usize {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    let mut d = vec![vec![0; b.len() + 1]; a.len() + 1];
+    for (i, row) in d.iter_mut().enumerate() {
+        row[0] = i;
+    }
+    for (j, cell) in d[0].iter_mut().enumerate() {
+        *cell = j;
+    }
+    for i in 1..=a.len() {
+        for j in 1..=b.len() {
+            let cost = usize::from(a[i - 1] != b[j - 1]);
+            let mut best = (d[i - 1][j] + 1)
+                .min(d[i][j - 1] + 1)
+                .min(d[i - 1][j - 1] + cost);
+            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                best = best.min(d[i - 2][j - 2] + 1);
+            }
+            d[i][j] = best;
+        }
+    }
+    d[a.len()][b.len()]
 }
 
 fn run(cli: Cli) -> ExitCode {
@@ -319,6 +330,9 @@ fn run(cli: Cli) -> ExitCode {
                 let scene = l.diagram.scene(&Approx, &l.theme.apply(&theme.theme()));
                 Ok(scene::svg::write(&scene).into_bytes())
             };
+            let Ok(output) = stdout_dash(&file, output) else {
+                return ExitCode::from(2);
+            };
             if let Some(md) = markdown_file(&file) {
                 return markdown_blocks(md, watch, || {
                     markdown::render(md, output.as_deref(), "svg", link, &render)
@@ -344,6 +358,10 @@ fn run(cli: Cli) -> ExitCode {
                 let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
                 png::write(&scene, png::Options { scale, quality })
             };
+            let to_stdout = output.as_deref() == Some(Path::new("-"));
+            let Ok(output) = stdout_dash(&file, output) else {
+                return ExitCode::from(2);
+            };
             if let Some(md) = markdown_file(&file) {
                 return markdown_blocks(md, watch, || {
                     markdown::render(md, output.as_deref(), "png", link, &render)
@@ -355,7 +373,7 @@ fn run(cli: Cli) -> ExitCode {
             let output = output.or_else(|| {
                 let default = file
                     .as_ref()
-                    .filter(|f| f.as_os_str() != "-")
+                    .filter(|f| f.as_os_str() != "-" && !to_stdout)
                     .map(|f| f.with_extension("png"));
                 if let Some(d) = &default {
                     log::debug!("no --output; writing next to the input as {}", d.display());
@@ -369,6 +387,19 @@ fn run(cli: Cli) -> ExitCode {
             convert(file, output, Some("png"), watch, render)
         }
     }
+}
+
+/// `output` with `-` read as stdout (`None`), as `-` is stdin for FILE; an error for a directory
+/// or Markdown `file`, which write many images.
+fn stdout_dash(file: &Option<PathBuf>, output: Option<PathBuf>) -> Result<Option<PathBuf>, ()> {
+    if output.as_deref() != Some(Path::new("-")) {
+        return Ok(output);
+    }
+    if markdown_file(file).is_some() || file.as_ref().is_some_and(|f| f.is_dir()) {
+        eprintln!("error: `--output -` writes one diagram to stdout; give a directory instead");
+        return Err(());
+    }
+    Ok(None)
 }
 
 /// `file` when it names a Markdown file (a directory named like one is a directory).
@@ -429,19 +460,38 @@ fn read(file: Option<PathBuf>) -> Result<(String, String), String> {
         Some(path) => {
             let name = path.display().to_string();
             log::debug!("reading {name}");
-            std::fs::read_to_string(&path)
-                .map(|src| (name.clone(), src))
-                .map_err(|e| format!("cannot read {name}: {e}"))
+            read_text(&path).map(|src| (name, src))
         }
         None => {
             log::debug!("reading <stdin>");
-            let mut src = String::new();
+            let mut src = Vec::new();
             std::io::stdin()
-                .read_to_string(&mut src)
-                .map(|_| ("<stdin>".to_owned(), src))
+                .read_to_end(&mut src)
+                .map_err(|e| format!("cannot read <stdin>: {e}"))?;
+            utf8(src)
+                .map(|src| ("<stdin>".to_owned(), src))
                 .map_err(|e| format!("cannot read <stdin>: {e}"))
         }
     }
+}
+
+/// Reads the file at `path` as UTF-8 text, with an error naming it.
+pub(crate) fn read_text(path: &Path) -> Result<String, String> {
+    std::fs::read(path)
+        .map_err(|e| e.to_string())
+        .and_then(utf8)
+        .map_err(|e| format!("cannot read {}: {e}", path.display()))
+}
+
+/// `bytes` as UTF-8, or an error naming UTF-16 (by its byte order mark) or the first bad byte.
+fn utf8(bytes: Vec<u8>) -> Result<String, String> {
+    if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
+        return Err("the text is UTF-16; sirene reads UTF-8".into());
+    }
+    String::from_utf8(bytes).map_err(|e| {
+        let at = e.utf8_error().valid_up_to();
+        format!("the text is not UTF-8 (an invalid byte at offset {at})")
+    })
 }
 
 /// How often `--watch` looks for changes.
@@ -755,8 +805,15 @@ mod tests {
         assert_eq!(check(&["sgv"]), Some(("sgv".into(), "svg")));
         assert_eq!(check(&["pgn"]), Some(("pgn".into(), "png")));
         assert_eq!(check(&["hlep"]), Some(("hlep".into(), "help")));
+        assert_eq!(check(&["acsii"]), Some(("acsii".into(), "ascii")));
+        assert_eq!(check(&["chekc"]), Some(("chekc".into(), "check")));
+        // Short names two edits from a command are new files.
         for ok in [
-            &["./asci"][..],
+            &["pdf"][..],
+            &["pu"],
+            &["gv"],
+            &["hello"],
+            &["./asci"],
             &["asci.mmd"],
             &["diagram"],
             &["a.mmd", "asci"],

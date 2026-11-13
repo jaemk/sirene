@@ -150,14 +150,21 @@ pub enum Provenance {
     Rejected(String),
 }
 
-/// Whether `gh`'s error means it could not run the check, rather than that the archive failed
-/// it. Narrow on purpose: "no attestations found" is also what a substituted archive gets, so it
-/// is a rejection.
+/// Whether `gh`'s error means this `gh` cannot run the check (too old, or not logged in), rather
+/// than that the archive failed it. Narrow on purpose: "no attestations found" is also what a
+/// substituted archive gets, so it is a rejection.
 pub fn gh_could_not_check(stderr: &str) -> bool {
     let lower = stderr.to_ascii_lowercase();
+    ["unknown command", "unknown flag", "gh auth login"]
+        .iter()
+        .any(|m| lower.contains(m))
+}
+
+/// Whether `gh`'s error means it could not reach GitHub. That fails the update: whoever controls
+/// the network could otherwise skip the check.
+pub fn gh_offline(stderr: &str) -> bool {
+    let lower = stderr.to_ascii_lowercase();
     [
-        "unknown command",
-        "unknown flag",
         "dial tcp",
         "no such host",
         "connection refused",
@@ -165,7 +172,6 @@ pub fn gh_could_not_check(stderr: &str) -> bool {
         "context deadline exceeded",
         "tls handshake",
         "certificate signed by unknown authority",
-        "gh auth login",
     ]
     .iter()
     .any(|m| lower.contains(m))
@@ -194,7 +200,9 @@ pub fn provenance(mut gh: Command, archive: &Path) -> Option<Provenance> {
         .chars()
         .map(|c| if c.is_control() { ' ' } else { c })
         .collect();
-    Some(if gh_could_not_check(&stderr) {
+    Some(if gh_offline(&stderr) {
+        Provenance::Rejected(format!("could not reach GitHub to check it: {stderr}"))
+    } else if gh_could_not_check(&stderr) {
         Provenance::Unchecked(stderr)
     } else {
         Provenance::Rejected(stderr)
@@ -427,13 +435,14 @@ mod tests {
             "unknown command \"attestation\" for \"gh\""
         ));
         assert!(gh_could_not_check(
-            "Post https://api.github.com: dial tcp: lookup api.github.com: no such host"
-        ));
-        assert!(gh_could_not_check(
             "To get started with GitHub CLI, please run:  gh auth login"
         ));
-        assert!(!gh_could_not_check("Error: no attestations found"));
-        assert!(!gh_could_not_check("HTTP 404: Not Found"));
+        let offline = "Post https://api.github.com: dial tcp: lookup api.github.com: no such host";
+        assert!(gh_offline(offline) && !gh_could_not_check(offline));
+        assert!(gh_offline("remote error: tls handshake failure"));
+        for rejected in ["Error: no attestations found", "HTTP 404: Not Found"] {
+            assert!(!gh_could_not_check(rejected) && !gh_offline(rejected));
+        }
     }
 
     #[test]
@@ -469,7 +478,16 @@ mod tests {
         let offline = fake("offline", "echo 'dial tcp: i/o timeout' >&2; exit 1");
         assert_eq!(
             provenance(offline, archive),
-            Some(Provenance::Unchecked("dial tcp: i/o timeout".into()))
+            Some(Provenance::Rejected(
+                "could not reach GitHub to check it: dial tcp: i/o timeout".into()
+            ))
+        );
+        let old = fake("old", "echo 'unknown command \"attestation\"' >&2; exit 1");
+        assert_eq!(
+            provenance(old, archive),
+            Some(Provenance::Unchecked(
+                "unknown command \"attestation\"".into()
+            ))
         );
         let none = fake(
             "none",

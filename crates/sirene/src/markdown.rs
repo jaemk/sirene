@@ -57,10 +57,10 @@ pub fn check(path: &Path) -> bool {
     }
     if markdown::is_markdown(path) {
         let name = path.display().to_string();
-        let src = match std::fs::read_to_string(path) {
+        let src = match crate::read_text(path) {
             Ok(src) => src,
             Err(e) => {
-                eprintln!("error: cannot read {name}: {e}");
+                eprintln!("error: {e}");
                 return false;
             }
         };
@@ -183,24 +183,26 @@ pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
         let Some(line) = line else {
             continue;
         };
-        // An unclosed block runs to the end: nothing can follow it.
+        // An unclosed block has no closing fence for the link to follow.
         if !block.closed {
             continue;
         }
         let rest = &src[block.end..];
         let next = rest.lines().next().unwrap_or("");
-        if next.trim() == line {
+        // The next line without the blockquote markers and indentation it shares with the fence.
+        let old = next.trim_start_matches([' ', '>']).trim_end();
+        if old == line {
             continue;
         }
         out.push_str(&src[at..block.end]);
         if !out.ends_with('\n') {
             out.push_str(newline);
         }
+        out.push_str(&block.quote);
         out.push_str(&" ".repeat(block.indent));
         out.push_str(line);
         out.push_str(newline);
         at = block.end;
-        let old = next.trim();
         if old.starts_with("![diagram ") && old.ends_with(')') {
             let ending = &rest[next.len()..];
             let ending = if ending.starts_with("\r\n") {
@@ -219,10 +221,10 @@ pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
 /// their diagnostics. Returns whether the file was read and had no errors.
 pub fn print_ascii(md: &Path, charset: Charset) -> bool {
     let name = md.display().to_string();
-    let src = match std::fs::read_to_string(md) {
+    let src = match crate::read_text(md) {
         Ok(src) => src,
         Err(e) => {
-            eprintln!("error: cannot read {name}: {e}");
+            eprintln!("error: {e}");
             return false;
         }
     };
@@ -262,10 +264,10 @@ pub fn render(
     render: &impl Fn(&Lowered) -> Result<Vec<u8>, String>,
 ) -> bool {
     let name = md.display().to_string();
-    let src = match std::fs::read_to_string(md) {
+    let src = match crate::read_text(md) {
         Ok(src) => src,
         Err(e) => {
-            eprintln!("error: cannot read {name}: {e}");
+            eprintln!("error: {e}");
             return false;
         }
     };
@@ -397,6 +399,13 @@ mod tests {
         let lines = vec![(blocks[0].clone(), Some("![diagram 1](a-1.svg)".to_owned()))];
         let once = with_links(src, &lines);
         assert_eq!(once, format!("{src}  ![diagram 1](a-1.svg)\n"));
+        assert_eq!(with_links(&once, &lines), once);
+        // A fence in a blockquote's list item keeps the link in both.
+        let src = "> 1. x\n>    ```mermaid\n>    pie\n>    ```\n";
+        let blocks = markdown::mermaid_blocks(src);
+        let lines = vec![(blocks[0].clone(), Some("![diagram 1](a-1.svg)".to_owned()))];
+        let once = with_links(src, &lines);
+        assert_eq!(once, format!("{src}>    ![diagram 1](a-1.svg)\n"));
         assert_eq!(with_links(&once, &lines), once);
     }
 

@@ -35,10 +35,14 @@ pub(crate) fn lower(root: &SyntaxNode) -> (QuadrantChart, Vec<Diagnostic>) {
                     .map(|t| text::unquote(t.text()).trim().to_owned())
                     .collect();
                 let label = |i: usize| texts.get(i).filter(|s| !s.is_empty()).cloned();
-                let axis = Axis {
+                let mut axis = Axis {
                     low: label(0),
                     high: label(1),
                 };
+                // `x-axis Low -->` with no high label: Mermaid appends the arrow to the low one.
+                if axis.high.is_none() && token(&stmt, ARROW).is_some() {
+                    axis.low = axis.low.map(|low| format!("{low} ⟶"));
+                }
                 match token(&stmt, AXIS_KW)
                     .map(|t| t.text().to_owned())
                     .as_deref()

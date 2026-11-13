@@ -18,7 +18,8 @@ mermaid|dot|d2|plantuml` to override detection. Within Mermaid, the header keywo
 diagram type (FLOWCH-4).
 
 In Markdown (MARKDO-1), a block's info string picks the language: `mermaid`; `dot` or
-`graphviz`; `d2`; `plantuml` or `puml`. Blocks of other languages are left alone.
+`graphviz`; `d2`; `plantuml` or `puml`, in any case, also as `{.mermaid}` or `{mermaid}`.
+Blocks of other languages are left alone.
 
 ## LANGS-2 Pipeline
 
