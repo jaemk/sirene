@@ -461,7 +461,9 @@ impl Parser<'_> {
             self.bracketed(".", "...");
         } else if line.starts_with("||") {
             self.space();
-        } else if keyword_in(r, PARTICIPANTS).is_some() || keyword_in(r, &["create"]).is_some() {
+        } else if (keyword_in(r, PARTICIPANTS).is_some() || keyword_in(r, &["create"]).is_some())
+            && find_arrow(line).is_none()
+        {
             self.participant();
         } else if let Some(kw) = keyword_in(r, &["note", "hnote", "rnote"]) {
             self.note(kw.len());
@@ -682,7 +684,17 @@ impl Parser<'_> {
             self.token(STYLE_TEXT, n);
             self.ws();
         }
-        self.text_or_body(&["end note", "endnote"], "note");
+        self.text_or_body(
+            &[
+                "end note",
+                "endnote",
+                "end hnote",
+                "endhnote",
+                "end rnote",
+                "endrnote",
+            ],
+            "note",
+        );
         self.finish();
     }
 
