@@ -1,6 +1,6 @@
 //! Cycle removal and rank assignment (LAYOUT-4).
 
-use std::collections::VecDeque;
+use std::collections::{BTreeSet, VecDeque};
 
 use crate::flowchart::RankEnd;
 
@@ -239,7 +239,12 @@ fn longest_path(n: usize, dag: &[RankEdge]) -> Vec<i32> {
 
 /// Moves items to shorten edges: an item with more incoming than outgoing edges moves as far up
 /// as its predecessors allow, and one with more outgoing edges as far down as its successors
-/// allow. Each move shortens the total edge span, so this terminates.
+/// allow. Each move shortens the total edge span, so this terminates, and keeps every edge's
+/// length, so stopping early leaves valid ranks.
+///
+/// Sweeps run in item order, as full sweeps would, but visit only items next to one that moved,
+/// since no other item's target changed; the edges looked at are capped at `TIGHTEN_WORK` per
+/// item and edge.
 fn tighten(ranks: &mut [i32], dag: &[RankEdge]) {
     let n = ranks.len();
     let mut incoming = vec![Vec::new(); n];
@@ -248,10 +253,17 @@ fn tighten(ranks: &mut [i32], dag: &[RankEdge]) {
         incoming[e.to].push(*e);
         outgoing[e.from].push(*e);
     }
-    loop {
-        let mut changed = false;
-        for v in 0..n {
+    let mut budget = TIGHTEN_WORK.saturating_mul(n + dag.len());
+    // This sweep's items still to visit, and the next sweep's.
+    let mut pending: BTreeSet<usize> = (0..n).collect();
+    while !pending.is_empty() {
+        let mut next = BTreeSet::new();
+        while let Some(v) = pending.pop_first() {
             let (ins, outs) = (&incoming[v], &outgoing[v]);
+            let Some(left) = budget.checked_sub(ins.len() + outs.len() + 1) else {
+                return;
+            };
+            budget = left;
             let target = if ins.len() > outs.len() {
                 ins.iter().map(|e| ranks[e.from] + e.len).max()
             } else if outs.len() > ins.len() {
@@ -263,14 +275,21 @@ fn tighten(ranks: &mut [i32], dag: &[RankEdge]) {
                 && t != ranks[v]
             {
                 ranks[v] = t;
-                changed = true;
+                for u in ins.iter().map(|e| e.from).chain(outs.iter().map(|e| e.to)) {
+                    if u > v {
+                        pending.insert(u);
+                    } else {
+                        next.insert(u);
+                    }
+                }
             }
         }
-        if !changed {
-            break;
-        }
+        pending = next;
     }
 }
+
+/// How many times over, per item and edge, `tighten` may look at edges.
+const TIGHTEN_WORK: usize = 64;
 
 #[cfg(test)]
 mod tests {
@@ -289,6 +308,25 @@ mod tests {
     #[test]
     fn chain() {
         assert_eq!(rank(3, &edges(&[(0, 1), (1, 2)]), &[]), [0, 2, 4]);
+    }
+
+    #[test]
+    fn tighten_is_bounded_and_keeps_lengths() {
+        // A chain numbered against its direction, each item also into one sink, so each pull
+        // down frees only the item before it.
+        let n = 20_000;
+        let sink = n;
+        let mut list = Vec::new();
+        for k in 1..n {
+            list.push((k, k - 1));
+        }
+        for k in 0..n {
+            list.push((k, sink));
+        }
+        let dag = edges(&list);
+        let mut ranks = longest_path(n + 1, &dag);
+        tighten(&mut ranks, &dag);
+        assert!(dag.iter().all(|e| ranks[e.to] - ranks[e.from] >= e.len));
     }
 
     #[test]

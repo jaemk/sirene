@@ -15,6 +15,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- SVG output: control characters XML does not allow are written as U+FFFD, and a NaN or infinite
+  number as 0, so the file stays well-formed.
+- Layout: rank tightening visits only items next to one that moved and has a work cap, instead
+  of sweeping every item until nothing moves; a `min_len` over 100 counts as 100.
 - PlantUML regex diagrams: a class nested in a class, as in `[[:alpha:]]`, is read as one class,
   and `{ 2 }` with spaces is literal text instead of a repeat, as in Java.
 - Mermaid ZenUML: `else`, `catch`, and `finally` may start the line after a branch's `}`; long

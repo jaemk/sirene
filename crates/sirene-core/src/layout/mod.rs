@@ -100,11 +100,15 @@ pub struct ClusterSpec {
     pub lane: bool,
 }
 
+/// The longest `EdgeSpec::min_len` the layout reads.
+pub const MAX_MIN_LEN: u32 = 100;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EdgeSpec {
     pub from: Item,
     pub to: Item,
-    /// Minimum length in ranks; 0 lets the ends share a rank.
+    /// Minimum length in ranks; 0 lets the ends share a rank. More than `MAX_MIN_LEN` counts as
+    /// `MAX_MIN_LEN`.
     pub min_len: u32,
     pub label: Option<Size>,
     /// Whether the edge ranks its ends (LAYOUT-4); when false they are ranked as if it were
@@ -511,7 +515,7 @@ impl<'a> Builder<'a> {
                 .map(|&(e, from, to)| RankEdge {
                     from: index[&from],
                     to: index[&to],
-                    len: 2 * self.graph.edges[e].min_len as i32,
+                    len: 2 * self.graph.edges[e].min_len.min(MAX_MIN_LEN) as i32,
                 })
                 .collect();
             // Each group's nodes directly in this scope.
