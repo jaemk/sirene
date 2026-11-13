@@ -194,8 +194,15 @@ impl Lowerer {
         let element = kind == "element";
         debug_assert!(KINDS.contains(&kind.as_str()));
         let id = value(&name);
+        // As in Mermaid, the first definition of a name is kept.
+        if !self.defined.insert(id.clone()) {
+            self.warning(
+                name.text_range(),
+                format!("`{id}` is already defined; this definition is skipped"),
+            );
+            return;
+        }
         let i = self.node(&id, stmt.text_range());
-        self.defined.insert(id.clone());
         self.chart.nodes[i].label = Label::plain(format!("«{}»\n{id}", stereotype(&kind)));
         self.shorthand(stmt, &id);
         for f in stmt.children().filter(|n| n.kind() == FIELD) {

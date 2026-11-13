@@ -105,7 +105,7 @@ fn model() {
     let (c, d) = lowered(
         "C4Container\ntitle T\nRel(u, api, \"Uses\", \"HTTPS\")\nPerson_Ext(u, \"User\", \"Someone\")\n\
          System_Boundary(sys, \"Sys\") {\n  Container(api, \"API\", $descr=\"Serves\", $techn=\"Go\")\n  \
-         Deployment_Node(n, \"Node\", \"k8s\") {\n    ComponentQueue(q, Queue)\n  }\n}\n\
+         Deployment_Node(n, \"Node\", \"k8s\")\n\n  {\n    ComponentQueue(q, Queue)\n  }\n}\n\
          SystemDb(db, DB)\nBiRel(api, db, \"Reads\")\nRel_Back(q, api, \"Feeds\")\n\
          UpdateElementStyle(u, $bgColor=\"grey\")\nUpdateRelStyle(api, db, $lineColor=\"red\")\n\
          UpdateRelStyle(q, api, $textColor=\"blue\")\nUpdateLayoutConfig($c4ShapeInRow=\"2\", $c4BoundaryInRow=\"1\")\n",

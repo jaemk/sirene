@@ -204,7 +204,7 @@ fn styling() {
 #[test]
 fn errors() {
     let (c, d) = lowered(
-        "requirementDiagram\n  requirement r {\n    risk: huge\n    type: x\n  }\n  element e {\n    id: 1\n  }\n  e - traces -> ghost\n  e - traces -> ghost\n  class nobody k\n",
+        "requirementDiagram\n  requirement r {\n    risk: huge\n    type: x\n  }\n  element e {\n    id: 1\n  }\n  requirement r {\n    risk: low\n    type: y\n  }\n  e - traces -> ghost\n  e - traces -> ghost\n  class nobody k\n",
     );
     let w = |s: &str| (Severity::Warning, s.to_owned());
     assert_eq!(
@@ -215,6 +215,7 @@ fn errors() {
                 "ignoring `type`: a requirement's fields are `id`, `text`, `risk`, and `verifymethod`"
             ),
             w("ignoring `id`: an element's fields are `type` and `docref`"),
+            w("`r` is already defined; this definition is skipped"),
             w("`ghost` is not defined; drawing it as a plain box"),
             w("unknown requirement or element `nobody`"),
         ]

@@ -34,7 +34,8 @@ compartment of two-column rows in a fixed order: `Id:`, `Text:`, `Risk:`, and `V
 for a requirement, `Type:` and `Doc Ref:` for an element. A risk is written `Low`, `Medium`, or
 `High`, and a verify method `Analysis`, `Inspection`, `Test`, or `Demonstration`, whatever their
 case in the source. A field another type does not have, or a risk or verify method not in those
-lists, is a warning and left out. A later definition of the same name adds to it.
+lists, is a warning and left out. A later definition of the same name is a warning and skipped,
+as Mermaid keeps the first.
 
 A relationship is an edge from its source to its destination in either form, labeled with its
 type (`«satisfies»`). `contains` is a solid line from a circle at the source; the others are
