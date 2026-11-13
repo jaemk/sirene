@@ -312,11 +312,18 @@ impl Lowerer {
         if self.composites.contains(&id) {
             return;
         }
-        let shape = match text_of(stmt, STEREOTYPE).as_deref() {
-            None => Shape::Rounded,
-            Some("<<fork>>" | "<<join>>") => Shape::Fork,
-            Some("<<choice>>") => Shape::Diamond,
-            Some(other) => {
+        self.stmt_class(stmt, &id);
+        let stereotype = text_of(stmt, STEREOTYPE);
+        let kind = stereotype.as_deref().map(|s| {
+            s.trim_matches(['<', '>', '[', ']'])
+                .trim()
+                .to_ascii_lowercase()
+        });
+        let shape = match (kind.as_deref(), stereotype.as_deref()) {
+            (None, _) | (_, None) => Shape::Rounded,
+            (Some("fork" | "join"), _) => Shape::Fork,
+            (Some("choice"), _) => Shape::Diamond,
+            (_, Some(other)) => {
                 self.warning(
                     stmt.text_range(),
                     format!("`{other}` states are not supported; drawing a plain state"),
@@ -338,6 +345,20 @@ impl Lowerer {
         }
         if let Some(t) = text_of(stmt, TEXT) {
             self.describe(&id, &t);
+        }
+    }
+
+    /// The class of `state id:::class`.
+    fn stmt_class(&mut self, stmt: &SyntaxNode, id: &str) {
+        let class = tokens(stmt)
+            .skip_while(|t| t.kind() != TRIPLE_COLON)
+            .find(|t| t.kind() == IDENT);
+        if let Some(class) = class {
+            self.styling.push((
+                id.to_owned(),
+                Styling::Class(class.text().to_owned()),
+                stmt.text_range(),
+            ));
         }
     }
 
@@ -375,6 +396,7 @@ impl Lowerer {
         let Some(id) = token(stmt, IDENT).map(|t| t.text().to_owned()) else {
             return;
         };
+        self.stmt_class(stmt, &id);
         if self.subgraph_index.contains_key(&id) {
             self.warning(
                 stmt.text_range(),

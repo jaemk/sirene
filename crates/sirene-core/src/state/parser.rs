@@ -196,10 +196,22 @@ impl Parser<'_> {
             return;
         }
         self.token(IDENT, n);
+        if self.rest().starts_with(":::") {
+            self.token(TRIPLE_COLON, 3);
+            let n = id_len(self.rest());
+            self.token(IDENT, n);
+        }
         self.ws();
         let r = self.rest();
-        if r.starts_with("<<") {
-            let len = r.find(">>").map_or(scan::line_len(r), |i| i + 2);
+        let close = if r.starts_with("<<") {
+            Some(">>")
+        } else if r.starts_with("[[") {
+            Some("]]")
+        } else {
+            None
+        };
+        if let Some(close) = close {
+            let len = r.find(close).map_or(scan::line_len(r), |i| i + 2);
             self.token(STEREOTYPE, len);
             self.builder.start_node_at(checkpoint, STATE_STMT.into());
             self.end();

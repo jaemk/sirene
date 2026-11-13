@@ -301,6 +301,32 @@ fn direction_and_styling() {
     assert_eq!(c.node("b").unwrap().classes, ["hot"]);
     assert_eq!(c.node("a").unwrap().styles[0].property, "stroke");
     assert_eq!(c.class("hot").unwrap().styles[0].value, "#f00");
+    let c = chart(
+        "stateDiagram-v2\n  classDef hot fill:#f00\n  state s:::hot\n  state C:::hot {\n    x\n  }\n",
+    );
+    assert_eq!(c.node("s").unwrap().classes, ["hot"]);
+    assert_eq!(c.subgraph("C").unwrap().classes, ["hot"]);
+}
+
+/// A `%%` comment may follow a statement.
+#[test]
+fn trailing_comments() {
+    let c = chart(
+        "stateDiagram-v2\n  direction LR %% x\n  A --> B %% go\n  C %% c\n  state D {\n    x\n  } %% d\n",
+    );
+    assert_eq!(c.direction, Direction::LeftRight);
+    assert_eq!(c.edges.len(), 1);
+    assert!(c.node("C").is_some());
+}
+
+/// `[[fork]]` is the same as `<<fork>>`, in any case.
+#[test]
+fn bracketed_pseudo_states() {
+    let c =
+        chart("stateDiagram-v2\n  state f [[fork]]\n  state c [[choice]]\n  state j <<Join>>\n");
+    assert_eq!(shape(&c, "f"), Shape::Fork);
+    assert_eq!(shape(&c, "c"), Shape::Diamond);
+    assert_eq!(shape(&c, "j"), Shape::Fork);
 }
 
 #[test]

@@ -630,7 +630,11 @@ pub fn set_direction(src: &str, subgraph: Option<&str>, dir: Direction) -> Optio
                     let end = usize::from(header.text_range().end());
                     // Before the header line's ending, `\r\n` or `\n`.
                     let at = src[end..].find('\n').map_or(src.len(), |i| end + i);
-                    let at = if src[..at].ends_with('\r') { at - 1 } else { at };
+                    let at = if src[..at].ends_with('\r') {
+                        at - 1
+                    } else {
+                        at
+                    };
                     let indent = doc.body_indent(&block);
                     (at..at, format!("{}{indent}direction {text}", doc.newline))
                 }
@@ -1200,7 +1204,12 @@ impl<'a> Doc<'a> {
     /// Whether `e` shares its stroke with other edges (`A & B --> C`), so its text cannot be
     /// changed alone.
     fn shares_stroke(&self, e: &Edge) -> bool {
-        self.chart.edges.iter().filter(|x| x.range == e.range).count() > 1
+        self.chart
+            .edges
+            .iter()
+            .filter(|x| x.range == e.range)
+            .count()
+            > 1
     }
 
     /// The `EDGE` syntax of `e`.
