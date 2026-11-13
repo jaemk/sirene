@@ -99,6 +99,8 @@ struct Lowerer {
     branches: Vec<State>,
     current: usize,
     ids: HashMap<String, usize>,
+    /// Branch name to its index in `branches`.
+    names: HashMap<String, usize>,
 }
 
 impl Lowerer {
@@ -113,6 +115,7 @@ impl Lowerer {
             }],
             current: 0,
             ids: HashMap::new(),
+            names: HashMap::from([("main".to_owned(), 0)]),
         }
     }
 
@@ -121,7 +124,7 @@ impl Lowerer {
     }
 
     fn branch_index(&self, name: &str) -> Option<usize> {
-        self.branches.iter().position(|b| b.name == name)
+        self.names.get(name).copied()
     }
 
     fn attrs(&mut self, stmt: &SyntaxNode, kw: &str) -> Attrs {
@@ -154,7 +157,7 @@ impl Lowerer {
                     ),
                 },
                 _ => match text.parse::<f64>() {
-                    Ok(n) if v.kind() == NUMBER => out.order = Some(n),
+                    Ok(n) if v.kind() == NUMBER && n.is_finite() => out.order = Some(n),
                     _ => self.error(v.text_range(), "`order` takes a whole number"),
                 },
             }
@@ -245,6 +248,7 @@ impl Lowerer {
         let k = self.branches.len();
         let order = order.unwrap_or_else(|| format!("0.{k}").parse().unwrap_or(0.0));
         let head = self.branches[self.current].head;
+        self.names.insert(name.clone(), k);
         self.branches.push(State { name, order, head });
         self.current = k;
     }

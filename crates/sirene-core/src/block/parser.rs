@@ -206,8 +206,8 @@ impl Parser<'_> {
             self.token(SHAPE_OPEN, len);
             self.start(LABEL);
             match self.rest().chars().next() {
-                Some('"') => match scan::string_len(self.rest()) {
-                    Some(n) if n <= scan::line_len(self.rest()) => {
+                Some('"') => match scan::string_len(&self.rest()[..scan::line_len(self.rest())]) {
+                    Some(n) => {
                         let kind = if self.rest().starts_with("\"`") {
                             MD_STRING
                         } else {
@@ -258,7 +258,7 @@ impl Parser<'_> {
         let r = self.rest();
         let line = scan::line_len(r);
         if r.starts_with('"') {
-            match scan::string_len(r).filter(|&n| n <= line) {
+            match scan::string_len(&r[..line]) {
                 Some(n) => self.token(STRING, n),
                 None => {
                     self.finish();
@@ -326,7 +326,7 @@ impl Parser<'_> {
                 let r = self.rest();
                 let line = scan::line_len(r);
                 if r.starts_with('"') {
-                    match scan::string_len(r).filter(|&n| n <= line) {
+                    match scan::string_len(&r[..line]) {
                         Some(n) => self.token(STRING, n),
                         None => {
                             self.finish();

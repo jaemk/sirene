@@ -118,6 +118,8 @@ struct Lowerer {
     chart: Flowchart,
     diagnostics: Vec<Diagnostic>,
     node_index: HashMap<String, usize>,
+    /// Class names to indexes in the chart's classes.
+    class_index: HashMap<String, usize>,
     /// Each node's fields by their place in the box, as `(row label, value)`.
     fields: Vec<[Option<(&'static str, String)>; 4]>,
     defined: HashSet<String>,
@@ -285,12 +287,16 @@ impl Lowerer {
         let styles = self.styles(&style);
         for n in tokens(&names).filter(|t| t.kind() == IDENT) {
             let n = n.text();
-            match self.chart.classes.iter_mut().find(|c| c.name == n) {
-                Some(class) => class.styles.extend(styles.iter().cloned()),
-                None => self.chart.classes.push(ClassDef {
-                    name: n.to_owned(),
-                    styles: styles.clone(),
-                }),
+            match self.class_index.get(n) {
+                Some(&i) => self.chart.classes[i].styles.extend(styles.iter().cloned()),
+                None => {
+                    self.class_index
+                        .insert(n.to_owned(), self.chart.classes.len());
+                    self.chart.classes.push(ClassDef {
+                        name: n.to_owned(),
+                        styles: styles.clone(),
+                    });
+                }
             }
         }
     }
