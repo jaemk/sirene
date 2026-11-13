@@ -12,6 +12,13 @@ use crate::flowchart::text;
 use crate::syntax::SyntaxKind::*;
 use crate::syntax::{SyntaxElement, SyntaxNode};
 
+/// The most sets in one union: the layout's work grows with every pair and every region a
+/// union holds.
+const MAX_UNION: usize = 8;
+
+/// The largest size: the layout squares areas, and a larger one overflows to NaN geometry.
+const MAX_SIZE: f64 = 1e100;
+
 /// A set (one name) or an overlap of sets (two or more).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Subset {
@@ -232,6 +239,13 @@ impl Parse {
                             ));
                             continue;
                         }
+                        if sets.len() > MAX_UNION {
+                            diagnostics.push(Diagnostic::new(
+                                node.text_range(),
+                                format!("a union of more than {MAX_UNION} sets; ignoring it"),
+                            ));
+                            continue;
+                        }
                         let unknown: Vec<&String> =
                             sets.iter().filter(|s| !known.contains(s)).collect();
                         if !unknown.is_empty() {
@@ -250,12 +264,24 @@ impl Parse {
                         known.push(sets[0].clone());
                     }
                     sets.sort();
-                    let size = node
+                    let number = node
                         .children_with_tokens()
                         .filter_map(SyntaxElement::into_token)
-                        .find(|t| t.kind() == NUMBER)
-                        .and_then(|t| t.text().trim_start_matches('+').parse::<f64>().ok())
-                        .unwrap_or(10.0 / (sets.len() * sets.len()) as f64);
+                        .find(|t| t.kind() == NUMBER);
+                    let given = number
+                        .as_ref()
+                        .and_then(|t| t.text().trim_start_matches('+').parse::<f64>().ok());
+                    let given = match (given, &number) {
+                        (Some(n), Some(t)) if n > MAX_SIZE => {
+                            diagnostics.push(Diagnostic::new(
+                                t.text_range(),
+                                "a size over 1e100; using the default size",
+                            ));
+                            None
+                        }
+                        _ => given,
+                    };
+                    let size = given.unwrap_or(10.0 / (sets.len() * sets.len()) as f64);
                     current = Some(sets.clone());
                     chart.subsets.push(Subset {
                         sets,

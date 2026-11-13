@@ -146,6 +146,25 @@ fn pipelines() {
         .map(|&i| (w.nodes[i].label.as_str(), w.nodes[i].x, w.nodes[i].y))
         .collect();
     assert_eq!(parts, [("X", 20.0, 60.0), ("Y z", 80.0, 60.0)]);
+    // Declared again, a pipeline or an `evolve` keeps its place and takes the new value.
+    let w = lowered(
+        "wardley-beta\ncomponent P [0.6, 0.4]\ncomponent Q [0.5, 0.5]\npipeline P {\n}\n\
+         pipeline Q {\n}\npipeline P {\n  component X [0.2]\n}\nevolve P 0.7\nevolve Q 0.8\n\
+         evolve P 0.9\n",
+    );
+    let parents: Vec<&str> = w
+        .pipelines
+        .iter()
+        .map(|p| w.nodes[p.parent].id.as_str())
+        .collect();
+    assert_eq!(parents, ["P", "Q"]);
+    assert_eq!(w.pipelines[0].components.len(), 1);
+    let trends: Vec<(&str, f64)> = w
+        .trends
+        .iter()
+        .map(|t| (w.nodes[t.node].id.as_str(), t.x))
+        .collect();
+    assert_eq!(trends, [("P", 90.0), ("Q", 80.0)]);
 }
 
 /// MWARD-3: out-of-range coordinates and unknown names.
@@ -171,6 +190,30 @@ fn problems() {
         errors("wardley-beta\npipeline P {\n}\n"),
         ["unknown component `P`: declare it before its pipeline"]
     );
+    // Stage positions are fractions in order; a bad one spaces the stages evenly.
+    assert_eq!(
+        errors("wardley-beta\nevolution A@0.1 -> B@99999999999 -> C@0.05 -> D@0.9\n"),
+        [
+            "a stage boundary must be from 0.1 to 1; got 99999999999",
+            "a stage boundary must be from 0.1 to 1; got 0.05",
+        ]
+    );
+    let l = diagram::lower("wardley-beta\nevolution A@0.1 -> B@99999999999\n");
+    l.diagram.ascii(&Default::default());
+    let Diagram::Wardley(w) = l.diagram else {
+        panic!("not a Wardley map");
+    };
+    assert_eq!(w.boundaries, [0.1]);
+    // A size out of range keeps the default.
+    assert_eq!(
+        errors("wardley-beta\nsize [0, 0]\n"),
+        ["a map size must be from 100 to 20000; using the default"]
+    );
+    let l = diagram::lower("wardley-beta\nsize [1e400, 300]\n");
+    let Diagram::Wardley(w) = l.diagram else {
+        panic!("not a Wardley map");
+    };
+    assert_eq!(w.size, None);
 }
 
 /// MWARD-4: a component's circle sits at its evolution across and visibility up.

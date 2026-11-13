@@ -143,6 +143,17 @@ fn unknown_sets() {
         errors("venn-beta\nset A\nunion A\n"),
         ["a union needs two or more sets"]
     );
+    // Bounds that keep the layout finite and quick.
+    let sets: String = (0..9).map(|i| format!("set S{i}\n")).collect();
+    let names: Vec<String> = (0..9).map(|i| format!("S{i}")).collect();
+    let src = format!("venn-beta\n{sets}union {}\n", names.join(","));
+    assert_eq!(errors(&src), ["a union of more than 8 sets; ignoring it"]);
+    let src = format!("venn-beta\nset A:1{}\nset B\nunion A,B\n", "0".repeat(400));
+    let l = diagram::lower(&src);
+    let messages: Vec<&str> = l.diagnostics.iter().map(|d| d.message.as_str()).collect();
+    assert_eq!(messages, ["a size over 1e100; using the default size"]);
+    let s = l.diagram.scene(&Approx, &Theme::LIGHT);
+    assert!(s.width.is_finite() && s.height.is_finite());
 }
 
 fn texts(src: &str) -> Vec<(String, f32, f32, Color)> {

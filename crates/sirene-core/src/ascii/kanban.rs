@@ -10,7 +10,8 @@ use crate::layout::Rect;
 const MIN_TEXT: i32 = 12;
 const MAX_TEXT: i32 = 28;
 
-/// `s` broken at spaces into lines at most `max` wide; a longer word keeps a line of its own.
+/// `s` broken at spaces into lines at most `max` wide; a longer word is broken into pieces
+/// that fit.
 fn wrap(s: &str, max: i32) -> Vec<String> {
     let mut out = Vec::new();
     for para in s.lines() {
@@ -22,7 +23,14 @@ fn wrap(s: &str, max: i32) -> Vec<String> {
             if !line.is_empty() {
                 line.push(' ');
             }
-            line.push_str(word);
+            for c in word.chars() {
+                let mut buf = [0; 4];
+                let c = c.encode_utf8(&mut buf);
+                if !line.is_empty() && width(&line) + width(c) > max {
+                    out.push(std::mem::take(&mut line));
+                }
+                line.push_str(c);
+            }
         }
         out.push(line);
     }
@@ -160,7 +168,8 @@ mod tests {
     #[test]
     fn wrapping() {
         assert_eq!(wrap("a bb ccc dddd", 6), ["a bb", "ccc", "dddd"]);
-        assert_eq!(wrap("toolongword x", 4), ["toolongword", "x"]);
+        assert_eq!(wrap("toolongword x", 4), ["tool", "ongw", "ord", "x"]);
+        assert_eq!(wrap("ab cdefgh", 4), ["ab", "cdef", "gh"]);
         assert_eq!(wrap("", 4), Vec::<String>::new());
     }
 

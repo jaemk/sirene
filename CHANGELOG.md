@@ -15,6 +15,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- Mermaid venn diagrams: a union of more than 8 sets, and a size over 1e100, are errors instead
+  of a slow layout or NaN geometry.
+- Mermaid Wardley maps: a stage `@position` outside 0 to 1 or out of order is an error instead
+  of overflowing the ASCII drawing; a `size` outside 100 to 20000 keeps the default; a pipeline
+  or `evolve` declared again keeps its place.
+- Mermaid kanban boards: a long ticket or assignee is cut short with `...` instead of
+  overlapping the other and the card's edge; in ASCII, a long word is broken to fit the card.
 - `--link`: a path with spaces or parentheses is linked as `<...>`, the link is indented as the
   fence (so it stays in a list item), and a link from an earlier run is replaced when a new block
   shifts the numbering instead of a second link being added.

@@ -38,7 +38,8 @@ in place of `#TICKET#`. Tests: `columns_and_cards`, `errors`.
 Columns 220 pixels wide side by side, each a rounded gray panel with its bold title wrapped at
 the top, and all as tall as the tallest. Cards stack down a column, each a rounded box in the
 background color with a node-stroke border, its label wrapped and aligned left, and under it the
-ticket at the left and the assignee at the right in a smaller size. A card with a priority has a
+ticket at the left and the assignee at the right in a smaller size, each cut short with `...`
+to fit (the ticket to half the width when there is an assignee). A card with a priority has a
 colored stripe down its left edge: red for very high, orange for high, blue for low, light blue
 for very low. The title is centered above. Every element is owned by the diagram. Tests:
 `drawing`.
@@ -46,7 +47,8 @@ for very low. The title is centered above. Every element is owned by the diagram
 ## MKAN-4 ASCII
 
 A box per column side by side, its title in the top border, holding a rounded box per card. Card
-text wraps at the widest label or details line, kept between 12 and 28 columns. Under a card's
+text wraps at the widest label or details line, kept between 12 and 28 columns; a longer word
+is broken. Under a card's
 label, a details line holds its priority (`▲▲` very high, `▲` high, `▼` low, `▼▼` very low; `^^`,
 `^`, `v`, `vv` in ASCII) and name, its ticket, and `@assignee`. The title is centered above.
 Tests: `snapshots`, `ascii_charset_snapshots`, and the renderer's unit tests.

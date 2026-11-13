@@ -27,7 +27,8 @@ parser's unit tests.
 `venn::parse(src).lower()` gives a `venn::Venn`: the title (the `title` statement over
 frontmatter), the subsets with sorted set names, sizes, and labels, the text nodes, and the
 styles. A size defaults to 10 divided by the square of the number of sets. A union needs two or
-more sets, each declared by an earlier `set`; otherwise it is an error and left out. Tests:
+more sets, at most 8, each declared by an earlier `set`; otherwise it is an error and left out.
+A size over 1e100 is an error, and the default size is used. Tests:
 `model`, `unknown_sets`.
 
 ## MVENN-3 Layout
