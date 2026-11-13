@@ -98,7 +98,8 @@ counting blocks from 1; `-o OUTDIR` writes them there instead.
 
 The Markdown file is not changed unless `--link` is given. `--link` adds an image link on the
 line after each rendered block, and only when that line is not already the link, so running it
-again changes nothing. The link is relative to the Markdown file (`../img/guide-1.svg` for
+again changes nothing. When a new block shifts the numbering, the old `![diagram N](...)` line is
+replaced. The link is relative to the Markdown file (`../img/guide-1.svg` for
 `sirene svg docs/guide.md -o img --link`). The blocks themselves are never changed or removed.
 
 ```

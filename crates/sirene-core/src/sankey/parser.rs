@@ -59,6 +59,21 @@ fn quoted_len(s: &str) -> Option<usize> {
     None
 }
 
+/// `n`, the length of a number at the start of `s`, plus an exponent after it (`1e3`, `2.5E-2`),
+/// as Mermaid reads the value with `parseFloat`.
+fn with_exponent(s: &str, n: usize) -> usize {
+    let Some(e) = s[n..].strip_prefix(['e', 'E']).filter(|_| n > 0) else {
+        return n;
+    };
+    let sign = usize::from(e.starts_with(['+', '-']));
+    let digits = e[sign..].bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 0 {
+        n
+    } else {
+        n + 1 + sign + digits
+    }
+}
+
 impl Parser<'_> {
     fn statement(&mut self, _depth: usize) {
         self.start(FLOW);
@@ -77,7 +92,7 @@ impl Parser<'_> {
             self.ws();
         }
         let r = self.rest();
-        let n = number_len(r);
+        let n = with_exponent(r, number_len(r));
         let line = scan::line_len(r);
         if n == 0 || scan::trim_end_len(r, line) != n {
             let message = if r[..line].contains(',') {

@@ -10,6 +10,9 @@ use crate::scene::parse_color;
 use crate::syntax::SyntaxKind::*;
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
+/// The largest link value drawn.
+const MAX_VALUE: f64 = 1e30;
+
 pub(crate) fn lower(root: &SyntaxNode) -> (Sankey, Vec<Diagnostic>) {
     let mut s = Sankey::default();
     let mut diagnostics = Vec::new();
@@ -49,6 +52,14 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sankey, Vec<Diagnostic>) {
             diagnostics.push(Diagnostic::new(
                 value.text_range(),
                 format!("`{source}` -> `{target}` has a negative value; ignoring it"),
+            ));
+            continue;
+        }
+        // Past this, widths summed in `f32` would overflow.
+        if v > MAX_VALUE {
+            diagnostics.push(Diagnostic::new(
+                value.text_range(),
+                format!("`{source}` -> `{target}` has a value over 1e30; ignoring it"),
             ));
             continue;
         }
