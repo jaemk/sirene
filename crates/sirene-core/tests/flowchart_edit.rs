@@ -354,6 +354,12 @@ fn directions() {
         applied(src, set_direction(src, Some("s"), Direction::RightLeft)),
         "flowchart TD\n  subgraph s\n      direction RL\n  end\n"
     );
+    // CRLF: the new line goes before the header's `\r\n`.
+    let src = "flowchart TD\r\nsubgraph s [T]\r\n    A\r\nend\r\n";
+    assert_eq!(
+        applied(src, set_direction(src, Some("s"), Direction::LeftRight)),
+        "flowchart TD\r\nsubgraph s [T]\r\n    direction LR\r\n    A\r\nend\r\n"
+    );
 }
 
 #[test]

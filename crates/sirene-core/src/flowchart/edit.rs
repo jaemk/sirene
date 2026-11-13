@@ -129,7 +129,8 @@ pub fn set_node_label(src: &str, id: &str, label: &str) -> Option<TextEdit> {
 }
 
 /// Sets the label of edge `edge` (an index into `Flowchart::edges`); an empty label removes it.
-/// `None` when there is no such edge or the label is unchanged.
+/// Edges sharing a stroke (`A & B --> C`) share the label. `None` when there is no such edge or
+/// the label is unchanged.
 pub fn set_edge_label(src: &str, edge: usize, label: &str) -> Option<TextEdit> {
     let doc = Doc::new(src);
     let e = doc.chart.edges.get(edge)?;
@@ -238,7 +239,7 @@ pub const MAX_LENGTH: u8 = 10;
 
 /// Sets the line of edge `edge` (an index into `Flowchart::edges`), rewriting its stroke in
 /// canonical form and keeping its label. The length is clamped to 1..=`MAX_LENGTH`. `None` when
-/// there is no such edge or the line is unchanged.
+/// there is no such edge or the line is unchanged. Edges sharing a stroke share the line.
 pub fn set_edge_line(src: &str, edge: usize, line: Line) -> Option<TextEdit> {
     let doc = Doc::new(src);
     let e = doc.chart.edges.get(edge)?;
@@ -275,7 +276,7 @@ pub fn reverse_edge(src: &str, edge: usize) -> Option<TextEdit> {
     let doc = Doc::new(src);
     let chart = &doc.chart;
     let e = chart.edges.get(edge)?;
-    if chart.edges.iter().filter(|x| x.range == e.range).count() > 1 {
+    if doc.shares_stroke(e) {
         return None;
     }
     let syntax = doc.edge_syntax(e)?;
@@ -627,7 +628,9 @@ pub fn set_direction(src: &str, subgraph: Option<&str>, dir: Direction) -> Optio
                 None => {
                     let header = child(&block, SUBGRAPH_HEADER)?;
                     let end = usize::from(header.text_range().end());
+                    // Before the header line's ending, `\r\n` or `\n`.
                     let at = src[end..].find('\n').map_or(src.len(), |i| end + i);
+                    let at = if src[..at].ends_with('\r') { at - 1 } else { at };
                     let indent = doc.body_indent(&block);
                     (at..at, format!("{}{indent}direction {text}", doc.newline))
                 }
@@ -882,7 +885,8 @@ pub fn move_edge(src: &str, edge: usize, later: bool) -> Option<TextEdit> {
 }
 
 /// Deletes the nodes `nodes`, the edges `edges` (indexes into `Flowchart::edges`), and every
-/// edge touching a deleted node. `None` when nothing changes.
+/// edge touching a deleted node; edges sharing a stroke (`A & B --> C`) go together. `None`
+/// when nothing changes.
 pub fn delete(src: &str, nodes: &[&str], edges: &[usize]) -> Option<TextEdit> {
     let doc = Doc::new(src);
     let chart = &doc.chart;
@@ -1191,6 +1195,12 @@ impl<'a> Doc<'a> {
             .descendants()
             .filter(|n| n.kind() == NODE && node.mentions.contains(&n.text_range()))
             .collect()
+    }
+
+    /// Whether `e` shares its stroke with other edges (`A & B --> C`), so its text cannot be
+    /// changed alone.
+    fn shares_stroke(&self, e: &Edge) -> bool {
+        self.chart.edges.iter().filter(|x| x.range == e.range).count() > 1
     }
 
     /// The `EDGE` syntax of `e`.
