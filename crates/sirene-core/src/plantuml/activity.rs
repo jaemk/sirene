@@ -1,7 +1,7 @@
 //! PlantUML activity diagrams (PACT-*), in the newer syntax, lowered to the graph model: each
 //! statement adds a node joined to the open ends of the flow before it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rowan::TextRange;
 
@@ -585,12 +585,39 @@ impl Lower {
         let i = match self.lanes.get(name) {
             Some(&i) => i,
             None => {
+                let first = self.lanes.is_empty();
                 let i = self.subgraph(name, line.range);
                 self.lanes.insert(name.to_owned(), i);
+                if first {
+                    self.adopt_earlier(i);
+                }
                 i
             }
         };
         self.lane = Some(i);
+    }
+
+    /// Moves the nodes and top-level groups made before the first `|Lane|` into that lane, so
+    /// every part of a swimlane chart is in a lane.
+    fn adopt_earlier(&mut self, lane: usize) {
+        let placed: HashSet<&String> = self
+            .chart
+            .subgraphs
+            .iter()
+            .flat_map(|s| s.members.iter())
+            .collect();
+        let mut earlier: Vec<String> = Vec::new();
+        for n in &self.chart.nodes {
+            if !placed.contains(&n.id) {
+                earlier.push(n.id.clone());
+            }
+        }
+        for s in &self.chart.subgraphs[..lane] {
+            if !placed.contains(&s.id) {
+                earlier.push(s.id.clone());
+            }
+        }
+        self.chart.subgraphs[lane].members = earlier;
     }
 
     fn subgraph(&mut self, title: &str, range: TextRange) -> usize {
@@ -658,12 +685,11 @@ impl Lower {
         let Some((cond, rest)) = parens(line.after_word()) else {
             return self.error(line.range, "expected `(condition)` after `if`");
         };
-        let mut text = lines::text(cond.trim());
+        let text = lines::text(cond.trim());
+        // `is (red) then`: the `is` label names the branch when `then` has none.
         let (is, rest) = label_after(rest, "is");
-        if let Some(is) = is {
-            text = format!("{text} {is}");
-        }
         let (yes, _) = label_after(rest, "then");
+        let yes = yes.or(is);
         let decision = self.add(Shape::Diamond, &text, line.range);
         self.tails = vec![Tail::labeled(&decision, yes)];
         self.push(
@@ -697,7 +723,9 @@ impl Lower {
         };
         ends.append(&mut self.tails);
         let from = decision.clone();
+        let (is, rest) = label_after(rest, "is");
         let (yes, _) = label_after(rest, "then");
+        let yes = yes.or(is);
         let next = self.node(Shape::Diamond, &lines::text(cond.trim()), line.range);
         self.edge(&from, &next, no, line.range);
         if let Some(Open::If { decision, .. }) = self.stack.last_mut() {
