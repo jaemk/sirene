@@ -85,9 +85,12 @@ A label is text plus a markdown flag.
 
 ## FLOWMO-7 Metadata
 
-An `@{ ... }` body is a flat YAML mapping: `key: value` entries separated by commas or newlines.
-Values may be plain, double-quoted (with `\"` and `\\` escapes), or single-quoted (with `''`
-escape). Every entry is kept in order as a string pair; later entries replace earlier ones with
+An `@{ ... }` body is a flat YAML mapping of `key: value` entries, read as Mermaid reads it. A
+body on one line is a flow mapping: entries are separated by commas outside quotes. A body over
+several lines is a block mapping: each entry starts a line, a comma is text, and lines indented
+more than an entry's continue its value (joined with spaces), or after `|` keep their line
+breaks and after `>` are folded, without the final line break. Values may be plain,
+double-quoted (with `\"` and `\\` escapes), or single-quoted (with `''` escape). Every entry is kept in order as a string pair; later entries replace earlier ones with
 the same key. An entry without `:` is an error.
 
 Interpreted node keys: `shape` (FLOWMO-5) and `label` (a markdown label unless `labelType` is

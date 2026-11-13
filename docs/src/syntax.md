@@ -126,7 +126,19 @@ A@{ shape: cyl, label: "Orders" }
 e1@{ animate: true }
 ```
 
-An `@{ ... }` block is a flat mapping of `key: value` entries. Nodes read `shape` and `label`;
+An `@{ ... }` block is a flat mapping of `key: value` entries, separated by commas on one line.
+Over several lines, each entry starts a line, so a comma is text, and `label: |` takes the
+indented lines after it as a multi-line label:
+
+```
+B@{
+  label: |
+    Hello, world
+    second line
+}
+```
+
+Nodes read `shape` and `label`;
 edges read `animate`, `animation`, and `curve`, and `linkStyle` reads `interpolate`. Those four
 are parsed but not drawn. Other keys are kept but have no effect.
 

@@ -268,7 +268,7 @@ fn split_unquoted(s: &str, is_sep: impl Fn(char) -> bool, single: bool) -> Vec<&
 pub(crate) fn metadata(body: &str) -> (Vec<(String, String)>, Vec<String>) {
     let mut entries: Vec<(String, String)> = Vec::new();
     let mut invalid = Vec::new();
-    for part in split_unquoted(body, |c| c == ',' || c == '\n', true) {
+    for part in metadata_parts(body) {
         let part = part.trim();
         if part.is_empty() {
             continue;
@@ -278,7 +278,7 @@ pub(crate) fn metadata(body: &str) -> (Vec<(String, String)>, Vec<String>) {
             continue;
         };
         let key = key.trim().to_owned();
-        let value = yaml_scalar(value.trim());
+        let value = yaml_value(value);
         match entries.iter_mut().find(|(k, _)| *k == key) {
             Some(entry) => entry.1 = value,
             None => entries.push((key, value)),
@@ -300,7 +300,7 @@ pub(crate) struct MetaEntry {
 /// The `key: value` entries of a metadata body in source order, each with where it is.
 pub(crate) fn metadata_entries(body: &str) -> Vec<MetaEntry> {
     let base = body.as_ptr() as usize;
-    split_unquoted(body, |c| c == ',' || c == '\n', true)
+    metadata_parts(body)
         .into_iter()
         .filter_map(|part| {
             let start = part.as_ptr() as usize - base;
@@ -318,6 +318,110 @@ pub(crate) fn metadata_entries(body: &str) -> Vec<MetaEntry> {
             })
         })
         .collect()
+}
+
+/// The entries of a metadata body, as Mermaid reads it: a body on one line is a YAML flow
+/// mapping, split at commas outside quotes; a body over several lines is a block mapping, split
+/// at lines, where lines indented more than an entry's (and blank lines among them) continue its
+/// value.
+fn metadata_parts(body: &str) -> Vec<&str> {
+    if !body.contains('\n') {
+        return split_unquoted(body, |c| c == ',', true);
+    }
+    let mut parts = Vec::new();
+    // A body that starts with an entry (trimmed by the caller) does not show that entry's
+    // indent: it is taken as the next entry line's.
+    let indent_of = |l: &str| l.len() - l.trim_start().len();
+    let first = body.lines().next().unwrap_or("");
+    let first_indent = if first.trim().is_empty() {
+        0
+    } else {
+        body.lines()
+            .skip(1)
+            .find(|l| {
+                let key = l.trim_start().split(':').next().unwrap_or("");
+                l.contains(':')
+                    && !key.is_empty()
+                    && key
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+            })
+            .map_or(indent_of(first), indent_of)
+    };
+    // The current entry's start and indent, and the end of its last non-blank line.
+    let mut entry: Option<(usize, usize)> = None;
+    let mut end = 0;
+    let mut at = 0;
+    for line in body.split_inclusive('\n') {
+        let text = line.trim_end_matches(['\n', '\r']);
+        let indent = if at == 0 {
+            first_indent
+        } else {
+            indent_of(text)
+        };
+        let blank = text.trim().is_empty();
+        match entry {
+            _ if blank => {}
+            Some((_, base)) if indent > base => {}
+            _ => {
+                if let Some((start, _)) = entry {
+                    parts.push(&body[start..end]);
+                }
+                entry = Some((at, indent));
+            }
+        }
+        if !blank {
+            end = at + text.len();
+        }
+        at += line.len();
+    }
+    if let Some((start, _)) = entry {
+        parts.push(&body[start..end]);
+    }
+    parts
+}
+
+/// A metadata value, the text after its key's `:`: a `|` (literal) or `>` (folded) block
+/// scalar from the lines after it, without the final line break; or a scalar whose lines are
+/// joined with spaces.
+fn yaml_value(v: &str) -> String {
+    let mut lines = v.lines();
+    let head = lines.next().unwrap_or("").trim();
+    let Some(style) = head.chars().next().filter(|c| *c == '|' || *c == '>') else {
+        let folded: Vec<&str> = v.lines().map(str::trim).filter(|l| !l.is_empty()).collect();
+        return yaml_scalar(&folded.join(" "));
+    };
+    let lines: Vec<&str> = lines.collect();
+    let indent = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.len() - l.trim_start().len())
+        .min()
+        .unwrap_or(0);
+    let lines: Vec<&str> = lines
+        .into_iter()
+        .map(|l| l.get(indent..).unwrap_or("").trim_end())
+        .collect();
+    let mut out = String::new();
+    if style == '|' {
+        out = lines.join("\n");
+    } else {
+        // Folded: lines join with a space; a blank line is a line break.
+        let mut gap = false;
+        for line in lines {
+            if line.is_empty() {
+                out.push('\n');
+                gap = true;
+            } else {
+                if !out.is_empty() && !gap {
+                    out.push(' ');
+                }
+                out.push_str(line);
+                gap = false;
+            }
+        }
+    }
+    out.trim_end_matches('\n').to_owned()
 }
 
 /// A YAML scalar: double-quoted (with `\` escapes), single-quoted (with `''`), or plain.
@@ -427,26 +531,32 @@ mod tests {
 
     #[test]
     fn metadata_entry_ranges() {
-        let body = r#" shape: doc ,label: "a, b"
-  bad
-  x:1"#;
-        let entries = metadata_entries(body);
-        let parts: Vec<(&str, &str, &str)> = entries
-            .iter()
-            .map(|e| {
-                (
-                    e.key.as_str(),
-                    &body[e.entry.clone()],
-                    &body[e.value.clone()],
-                )
-            })
-            .collect();
+        fn parts(body: &str) -> Vec<(&str, &str, &str)> {
+            metadata_entries(body)
+                .into_iter()
+                .map(|e| (&body[e.entry.clone()], &body[e.value.clone()]))
+                .map(|(entry, value)| (entry.split(':').next().unwrap().trim(), entry, value))
+                .collect()
+        }
         assert_eq!(
-            parts,
+            parts(r#" shape: doc ,label: "a, b", bad,x:1"#),
             [
                 ("shape", "shape: doc", "doc"),
                 ("label", r#"label: "a, b""#, r#""a, b""#),
                 ("x", "x:1", "1"),
+            ]
+        );
+        // Over several lines, an entry runs on through the lines indented more.
+        assert_eq!(
+            parts("\n  shape: doc\n  label: |\n    one\n\n    two\n  x: 1\n"),
+            [
+                ("shape", "shape: doc", "doc"),
+                (
+                    "label",
+                    "label: |\n    one\n\n    two",
+                    "|\n    one\n\n    two"
+                ),
+                ("x", "x: 1", "1"),
             ]
         );
         assert!(metadata_entries("").is_empty());
@@ -574,6 +684,34 @@ mod tests {
             ]
         );
         assert_eq!(invalid, ["bad"]);
+
+        // Over several lines (a YAML block mapping), commas are text, and `|` and `>` read the
+        // lines after them.
+        let (entries, invalid) = metadata(
+            "\n  label: Hello, world\n  a: |\n    one\n      two\n\n    three\n  b: >\n    one\n    two\n\n    three\n  c: long\n    plain\n",
+        );
+        assert_eq!(
+            entries,
+            [
+                ("label".to_owned(), "Hello, world".to_owned()),
+                ("a".to_owned(), "one\n  two\n\nthree".to_owned()),
+                ("b".to_owned(), "one two\nthree".to_owned()),
+                ("c".to_owned(), "long plain".to_owned()),
+            ]
+        );
+        assert!(invalid.is_empty());
+        // A body trimmed before it is read: the first entry is at the next one's level.
+        let (entries, _) = metadata("a: 1\n      b: 2\n      c: |\n        x\n    ");
+        assert_eq!(
+            entries,
+            [
+                ("a".to_owned(), "1".to_owned()),
+                ("b".to_owned(), "2".to_owned()),
+                ("c".to_owned(), "x".to_owned()),
+            ]
+        );
+        let (entries, _) = metadata("label: |\n  one\n  two");
+        assert_eq!(entries, [("label".to_owned(), "one\ntwo".to_owned())]);
 
         let (entries, _) = metadata(r#"a: "x\ny\tz\"#);
         assert_eq!(entries, [("a".to_owned(), r#""x\ny\tz\"#.to_owned())]);

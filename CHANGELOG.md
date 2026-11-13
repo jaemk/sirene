@@ -70,6 +70,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that it is not drawn, instead of vanishing silently.
 - Flowchart labels decode all HTML 4 named entities (`#copy;`, `&hearts;`, `&mdash;`), draw
   `<b>`/`<strong>` and `<i>`/`<em>` as bold and italic, and drop other HTML tags such as `<span>`.
+- A flowchart `@{ ... }` body over several lines is read as Mermaid reads it, a YAML block
+  mapping: commas are text (`label: Hello, world`), and `|` and `>` take the indented lines
+  after them.
 - The guide says `animate`, `animation`, `curve`, and `interpolate` are parsed but not drawn,
   `fa:` icons stay as text, and shows `rgb(255\,0\,0)` with an escaped comma in `style`.
 
