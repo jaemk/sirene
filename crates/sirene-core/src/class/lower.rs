@@ -222,6 +222,12 @@ struct Lowerer {
     node_index: HashMap<String, usize>,
     classes: Vec<Class>,
     namespaces: Vec<Subgraph>,
+    /// The index in `namespaces` of each namespace id.
+    namespace_index: HashMap<String, usize>,
+    /// The namespace each class was last placed in by `join`.
+    home: HashMap<String, usize>,
+    /// The index in `chart.classes` of each `classDef` name.
+    class_index: HashMap<String, usize>,
     /// `:::`, `cssClass`, and `style`, applied once every class exists.
     styling: Vec<(String, Styling, TextRange)>,
 }
@@ -262,8 +268,8 @@ impl Lowerer {
     /// Moves class `id` into namespace `n`, out of any other: a `class` declaration in a
     /// namespace places it there, wherever the class was first mentioned.
     fn join(&mut self, id: &str, n: usize) {
-        for s in &mut self.namespaces {
-            s.members.retain(|m| m != id);
+        if let Some(old) = self.home.insert(id.to_owned(), n) {
+            self.namespaces[old].members.retain(|m| m != id);
         }
         self.namespaces[n].members.push(id.to_owned());
     }
@@ -462,9 +468,11 @@ impl Lowerer {
         let Some(id) = text_of(stmt, IDENT) else {
             return;
         };
-        let k = match self.namespaces.iter().position(|s| s.id == id) {
-            Some(k) => k,
+        let k = match self.namespace_index.get(&id) {
+            Some(&k) => k,
             None => {
+                self.namespace_index
+                    .insert(id.clone(), self.namespaces.len());
                 self.namespaces.push(Subgraph {
                     id: id.clone(),
                     title: Label::plain(&id),
@@ -536,12 +544,16 @@ impl Lowerer {
         let styles = self.styles(&style);
         for name in tokens(&names).filter(|t| t.kind() == IDENT) {
             let name = name.text();
-            match self.chart.classes.iter_mut().find(|c| c.name == name) {
-                Some(class) => class.styles.extend(styles.iter().cloned()),
-                None => self.chart.classes.push(ClassDef {
-                    name: name.to_owned(),
-                    styles: styles.clone(),
-                }),
+            match self.class_index.get(name) {
+                Some(&i) => self.chart.classes[i].styles.extend(styles.iter().cloned()),
+                None => {
+                    self.class_index
+                        .insert(name.to_owned(), self.chart.classes.len());
+                    self.chart.classes.push(ClassDef {
+                        name: name.to_owned(),
+                        styles: styles.clone(),
+                    });
+                }
             }
         }
     }

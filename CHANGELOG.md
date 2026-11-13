@@ -19,6 +19,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   number as 0, so the file stays well-formed.
 - Layout: rank tightening visits only items next to one that moved and has a work cap, instead
   of sweeping every item until nothing moves; a `min_len` over 100 counts as 100.
+- Mermaid state diagrams: an unclosed `<<` or `[[` ends with its line instead of taking the
+  lines up to a later `>>`.
+- Mermaid sequence, state, and class diagrams: participant, `classDef`, namespace, and region
+  lookups no longer take quadratic time.
+- Desktop app: an export is written to a temporary file and renamed over the target; a file over
+  64 MiB is not opened; a settings file that cannot be read is no longer overwritten with
+  defaults; a NaN zoom is ignored.
 - PlantUML regex diagrams: a class nested in a class, as in `[[:alpha:]]`, is read as one class,
   and `{ 2 }` with spaces is literal text instead of a repeat, as in Java.
 - Mermaid ZenUML: `else`, `catch`, and `finally` may start the line after a branch's `}`; long

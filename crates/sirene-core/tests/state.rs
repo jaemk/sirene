@@ -329,6 +329,16 @@ fn bracketed_pseudo_states() {
     assert_eq!(shape(&c, "j"), Shape::Fork);
 }
 
+/// An unclosed `<<` ends with its line, not at a later `>>`.
+#[test]
+fn unclosed_stereotype_stays_on_its_line() {
+    let lowered =
+        diagram::lower("stateDiagram-v2\n  state a <<fork\n  b --> c\n  state d <<join>>\n");
+    let c = lowered.diagram.into_graph();
+    assert_eq!(c.edges.len(), 1, "{:?}", c.edges);
+    assert_eq!(shape(&c, "d"), Shape::Fork);
+}
+
 #[test]
 fn metadata() {
     let c = chart(

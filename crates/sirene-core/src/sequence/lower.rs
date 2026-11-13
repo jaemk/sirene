@@ -83,6 +83,8 @@ struct Lower {
     active: Vec<Vec<TextRange>>,
     /// The next `autonumber` number and the step, while numbering is on.
     numbering: Option<(u32, u32)>,
+    /// The index of each participant id.
+    ids: std::collections::HashMap<String, usize>,
 }
 
 fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
@@ -137,7 +139,7 @@ impl Lower {
     }
 
     fn find(&self, id: &str) -> Option<usize> {
-        self.seq.participants.iter().position(|p| p.id == id)
+        self.ids.get(id).copied()
     }
 
     /// The participant named `id`, added on first mention.
@@ -145,6 +147,7 @@ impl Lower {
         if let Some(i) = self.find(id) {
             return i;
         }
+        self.ids.insert(id.to_owned(), self.seq.participants.len());
         self.seq.participants.push(Participant {
             id: id.to_owned(),
             label: display(id),
