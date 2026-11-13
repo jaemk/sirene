@@ -103,9 +103,9 @@ enum Command {
         #[arg(required = true)]
         files: Vec<PathBuf>,
     },
-    /// Print a diagram as text.
+    /// Print a diagram, or each diagram block of a Markdown file, as text.
     Ascii {
-        /// Diagram file to read; stdin when omitted or `-`.
+        /// Diagram or Markdown file to read; stdin when omitted or `-`.
         file: Option<PathBuf>,
         /// Characters to draw with.
         #[arg(long, value_enum, default_value_t = CharsetArg::Unicode)]
@@ -301,6 +301,12 @@ fn run(cli: Cli) -> ExitCode {
                 CharsetArg::Unicode => Charset::Unicode,
                 CharsetArg::Ascii => Charset::Ascii,
             };
+            if let Some(md) = file
+                .as_ref()
+                .filter(|f| sirene_core::markdown::is_markdown(f))
+            {
+                return markdown_blocks(md, watch, || markdown::print_ascii(md, charset));
+            }
             convert(file, None, None, watch, |l| {
                 Ok(l.diagram.ascii(&Options { charset }).into_bytes())
             })
@@ -320,7 +326,9 @@ fn run(cli: Cli) -> ExitCode {
                 .as_ref()
                 .filter(|f| sirene_core::markdown::is_markdown(f))
             {
-                return render_markdown(md, output.as_deref(), "svg", link, watch, &render);
+                return markdown_blocks(md, watch, || {
+                    markdown::render(md, output.as_deref(), "svg", link, &render)
+                });
             }
             convert(file, output, Some("svg"), watch, render)
         }
@@ -346,7 +354,9 @@ fn run(cli: Cli) -> ExitCode {
                 .as_ref()
                 .filter(|f| sirene_core::markdown::is_markdown(f))
             {
-                return render_markdown(md, output.as_deref(), "png", link, watch, &render);
+                return markdown_blocks(md, watch, || {
+                    markdown::render(md, output.as_deref(), "png", link, &render)
+                });
             }
             if file.as_ref().is_some_and(|f| f.is_dir()) {
                 return convert(file, output, Some("png"), watch, render);
@@ -370,18 +380,11 @@ fn run(cli: Cli) -> ExitCode {
     }
 }
 
-/// Renders Markdown file `md`'s diagram blocks (CLI-12); with `watch`, again whenever it changes,
-/// never returning.
-fn render_markdown(
-    md: &Path,
-    out: Option<&Path>,
-    ext: &str,
-    link: bool,
-    watch: bool,
-    render: &impl Fn(&Lowered) -> Result<Vec<u8>, String>,
-) -> ExitCode {
+/// Runs `run` on Markdown file `md`'s diagram blocks (CLI-12); with `watch`, again whenever it
+/// changes, never returning.
+fn markdown_blocks(md: &Path, watch: bool, run: impl Fn() -> bool) -> ExitCode {
     if !watch {
-        return if markdown::render(md, out, ext, link, render) {
+        return if run() {
             ExitCode::SUCCESS
         } else {
             ExitCode::FAILURE
@@ -392,7 +395,7 @@ fn render_markdown(
     loop {
         let now = stamp(md);
         if now != seen {
-            markdown::render(md, out, ext, link, render);
+            run();
             // Adding links changes the file; that is not a change to render again.
             seen = stamp(md);
         }

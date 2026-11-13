@@ -15,8 +15,11 @@ Tests: `suggests_a_misspelled_command`, and `misspelled_commands` in `main.rs`.
 
 ## CLI-2 `sirene ascii`
 
-`sirene ascii [FILE]` reads a flowchart from FILE, or from stdin when FILE is omitted or `-`,
-and prints it to stdout with the ASCII renderer (`ascii-renderer.md`).
+`sirene ascii [FILE]` reads a diagram from FILE, or from stdin when FILE is omitted or `-`,
+and prints it to stdout with the ASCII renderer (`ascii-renderer.md`). A Markdown FILE prints
+each of its diagram blocks (MARKDO-1), a blank line between them, with diagnostics at positions
+in the Markdown file; one with none prints `NAME: no diagram blocks` to stderr and nothing to
+stdout. Tests: `markdown_ascii` in `crates/sirene/tests/cli.rs`.
 
 `--charset unicode|ascii` picks the character set; the default is `unicode`.
 
@@ -32,7 +35,7 @@ When FILE cannot be read, sirene prints `error: cannot read FILE: REASON` to std
 
 ## CLI-5 `sirene svg`
 
-`sirene svg [FILE]` reads a flowchart as `sirene ascii` does and prints it to stdout as a
+`sirene svg [FILE]` reads a diagram as `sirene ascii` does and prints it to stdout as a
 standalone SVG document (`display-list.md`), with text measured by the monospace estimate.
 `--theme light|dark` picks the colors; the default is `light`. `-o, --output PATH` writes the
 SVG to PATH instead of stdout; a PATH that is FILE itself is refused before anything is read
@@ -41,7 +44,7 @@ status follow CLI-3 and CLI-4.
 
 ## CLI-6 `sirene png`
 
-`sirene png [FILE]` reads a flowchart as `sirene ascii` does and writes it as a PNG
+`sirene png [FILE]` reads a diagram as `sirene ascii` does and writes it as a PNG
 (DISPLA-11), with text measured by the embedded font, without opening a window. `--theme` is as
 for `sirene svg`; `--quality draft|normal|fine` (default `fine`) picks the detail (DISPLA-12),
 drawn at that quality's scale, shrunk to fit when the image would be too large; `--scale N` sets
@@ -73,8 +76,8 @@ in `crates/sirene/tests/cli.rs` and `arguments` in `crates/sirene/src/main.rs`.
 
 ## CLI-9 Directories
 
-`sirene svg DIR` and `sirene png DIR` render every `.mmd`, `.mermaid`, `.dot`, and `.gv` file
-under DIR, recursing
+`sirene svg DIR` and `sirene png DIR` render every diagram file under DIR (by `Lang::of_path`:
+`.mmd`, `.mermaid`, `.dot`, `.gv`, `.puml`, `.plantuml`, `.pu`, and `.iuml`, in any case), recursing
 into subdirectories but skipping hidden entries and symlinked directories, in path order. Each is
 written as `.svg` or `.png` beside it, or with `-o OUTDIR` to the same relative path under OUTDIR
 (directories are created as needed). Diagnostics follow CLI-3 for each file; one file's errors
@@ -123,7 +126,7 @@ was written, a line `![diagram N](PATH)` (PATH relative to the Markdown file's d
 `..` to leave it; an absolute `-o` outside that directory stays absolute) is inserted unless the
 line after the block already is that line, and `linked the images in NAME` is printed. The
 diagram blocks themselves are never removed or changed. `--watch` renders again whenever the file changes; the links it adds do not count as
-a change. Tests: `markdown_images`, `markdown_links_from_the_file`, and `watch_markdown` in
+a change. `sirene ascii FILE.md` prints the blocks instead (CLI-2). Tests: `markdown_images`, `markdown_links_from_the_file`, and `watch_markdown` in
 `crates/sirene/tests/cli.rs`, and
 the unit tests in `crates/sirene/src/markdown.rs`.
 

@@ -35,6 +35,7 @@ sirene png diagram.mmd -o diagram.png        # write a PNG
 sirene png diagram.mmd -o dark.png --theme dark --quality normal
 sirene svg diagram.mmd -o diagram.svg        # write an SVG (stdout without -o)
 sirene check notes.md docs                   # each diagram block, every diagram under docs/
+sirene ascii notes.md                        # print each diagram block as text
 sirene png notes.md -o out                   # out/notes-1.png, ... one per diagram block
 sirene svg docs -o out                       # out/a.svg, ... one per diagram under docs/
 ```

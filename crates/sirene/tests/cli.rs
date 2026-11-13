@@ -807,7 +807,44 @@ fn markdown_links_from_the_file() {
     );
 }
 
-/// `svg` and `png` on a Markdown file write one image per mermaid block and never change the
+/// `ascii` on a Markdown file prints each diagram block, a blank line between them, with
+/// diagnostics at Markdown positions.
+#[test]
+fn markdown_ascii() {
+    let tmp = tempfile::tempdir().unwrap();
+    let md = tmp.path().join("doc.md");
+    std::fs::write(
+        &md,
+        "# Doc\n\n```mermaid\nflowchart LR\n  A\n```\n\n```dot\ndigraph { b -> }\n```\n",
+    )
+    .unwrap();
+    let out = sirene()
+        .args(["ascii", "--charset", "ascii"])
+        .arg(&md)
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "+---+\n| A |\n+---+\n\n.---.\n( b )\n'---'\n"
+    );
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(
+        stderr.starts_with(&format!("{}:9:", md.display())),
+        "{stderr}"
+    );
+    std::fs::write(&md, "# Doc\n").unwrap();
+    sirene()
+        .arg("ascii")
+        .arg(&md)
+        .assert()
+        .success()
+        .stdout("")
+        .stderr(predicates::str::contains("no diagram blocks"));
+}
+
+/// `svg` and `png` on a Markdown file write one image per diagram block and never change the
 /// blocks; `--link` adds a link after each, once.
 #[test]
 fn markdown_images() {
