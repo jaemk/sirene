@@ -107,9 +107,9 @@ actions!(
         MoveLater,
         /// Show or hide the styles panel.
         ToggleStyles,
-        /// Show a Markdown file's next mermaid block.
+        /// Show a Markdown file's next diagram block.
         NextDiagram,
-        /// Show a Markdown file's previous mermaid block.
+        /// Show a Markdown file's previous diagram block.
         PreviousDiagram,
     ]
 );

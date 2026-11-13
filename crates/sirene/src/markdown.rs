@@ -63,7 +63,7 @@ pub fn check(path: &Path) -> bool {
             }
         };
         let blocks = markdown::mermaid_blocks(&src);
-        log::debug!("{name}: {} mermaid block(s)", blocks.len());
+        log::debug!("{name}: {} diagram block(s)", blocks.len());
         let mut ok = true;
         for block in &blocks {
             let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));

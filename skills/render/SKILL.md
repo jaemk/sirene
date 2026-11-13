@@ -1,13 +1,15 @@
 ---
 name: render
-description: Render Mermaid flowcharts to PNG, SVG, or terminal text with the sirene CLI, and check them for errors. Use to look at a diagram you wrote, show one in the terminal, make images for docs, or check the mermaid blocks in a Markdown file.
+description: Render Mermaid, PlantUML, and Graphviz DOT diagrams to PNG, SVG, or terminal text with the sirene CLI, and check them for errors. Use to look at a diagram you wrote, show one in the terminal, make images for docs, or check the diagram blocks in a Markdown file.
 ---
 
 # render
 
-`sirene` renders Mermaid flowcharts (`flowchart` and `graph`) to PNG, SVG, and text. Other
-Mermaid diagram types (`sequenceDiagram`, `classDiagram`, ...) are reported as unsupported and
-not drawn.
+`sirene` renders Mermaid, PlantUML, and Graphviz DOT diagrams to PNG, SVG, and text. Mermaid
+flowcharts and over 30 other Mermaid kinds are drawn (`sequenceDiagram`, `classDiagram`,
+`stateDiagram-v2`, `erDiagram`, `gantt`, ...); a Mermaid type it does not know is reported as
+unsupported. The language comes from the extension (`.mmd`, `.puml`, `.dot`, ...), the Markdown
+block name (`mermaid`, `plantuml`, `puml`, `dot`, `graphviz`), or `--lang mermaid|dot|plantuml`.
 
 ## Setup
 
@@ -32,9 +34,9 @@ sirene ascii --charset ascii diagram.mmd     # print with ASCII characters only
 sirene png diagram.mmd -o diagram.png        # write a PNG
 sirene png diagram.mmd -o dark.png --theme dark --quality normal
 sirene svg diagram.mmd -o diagram.svg        # write an SVG (stdout without -o)
-sirene check notes.md docs                   # each mermaid block, every .mmd under docs/
-sirene png notes.md -o out                   # out/notes-1.png, ... one per mermaid block
-sirene svg docs -o out                       # out/a.svg, ... one per .mmd under docs/
+sirene check notes.md docs                   # each diagram block, every diagram under docs/
+sirene png notes.md -o out                   # out/notes-1.png, ... one per diagram block
+sirene svg docs -o out                       # out/a.svg, ... one per diagram under docs/
 ```
 
 With no FILE, or `-`, a command reads stdin:
@@ -58,11 +60,12 @@ errors, and the exit status is 1. Fix every error before handing a diagram back.
 
 To check how a diagram you wrote looks:
 
-1. Write it to a `.mmd` file, or a mermaid block in Markdown.
+1. Write it to a `.mmd`, `.puml`, or `.dot` file, or a diagram block in Markdown.
 2. `sirene check` it and fix the errors.
 3. Render a PNG to a scratch path (`-o`) and read the image; or `sirene ascii` it to see the
    layout as text, which is also what to show the user in a terminal.
-4. Adjust direction (`flowchart LR` or `TD`), subgraphs, and edge lengths (`-->` vs `--->`)
-   until it reads well, then render the final output where the user wants it.
+4. Adjust direction (`flowchart LR` or `TD`, `rankdir`, `left to right direction`), grouping,
+   and edge lengths (`-->` vs `--->`) until it reads well, then render the final output where
+   the user wants it.
 
-The supported syntax is at <https://jaemk.github.io/sirene/syntax.html>.
+What each diagram kind reads is at <https://jaemk.github.io/sirene/guide/>.

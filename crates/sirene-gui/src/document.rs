@@ -48,12 +48,12 @@ pub enum Disk {
     Conflict,
 }
 
-/// A Markdown file, edited one mermaid block at a time (WYSIWY-20).
+/// A Markdown file, edited one diagram block at a time (WYSIWY-20).
 #[derive(Debug, Clone)]
 pub struct Markdown {
     /// The whole file's text, with the edits made to its blocks.
     pub text: String,
-    /// The mermaid blocks of `text`.
+    /// The diagram blocks of `text`.
     pub blocks: Vec<Block>,
     /// The block shown, an index into `blocks`.
     pub block: usize,
@@ -93,7 +93,7 @@ impl Document {
     }
 
     /// A document showing `source`, which counts as saved. For a Markdown `path`, `source` is the
-    /// file's text and the document shows its first mermaid block.
+    /// file's text and the document shows its first diagram block.
     pub fn from_source(path: Option<PathBuf>, source: String) -> Self {
         let markdown = path
             .as_deref()
@@ -201,7 +201,7 @@ impl Document {
         }
     }
 
-    /// Shows mermaid block `i` of a Markdown file. Returns whether the shown block changed.
+    /// Shows diagram block `i` of a Markdown file. Returns whether the shown block changed.
     pub fn show_block(&mut self, i: usize) -> bool {
         let Some(md) = &mut self.markdown else {
             return false;
@@ -280,7 +280,8 @@ impl Document {
                         text.push('\n');
                     }
                     let code = source.trim_end_matches('\n');
-                    text.push_str(&format!("```mermaid\n{code}\n```\n"));
+                    let info = fence_info(&source, None);
+                    text.push_str(&format!("```{info}\n{code}\n```\n"));
                     text
                 }
             };
@@ -378,13 +379,15 @@ impl Document {
     }
 
     /// Saves to `path`, which the document then shows. Saving a diagram as Markdown writes it in
-    /// a mermaid block; saving a Markdown file's block as a diagram writes the block alone.
+    /// a block named for its language; saving a Markdown file's block as a diagram writes the
+    /// block alone.
     pub fn save_as(&mut self, path: PathBuf) -> Result<(), String> {
         match (&self.markdown, is_markdown(&path)) {
             (Some(_), false) => self.markdown = None,
             (None, true) => {
                 let code = self.source.trim_end_matches('\n');
-                let text = format!("```mermaid\n{code}\n```\n");
+                let info = fence_info(&self.source, self.lang());
+                let text = format!("```{info}\n{code}\n```\n");
                 self.markdown = Some(Markdown {
                     blocks: mermaid_blocks(&text),
                     text,
@@ -435,7 +438,7 @@ impl Document {
             .is_some_and(|md| md.blocks.is_empty())
         {
             return format!(
-                "{} has no mermaid blocks; editing adds one at the end",
+                "{} has no diagram blocks; editing adds one at the end",
                 self.name()
             );
         }
@@ -449,6 +452,16 @@ impl Document {
             Some(p) if self.problems.len() == 1 => p.to_string(),
             Some(p) => format!("{p} (+{} more)", self.problems.len() - 1),
         }
+    }
+}
+
+/// The info string of a Markdown block holding `source`, read as `lang` when given: `dot`,
+/// `plantuml`, or `mermaid` (MARKDO-1).
+fn fence_info(source: &str, lang: Option<Lang>) -> &'static str {
+    match Kind::of_lang(source, lang) {
+        Kind::Dot => "dot",
+        Kind::PlantUml => "plantuml",
+        _ => "mermaid",
     }
 }
 
