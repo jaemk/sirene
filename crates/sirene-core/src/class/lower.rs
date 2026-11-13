@@ -176,7 +176,7 @@ fn unticked(id: &str) -> &str {
 pub(crate) fn member(raw: &str) -> (bool, Row) {
     let mut t = raw.trim().to_owned();
     let (mut underline, mut italic) = (false, false);
-    let mut take = |at: usize, t: &mut String| match t[at..].chars().next() {
+    let mut take = |at: usize, t: &mut String| match t.get(at..).and_then(|s| s.chars().next()) {
         Some('$') => {
             underline = true;
             t.remove(at);
@@ -629,6 +629,8 @@ mod tests {
             (false, "~List<int> items".into(), false, false)
         );
         assert_eq!(m("~run()"), (true, "~run()".into(), false, false));
+        assert_eq!(m("é"), (false, "é".into(), false, false));
+        assert_eq!(m("run()é"), (true, "run()é".into(), false, false));
         assert_eq!(m("  "), (false, String::new(), false, false));
     }
 }
