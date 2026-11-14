@@ -46,6 +46,13 @@ Markdown FILE); a PATH that is FILE itself is refused before anything is read
 (`error: refusing to overwrite the input FILE; use --output`, exit 1). Diagnostics and exit
 status follow CLI-3 and CLI-4.
 
+Regular output files are written through an exclusively created temporary file beside the
+destination, synced, then renamed into place. Existing output permissions are kept. An
+existing output symlink is replaced rather than written through; Markdown `--link` rewrites
+instead follow the Markdown file's symlink. Unrelated files, including ones named like an old
+staging file, are left alone. Tests: `output_keeps_unrelated_staging_file` in
+`crates/sirene/tests/cli.rs`, and the `writes_*` unit tests in `crates/sirene/src/main.rs`.
+
 ## CLI-6 `sirene png`
 
 `sirene png [FILE]` reads a diagram as `sirene ascii` does and writes it as a PNG
@@ -137,6 +144,11 @@ diagram blocks themselves are never removed or changed. `--watch` renders again 
 a change. `sirene ascii FILE.md` prints the blocks instead (CLI-2). Tests: `markdown_images`, `markdown_links_from_the_file`, and `watch_markdown` in
 `crates/sirene/tests/cli.rs`, and
 the unit tests in `crates/sirene/src/markdown.rs`.
+
+Image paths encode literal URI syntax (`#`, `?`, `%`, and `:`) as percent escapes, keeping
+directory separators, so a file named `guide#v2-1.svg` is linked as `guide%23v2-1.svg` rather
+than as a fragment. Test: `markdown_links_encode_filename_delimiters` in
+`crates/sirene/tests/cli.rs`.
 
 ## CLI-13 `--lang`
 

@@ -115,7 +115,13 @@ fn link_target(md: &Path, image: &Path) -> String {
         .as_deref()
         .unwrap_or(image)
         .to_string_lossy()
-        .replace('\\', "/");
+        .replace('\\', "/")
+        // Encode literal URI syntax before CommonMark's destination formatting. In
+        // particular, a literal `%20` filename must not turn into a space.
+        .replace('%', "%25")
+        .replace('#', "%23")
+        .replace('?', "%3F")
+        .replace(':', "%3A");
     // A CommonMark link destination with spaces or parentheses goes in `<...>`.
     if target.contains(|c: char| c.is_whitespace() || "()<>".contains(c)) {
         format!("<{}>", target.replace('<', "\\<").replace('>', "\\>"))
@@ -378,6 +384,15 @@ mod tests {
             link_target(md, Path::new("docs/a<b>.svg")),
             "<a\\<b\\>.svg>"
         );
+        for (image, target) in [
+            ("docs/guide#v2.svg", "guide%23v2.svg"),
+            ("docs/guide?x.svg", "guide%3Fx.svg"),
+            ("docs/guide%20.svg", "guide%2520.svg"),
+            ("docs/guide:v2.svg", "guide%3Av2.svg"),
+            ("docs/img#1/guide (1)%.svg", "<img%231/guide (1)%25.svg>"),
+        ] {
+            assert_eq!(link_target(md, Path::new(image)), target);
+        }
     }
 
     #[test]
