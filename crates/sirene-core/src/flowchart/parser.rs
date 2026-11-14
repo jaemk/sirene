@@ -452,7 +452,8 @@ impl<'a> Parser<'a> {
             }
             self.finish();
         }
-        if self.rest().starts_with("@{") {
+        // Mermaid allows whitespace before shape data (`node SPACE shapeData`).
+        if self.ws_then(|r| r.starts_with("@{")) {
             self.metadata();
         }
         self.finish();
@@ -664,14 +665,15 @@ impl<'a> Parser<'a> {
                 self.token(IDENT, n);
                 self.ws();
                 self.shape(1, Opener::Rect);
-                if self.agentflow && self.rest().starts_with("@{") {
+                if self.agentflow && self.ws_then(|r| r.starts_with("@{")) {
                     self.metadata();
                 }
             } else if n > 0 && scan::is_stmt_end(after) {
                 self.token(IDENT, n);
-            } else if self.agentflow && n > 0 && r[n..].starts_with("@{") {
+            } else if self.agentflow && n > 0 && after.starts_with("@{") {
                 // MAGF-2: `flow id@{ ... }`.
                 self.token(IDENT, n);
+                self.ws();
                 self.metadata();
             } else {
                 let len = scan::trim_end_len(r, scan::stmt_len(r));

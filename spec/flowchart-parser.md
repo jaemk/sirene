@@ -101,7 +101,8 @@ document.
 
 ## FLOWCH-9 Edges
 
-An edge is an optional edge id (`id@`), a stroke, and an optional label.
+An edge is an optional edge id (`id@`), a stroke, and an optional label. An edge id is any run
+of characters except whitespace, `"`, brackets, braces, `|`, and `@` (so `e:1@-->` is an edge id).
 
 | Stroke | Forms |
 |---|---|
@@ -161,7 +162,8 @@ the next `}` and may span lines.
 ## FLOWCH-15 Metadata blocks
 
 `<id>@{ ... }` attaches metadata to a node, edge, or subgraph. It is valid after a node in a
-vertex statement and as a statement of its own (e.g. `e1@{ animate: true }`). The body runs to
+vertex statement and as a statement of its own (e.g. `e1@{ animate: true }`). Inline whitespace
+may separate the id or shape from `@{` (`A @{ shape: circle }`). The body runs to
 the first `}` outside double-quoted strings (bodies do not nest) and may span lines. Its content
 is interpreted by the model. An unclosed block ends at the end of its line, with a diagnostic.
 

@@ -382,6 +382,36 @@ fn subgraph_metadata() {
     assert!(c.node("s").is_none());
 }
 
+#[test]
+fn metadata_after_whitespace() {
+    let c = chart("flowchart LR\n A @{ shape: circle }\nB[x] @{ shape: rect } --> C\n");
+    assert_eq!(c.node("A").unwrap().shape, Shape::Circle);
+    assert_eq!(c.node("B").unwrap().shape, Shape::Rect);
+    assert!(c.node("C").is_some());
+
+    let c = chart("flowchart\nA e1@--> B\ne1 @{ animate: true }\n");
+    assert!(c.edge("e1").unwrap().animate);
+    assert_eq!(c.nodes.len(), 2);
+}
+
+#[test]
+fn edge_id_chars() {
+    let c = chart("flowchart\nA e:1@--> B\n");
+    assert_eq!(c.nodes.len(), 2);
+    assert_eq!(c.edges.len(), 1);
+    assert!(c.edge("e:1").is_some());
+}
+
+#[test]
+fn subgraph_id_takes_metadata_before_edge_id() {
+    let c = chart("flowchart\nsubgraph s\nX\nend\nA s@--> B\ns@{ view: collapsed }\n");
+    assert_eq!(
+        c.subgraph("s").unwrap().metadata,
+        [("view".to_owned(), "collapsed".to_owned())]
+    );
+    assert!(c.edge("s").unwrap().metadata.is_empty());
+}
+
 // ---- FLOWMO-8 ----
 
 #[test]
