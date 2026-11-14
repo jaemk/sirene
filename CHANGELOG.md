@@ -24,6 +24,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `cargo xtask sign` uses an exclusively created temporary file, preserving existing files and
+  symlink targets beside the archive and retaining the archive's permissions. The release
+  workflow decodes its signing key with owner-only permissions.
 - CLI: images, `-o` files, and `--link` rewrites are written to a temporary file and renamed
   into place, so a failed write keeps the old file; a symlinked output is replaced, not written
   through. Inputs and stdin over 64 MiB are refused.
@@ -198,6 +201,28 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   longer each rescan the rest of the source, in flowcharts and the other Mermaid parsers.
 - ASCII edges far outside the canvas are clipped to it before they are drawn.
 - Block diagram groups nest at most 8 deep (was 12), since each level doubles the sizing work.
+- `sirene update` compares versions by semver precedence, so build metadata no longer makes a
+  release look newer, and `--to` refuses a version with `+`.
+- `sirene update --check` on a package-manager install names the update command also when the
+  running build is newer than the latest release.
+- Rendering a directory on macOS or Windows no longer overwrites an output when two inputs
+  differ only in case (`A.mmd` and `a.mmd`); the second is skipped with an error.
+- Release workflow: xtask is built before the signing key is decoded, and a re-run by hand
+  refuses when `main` is no longer at the release's tag.
+- Mermaid flowcharts: shape data may follow a space (`A @{ shape: circle }`,
+  `e1 @{ animate: true }`); edge ids take any character Mermaid allows (`A e:1@--> B`); and
+  `id@{ ... }` goes to a subgraph before an edge with the same id, as in Mermaid.
+- PlantUML state diagrams: `[*] -up-> A` draws a start state and `A -left-> [*]` an end state,
+  instead of the other way around.
+- Mermaid sequence diagrams: `autonumber` keeps counting messages while numbering is off, and
+  a bare `autonumber` continues from the current number and step instead of restarting at 1,
+  as in Mermaid.
+- Mermaid class diagrams: a method's return type is drawn after ` : ` (`+getAge() : int`), as
+  in Mermaid.
+- Mermaid ER diagrams: cardinality words, `to`, `optionally to`, and `PK`/`FK`/`UK` keys match
+  in any case.
+- Mermaid gantt charts: an `x` or `X` timestamp out of range is an invalid date instead of
+  overflowing.
 
 ## [0.3.0] - 2026-11-12
 

@@ -295,6 +295,7 @@ jobs:
           ZIPSIGN_KEY: ${{ secrets.ZIPSIGN_KEY }}
         run: |
           set -euo pipefail
+          umask 077
           key="$RUNNER_TEMP/release.key"
           trap 'rm -f "$key"' EXIT
           printf '%s' "$ZIPSIGN_KEY" | base64 -d > "$key"
