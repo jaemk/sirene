@@ -595,29 +595,65 @@ fn draw_node_text(canvas: &mut Canvas, node: &Node, r: Rect) {
     draw_lines(canvas, &lines, x, w, y + (h - lines.len() as i32) / 2);
 }
 
-/// Every cell along an orthogonal path, in order.
-fn cells(points: &[Point]) -> Vec<Point> {
+/// Every cell along an orthogonal path, in order, within one cell of a `width` by `height`
+/// canvas. Past that, a run keeps only its corners, so a path through a drawing cut down to
+/// the canvas costs no more than the canvas; the cells left out would not be drawn.
+fn cells(points: &[Point], width: i32, height: i32) -> Vec<Point> {
     let mut out = Vec::new();
     for (i, &p) in points.iter().enumerate() {
         if i == 0 {
             out.push(p);
             continue;
         }
-        let mut at = points[i - 1];
-        while at != p {
-            at.x += (p.x - at.x).signum();
-            if at.x == p.x {
-                at.y += (p.y - at.y).signum();
-            }
-            out.push(at);
-        }
+        // Across, then down: a diagonal step is taken as two runs.
+        let a = points[i - 1];
+        let corner = Point { x: p.x, y: a.y };
+        run(&mut out, a, corner, width, height);
+        run(&mut out, corner, p, width, height);
     }
     out
 }
 
-/// The direction bits from `a` to the adjacent cell `b`, and back.
+/// Pushes the cells after `a` up to `b` on a straight run: those within one cell of the
+/// canvas, and `b`.
+fn run(out: &mut Vec<Point>, a: Point, b: Point, width: i32, height: i32) {
+    let (ex, ey) = (
+        i64::from(b.x) - i64::from(a.x),
+        i64::from(b.y) - i64::from(a.y),
+    );
+    let (dx, dy) = (ex.signum() as i32, ey.signum() as i32);
+    let n = ex.abs().max(ey.abs());
+    if n == 0 {
+        return;
+    }
+    // The steps `k` in 1..=n whose cell is near the canvas, one axis at a time.
+    let near = |c: i32, d: i32, hi: i32| -> (i64, i64) {
+        let (c, lo, hi) = (i64::from(c), -1, i64::from(hi));
+        match d {
+            0 if (lo..=hi).contains(&c) => (1, n),
+            0 => (1, 0),
+            1 => (lo - c, hi - c),
+            _ => (c - hi, c - lo),
+        }
+    };
+    let (x0, x1) = near(a.x, dx, width);
+    let (y0, y1) = near(a.y, dy, height);
+    let (k0, k1) = (x0.max(y0).max(1), x1.min(y1).min(n));
+    let at = |k: i64| Point {
+        x: (i64::from(a.x) + i64::from(dx) * k) as i32,
+        y: (i64::from(a.y) + i64::from(dy) * k) as i32,
+    };
+    for k in k0..=k1 {
+        out.push(at(k));
+    }
+    if k0 > k1 || k1 < n {
+        out.push(b);
+    }
+}
+
+/// The direction bits from `a` to `b`, the next cell along a run, and back.
 fn bits(a: Point, b: Point) -> (u8, u8) {
-    match (b.x - a.x, b.y - a.y) {
+    match (b.x.cmp(&a.x) as i32, b.y.cmp(&a.y) as i32) {
         (1, _) => (RIGHT, LEFT),
         (-1, _) => (LEFT, RIGHT),
         (_, 1) => (DOWN, UP),
@@ -666,7 +702,7 @@ fn draw_edge(
         Stroke::Dotted => Line::Dotted,
         _ => Line::Light,
     };
-    let path = cells(points);
+    let path = cells(points, canvas.width(), canvas.height());
     let Some(first) = path.iter().position(|&p| !from.contains(p)) else {
         return;
     };

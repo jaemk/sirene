@@ -73,6 +73,11 @@ impl Canvas {
         self.width
     }
 
+    /// The rows kept, after any cut.
+    pub fn height(&self) -> i32 {
+        self.height
+    }
+
     fn cell(&mut self, x: i32, y: i32) -> Option<&mut Cell> {
         if x < 0 || y < 0 || x >= self.width || y >= self.height {
             return None;

@@ -27,8 +27,9 @@ const STATEMENT: &str = "expected a block such as `a` or `a[\"Label\"]`, `space`
                          `style`";
 
 /// How deep groups nest (LANGS-8). Lower than the shared limit: sizing a group sizes each of
-/// its groups twice, as Mermaid does, so the work doubles with every level.
-const MAX_GROUPS: usize = 12;
+/// its groups twice, as Mermaid does, so the work doubles with every level. At 8 a block is
+/// sized at most 256 times.
+const MAX_GROUPS: usize = 8;
 
 struct Parser<'a>(Base<'a>);
 

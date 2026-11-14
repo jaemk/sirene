@@ -6,7 +6,7 @@ use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, Next};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -40,30 +40,6 @@ pub(crate) const SHAPES: [(&str, &str); 6] = [
 
 /// The base parser, and the next `` `" `` and `}` for strings and metadata that may span lines.
 struct Parser<'a>(Base<'a>, Next, Next);
-
-/// The next match of a needle at or after a position. A later search from a position no further
-/// than that match reuses it, so unclosed openers on many lines do not each rescan the rest.
-#[derive(Default)]
-struct Next {
-    from: usize,
-    at: Option<Option<usize>>,
-}
-
-impl Next {
-    /// The absolute offset of the first `needle` in `rest`, which starts at `pos`.
-    fn find(&mut self, rest: &str, pos: usize, needle: &str) -> Option<usize> {
-        if let Some(at) = self.at
-            && pos >= self.from
-            && at.is_none_or(|a| pos <= a)
-        {
-            return at;
-        }
-        let at = rest.find(needle).map(|i| pos + i);
-        self.from = pos;
-        self.at = Some(at);
-        at
-    }
-}
 
 impl<'a> Deref for Parser<'a> {
     type Target = Base<'a>;
@@ -161,8 +137,8 @@ impl Parser<'_> {
         self.start(METADATA);
         self.token(META_OPEN, 2);
         let pos = self.pos;
-        let close = self.0.rest();
-        let closed = match self.2.find(close, pos, "}").map(|at| at - pos) {
+        let src = self.0.src;
+        let closed = match self.2.find(src, pos, "}").map(|at| at - pos) {
             Some(i) => {
                 self.token(META_BODY, i);
                 self.token(META_CLOSE, 1);
@@ -189,11 +165,12 @@ impl Parser<'_> {
         let ws = scan::ws_len(r);
         let quoted = &r[ws..];
         let line = &r[..scan::line_len(r)];
-        if let Some(body) = quoted.strip_prefix("\"`") {
+        if quoted.starts_with("\"`") {
             self.token(WHITESPACE, ws);
             // A markdown string may span lines.
             let from = self.pos + 2;
-            match self.1.find(body, from, "`\"").map(|at| at - from) {
+            let src = self.0.src;
+            match self.1.find(src, from, "`\"").map(|at| at - from) {
                 Some(i) => self.token(MD_STRING, i + 4),
                 None => {
                     self.fail("unclosed markdown string: expected `` `\" ``");

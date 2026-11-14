@@ -182,6 +182,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   after them.
 - The guide says `animate`, `animation`, `curve`, and `interpolate` are parsed but not drawn,
   `fa:` icons stay as text, and shows `rgb(255\,0\,0)` with an escaped comma in `style`.
+- A flowchart edge label on an `&` product counts once per edge toward a 16 MiB budget, and
+  `classDef`, `class`, and `linkStyle` lines naming many targets count toward a 64 MiB one;
+  past them the rest is left out with a warning.
+- A flowchart element keeps at most 256 `@{ ... }` metadata keys, and subgraphs that list one
+  another as members nest at most 65 deep, each with a warning.
+- Lines that open a directive, string, metadata body, or `accDescr {` without closing it no
+  longer each rescan the rest of the source, in flowcharts and the other Mermaid parsers.
+- ASCII edges far outside the canvas are clipped to it before they are drawn.
+- Block diagram groups nest at most 8 deep (was 12), since each level doubles the sizing work.
 
 ## [0.3.0] - 2026-11-12
 
