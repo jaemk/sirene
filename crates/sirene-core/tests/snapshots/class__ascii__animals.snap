@@ -2,20 +2,20 @@
 source: crates/sirene-core/tests/class.rs
 expression: "classDiagram\n    note for Duck \"can fly\\ncan swim\"\n    Animal <|-- Duck\n    Animal <|-- Fish\n    Animal <|-- Zebra\n    Animal : +int age\n    Animal : +String gender\n    Animal: +isMammal() bool\n    Animal: +mate()\n    class Duck{\n        +String beakColor\n        +swim()\n        +quack()\n    }\n    class Fish{\n        -int sizeInFeet\n        -canEat()\n    }\n    class Zebra{\n        +bool is_wild\n        +run()$\n    }\n    class Shape{\n        <<interface>>\n        noOfVertices\n        draw()*\n    }\n    Zebra \"1\" *-- \"many\" Shape : has\n    Fish o.. Shape\n"
 ---
-                                   +------------------+
-                                   |      Animal      |
-                                   +------------------+
-                                   | +int age         |
-                                   | +String gender   |
-                                   +------------------+
-                                   | +isMammal() bool |
-                                   | +mate()          |
-                                   +------------------+
-                                       ^     ^     ^
-                        +--------------+     |     +-------+
-                        |                    |             |
-                        |                    |             |
-          +-------------+                    +-+           +--------+
+                                  +--------------------+
+                                  |       Animal       |
+                                  +--------------------+
+                                  | +int age           |
+                                  | +String gender     |
+                                  +--------------------+
+                                  | +isMammal() : bool |
+                                  | +mate()            |
+                                  +--------------------+
+                                      ^      ^     ^
+                       +--------------+      |     +------+
+                       |                     |            |
+                       |                     |            |
+          +------------+                     +-+          +---------+
           |                                    |                    |
 +---------+---------+                 +--------+--------+   +-------+-------+
 |       Duck        |                 |      Fish       |   |     Zebra     |
@@ -26,11 +26,11 @@ expression: "classDiagram\n    note for Duck \"can fly\\ncan swim\"\n    Animal 
 | +quack()          |                 +-----------------+   +---------------+
 +-------------------+                          o                    *1
                                                :                    |
-                                               ++              +----+
-                                                :              |
-                                                :             has
-                                                :              |
-                                                :       +------+
+                                               ++             +-----+
+                                                :             |
+                                                :            has
+                                                :             |
+                                                :       +-----+
                                                 :       |many
                                             +---+-------+---+
                                             | <<interface>> |

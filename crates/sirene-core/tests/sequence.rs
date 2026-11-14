@@ -279,6 +279,30 @@ fn box_contents() {
     assert_eq!(s.participants[0].label, ["Alice"]);
 }
 
+/// Mermaid counts messages while numbering is off, and a bare `autonumber` keeps the current
+/// number and step; a start or step of 0 is ignored.
+#[test]
+fn autonumber_counts_while_off() {
+    let numbers =
+        |src: &str| -> Vec<Option<u32>> { sequence(src).messages().map(|m| m.number).collect() };
+    assert_eq!(
+        numbers("sequenceDiagram\nA->>B: x\nautonumber\nA->>B: y\n"),
+        [None, Some(2)]
+    );
+    assert_eq!(
+        numbers(
+            "sequenceDiagram\nautonumber 10 5\nA->>B: a\nautonumber off\nA->>B: b\nautonumber\nA->>B: c\n"
+        ),
+        [Some(10), None, Some(20)]
+    );
+    assert_eq!(
+        numbers(
+            "sequenceDiagram\nautonumber 7 3\nA->>B: a\nautonumber 0\nA->>B: b\nautonumber 0 0\nA->>B: c\n"
+        ),
+        [Some(7), Some(10), Some(11)]
+    );
+}
+
 /// MSEQ-1: notes, `autonumber`, `box`, `create`, `destroy`, and the title.
 #[test]
 fn statements() {

@@ -93,7 +93,12 @@ pub(crate) fn relationship(rel: &str) -> (Arrow, Stroke, Arrow) {
             .map_or(Arrow::One, |(_, sym)| marker(sym))
     };
     // The words may be separated by any whitespace.
-    let rel = rel.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Mermaid's lexer ignores case.
+    let rel = rel
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase();
     let rel = rel.as_str();
     let (sep, stroke) = if rel.contains(" optionally to ") {
         (" optionally to ", Stroke::Dotted)
@@ -181,7 +186,13 @@ impl Lowerer {
             };
             let ty = generic(ty);
             let keys = text_of(&a, KEYS)
-                .map(|k| k.split(',').map(str::trim).collect::<Vec<_>>().join(", "))
+                .map(|k| {
+                    let keys: Vec<String> = k
+                        .split(',')
+                        .map(|k| k.trim().to_ascii_uppercase())
+                        .collect();
+                    keys.join(", ")
+                })
                 .unwrap_or_default();
             let comment = token(&a, STRING)
                 .map(|s| text::unquote(s.text()).to_owned())

@@ -353,11 +353,15 @@ pub fn parse_dayjs(s: &str, format: &str, now: Time) -> Option<Time> {
                         .count();
                     let v: f64 = rest[..n].parse().ok()?;
                     rest = &rest[n..];
-                    stamp = Some(if tok == "X" {
-                        (v * 1000.0).round() as i64
+                    let ms = if tok == "X" {
+                        (v * 1000.0).round()
                     } else {
-                        v as i64
-                    });
+                        v.trunc()
+                    };
+                    if !ms.is_finite() || ms.abs() > LIMIT {
+                        return None;
+                    }
+                    stamp = Some(ms as i64);
                 }
                 // Weekdays and quarters are written, not read.
                 _ => return None,

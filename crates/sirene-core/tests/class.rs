@@ -178,7 +178,7 @@ fn members_and_sections() {
     assert_eq!(a.label.text, "«interface»\nA");
     assert_eq!(a.sections.len(), 2);
     assert_eq!(rows(&a.sections[0]), ["+int id", "-String name"]);
-    assert_eq!(rows(&a.sections[1]), ["+run() bool", "+stop()"]);
+    assert_eq!(rows(&a.sections[1]), ["+run() : bool", "+stop()"]);
     assert!(a.sections[0][1].underline && !a.sections[0][1].italic);
     assert!(a.sections[1][1].italic && !a.sections[1][1].underline);
     // No members: a plain box; only methods: an empty attribute section first.
