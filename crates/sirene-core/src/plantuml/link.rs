@@ -28,6 +28,8 @@ pub(crate) struct Link<'a> {
     pub unknown: Vec<String>,
     /// The arrow as written, from its first head to its last.
     pub arrow: &'a str,
+    /// Whether the ends were swapped by `up` or `left`: `from` was written second.
+    pub turned: bool,
 }
 
 const LEFT_HEADS: &[u8] = b"<|*o#x}{+^";
@@ -339,6 +341,7 @@ pub(crate) fn link(s: &str) -> Option<Link<'_>> {
         styles: Vec::new(),
         unknown,
         arrow: &s[left..right],
+        turned: false,
     };
     for option in options.into_iter().flat_map(|o| o.split([',', ';'])) {
         let o = option.trim();
@@ -384,6 +387,7 @@ impl Link<'_> {
         std::mem::swap(&mut self.from, &mut self.to);
         std::mem::swap(&mut self.from_label, &mut self.to_label);
         std::mem::swap(&mut self.start, &mut self.end);
+        self.turned = !self.turned;
     }
 }
 

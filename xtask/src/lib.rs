@@ -328,7 +328,7 @@ pub fn gen_key(dir: &Path) -> Result<(PathBuf, PathBuf), String> {
     getrandom::fill(&mut seed).map_err(|e| format!("could not read random bytes: {e}"))?;
     let key = zipsign_api::SigningKey::from_bytes(&seed);
     fs::create_dir_all(dir).map_err(|e| context(dir, e))?;
-    write_new(&private, &key.to_keypair_bytes())?;
+    write_private_new(&private, &key.to_keypair_bytes())?;
     write_new(&public, key.verifying_key().as_bytes())?;
     Ok((private, public))
 }
@@ -374,9 +374,22 @@ pub fn sign(key: &zipsign_api::SigningKey, archive: &Path) -> Result<(), String>
         Some(name.as_bytes()),
     )
     .map_err(|e| format!("{}: {e}", archive.display()))?;
-    let tmp = archive.with_file_name(format!(".{name}.signing"));
-    write(&tmp, signed.get_ref())?;
-    fs::rename(&tmp, archive).map_err(|e| context(archive, e))
+    let parent = archive
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let mut tmp = tempfile::NamedTempFile::new_in(parent).map_err(|e| context(archive, e))?;
+    tmp.write_all(signed.get_ref())
+        .map_err(|e| context(archive, e))?;
+    let permissions = fs::metadata(archive)
+        .map_err(|e| context(archive, e))?
+        .permissions();
+    tmp.as_file()
+        .set_permissions(permissions)
+        .map_err(|e| context(archive, e))?;
+    tmp.persist(archive)
+        .map(|_| ())
+        .map_err(|e| context(archive, e.error))
 }
 
 fn write(path: &Path, bytes: &[u8]) -> Result<(), String> {
@@ -389,6 +402,18 @@ fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .create_new(true)
         .open(path)
         .map_err(|e| context(path, e))?;
+    f.write_all(bytes).map_err(|e| context(path, e))
+}
+
+fn write_private_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut f = options.open(path).map_err(|e| context(path, e))?;
     f.write_all(bytes).map_err(|e| context(path, e))
 }
 
@@ -481,6 +506,55 @@ mod tests {
 
         let e = sign(&key, &dir.path().join("a.zip")).unwrap_err();
         assert!(e.ends_with("not a .tar.gz file name"), "{e}");
+    }
+
+    fn signing_fixture() -> (tempfile::TempDir, zipsign_api::SigningKey, PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let archive = dir.path().join("sirene-1.0.0-test.tar.gz");
+        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        gz.write_all(b"archive contents").unwrap();
+        fs::write(&archive, gz.finish().unwrap()).unwrap();
+        (dir, zipsign_api::SigningKey::from_bytes(&[7; 32]), archive)
+    }
+
+    #[test]
+    fn signing_preserves_existing_staging_file() {
+        let (_dir, key, archive) = signing_fixture();
+        let staging = archive.with_file_name(".sirene-1.0.0-test.tar.gz.signing");
+        fs::write(&staging, b"keep this file").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&archive, fs::Permissions::from_mode(0o640)).unwrap();
+        }
+        sign(&key, &archive).unwrap();
+        assert_eq!(fs::read(&staging).unwrap(), b"keep this file");
+        self_update::verify_signature(&archive, &[key.verifying_key().to_bytes()]).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&archive).unwrap().permissions().mode() & 0o777,
+                0o640
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn signing_does_not_follow_staging_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let (dir, key, archive) = signing_fixture();
+        let sentinel = dir.path().join("sentinel");
+        fs::write(&sentinel, b"keep this target").unwrap();
+        let staging = archive.with_file_name(".sirene-1.0.0-test.tar.gz.signing");
+        symlink(&sentinel, &staging).unwrap();
+        sign(&key, &archive).unwrap();
+        assert_eq!(fs::read(&sentinel).unwrap(), b"keep this target");
+        assert!(fs::symlink_metadata(&staging).unwrap().is_symlink());
+        assert!(fs::symlink_metadata(&archive).unwrap().is_file());
+        self_update::verify_signature(&archive, &[key.verifying_key().to_bytes()]).unwrap();
     }
 
     #[test]

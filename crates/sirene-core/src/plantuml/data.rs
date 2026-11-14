@@ -323,17 +323,67 @@ impl YLine {
     }
 }
 
+/// Quoted scalars start only at a scalar boundary. Quotes within a plain scalar, such as
+/// `don't` or `a "word"`, are literal. Whitespace alone does not start a new scalar.
+#[derive(Default)]
+struct YamlQuotes {
+    quote: Option<char>,
+    scalar_started: bool,
+    flow_depth: usize,
+}
+
+impl YamlQuotes {
+    /// Escapes and doubled single quotes consume their second character, which cannot close
+    /// the scalar or separate its contents.
+    fn quoted(
+        &mut self,
+        c: char,
+        chars: &mut std::iter::Peekable<std::str::CharIndices<'_>>,
+    ) -> bool {
+        match self.quote {
+            Some('"') if c == '\\' => {
+                chars.next();
+            }
+            Some('\'') if c == '\'' && chars.peek().is_some_and(|(_, c)| *c == '\'') => {
+                chars.next();
+            }
+            Some(q) if c == q => self.quote = None,
+            Some(_) => {}
+            None if !self.scalar_started && matches!(c, '"' | '\'') => {
+                self.quote = Some(c);
+                self.scalar_started = true;
+            }
+            None => {
+                let separated = chars.peek().is_none_or(|(_, c)| c.is_whitespace());
+                match c {
+                    '[' | '{' if !self.scalar_started => {
+                        self.flow_depth += 1;
+                    }
+                    ']' | '}' if self.flow_depth > 0 => {
+                        self.flow_depth -= 1;
+                        self.scalar_started = true;
+                    }
+                    ',' if self.flow_depth > 0 => self.scalar_started = false,
+                    ':' if separated => self.scalar_started = false,
+                    '-' if !self.scalar_started && separated => {}
+                    _ if !c.is_whitespace() => self.scalar_started = true,
+                    _ => {}
+                }
+                return false;
+            }
+        }
+        true
+    }
+}
+
 /// The offset of a `#` comment in `s`, outside quotes.
 fn comment(s: &str) -> Option<usize> {
-    let mut quote = None;
+    let mut quotes = YamlQuotes::default();
     let mut prev = ' ';
-    for (i, c) in s.char_indices() {
-        match quote {
-            Some(q) if c == q => quote = None,
-            Some(_) => {}
-            None if c == '"' || c == '\'' => quote = Some(c),
-            None if c == '#' && prev.is_whitespace() => return Some(i),
-            None => {}
+    let mut chars = s.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if !quotes.quoted(c, &mut chars) && c == '#' && prev.is_whitespace() {
+            return Some(i);
         }
         prev = c;
     }
@@ -343,22 +393,20 @@ fn comment(s: &str) -> Option<usize> {
 /// The offset of a mapping's `:` in `s`, outside quotes and brackets: one followed by a space or
 /// the end.
 fn colon(s: &str) -> Option<usize> {
-    let mut quote = None;
+    let mut quotes = YamlQuotes::default();
     let mut depth = 0usize;
     let b = s.as_bytes();
-    for (i, c) in s.char_indices() {
-        match quote {
-            Some(q) if c == q => quote = None,
-            Some(_) => {}
-            None => match c {
-                '"' | '\'' if i == 0 => quote = Some(c),
+    let mut chars = s.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if !quotes.quoted(c, &mut chars) {
+            match c {
                 '[' | '{' => depth += 1,
                 ']' | '}' => depth = depth.saturating_sub(1),
                 ':' if depth == 0 && b.get(i + 1).is_none_or(|b| b.is_ascii_whitespace()) => {
                     return Some(i);
                 }
                 _ => {}
-            },
+            }
         }
     }
     None
@@ -378,13 +426,15 @@ fn unquote(s: &str) -> String {
 /// The parts of a flow collection's inside, split at its top-level commas.
 fn flow_items(s: &str) -> Vec<&str> {
     let mut out = Vec::new();
-    let (mut depth, mut quote, mut from) = (0usize, None, 0);
-    for (i, c) in s.char_indices() {
-        match quote {
-            Some(q) if c == q => quote = None,
-            Some(_) => {}
-            None => match c {
-                '"' | '\'' => quote = Some(c),
+    let (mut depth, mut from) = (0usize, 0);
+    let mut quotes = YamlQuotes {
+        flow_depth: 1,
+        ..Default::default()
+    };
+    let mut chars = s.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if !quotes.quoted(c, &mut chars) {
+            match c {
                 '[' | '{' => depth += 1,
                 ']' | '}' => depth = depth.saturating_sub(1),
                 ',' if depth == 0 => {
@@ -392,7 +442,7 @@ fn flow_items(s: &str) -> Vec<&str> {
                     from = i + 1;
                 }
                 _ => {}
-            },
+            }
         }
     }
     out.push(s[from..].trim());
@@ -891,6 +941,59 @@ mod tests {
         assert_eq!(scalar(flow[0].1), "v");
         assert_eq!(items(flow[1].1).len(), 2);
         assert_eq!(scalar(pairs(&top[2])[0].1), "http://x");
+    }
+
+    #[test]
+    fn yaml_escaped_quotes_keep_comments_and_separators_inside_scalars() {
+        let v = yaml(
+            r#"name: "say \"hi # friend\"" # outside
+items: ["say \"hi, friend\"", tail]
+"say \"hi: friend\"": value
+single: ['it''s # fine, too', tail]
+don't: stop
+"#,
+        );
+        let p = pairs(&v);
+        assert_eq!(p.len(), 5);
+        assert_eq!(scalar(p[0].1), "say \"hi # friend\"");
+        assert_eq!(
+            items(p[1].1).iter().map(scalar).collect::<Vec<_>>(),
+            ["say \"hi, friend\"", "tail"]
+        );
+        assert_eq!(p[2].0, "say \"hi: friend\"");
+        assert_eq!(scalar(p[2].1), "value");
+        assert_eq!(
+            items(p[3].1).iter().map(scalar).collect::<Vec<_>>(),
+            ["it's # fine, too", "tail"]
+        );
+        assert_eq!(p[4].0, "don't");
+        assert_eq!(scalar(p[4].1), "stop");
+    }
+
+    #[test]
+    fn yaml_quotes_inside_plain_scalars_are_literal() {
+        let v = yaml(
+            r#"name: don't # a comment
+items: [don't, stop, plain 'still plain, tail]
+double: say "hello # a comment
+flow: [say "hello, tail]
+sequence:
+  - "quoted # value" # a comment
+"#,
+        );
+        let p = pairs(&v);
+        assert_eq!(scalar(p[0].1), "don't");
+        assert_eq!(
+            items(p[1].1).iter().map(scalar).collect::<Vec<_>>(),
+            ["don't", "stop", "plain 'still plain", "tail"]
+        );
+        assert_eq!(scalar(p[2].1), "say \"hello");
+        assert_eq!(
+            items(p[3].1).iter().map(scalar).collect::<Vec<_>>(),
+            ["say \"hello", "tail"]
+        );
+        assert_eq!(scalar(&items(p[4].1)[0]), "quoted # value");
+        assert_eq!(comment("plain 'still plain # comment"), Some(19));
     }
 
     #[test]

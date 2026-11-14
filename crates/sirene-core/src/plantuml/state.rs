@@ -417,8 +417,9 @@ impl Lower {
                 format!("`{}`: {item} is not drawn; ignoring it", link.arrow),
             );
         }
-        let from = self.end(link.from, false, line.range_of(link.from));
-        let to = self.end(link.to, true, line.range_of(link.to));
+        // A turned link lists the ends in drawing order, so the written source is the `to` end.
+        let from = self.end(link.from, link.turned, line.range_of(link.from));
+        let to = self.end(link.to, !link.turned, line.range_of(link.to));
         let mut edge = Edge::new(from, to, line.range);
         edge.start = link.start;
         edge.end = link.end;
@@ -611,6 +612,15 @@ mod tests {
         assert_eq!(g.edges[1].length, 0);
         assert_eq!(g.node("c").unwrap().shape, Shape::Diamond);
         assert_eq!(g.node(":[*]start").unwrap().shape, Shape::SmallCircle);
+    }
+
+    #[test]
+    fn turned_transitions_keep_start_and_end() {
+        let (g, d) = lower_src("[*] -up-> A\nA -left-> [*]");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(edges(&g), ["A>:[*]start", ":[*]end>A"]);
+        assert_eq!(g.node(":[*]start").unwrap().shape, Shape::SmallCircle);
+        assert_eq!(g.node(":[*]end").unwrap().shape, Shape::FramedCircle);
     }
 
     #[test]

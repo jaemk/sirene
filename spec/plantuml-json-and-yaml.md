@@ -24,6 +24,9 @@ Block mappings (`key: value`) and sequences (`- item`) nested by indentation, a 
 its key's indentation, `- key: value` items, flow collections (`[a, b]`, `{a: 1}`), quoted and
 plain scalars, `|` and `>` block scalars (their lines joined by spaces), `#` comments, and
 `---` markers. A document may be a lone scalar. Anchors, aliases, and tags are drawn as text.
+Escaped double quotes and doubled single quotes keep `#`, `:`, and commas inside their quoted
+scalars, rather than starting comments or separating mapping and flow-collection entries.
+Quotes within a plain scalar are literal; spaces within it do not start a quoted scalar.
 
 ## PDATA-4 Drawing
 

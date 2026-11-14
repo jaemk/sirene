@@ -862,6 +862,64 @@ fn markdown_links_from_the_file() {
     );
 }
 
+/// Rendering must not delete a file whose name happens to match the former staging path.
+#[test]
+fn output_keeps_unrelated_staging_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    std::fs::write(dir.join("diagram.mmd"), "flowchart LR\nA --> B\n").unwrap();
+    let staging = dir.join(".out.svg.sirene-tmp");
+    std::fs::write(&staging, b"keep this file").unwrap();
+    sirene()
+        .current_dir(dir)
+        .args(["svg", "diagram.mmd", "-o", "out.svg"])
+        .assert()
+        .success();
+    assert_eq!(std::fs::read(&staging).unwrap(), b"keep this file");
+    assert!(
+        std::fs::read_to_string(dir.join("out.svg"))
+            .unwrap()
+            .starts_with("<svg")
+    );
+    assert_eq!(std::fs::read_dir(dir).unwrap().count(), 3);
+}
+
+/// A generated link must refer to the image's literal filename, not a URI fragment or query.
+#[test]
+fn markdown_links_encode_filename_delimiters() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = tmp.path();
+    let source = "```mermaid\nflowchart LR\nA --> B\n```\n";
+    let names = [
+        ("guide#v2", "guide%23v2"),
+        ("guide%20", "guide%2520"),
+        #[cfg(unix)]
+        ("guide?x", "guide%3Fx"),
+    ];
+    for (stem, encoded) in names {
+        let md = dir.join(format!("{stem}.md"));
+        std::fs::write(&md, source).unwrap();
+        sirene()
+            .current_dir(dir)
+            .arg("svg")
+            .arg(&md)
+            .arg("--link")
+            .assert()
+            .success();
+        assert!(dir.join(format!("{stem}-1.svg")).is_file());
+        let linked = format!("{source}![diagram 1]({encoded}-1.svg)\n");
+        assert_eq!(std::fs::read_to_string(&md).unwrap(), linked);
+        // Regenerating the encoded link is idempotent too.
+        sirene()
+            .arg("svg")
+            .arg(&md)
+            .arg("--link")
+            .assert()
+            .success();
+        assert_eq!(std::fs::read_to_string(&md).unwrap(), linked);
+    }
+}
+
 /// `ascii` on a Markdown file prints each diagram block, a blank line between them, with
 /// diagnostics at Markdown positions.
 #[test]

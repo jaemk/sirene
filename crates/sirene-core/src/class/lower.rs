@@ -194,6 +194,16 @@ pub(crate) fn member(raw: &str) -> (bool, Row) {
     }
     while !t.is_empty() && take(t.len() - 1, &mut t) {}
     let method = t.contains('(');
+    // A return type after the last `)` shows as `name() : type`.
+    if let Some(open) = t.find('(')
+        && let Some(close) = t.rfind(')')
+        && close > open
+    {
+        let ret = t[close + 1..].trim();
+        if !ret.is_empty() {
+            t = format!("{} : {ret}", t[..=close].trim_end());
+        }
+    }
     // A leading `~` is package visibility, not a generic.
     let t = t.trim();
     let cell = match t.strip_prefix('~') {
@@ -624,10 +634,17 @@ mod tests {
             (method, row.cells[0].clone(), row.italic, row.underline)
         };
         assert_eq!(m("+int id"), (false, "+int id".into(), false, false));
-        assert_eq!(m("+run() bool"), (true, "+run() bool".into(), false, false));
+        assert_eq!(
+            m("+run() bool"),
+            (true, "+run() : bool".into(), false, false)
+        );
+        assert_eq!(
+            m("+get(int x)int"),
+            (true, "+get(int x) : int".into(), false, false)
+        );
         assert_eq!(
             m("+make()$ Shape"),
-            (true, "+make() Shape".into(), false, true)
+            (true, "+make() : Shape".into(), false, true)
         );
         assert_eq!(m("draw()*"), (true, "draw()".into(), true, false));
         assert_eq!(m("String id$"), (false, "String id".into(), false, true));
@@ -642,7 +659,7 @@ mod tests {
         );
         assert_eq!(m("~run()"), (true, "~run()".into(), false, false));
         assert_eq!(m("é"), (false, "é".into(), false, false));
-        assert_eq!(m("run()é"), (true, "run()é".into(), false, false));
+        assert_eq!(m("run()é"), (true, "run() : é".into(), false, false));
         assert_eq!(m("  "), (false, String::new(), false, false));
     }
 }

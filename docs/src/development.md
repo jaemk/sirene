@@ -1,12 +1,13 @@
 # Development
 
-The workspace has three crates:
+The workspace has four crates:
 
 | Crate | What |
 |---|---|
 | `sirene-core` | the parser, model, edits, layout, and SVG, PNG, and ASCII renderers; no GUI |
 | `sirene-gui` | the editor, on gpui and GPUI Kit |
 | `sirene` | the binary; the `gui` feature (on by default) links `sirene-gui` |
+| `xtask` | packaging and release-signing tasks; not published |
 
 The behavior of each part is specified in [`spec/`](https://github.com/jaemk/sirene/tree/main/spec),
 with stable ids (`FLOWCH-7`, `GUISHE-5`) that tests and code comments refer to.

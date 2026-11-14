@@ -1,9 +1,12 @@
-//! The diagrams in `examples/` parse without diagnostics and render in every format.
+//! The diagrams in `examples/` parse without diagnostics and render in every format, and the
+//! diagram blocks in the docs have no errors.
 
 use std::path::Path;
 
 use sirene_core::ascii::Options;
+use sirene_core::diagnostic::Severity;
 use sirene_core::diagram::{self, Lang};
+use sirene_core::markdown;
 use sirene_core::scene::png::{self, FontMetrics};
 use sirene_core::scene::{Theme, svg};
 
@@ -46,4 +49,44 @@ fn examples_render_cleanly() {
             path.display()
         );
     }
+}
+
+/// Every diagram block in the guide reads without errors, so the syntax it shows works.
+/// Warnings are allowed: some pages show what is read but not drawn.
+#[test]
+fn docs_blocks_have_no_errors() {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/src");
+    let mut paths: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|e| e == "md"))
+        .collect();
+    paths.sort();
+    let mut blocks = 0;
+    let mut failures = Vec::new();
+    for path in &paths {
+        let src = std::fs::read_to_string(path).unwrap();
+        for block in markdown::mermaid_blocks(&src) {
+            // `{{#include ...}}` pulls in a file from `examples/`, checked above.
+            if block.code.trim_start().starts_with("{{#include") {
+                continue;
+            }
+            blocks += 1;
+            let lowered = diagram::lower_as(&block.code, Some(block.lang));
+            for d in lowered
+                .diagnostics
+                .iter()
+                .filter(|d| d.severity == Severity::Error)
+            {
+                failures.push(format!(
+                    "{}:{}: {}",
+                    path.file_name().unwrap().to_string_lossy(),
+                    block.line,
+                    d.message
+                ));
+            }
+        }
+    }
+    assert!(blocks >= 35, "only {blocks} blocks found");
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

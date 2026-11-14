@@ -56,6 +56,14 @@ pub(crate) fn id_len(s: &str) -> usize {
     end
 }
 
+/// Whether `s` starts with the ASCII `prefix`, ignoring ASCII case. A match ends on a char
+/// boundary because the matched bytes are ASCII.
+fn starts_with_ci(s: &str, prefix: &str) -> bool {
+    s.as_bytes()
+        .get(..prefix.len())
+        .is_some_and(|b| b.eq_ignore_ascii_case(prefix.as_bytes()))
+}
+
 fn keyword(s: &str, kw: &str) -> bool {
     s.starts_with(kw) && id_len(s) == kw.len()
 }
@@ -83,7 +91,7 @@ fn words_len(s: &str) -> usize {
     WORDS
         .iter()
         .find(|(w, _)| {
-            s.starts_with(w)
+            starts_with_ci(s, w)
                 && !s[w.len()..]
                     .chars()
                     .next()
@@ -111,7 +119,8 @@ pub(crate) fn relation_len(s: &str) -> usize {
     }
     let mut at = a + scan::ws_len(&s[a..]);
     let connector = ["optionally to", "to"].into_iter().find(|c| {
-        keyword(&s[at..], c) || s[at..].starts_with(c) && s[at + c.len()..].starts_with(' ')
+        let r = &s[at..];
+        starts_with_ci(r, c) && (id_len(&r[c.len()..]) == 0 || r[c.len()..].starts_with(' '))
     });
     let Some(c) = connector else {
         return 0;
@@ -277,7 +286,7 @@ fn keys_len(s: &str) -> usize {
         let r = &s[at..];
         let Some(k) = ["PK", "FK", "UK"]
             .into_iter()
-            .find(|k| r.starts_with(k) && !r[2..].starts_with(|c: char| c.is_alphanumeric()))
+            .find(|k| starts_with_ci(r, k) && !r[2..].starts_with(|c: char| c.is_alphanumeric()))
         else {
             return end;
         };

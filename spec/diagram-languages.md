@@ -132,7 +132,13 @@ more than 64 deep`, which is reported once per diagram (once per rule in a railr
   text through the matching closer is one `ERROR` node, so the tree still holds every byte.
   Blocks left open at the end of the source are one `unclosed` error per kind of block in the
   shared line parser (`lines::Base`).
-- Block diagrams nest 12 deep, since sizing a block visits its children twice per level.
+- Block diagrams nest 8 deep, since sizing a block visits its children twice per level.
+- Flowchart subgraphs nest at most 65 deep however they are made, so listing a subgraph as a
+  member of another cannot build a deeper chain than blocks can; a member past that is left
+  out with a warning. An element keeps at most 256 `@{ ... }` metadata keys. Edge labels on an
+  `&` product count once per edge toward 16 MiB, and `classDef`, `class`, and `linkStyle`
+  copies count once per target toward 64 MiB; past either, the rest is left out with one
+  warning.
 - Indented levels (mindmap nodes, treemap sections, tree view entries, ishikawa causes): deeper
   lines are left out.
 - Sequence diagrams: a deeper block is left out with the statements inside it, up to its `end`.

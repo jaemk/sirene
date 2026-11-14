@@ -33,6 +33,11 @@ In the editor a sequence diagram is read-only on the drawing side.
 
 Keywords are matched in any case, so `Note over A` works.
 
+Messages advance the `autonumber` counter even while numbering is off. A bare `autonumber`
+resumes the current number and step instead of restarting: after `autonumber 10 5`, one numbered
+message, `autonumber off`, and one unnumbered message, a bare `autonumber` numbers the next
+message 20. See the forms above to set a new start or step.
+
 ## Errors
 
 These are errors, and the rest of the diagram is drawn:

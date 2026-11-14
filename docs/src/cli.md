@@ -60,7 +60,8 @@ $ printf 'flowchart TD\n  A --> B\n' | sirene ascii --charset ascii
 ## `sirene svg`
 
 Prints a standalone SVG document. `--theme light|dark` picks the colors (default `light`), and
-`-o, --output PATH` writes to PATH instead of stdout (`-o -` is stdout).
+`-o, --output PATH` writes to PATH instead of stdout (`-o -` is stdout for a single diagram).
+Directory and Markdown inputs write one image per diagram and refuse `-o -` with exit status 2.
 
 ## `sirene png`
 
@@ -69,12 +70,13 @@ machine.
 
 | Option | Meaning |
 |---|---|
-| `-o, --output PATH` | where to write (`-` is stdout); default FILE with `.png`, or stdout when reading stdin |
+| `-o, --output PATH` | where to write (`-` is stdout for a single diagram); default FILE with `.png`, or stdout when reading stdin |
 | `--theme light\|dark` | the colors (default `light`) |
 | `--quality draft\|normal\|fine` | the detail (default `fine`); large drawings are shrunk to fit |
 | `--scale N` | pixels per diagram unit, instead of `--quality` |
 
-sirene refuses to write a PNG to a terminal, or to overwrite the input file.
+sirene refuses to write a PNG to a terminal, or to overwrite the input file. Directory and
+Markdown inputs refuse `-o -` with exit status 2.
 
 ## Directories
 
@@ -89,6 +91,8 @@ sirene svg docs/ -o site/diagrams/   # docs/x/b.mmd -> site/diagrams/x/b.svg
 
 One file's errors fail the run without stopping the others. When two diagrams would write the
 same output (`a.mmd` beside `a.mermaid`), the first in path order wins and the other is reported.
+On macOS and Windows, output paths compare without regard to case, so `A.mmd` and `a.mmd`
+also collide.
 
 ## Markdown files
 
@@ -98,10 +102,11 @@ counting blocks from 1; `-o OUTDIR` writes them there instead. Blocks inside blo
 list items count, and the name may be in any case or in braces (`{.mermaid}`, `{mermaid}`).
 
 The Markdown file is not changed unless `--link` is given. `--link` adds an image link on the
-line after each rendered block, and only when that line is not already the link, so running it
-again changes nothing. When a new block shifts the numbering, the old `![diagram N](...)` line is
-replaced. The link is relative to the Markdown file (`../img/guide-1.svg` for
+line after each rendered, closed block, and only when that line is not already the link, so
+running it again changes nothing. When a new block shifts the numbering, the old
+`![diagram N](...)` line is replaced. The link is relative to the Markdown file (`../img/guide-1.svg` for
 `sirene svg docs/guide.md -o img --link`). The blocks themselves are never changed or removed.
+An unclosed block is still rendered, but no image link is inserted for it.
 
 ```
 $ sirene svg guide.md --link
@@ -143,7 +148,7 @@ build stays a GUI build. Before anything is replaced it is checked against the r
 
 ```
 $ sirene update --check
-update available: 0.2.0 -> 0.3.0 (target x86_64-unknown-linux-gnu)
+update available: 0.4.0 -> 0.4.1 (target x86_64-unknown-linux-gnu)
 ```
 
 It never downgrades. A sirene installed by Homebrew or `cargo install` is refused with the
@@ -167,7 +172,9 @@ wrote docs/a.png
 Problems are printed to stderr as `NAME:LINE:COL: error: MESSAGE` (or `warning:`), with LINE and
 COL counting from 1. The diagram is still drawn when there are errors. The exit status is 1 when
 there is an error (in the diagram, or reading or writing a file) and 0 otherwise. Input is read
-as UTF-8; UTF-16 or other text is an error that says so (exit 1).
+as UTF-8; UTF-16 or other text is an error that says so (exit 1). Each input file or stdin stream
+is limited to 64 MiB (67,108,864 bytes); larger inputs are refused with exit status 1. For a
+Markdown input, the limit applies to the whole file, not each diagram block.
 
 ```
 $ printf 'flowchart TD\n  A -->\n' | sirene ascii

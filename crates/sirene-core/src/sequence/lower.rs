@@ -81,8 +81,11 @@ struct Lower {
     deep_activation: bool,
     /// Where each participant's open activations began.
     active: Vec<Vec<TextRange>>,
-    /// The next `autonumber` number and the step, while numbering is on.
-    numbering: Option<(u32, u32)>,
+    /// Whether `autonumber` is on.
+    numbering: bool,
+    /// The next `autonumber` number and the step; 0 means the default of 1.
+    /// Messages advance it even while numbering is off, as Mermaid does.
+    counter: (u32, u32),
     /// The index of each participant id.
     ids: std::collections::HashMap<String, usize>,
 }
@@ -275,10 +278,9 @@ impl Lower {
         if activate {
             activate = self.activate(to, stmt.text_range());
         }
-        let number = self.numbering.map(|(n, step)| {
-            self.numbering = Some((n.saturating_add(step), step));
-            n
-        });
+        let (n, step) = (self.counter.0.max(1), self.counter.1.max(1));
+        self.counter = (n.saturating_add(step), step);
+        let number = self.numbering.then_some(n);
         let text = text_of(stmt, TEXT).map_or_else(Vec::new, |t| display(&t));
         self.seq.events.push(Event::Message(Message {
             from,
@@ -421,9 +423,20 @@ impl Lower {
             words.get(i).map_or(Some(default), |w| w.parse().ok())
         };
         match words.as_slice() {
-            [off] if off.eq_ignore_ascii_case("off") => self.numbering = None,
-            _ if words.len() <= 2 => match (number(0, 1), number(1, 1)) {
-                (Some(start), Some(step)) => self.numbering = Some((start, step)),
+            [off] if off.eq_ignore_ascii_case("off") => self.numbering = false,
+            _ if words.len() <= 2 => match (number(0, 0), number(1, 0)) {
+                (Some(start), Some(step)) => {
+                    // Mermaid keeps the current number or step when it is
+                    // absent or 0; a lone START sets the step to 1.
+                    self.numbering = true;
+                    if start != 0 {
+                        self.counter.0 = start;
+                    }
+                    let step = if words.len() == 1 { 1 } else { step };
+                    if step != 0 {
+                        self.counter.1 = step;
+                    }
+                }
                 _ => self.error(range, "expected `off`, or a start number and a step"),
             },
             _ => self.error(range, "expected `off`, or a start number and a step"),

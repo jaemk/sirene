@@ -24,7 +24,8 @@ starts no PlantUML comment.
   Inline flags (`(?i)`, `(?i: )`) are not drawn, with a warning; an empty group draws nothing.
 - `?` is an option; `*`, `+`, `{n}`, `{n,}`, and `{n,m}` repeat, drawn with a bypass when
   the minimum is 0. A lazy or possessive suffix draws the same. A `{` that is not a repeat is
-  a literal.
+  a literal. Bound recognition stops at the first character outside the numeric/comma prefix,
+  so repeated literal `{` characters are scanned in linear time.
 
 ## PREGEX-3 Diagnostics
 

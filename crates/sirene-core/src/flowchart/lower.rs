@@ -438,18 +438,19 @@ impl Lowerer {
             return None;
         }
         let meta = child(syntax, METADATA).map(|m| self.metadata(&m));
-        if let Some(&e) = self.edge_ids.get(&id) {
-            if let Some(entries) = meta {
-                self.edge_metadata(e, entries, syntax.text_range());
-            }
-            return None;
-        }
+        // A subgraph id takes the metadata before an edge id does, as in Mermaid's `addVertex`.
         if let Some(entries) = &meta
             && let Some(&s) = self.subgraph_index.get(&id)
         {
             let sg = &mut self.subgraphs[s];
             if merge_metadata(&mut sg.metadata, entries.clone()) {
                 self.too_many_keys(syntax.text_range());
+            }
+            return None;
+        }
+        if let Some(&e) = self.edge_ids.get(&id) {
+            if let Some(entries) = meta {
+                self.edge_metadata(e, entries, syntax.text_range());
             }
             return None;
         }

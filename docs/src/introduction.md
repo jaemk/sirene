@@ -2,7 +2,7 @@
 
 sirene is a local WYSIWYG editor and viewer for [Mermaid](https://mermaid.js.org),
 [PlantUML](plantuml.md), and [Graphviz DOT](dot.md) diagrams, with SVG, PNG, and terminal ASCII
-output. It is one Rust binary: no browser, no Node, no Java, no network.
+output. It is one Rust binary, and renders offline without a browser, Node, or Java.
 
 ```
 $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
@@ -13,8 +13,9 @@ $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
 
 - `sirene FILE` opens an editor window: the source on the left, a live drawing on the right.
   Edits on either side are written to the source as ordinary text edits.
-- `sirene svg`, `sirene png`, and `sirene ascii` render without opening a window, one file, a
-  directory of diagrams, a Markdown file's diagram blocks, or stdin, and can watch for changes.
+- `sirene svg`, `sirene png`, and `sirene ascii` render a diagram file, a Markdown file's
+  diagram blocks, or stdin without opening a window, and can watch files for changes.
+  `svg` and `png` also render directories of diagrams and watch for new files.
 - The parser keeps every byte of the source, so the editor never reformats a file. Diagnostics
   point at a line and column, and a diagram with errors is still drawn.
 

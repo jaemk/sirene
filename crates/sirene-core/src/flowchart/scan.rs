@@ -376,7 +376,15 @@ pub(crate) fn inline_edge_text_len(s: &str, kind: StrokeKind) -> usize {
 
 /// Length of an edge id at the start of `s` (`id` in `id@-->`), if one is there.
 pub(crate) fn edge_id_len(s: &str) -> Option<usize> {
-    let n = id_len(s);
+    // Mermaid's LINK_ID: any run except whitespace, quotes, brackets, braces and `|`.
+    if stroke(s).is_some() {
+        return None;
+    }
+    let n = s
+        .find(|c: char| {
+            c.is_whitespace() || matches!(c, '"' | '[' | ']' | '(' | ')' | '{' | '}' | '|' | '@')
+        })
+        .unwrap_or(s.len());
     let after = s[n..].strip_prefix('@')?;
     (n > 0 && stroke(after).is_some()).then_some(n)
 }
@@ -583,6 +591,8 @@ mod tests {
     #[test]
     fn edge_ids() {
         assert_eq!(edge_id_len("e1@-->B"), Some(2));
+        assert_eq!(edge_id_len("e:1@-->B"), Some(3));
+        assert_eq!(edge_id_len("-->B@-->C"), None);
         assert_eq!(edge_id_len("e1@{ x }"), None);
         assert_eq!(edge_id_len("e1@B"), None);
         assert_eq!(edge_id_len("e1"), None);

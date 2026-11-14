@@ -13,8 +13,10 @@ flowchart LR
 The direction is `TB` (or `TD`), `BT`, `LR`, or `RL`, and defaults to `TB`. `direction` inside a
 subgraph sets that subgraph's direction; outside one it has no effect and is a warning.
 
-Frontmatter (`---` ... `---`) is read for `title:`, which is drawn above the diagram. Other keys
-and `%%{init}%%` directives are ignored for now. Lines starting with `%%` are comments.
+Frontmatter (`---` ... `---`) is read for `title:`, which is drawn above the diagram, and for
+`config.theme` and `config.themeVariables`. Theme settings in `%%{init}%%` directives are also
+read and override the frontmatter; see [Themes](themes.md). Other lines starting with `%%` are
+comments.
 
 ## Nodes and labels
 

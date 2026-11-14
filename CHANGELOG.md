@@ -6,25 +6,38 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-14
+
 ### Added
 
 - `sirene ascii FILE.md` prints each diagram block of a Markdown file, with diagnostics at
   positions in the file, instead of reading the whole file as one Mermaid diagram.
 - Mermaid class diagrams: `link A "url"`, `click A href "url"`, `callback A "fn"`, and
   `click A call fn(args)` set the class's link or callback, with an optional tooltip.
-- Release tarballs are signed with zipsign (`cargo xtask sign`, `cargo xtask gen-key`).
+- Release tarballs are signed with zipsign (`cargo xtask sign`, `cargo xtask gen-key --out DIR`).
 
 ### Changed
 
 - `sirene update` checks the release archive's signature against a key built into sirene,
   instead of running `gh attestation verify` when `gh` is installed. An unsigned or badly signed
   archive is refused. Releases still carry build provenance attestations.
+- The guide and specs document theme palettes, CLI limits, signing setup and key rotation,
+  the pinned toolchain and workspace crates, and sequence numbering while it is off.
 
 ### Fixed
 
-- CLI: images, `-o` files, and `--link` rewrites are written to a temporary file and renamed
-  into place, so a failed write keeps the old file; a symlinked output is replaced, not written
-  through. Inputs and stdin over 64 MiB are refused.
+- `cargo xtask sign` uses an exclusively created temporary file, preserving existing files and
+  symlink targets beside the archive and retaining the archive's permissions. The release
+  workflow decodes its signing key with owner-only permissions.
+- CLI: images, `-o` files, and `--link` rewrites are written to an exclusively created temporary
+  file and renamed into place, so a failed write keeps the old file and an existing temporary
+  file is left alone; a symlinked output is replaced, not written through. Inputs and stdin
+  over 64 MiB are refused.
+- The install script stages the binary before replacing it, so a failed copy keeps the old
+  binary and a symlink's target is left alone. A directory at the install path is refused.
+- PlantUML YAML: escaped double quotes and doubled single quotes keep `#`, commas, and colons
+  inside the quoted value instead of reading them as comments or separators. An apostrophe in
+  plain text (`don't`) no longer hides a comment or merges flow-array items.
 - Markdown: replacing an unclosed block at the end of a text with empty code no longer panics.
 - PlantUML timing: at most 100 clocks, the rest left out with an error; each state label is
   measured once. Cynefin: many quoted items on one line are read in linear time.
@@ -52,7 +65,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   64 MiB is not opened; a settings file that cannot be read is no longer overwritten with
   defaults; a NaN zoom is ignored.
 - PlantUML regex diagrams: a class nested in a class, as in `[[:alpha:]]`, is read as one class,
-  and `{ 2 }` with spaces is literal text instead of a repeat, as in Java.
+  and `{ 2 }` with spaces is literal text instead of a repeat, as in Java. Runs of unmatched
+  literal `{` are read in linear time.
 - Mermaid ZenUML: `else`, `catch`, and `finally` may start the line after a branch's `}`; long
   diagrams no longer lower in quadratic time.
 - Mermaid use case diagrams: a JSON `\u` surrogate pair is one character, `\u` takes exactly four
@@ -73,7 +87,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   at 1000 instead of drawing at infinite size.
 - `--link`: a path with spaces or parentheses is linked as `<...>`, the link is indented as the
   fence (so it stays in a list item), and a link from an earlier run is replaced when a new block
-  shifts the numbering instead of a second link being added.
+  shifts the numbering instead of a second link being added. `#`, `?`, `%`, and `:` in filenames
+  are percent-encoded so the link reaches the image file.
 - Mermaid XY charts: values past the last category no longer stretch the value axis, and on a
   numeric x-axis each series spans the whole range by its own length, as in Mermaid.
 - Mermaid sankey diagrams: a value may have an exponent (`1e3`); a value over 1e30 is an error
@@ -85,8 +100,6 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `-o -` writes the SVG or PNG to stdout instead of to a file named `-`.
 - Reading UTF-16 or other non-UTF-8 input fails with a message naming the problem instead of
   `stream did not contain valid UTF-8`.
-- `sirene update` aborts when `gh` cannot reach GitHub to check the build provenance, instead of
-  continuing with a note.
 - A missing short file name such as `pdf` is no longer refused as a mistyped command.
 - Mermaid quadrant charts: `x-axis Low -->` with no high label draws `Low ⟶`, as in Mermaid.
 - Mermaid gantt charts: a huge duration is an error instead of overflowing, and `excludes` is
@@ -198,6 +211,28 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   longer each rescan the rest of the source, in flowcharts and the other Mermaid parsers.
 - ASCII edges far outside the canvas are clipped to it before they are drawn.
 - Block diagram groups nest at most 8 deep (was 12), since each level doubles the sizing work.
+- `sirene update` compares versions by semver precedence, so build metadata no longer makes a
+  release look newer, and `--to` refuses a version with `+`.
+- `sirene update --check` on a package-manager install names the update command also when the
+  running build is newer than the latest release.
+- Rendering a directory on macOS or Windows no longer overwrites an output when two inputs
+  differ only in case (`A.mmd` and `a.mmd`); the second is skipped with an error.
+- Release workflow: xtask is built before the signing key is decoded, and a re-run by hand
+  refuses when `main` is no longer at the release's tag.
+- Mermaid flowcharts: shape data may follow a space (`A @{ shape: circle }`,
+  `e1 @{ animate: true }`); edge ids take any character Mermaid allows (`A e:1@--> B`); and
+  `id@{ ... }` goes to a subgraph before an edge with the same id, as in Mermaid.
+- PlantUML state diagrams: `[*] -up-> A` draws a start state and `A -left-> [*]` an end state,
+  instead of the other way around.
+- Mermaid sequence diagrams: `autonumber` keeps counting messages while numbering is off, and
+  a bare `autonumber` continues from the current number and step instead of restarting at 1,
+  as in Mermaid.
+- Mermaid class diagrams: a method's return type is drawn after ` : ` (`+getAge() : int`), as
+  in Mermaid.
+- Mermaid ER diagrams: cardinality words, `to`, `optionally to`, and `PK`/`FK`/`UK` keys match
+  in any case.
+- Mermaid gantt charts: an `x` or `X` timestamp out of range is an invalid date instead of
+  overflowing.
 
 ## [0.3.0] - 2026-11-12
 

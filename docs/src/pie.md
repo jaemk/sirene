@@ -28,6 +28,10 @@ others fill the circle) but stays in the legend.
 A negative value is an error, and a label given twice is a warning; the slice is skipped and the
 rest of the chart is drawn.
 
+## Colors
+
+Slice colors can be overridden with `themeVariables.pie1` to `pie12`; see [Themes](themes.md).
+
 ## Not drawn
 
-`textPosition` and the `pie1` to `pie12` theme colors are ignored.
+`textPosition` is ignored.

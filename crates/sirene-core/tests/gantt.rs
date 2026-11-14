@@ -166,6 +166,21 @@ fn dates() {
     assert_eq!(task(&g, "x").start, date(2020, 6, 15) + 9 * HOUR);
     let g = chart("gantt\n  dateFormat X\n  x : 1389000000, 1d\n");
     assert_eq!(task(&g, "x").start, 1_389_000_000_000);
+    let g = chart("gantt\n  dateFormat x\n  x : 1389000000000, 1d\n");
+    assert_eq!(task(&g, "x").start, 1_389_000_000_000);
+}
+
+/// MGANTT-2: a timestamp beyond the representable range is not a date, and never overflows.
+#[test]
+fn huge_timestamps() {
+    for src in [
+        "gantt\ndateFormat x\ninclusiveEndDates\nsection s\na : 0, 99999999999999999999\n",
+        "gantt\ndateFormat X\ninclusiveEndDates\nsection s\na : 99999999999999999999, 1d\n",
+        "gantt\ndateFormat x\na : 1e400, 1d\n",
+    ] {
+        let lowered = diagram::lower(src);
+        assert!(!lowered.diagnostics.is_empty(), "{src}");
+    }
 }
 
 /// MGANTT-2: the axis format, and settings from frontmatter and directives.

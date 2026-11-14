@@ -4,13 +4,16 @@ Cargo workspace layout, toolchain, CI, and the coverage gate.
 
 ## WORKSP-1
 
-The repository root is a virtual Cargo workspace. Member crates live under `crates/`:
+The repository root is a virtual Cargo workspace. The three published crates live under
+`crates/`:
 
 - `sirene-core`: parsing, diagram model, layout, ASCII and display-list drawing, SVG. No GUI or
   terminal dependencies.
 - `sirene-gui`: the GPUI Kit editor (`gui-shell.md`, `wysiwyg-editing.md`). Only paints
   display lists; no layout or drawing logic.
 - `sirene`: the `sirene` binary (CLI entrypoint and GUI launcher).
+
+The fourth member, `xtask/`, holds packaging and release-signing tasks and is not published.
 
 ## WORKSP-2
 
@@ -24,9 +27,10 @@ inherited by members.
 
 ## WORKSP-4
 
-`rust-toolchain.toml` pins the `stable` channel with `rustfmt`, `clippy`, and
-`llvm-tools-preview`. The workspace `rust-version` is the newest one any locked dependency
-declares (1.92, from GPUI Kit's tree).
+`rust-toolchain.toml` pins the development toolchain to Rust `1.99.1`, with `rustfmt`, `clippy`,
+and `llvm-tools-preview`. This is separate from the workspace's minimum supported Rust version,
+`rust-version = "1.92"`, the newest minimum any locked dependency declares (from GPUI Kit's
+tree).
 
 ## WORKSP-5
 
@@ -52,7 +56,9 @@ Merging a version bump to `main` is the release. Between releases `main` carries
 patch's `-dev` version. To release, set the version (`[workspace.package]` and the
 `[workspace.dependencies]` pins) to a stable `X.Y.Z` and add a `## [X.Y.Z]` section to
 `CHANGELOG.md`. `.github/workflows/release.yml` runs on every push to `main` (and by hand from
-`main`, to re-run a release that failed partway; every step is idempotent; any other ref skips):
+`main`, to re-run a release that failed partway; every step is idempotent; any other ref skips;
+a re-run of a version whose `vX.Y.Z` tag exists fails in `decide` unless `main` is at the
+tagged commit):
 
 1. `decide`: `bin/check-versions.sh` requires every dependency between publishable members to pin
    exactly that member's version, and no stable crate to depend on a pre-release. A `-dev`
@@ -63,8 +69,9 @@ patch's `-dev` version. To release, set the version (`[workspace.package]` and t
 3. `build`, after all three: one `sirene-X.Y.Z-TARGET.tar.gz` (holding `sirene`) per target,
    built with `cargo auditable` and the pinned toolchain (WORKSP-9). The macOS and gnu legs also
    run `cargo package --workspace`, which build-checks each crate against the packaged crates
-   before it. `sign`, in the `signing` environment, signs each tarball with `cargo xtask sign`
-   (UPDATE-5) and gives the signed tarballs a build provenance attestation. `app` builds the
+   before it. `sign`, in the `signing` environment, builds `xtask` in a step without the key,
+   then signs each tarball with `target/release/xtask sign` (UPDATE-5; the key is never in the
+   environment of a compile) and gives the signed tarballs a build provenance attestation. `app` builds the
    universal `Sirene.app` zip and cask (MACOSP-6).
 4. `release`: creates the `vX.Y.Z` tag on the released commit and its GitHub release, with the
    changelog section as notes and the tarballs, the zip, the cask, and `SHA256SUMS` (of the
@@ -95,3 +102,8 @@ and the musl build on Linux unless `SIRENE_TARGET` names another. If a release h
 build and `SIRENE_TARGET` is unset, Linux falls back once to the gnu build. It refuses an unsupported OS or architecture before any request, and a tarball
 whose checksum is not in `SHA256SUMS` or does not match. When `gh` is present it checks the
 build provenance attestation, reporting but not failing on a mismatch.
+The verified executable is copied to an exclusively created temporary file in the install
+directory, made executable, then renamed over `sirene`. Failed staging leaves the old binary
+unchanged; the temporary file is cleaned up. A destination symlink is replaced without writing
+through it. A directory destination, including a symlink to a directory, is refused rather than
+installing a nested `sirene/sirene`.

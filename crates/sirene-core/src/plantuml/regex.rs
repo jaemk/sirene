@@ -230,7 +230,14 @@ impl Reader<'_> {
     /// `{n}`, `{n,}`, or `{n,m}` at `at`: its bounds and length.
     fn bounds(&self, at: usize) -> Option<(u32, Option<u32>, usize)> {
         let inner = self.s[at..].strip_prefix('{')?;
-        let close = inner.find('}')?;
+        // A repeat contains only digits and an optional comma. Stop at the first other
+        // character, so runs of literal `{` do not each scan the remaining line.
+        let close = inner
+            .bytes()
+            .position(|b| !b.is_ascii_digit() && b != b',')?;
+        if inner.as_bytes()[close] != b'}' {
+            return None;
+        }
         let spec = &inner[..close];
         // Digits only: `{ 2 }` and `{+2}` are literal text, as in Java.
         let number = |s: &str| -> Option<u32> {
@@ -464,6 +471,29 @@ mod tests {
         assert!(d.is_empty(), "{d:?}");
         assert_eq!(r.title.as_deref(), Some("Words"));
         assert_eq!(r.rules.len(), 4);
+    }
+
+    #[test]
+    fn literal_braces_and_repeat_bound_prefixes() {
+        let literal = "{".repeat(100_000);
+        assert_eq!(ok(&literal), t(&literal));
+        for literal in ["a{2x}", "a{2,3x}", "a{4294967296}", "a{2,,3}"] {
+            assert_eq!(ok(literal), t(literal));
+        }
+        for (src, min, max) in [
+            ("a{00000000000000000000002}", 2, Some(2)),
+            ("a{2,}", 2, None),
+            ("a{2,3}", 2, Some(3)),
+        ] {
+            assert_eq!(
+                ok(src),
+                Expr::Repeat {
+                    expr: Box::new(t("a")),
+                    min,
+                    max
+                }
+            );
+        }
     }
 
     #[test]

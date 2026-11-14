@@ -617,6 +617,91 @@ fn install_prefers_the_musl_binary_on_linux() {
 }
 
 #[test]
+fn install_replaces_a_symlink_without_writing_its_target() {
+    let fx = Install::new("Linux", "x86_64");
+    let musl = fx.publish("x86_64-unknown-linux-musl", "NEW");
+    fx.sums(&[&musl], None);
+    std::fs::create_dir_all(fx.path("install")).unwrap();
+    std::fs::write(fx.path("sentinel"), "KEEP").unwrap();
+    std::os::unix::fs::symlink(fx.path("sentinel"), fx.path("install/sirene")).unwrap();
+    write_exec(&fx.path("bin/install"), "#!/bin/sh\nexit 1\n");
+
+    let out = fx.run(&[]);
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(read(&fx.path("sentinel")), "KEEP");
+    assert_eq!(fx.installed().as_deref(), Some("NEW"));
+    assert!(
+        std::fs::symlink_metadata(fx.path("install/sirene"))
+            .unwrap()
+            .is_file()
+    );
+    assert_eq!(
+        std::fs::metadata(fx.path("install/sirene"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o755
+    );
+    assert_eq!(std::fs::read_dir(fx.path("install")).unwrap().count(), 1);
+}
+
+#[test]
+fn install_refuses_a_directory_destination() {
+    for linked in [false, true] {
+        let fx = Install::new("Linux", "x86_64");
+        let musl = fx.publish("x86_64-unknown-linux-musl", "NEW");
+        fx.sums(&[&musl], None);
+        std::fs::create_dir_all(fx.path("install")).unwrap();
+        let directory = if linked {
+            fx.path("other")
+        } else {
+            fx.path("install/sirene")
+        };
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("sentinel"), "KEEP").unwrap();
+        if linked {
+            std::os::unix::fs::symlink(&directory, fx.path("install/sirene")).unwrap();
+        }
+
+        let out = fx.run(&[]);
+        assert!(!out.status.success());
+        assert!(
+            stderr(&out).contains("is a directory; refusing to install"),
+            "{}",
+            stderr(&out)
+        );
+        assert_eq!(read(&directory.join("sentinel")), "KEEP");
+        assert!(!directory.join("sirene").exists());
+        assert_eq!(std::fs::read_dir(fx.path("install")).unwrap().count(), 1);
+    }
+}
+
+#[test]
+fn install_failed_staging_preserves_the_old_binary_and_cleans_up() {
+    let fx = Install::new("Linux", "x86_64");
+    let musl = fx.publish("x86_64-unknown-linux-musl", "NEW");
+    fx.sums(&[&musl], None);
+    std::fs::create_dir_all(fx.path("install")).unwrap();
+    std::fs::write(fx.path("install/sirene"), "OLD").unwrap();
+    write_exec(&fx.path("bin/install"), "#!/bin/sh\nexit 1\n");
+    write_exec(
+        &fx.path("bin/cp"),
+        "#!/bin/sh\ncase \"$2\" in */install/.sirene.*) printf partial > \"$2\"; exit 1 ;; esac\nexec /bin/cp \"$@\"\n",
+    );
+
+    let out = fx.run(&[]);
+    assert!(!out.status.success());
+    assert!(
+        stderr(&out).contains("could not write to"),
+        "{}",
+        stderr(&out)
+    );
+    assert_eq!(fx.installed().as_deref(), Some("OLD"));
+    assert_eq!(std::fs::read_dir(fx.path("install")).unwrap().count(), 1);
+}
+
+#[test]
 fn install_falls_back_to_gnu_once_when_musl_is_missing() {
     let fx = Install::new("Linux", "aarch64");
     let gnu = fx.publish("aarch64-unknown-linux-gnu", "GNU");

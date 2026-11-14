@@ -514,28 +514,25 @@ pub(crate) fn write_file(path: &Path, bytes: &[u8], follow: bool) -> std::io::Re
     {
         return std::fs::write(&path, bytes);
     }
-    let name = path
-        .file_name()
-        .map_or_else(|| "file".into(), |n| n.to_string_lossy().into_owned());
-    let tmp = path.with_file_name(format!(".{name}.sirene-tmp"));
-    // A leftover temporary file, or anything planted there, is replaced, never written through.
-    let _ = std::fs::remove_file(&tmp);
-    let staged = (|| {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp)?;
-        if let Some(m) = meta.as_ref().filter(|m| m.is_file()) {
-            file.set_permissions(m.permissions())?;
-        }
-        file.write_all(bytes)?;
-        file.sync_all()
-    })();
-    let result = staged.and_then(|()| std::fs::rename(&tmp, &path));
-    if result.is_err() {
-        let _ = std::fs::remove_file(&tmp);
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(".sirene-");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // Match ordinary output-file creation, including the caller's umask.
+        builder.permissions(std::fs::Permissions::from_mode(0o666));
     }
-    result
+    let mut tmp = builder.tempfile_in(parent)?;
+    if let Some(m) = meta.as_ref().filter(|m| m.is_file()) {
+        tmp.as_file().set_permissions(m.permissions())?;
+    }
+    tmp.write_all(bytes)?;
+    tmp.as_file().sync_all()?;
+    tmp.persist(&path).map(|_| ()).map_err(|e| e.error)
 }
 
 /// `bytes` as UTF-8, or an error naming UTF-16 (by its byte order mark) or the first bad byte.
@@ -732,12 +729,23 @@ type Job = (Option<PathBuf>, Option<PathBuf>);
 
 /// `found` as jobs, without each input whose output an earlier input already writes (`a.mmd`
 /// beside `a.mermaid`), plus an error line for each input left out.
+/// Outputs compare case-insensitively on macOS and Windows, whose filesystems fold case.
 fn distinct(found: Vec<(PathBuf, PathBuf)>) -> (Vec<Job>, Vec<String>) {
+    distinct_by(found, cfg!(any(target_os = "macos", target_os = "windows")))
+}
+
+/// `distinct`, with `fold_case` choosing whether outputs differing only in case collide.
+fn distinct_by(found: Vec<(PathBuf, PathBuf)>, fold_case: bool) -> (Vec<Job>, Vec<String>) {
     let mut writers: HashMap<PathBuf, PathBuf> = HashMap::new();
     let mut jobs = Vec::new();
     let mut skipped = Vec::new();
     for (input, output) in found {
-        if let Some(first) = writers.get(&output) {
+        let key = if fold_case {
+            PathBuf::from(output.to_string_lossy().to_lowercase())
+        } else {
+            output.clone()
+        };
+        if let Some(first) = writers.get(&key) {
             skipped.push(format!(
                 "error: skipping {}; {} also writes {}",
                 input.display(),
@@ -746,7 +754,7 @@ fn distinct(found: Vec<(PathBuf, PathBuf)>) -> (Vec<Job>, Vec<String>) {
             ));
             continue;
         }
-        writers.insert(output.clone(), input.clone());
+        writers.insert(key, input.clone());
         jobs.push((Some(input), Some(output)));
     }
     (jobs, skipped)
@@ -950,6 +958,19 @@ mod tests {
         );
     }
 
+    /// Outputs differing only in case collide when the filesystem folds case.
+    #[test]
+    fn distinct_outputs_fold_case() {
+        let p = PathBuf::from;
+        let found = || vec![(p("A.mmd"), p("A.svg")), (p("a.mmd"), p("a.svg"))];
+        let (jobs, skipped) = distinct_by(found(), true);
+        assert_eq!(jobs, [(Some(p("A.mmd")), Some(p("A.svg")))]);
+        assert_eq!(skipped, ["error: skipping a.mmd; A.mmd also writes a.svg"]);
+        let (jobs, skipped) = distinct_by(found(), false);
+        assert_eq!(jobs.len(), 2);
+        assert!(skipped.is_empty());
+    }
+
     #[test]
     fn scan_skips_hidden_and_other_files() {
         let tmp = tempfile::tempdir().unwrap();
@@ -989,6 +1010,24 @@ mod tests {
         let big = std::io::repeat(b'a').take(MAX_INPUT + 1);
         assert!(read_capped(big).unwrap_err().contains("over 64 MiB"));
         assert_eq!(read_capped(&b"ab"[..]).unwrap(), b"ab");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn writes_leave_unrelated_staging_symlink_alone() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("keep");
+        std::fs::write(&target, b"keep this target").unwrap();
+        let staging = dir.path().join(".out.svg.sirene-tmp");
+        symlink(&target, &staging).unwrap();
+        let out = dir.path().join("out.svg");
+        write_file(&out, b"new output", false).unwrap();
+        assert_eq!(std::fs::read(&out).unwrap(), b"new output");
+        assert_eq!(std::fs::read(&target).unwrap(), b"keep this target");
+        assert!(std::fs::symlink_metadata(&staging).unwrap().is_symlink());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 3);
     }
 
     #[cfg(unix)]

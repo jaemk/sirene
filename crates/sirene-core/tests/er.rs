@@ -131,6 +131,36 @@ fn relationships() {
     );
 }
 
+/// Mermaid's lexer ignores case: cardinality words, `to`, `optionally to`, and keys.
+#[test]
+fn case_insensitive_words_and_keys() {
+    let c = chart(
+        "erDiagram\n  A One Or More TO Zero or MANY B\n  C ZERO OR ONE Optionally To ONLY ONE D\n  \
+         E {\n    int id pk, Fk\n    string n uk\n  }\n",
+    );
+    // Non-ASCII right after a word is not a char-boundary panic.
+    diagram::lower("erDiagram\n  A ONé TO B\n  C o\u{e9}\n  D {\n    int x P\u{e9}\n  }\n");
+    use Arrow::*;
+    let got: Vec<_> = c
+        .edges
+        .iter()
+        .take(2)
+        .map(|e| (e.start.unwrap(), e.stroke, e.end.unwrap()))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (OneMany, Stroke::Normal, ZeroMany),
+            (ZeroOne, Stroke::Dotted, One),
+        ]
+    );
+    let keys: Vec<&str> = c.node("E").unwrap().sections[0]
+        .iter()
+        .map(|r| r.cells[2].as_str())
+        .collect();
+    assert_eq!(keys, ["PK, FK", "UK"]);
+}
+
 /// MER-1: either spelling of a cardinality symbol is read on either side.
 #[test]
 fn mirrored_symbols() {
