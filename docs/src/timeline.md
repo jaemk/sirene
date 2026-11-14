@@ -33,6 +33,11 @@ period `10:30`. Each section has its own color; without sections, each period do
 An event before any period and a `section` without a name are errors, and an empty event is a
 warning; the rest of the timeline is drawn.
 
+## Colors
+
+Section colors can be overridden with `themeVariables.cScale0` to `cScale11`; see
+[Themes](themes.md).
+
 ## Not drawn
 
-`disableMulticolor` and the `cScale` theme colors are ignored.
+`disableMulticolor` is ignored.

@@ -32,6 +32,9 @@ printed even when there are errors. The exit status is 1 when there is an error 
 ## CLI-4 Read failures
 
 When FILE cannot be read, sirene prints `error: cannot read FILE: REASON` to stderr and exits 1.
+Each file or stdin stream is limited to 64 MiB (67,108,864 bytes); a larger input is refused
+with `cannot read NAME: the text is over 64 MiB`, exit 1. For Markdown, this is a limit on the
+whole file, not on individual diagram blocks. Inputs must be UTF-8.
 
 ## CLI-5 `sirene svg`
 
@@ -82,8 +85,10 @@ in `crates/sirene/tests/cli.rs` and `arguments` in `crates/sirene/src/main.rs`.
 into subdirectories but skipping hidden entries and symlinked directories, in path order. Each is
 written as `.svg` or `.png` beside it, or with `-o OUTDIR` to the same relative path under OUTDIR
 (directories are created as needed). Diagnostics follow CLI-3 for each file; one file's errors
-fail the run without stopping the others. When two diagrams would write the same output
-(`a.mmd` beside `a.mermaid`), the first in path order is rendered and each later one is
+fail the run without stopping the others. Output paths compare without regard to case on
+macOS and Windows, and with regard to case on other platforms. When two diagrams would write
+the same output (`a.mmd` beside `a.mermaid`, or `A.mmd` beside `a.mmd` on macOS and Windows),
+the first in path order is rendered and each later one is
 skipped with `error: skipping LATER; FIRST also writes OUTPUT`, which fails the run (in a watch,
 the line is printed again only when the set of skipped files changes). These are errors that
 render nothing: a DIR with no diagrams (`error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml,

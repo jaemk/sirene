@@ -52,15 +52,32 @@ with the binary unchanged. No external tool is needed.
 
 The release workflow signs each archive in its `sign` job with `cargo xtask sign`, which refuses
 a key that is not the pair of `release.pub`; the key pair is the `ZIPSIGN_KEY` secret (base64) of
-the `signing` environment, which only `main` can deploy to. `cargo xtask gen-key --out DIR` writes a new pair. To rotate, list the
-old and new verifying keys in `KEYS` in `update.rs` for at least one release, then drop the old
-one. Releases up to 0.3.0 are unsigned and fail the check, but a sirene that checks signatures
-is newer than them, and `sirene update` never moves to an older release.
+the `signing` environment, which only `main` can deploy to. `cargo xtask gen-key --out DIR` writes
+a new pair. Keep `release.key` outside the repository; only the verifying key is committed.
+
+Key rotation needs a bridge release:
+
+1. Embed both old and new verifying keys in `KEYS` in `update.rs`, keeping `release.pub` and
+   `ZIPSIGN_KEY` on the old pair. Publish this bridge release signed with the old key, so
+   existing installations can verify it and acquire the new verifying key.
+2. For a subsequent release, replace `crates/sirene/release.pub` and the `ZIPSIGN_KEY` secret
+   with the new pair's verifying key and base64-encoded signing key, respectively. Sign that
+   release with the new key. The old verifying key can then be removed from new builds.
+
+`xtask sign` signs with one key. An installation that skips the bridge still trusts only the
+old key and cannot verify the latest release signed with the new one. It must first run
+`sirene update --to BRIDGE_VERSION`, then `sirene update`, or manually reinstall a current
+release. Publishing a bridge for one release does not make direct updates from older versions
+work indefinitely. Keep the bridge release available for that migration path.
+
+Releases up to 0.3.0 are unsigned and fail the check, but a sirene that checks signatures is
+newer than them, and `sirene update` never moves to an older release.
 
 ## UPDATE-6 Inputs
 
-`--to` takes `X.Y.Z` with an optional leading `v` and pre-release or build suffix of ASCII
-letters, digits, `.`, and `-`; anything else is refused before any request. `GH_TOKEN` or
+`--to` takes `X.Y.Z` with an optional leading `v` and a pre-release suffix of ASCII letters,
+digits, `.`, and `-` (for example, `v1.0.0-rc.1`). Build metadata such as `1.0.0+build.1` is
+refused, as is anything else outside that syntax, before any request. `GH_TOKEN` or
 `GITHUB_TOKEN`, when set, authenticates the requests. The release lookup times out after 15
 seconds and the download after 10 minutes. The install directory must be writable, checked
 before the download.

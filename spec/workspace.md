@@ -4,13 +4,16 @@ Cargo workspace layout, toolchain, CI, and the coverage gate.
 
 ## WORKSP-1
 
-The repository root is a virtual Cargo workspace. Member crates live under `crates/`:
+The repository root is a virtual Cargo workspace. The three published crates live under
+`crates/`:
 
 - `sirene-core`: parsing, diagram model, layout, ASCII and display-list drawing, SVG. No GUI or
   terminal dependencies.
 - `sirene-gui`: the GPUI Kit editor (`gui-shell.md`, `wysiwyg-editing.md`). Only paints
   display lists; no layout or drawing logic.
 - `sirene`: the `sirene` binary (CLI entrypoint and GUI launcher).
+
+The fourth member, `xtask/`, holds packaging and release-signing tasks and is not published.
 
 ## WORKSP-2
 
@@ -24,9 +27,10 @@ inherited by members.
 
 ## WORKSP-4
 
-`rust-toolchain.toml` pins the `stable` channel with `rustfmt`, `clippy`, and
-`llvm-tools-preview`. The workspace `rust-version` is the newest one any locked dependency
-declares (1.92, from GPUI Kit's tree).
+`rust-toolchain.toml` pins the development toolchain to Rust `1.99.1`, with `rustfmt`, `clippy`,
+and `llvm-tools-preview`. This is separate from the workspace's minimum supported Rust version,
+`rust-version = "1.92"`, the newest minimum any locked dependency declares (from GPUI Kit's
+tree).
 
 ## WORKSP-5
 

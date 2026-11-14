@@ -13,7 +13,11 @@ PlantUML sequence diagrams lower to the same model (PUML-3). Reference:
   `box` that declares it, and a declaration in another is an error. Test: `box_contents`.
 - Messages `A->>B: text` with arrows `->`, `-->`, `->>`, `-->>`, `-x`, `--x`, `-)`, `--)`,
   `<<->>`, `<<-->>`; `+` and `-` after the arrow activate and deactivate the target.
-- `activate A`, `deactivate A`; `autonumber`.
+- `activate A`, `deactivate A`; `autonumber`, `autonumber START`, `autonumber START STEP`,
+  and `autonumber off`. Every message advances the counter, even while numbering is off.
+  Bare `autonumber` resumes the current number and step; a nonzero `START` sets the next
+  number, and `autonumber START` resets the step to 1. A supplied zero leaves the current
+  number or step unchanged (except the single-argument form still resets the step to 1).
 - Notes: `note left of A`, `note right of A`, `note over A,B`.
 - Blocks: `loop`, `alt` / `else`, `opt`, `par` / `and`, `critical` / `option`, `break`, `rect`,
   each closed by `end`, nested.

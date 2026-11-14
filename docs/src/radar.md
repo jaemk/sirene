@@ -43,6 +43,11 @@ without an id, and a missing axis are errors. A repeated axis id, a `max` at or 
 an option with a bad value (`graticule square`, `ticks 0`) are errors; a bad `config.radar`
 value is a warning.
 
+## Colors
+
+Curve colors can be overridden with `themeVariables.cScale0` to `cScale11`; see
+[Themes](themes.md).
+
 ## Not drawn
 
-Theme variables (`cScale0` and up, and `themeVariables.radar`) are ignored.
+`themeVariables.radar` is ignored.

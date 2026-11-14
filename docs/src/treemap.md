@@ -46,6 +46,7 @@ A value that is not a number, a missing value after `:`, a name not closed on it
 line that is not an item, `classDef`, or `title` are errors. A section with no items, a class
 with no `classDef`, and a bad `config.treemap` value are warnings.
 
-## Not drawn
+## Colors
 
-Theme variables are ignored.
+Section colors can be overridden with `themeVariables.cScale0` to `cScale11`; see
+[Themes](themes.md).
