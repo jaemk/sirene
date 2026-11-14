@@ -12,6 +12,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   positions in the file, instead of reading the whole file as one Mermaid diagram.
 - Mermaid class diagrams: `link A "url"`, `click A href "url"`, `callback A "fn"`, and
   `click A call fn(args)` set the class's link or callback, with an optional tooltip.
+- Release tarballs are signed with zipsign (`cargo xtask sign`, `cargo xtask gen-key`).
+
+### Changed
+
+- `sirene update` checks the release archive's signature against a key built into sirene,
+  instead of running `gh attestation verify` when `gh` is installed. An unsigned or badly signed
+  archive is refused. Releases still carry build provenance attestations.
 
 ### Fixed
 

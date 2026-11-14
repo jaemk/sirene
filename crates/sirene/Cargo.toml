@@ -34,6 +34,7 @@ self_update = { version = "1.3", default-features = false, features = [
     "progress-bar",
     "compression-tar-gz",
     "checksums",
+    "signatures",
 ] }
 sirene-core = { workspace = true, features = ["png"] }
 sirene-gui = { workspace = true, optional = true }

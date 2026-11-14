@@ -61,10 +61,11 @@ patch's `-dev` version. To release, set the version (`[workspace.package]` and t
 2. `ci` (Linux) and `ci-macos` run `scripts/ci.sh`; `audit` runs the RustSec scan, with the
    advisories `.cargo/audit.toml` ignores and why.
 3. `build`, after all three: one `sirene-X.Y.Z-TARGET.tar.gz` (holding `sirene`) per target,
-   built with `cargo auditable` and the pinned toolchain, each with a build provenance
-   attestation (WORKSP-9). The macOS and gnu legs also run `cargo package --workspace`, which
-   build-checks each crate against the packaged crates before it. `app` builds the universal
-   `Sirene.app` zip and cask (MACOSP-6).
+   built with `cargo auditable` and the pinned toolchain (WORKSP-9). The macOS and gnu legs also
+   run `cargo package --workspace`, which build-checks each crate against the packaged crates
+   before it. `sign`, in the `signing` environment, signs each tarball with `cargo xtask sign`
+   (UPDATE-5) and gives the signed tarballs a build provenance attestation. `app` builds the
+   universal `Sirene.app` zip and cask (MACOSP-6).
 4. `release`: creates the `vX.Y.Z` tag on the released commit and its GitHub release, with the
    changelog section as notes and the tarballs, the zip, the cask, and `SHA256SUMS` (of the
    tarballs and zip) as assets.
