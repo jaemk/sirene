@@ -9517,11 +9517,15 @@ version = "0.3.1-dev"
 dependencies = [
  "assert_cmd",
  "clap",
+ "flate2",
+ "getrandom 0.3.4",
  "icns",
  "plist",
  "predicates",
  "resvg 0.46.0",
+ "self_update",
  "tempfile",
+ "zipsign-api",
 ]
 
 [[package]]

@@ -138,9 +138,8 @@ guide.md:15:8: error: expected a node after the edge
 Replaces the running binary with the latest release, or the one `--to VERSION` names, after
 asking (`--yes` skips the question). `--check` only reports. The download is the same
 `sirene-VERSION-TARGET.tar.gz` the install script uses, for the running build's target, so a GUI
-build stays a GUI build. It is checked against the release's `SHA256SUMS`, and against its build
-provenance when `gh` is installed, before anything is replaced. When `gh` cannot reach GitHub
-for the provenance check, the update stops; run it again once the network is back.
+build stays a GUI build. Before anything is replaced it is checked against the release's
+`SHA256SUMS` and against a signature by the project's release key, which is built into sirene.
 
 ```
 $ sirene update --check

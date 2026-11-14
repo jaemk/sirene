@@ -160,8 +160,6 @@ jobs:
       VERSION: ${{ needs.decide.outputs.version }}
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -241,14 +239,60 @@ jobs:
           cp "target/${{ matrix.target }}/release/sirene" "$dist/"
           cp LICENSE-MIT LICENSE-APACHE THIRD-PARTY-NOTICES "$dist/"
           tar -czf "${dist}.tar.gz" -C "$dist" sirene LICENSE-MIT LICENSE-APACHE THIRD-PARTY-NOTICES
+      # Signed, attested, and checksummed by the `sign` job.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsigned-${{ matrix.target }}
+          path: sirene-*.tar.gz
+
+  # Signs every archive with the zipsign key `sirene update` checks
+  # (spec/self-update.md UPDATE-5), then attests the signed archives. Signing
+  # rewrites an archive, so it comes before the attestation, SHA256SUMS, and
+  # the Homebrew formula's checksums. Only this job holds the key: the
+  # `ZIPSIGN_KEY` secret of the `signing` environment, restricted to main.
+  sign:
+    needs: [decide, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: signing
+    env:
+      RUSTUP_TOOLCHAIN: "1.99.1"
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit
+        with:
+          toolchain: "1.99.1"
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: sign
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: unsigned-*
+          path: dist
+          merge-multiple: true
+      # `xtask sign` refuses a key that is not the pair of
+      # crates/sirene/release.pub, so a wrong secret fails here.
+      - name: sign the archives
+        env:
+          ZIPSIGN_KEY: ${{ secrets.ZIPSIGN_KEY }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/release.key"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$ZIPSIGN_KEY" | base64 -d > "$key"
+          cargo run -q --locked -p xtask -- sign --key "$key" dist/*.tar.gz
       - name: attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: sirene-*.tar.gz
+          subject-path: dist/sirene-*.tar.gz
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ${{ matrix.target }}
-          path: sirene-*.tar.gz
+          name: signed
+          path: dist/sirene-*.tar.gz
 
   # The universal Sirene.app zip and its Homebrew cask (spec/macos-packaging.md).
   app:
@@ -303,7 +347,7 @@ jobs:
           path: app/
 
   release:
-    needs: [decide, build, app]
+    needs: [decide, sign, app]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -312,10 +356,15 @@ jobs:
       VERSION: ${{ needs.decide.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The signed archives and the app, not the `unsigned-*` artifacts.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          name: signed
           path: dist
-          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: app
+          path: dist
       - name: generate SHA256SUMS
         run: |
           cd dist
@@ -368,10 +417,15 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: bash bin/publish.sh
+      # The formula's checksums are the signed archives'.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          name: signed
           path: dist
-          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: app
+          path: dist
       - name: commit the formula, the cask, and the next dev version
         # Pushes straight to main with the job's default GITHUB_TOKEN. If branch
         # protection is ever enabled on main (required reviews, required status

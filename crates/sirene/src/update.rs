@@ -1,22 +1,25 @@
 //! `sirene update`: replace the running binary with a release (UPDATE-1 to UPDATE-6).
 //!
-//! The download, checksum, extraction, and swap are the `self_update` crate's, through its
-//! GitHub backend. What lives here is everything around it: the target triple, the version
-//! decision, package-manager refusals, the prompt, and the provenance check. The decisions are
-//! pure functions, tested without the network.
+//! The download, checksum, signature check, extraction, and swap are the `self_update` crate's,
+//! through its GitHub backend. What lives here is everything around it: the target triple, the
+//! version decision, package-manager refusals, the prompt, and the signing key. The decisions
+//! are pure functions, tested without the network.
 
 use std::io::{IsTerminal, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 use std::time::Duration;
 
 use self_update::backends::github;
 
 const OWNER: &str = "jaemk";
 const NAME: &str = "sirene";
-const REPO: &str = "jaemk/sirene";
 /// The release asset holding each asset's SHA-256 (UPDATE-5).
 const SUMS: &str = "SHA256SUMS";
+/// The zipsign keys a release archive must be signed with (UPDATE-5). The release workflow signs
+/// with the matching key pair; `cargo xtask gen-key` writes a new one. During a key rotation this
+/// lists the old key and the new one.
+const KEYS: [self_update::VerifyingKey; 1] = [*include_bytes!("../release.pub")];
 /// The release lookup's budget (UPDATE-6).
 const LOOKUP: Duration = Duration::from_secs(15);
 /// The download's budget, as `bin/install.sh` gives curl (UPDATE-6).
@@ -140,93 +143,6 @@ fn cargo_home() -> Option<PathBuf> {
         .or_else(|| std::env::home_dir().map(|h| h.join(".cargo")))
 }
 
-/// What `gh attestation verify` said about an archive (UPDATE-5).
-#[derive(Debug, PartialEq, Eq)]
-pub enum Provenance {
-    Verified,
-    /// `gh` could not run the check; says nothing about the archive.
-    Unchecked(String),
-    /// `gh` ran the check and the archive did not verify.
-    Rejected(String),
-}
-
-/// Whether `gh`'s error means this `gh` cannot run the check (too old, or not logged in), rather
-/// than that the archive failed it. Narrow on purpose: "no attestations found" is also what a
-/// substituted archive gets, so it is a rejection.
-pub fn gh_could_not_check(stderr: &str) -> bool {
-    let lower = stderr.to_ascii_lowercase();
-    ["unknown command", "unknown flag", "gh auth login"]
-        .iter()
-        .any(|m| lower.contains(m))
-}
-
-/// Whether `gh`'s error means it could not reach GitHub. That fails the update: whoever controls
-/// the network could otherwise skip the check.
-pub fn gh_offline(stderr: &str) -> bool {
-    let lower = stderr.to_ascii_lowercase();
-    [
-        "dial tcp",
-        "no such host",
-        "connection refused",
-        "i/o timeout",
-        "context deadline exceeded",
-        "tls handshake",
-        "certificate signed by unknown authority",
-    ]
-    .iter()
-    .any(|m| lower.contains(m))
-}
-
-/// Runs `gh attestation verify` on `archive`, with `gh` the command that starts `gh`; `None`
-/// when `gh` is not installed.
-pub fn provenance(mut gh: Command, archive: &Path) -> Option<Provenance> {
-    let out = match gh
-        .arg("attestation")
-        .arg("verify")
-        .arg(archive)
-        .args(["--repo", REPO])
-        .output()
-    {
-        Ok(out) => out,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
-        Err(e) => return Some(Provenance::Unchecked(e.to_string())),
-    };
-    if out.status.success() {
-        return Some(Provenance::Verified);
-    }
-    // gh's output reaches the terminal; keep it to printable text.
-    let stderr: String = String::from_utf8_lossy(&out.stderr)
-        .trim()
-        .chars()
-        .map(|c| if c.is_control() { ' ' } else { c })
-        .collect();
-    Some(if gh_offline(&stderr) {
-        Provenance::Rejected(format!("could not reach GitHub to check it: {stderr}"))
-    } else if gh_could_not_check(&stderr) {
-        Provenance::Unchecked(stderr)
-    } else {
-        Provenance::Rejected(stderr)
-    })
-}
-
-/// The `self_update` hook run on the downloaded archive, before it is extracted.
-fn verify(archive: &Path) -> Result<(), self_update::Error> {
-    match provenance(Command::new("gh"), archive) {
-        None => Ok(()),
-        Some(Provenance::Verified) => {
-            println!("build provenance verified");
-            Ok(())
-        }
-        Some(Provenance::Unchecked(why)) => {
-            eprintln!("note: build provenance could not be checked ({why}); continuing");
-            Ok(())
-        }
-        Some(Provenance::Rejected(why)) => Err(self_update::Error::archive_verification_rejected(
-            format!("build provenance did not verify: {why}"),
-        )),
-    }
-}
-
 /// The GitHub updater for `target`, at release `version` or the latest.
 fn updater(
     target: &str,
@@ -246,7 +162,7 @@ fn updater(
         .show_download_progress(std::io::stderr().is_terminal())
         .check_install_path_writable(true)
         .checksum_from_asset(SUMS)
-        .verify_archive(verify);
+        .verifying_keys(KEYS);
     if let Some(v) = version {
         b.release_tag(format!("v{v}"));
     }
@@ -427,77 +343,5 @@ mod tests {
         assert_eq!(of("/home/u/.cargo/bin/x/sirene"), None);
         assert_eq!(owner(Path::new("/home/u/.cargo/bin/sirene"), None), None);
         assert_eq!(Owner::Cask.command(), "brew upgrade --cask sirene");
-    }
-
-    #[test]
-    fn gh_errors() {
-        assert!(gh_could_not_check(
-            "unknown command \"attestation\" for \"gh\""
-        ));
-        assert!(gh_could_not_check(
-            "To get started with GitHub CLI, please run:  gh auth login"
-        ));
-        let offline = "Post https://api.github.com: dial tcp: lookup api.github.com: no such host";
-        assert!(gh_offline(offline) && !gh_could_not_check(offline));
-        assert!(gh_offline("remote error: tls handshake failure"));
-        for rejected in ["Error: no attestations found", "HTTP 404: Not Found"] {
-            assert!(!gh_could_not_check(rejected) && !gh_offline(rejected));
-        }
-    }
-
-    #[test]
-    fn missing_gh_is_skipped() {
-        assert_eq!(
-            provenance(Command::new("sirene-no-such-gh"), Path::new("a.tar.gz")),
-            None
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn gh_outcomes() {
-        let dir = tempfile::tempdir().unwrap();
-        // Each fake `gh` is a script run by `sh`, not executed itself: executing a file just
-        // written fails with ETXTBSY when another test thread forks while it is open.
-        let fake = |name: &str, body: &str| {
-            let path = dir.path().join(name);
-            std::fs::write(&path, format!("{body}\n")).unwrap();
-            let mut sh = Command::new("sh");
-            sh.arg(path);
-            sh
-        };
-        let archive = Path::new("sirene.tar.gz");
-        // The archive and repo are passed through.
-        let args = dir.path().join("args");
-        let ok = fake("ok", &format!("echo \"$@\" > {}", args.display()));
-        assert_eq!(provenance(ok, archive), Some(Provenance::Verified));
-        assert_eq!(
-            std::fs::read_to_string(&args).unwrap(),
-            "attestation verify sirene.tar.gz --repo jaemk/sirene\n"
-        );
-        let offline = fake("offline", "echo 'dial tcp: i/o timeout' >&2; exit 1");
-        assert_eq!(
-            provenance(offline, archive),
-            Some(Provenance::Rejected(
-                "could not reach GitHub to check it: dial tcp: i/o timeout".into()
-            ))
-        );
-        let old = fake("old", "echo 'unknown command \"attestation\"' >&2; exit 1");
-        assert_eq!(
-            provenance(old, archive),
-            Some(Provenance::Unchecked(
-                "unknown command \"attestation\"".into()
-            ))
-        );
-        let none = fake(
-            "none",
-            "printf 'Error: no attestations found\\033[0m' >&2; exit 1",
-        );
-        assert_eq!(
-            provenance(none, archive),
-            Some(Provenance::Rejected(
-                "Error: no attestations found [0m".into()
-            ))
-        );
     }
 }

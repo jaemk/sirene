@@ -45,11 +45,17 @@ names the command, when the running executable (symlinks resolved) is:
 ## UPDATE-5 Verification
 
 Before anything is extracted, the archive's SHA-256 must match its entry in the release's
-`SHA256SUMS`; a missing entry or a mismatch aborts with the binary unchanged. When `gh` is on the
-PATH, `gh attestation verify ARCHIVE --repo jaemk/sirene` then checks its build provenance
-(WORKSP-9): success prints `build provenance verified`; a `gh` that cannot run the check (an old
-`gh`, or not logged in) prints a note and continues; any other failure, including no attestation
-found and not reaching GitHub (so the network cannot skip the check), aborts. Without `gh` the check is skipped silently, as `bin/install.sh` does.
+`SHA256SUMS`, and the archive must carry a zipsign (ed25519) signature, over its bytes with its
+file name as the context, by a key whose verifying key is built into sirene
+(`crates/sirene/release.pub`). A missing entry, a mismatch, or a missing or bad signature aborts
+with the binary unchanged. No external tool is needed.
+
+The release workflow signs each archive in its `sign` job with `cargo xtask sign`, which refuses
+a key that is not the pair of `release.pub`; the key pair is the `ZIPSIGN_KEY` secret (base64) of
+the `signing` environment, which only `main` can deploy to. `cargo xtask gen-key --out DIR` writes a new pair. To rotate, list the
+old and new verifying keys in `KEYS` in `update.rs` for at least one release, then drop the old
+one. Releases up to 0.3.0 are unsigned and fail the check, but a sirene that checks signatures
+is newer than them, and `sirene update` never moves to an older release.
 
 ## UPDATE-6 Inputs
 
