@@ -72,7 +72,7 @@ pub fn decide(current: &str, target: &str) -> Result<Decision, String> {
     let parse =
         |v: &str| semver::Version::parse(v).map_err(|e| format!("'{v}' is not a version: {e}"));
     let (current, target) = (parse(current)?, parse(target)?);
-    Ok(match target.cmp(&current) {
+    Ok(match target.cmp_precedence(&current) {
         std::cmp::Ordering::Equal => Decision::UpToDate,
         std::cmp::Ordering::Greater => Decision::Update,
         std::cmp::Ordering::Less => Decision::Older,
@@ -85,7 +85,7 @@ pub fn version_arg(raw: &str) -> Result<String, String> {
     let v = raw.strip_prefix('v').unwrap_or(raw);
     let plain = !v.is_empty()
         && v.chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'));
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-'));
     if plain && semver::Version::parse(v).is_ok() {
         Ok(v.to_owned())
     } else {
@@ -250,6 +250,7 @@ pub fn run(args: Args) -> ExitCode {
             println!(
                 "sirene {current} is newer than the latest release, {version} (target {triple})"
             );
+            note();
             return ExitCode::SUCCESS;
         }
         Decision::Update if args.check => {
@@ -312,6 +313,9 @@ mod tests {
         assert_eq!(decide("0.2.1-dev", "0.2.0"), Ok(Decision::Older));
         assert_eq!(decide("0.2.1-dev", "0.2.1"), Ok(Decision::Update));
         assert!(decide("0.2.0", "latest").is_err());
+        // Build metadata does not affect precedence.
+        assert_eq!(decide("0.2.0+a", "0.2.0+b"), Ok(Decision::UpToDate));
+        assert_eq!(decide("0.2.0", "0.2.0+build.5"), Ok(Decision::UpToDate));
     }
 
     #[test]
@@ -320,7 +324,15 @@ mod tests {
         assert_eq!(version_arg("v0.2.0").as_deref(), Ok("0.2.0"));
         assert_eq!(version_arg("1.0.0-rc.1").as_deref(), Ok("1.0.0-rc.1"));
         for bad in [
-            "", "v", "vv0.2.0", "0.2", "../0.2.0", "0.2.0/x", "0.2.0 x", "latest",
+            "",
+            "v",
+            "vv0.2.0",
+            "0.2.0+build.1",
+            "0.2",
+            "../0.2.0",
+            "0.2.0/x",
+            "0.2.0 x",
+            "latest",
         ] {
             assert!(version_arg(bad).is_err(), "{bad}");
         }

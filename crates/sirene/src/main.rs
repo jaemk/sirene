@@ -732,12 +732,23 @@ type Job = (Option<PathBuf>, Option<PathBuf>);
 
 /// `found` as jobs, without each input whose output an earlier input already writes (`a.mmd`
 /// beside `a.mermaid`), plus an error line for each input left out.
+/// Outputs compare case-insensitively on macOS and Windows, whose filesystems fold case.
 fn distinct(found: Vec<(PathBuf, PathBuf)>) -> (Vec<Job>, Vec<String>) {
+    distinct_by(found, cfg!(any(target_os = "macos", target_os = "windows")))
+}
+
+/// `distinct`, with `fold_case` choosing whether outputs differing only in case collide.
+fn distinct_by(found: Vec<(PathBuf, PathBuf)>, fold_case: bool) -> (Vec<Job>, Vec<String>) {
     let mut writers: HashMap<PathBuf, PathBuf> = HashMap::new();
     let mut jobs = Vec::new();
     let mut skipped = Vec::new();
     for (input, output) in found {
-        if let Some(first) = writers.get(&output) {
+        let key = if fold_case {
+            PathBuf::from(output.to_string_lossy().to_lowercase())
+        } else {
+            output.clone()
+        };
+        if let Some(first) = writers.get(&key) {
             skipped.push(format!(
                 "error: skipping {}; {} also writes {}",
                 input.display(),
@@ -746,7 +757,7 @@ fn distinct(found: Vec<(PathBuf, PathBuf)>) -> (Vec<Job>, Vec<String>) {
             ));
             continue;
         }
-        writers.insert(output.clone(), input.clone());
+        writers.insert(key, input.clone());
         jobs.push((Some(input), Some(output)));
     }
     (jobs, skipped)
@@ -948,6 +959,19 @@ mod tests {
             skipped,
             ["error: skipping a.mmd; a.mermaid also writes a.svg"]
         );
+    }
+
+    /// Outputs differing only in case collide when the filesystem folds case.
+    #[test]
+    fn distinct_outputs_fold_case() {
+        let p = PathBuf::from;
+        let found = || vec![(p("A.mmd"), p("A.svg")), (p("a.mmd"), p("a.svg"))];
+        let (jobs, skipped) = distinct_by(found(), true);
+        assert_eq!(jobs, [(Some(p("A.mmd")), Some(p("A.svg")))]);
+        assert_eq!(skipped, ["error: skipping a.mmd; A.mmd also writes a.svg"]);
+        let (jobs, skipped) = distinct_by(found(), false);
+        assert_eq!(jobs.len(), 2);
+        assert!(skipped.is_empty());
     }
 
     #[test]

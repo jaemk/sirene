@@ -52,7 +52,9 @@ Merging a version bump to `main` is the release. Between releases `main` carries
 patch's `-dev` version. To release, set the version (`[workspace.package]` and the
 `[workspace.dependencies]` pins) to a stable `X.Y.Z` and add a `## [X.Y.Z]` section to
 `CHANGELOG.md`. `.github/workflows/release.yml` runs on every push to `main` (and by hand from
-`main`, to re-run a release that failed partway; every step is idempotent; any other ref skips):
+`main`, to re-run a release that failed partway; every step is idempotent; any other ref skips;
+a re-run of a version whose `vX.Y.Z` tag exists fails in `decide` unless `main` is at the
+tagged commit):
 
 1. `decide`: `bin/check-versions.sh` requires every dependency between publishable members to pin
    exactly that member's version, and no stable crate to depend on a pre-release. A `-dev`
@@ -63,8 +65,9 @@ patch's `-dev` version. To release, set the version (`[workspace.package]` and t
 3. `build`, after all three: one `sirene-X.Y.Z-TARGET.tar.gz` (holding `sirene`) per target,
    built with `cargo auditable` and the pinned toolchain (WORKSP-9). The macOS and gnu legs also
    run `cargo package --workspace`, which build-checks each crate against the packaged crates
-   before it. `sign`, in the `signing` environment, signs each tarball with `cargo xtask sign`
-   (UPDATE-5) and gives the signed tarballs a build provenance attestation. `app` builds the
+   before it. `sign`, in the `signing` environment, builds `xtask` in a step without the key,
+   then signs each tarball with `target/release/xtask sign` (UPDATE-5; the key is never in the
+   environment of a compile) and gives the signed tarballs a build provenance attestation. `app` builds the
    universal `Sirene.app` zip and cask (MACOSP-6).
 4. `release`: creates the `vX.Y.Z` tag on the released commit and its GitHub release, with the
    changelog section as notes and the tarballs, the zip, the cask, and `SHA256SUMS` (of the

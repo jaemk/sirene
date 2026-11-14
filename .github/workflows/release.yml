@@ -68,6 +68,16 @@ jobs:
           # than skip a real release.
           if gh release view "v$version" --json tagName >/dev/null 2>err.txt; then
             if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              # A re-run builds this checkout (main's HEAD). It must be the
+              # commit the tag names, or the clobbered assets and the publish
+              # would ship different code under the old tag.
+              git fetch --force --tags origin "refs/tags/v$version:refs/tags/v$version"
+              tagged="$(git rev-list -n1 "v$version")"
+              head="$(git rev-parse HEAD)"
+              if [ "$tagged" != "$head" ]; then
+                echo "v$version is tagged at $tagged but main is at $head; refusing to re-run its release from a different commit" >&2
+                exit 1
+              fi
               echo "v$version exists; re-running its release steps"
               echo "release=true" >> "$GITHUB_OUTPUT"
             else
@@ -274,6 +284,10 @@ jobs:
           pattern: unsigned-*
           path: dist
           merge-multiple: true
+      # Compiling xtask runs its dependencies' build scripts and proc macros,
+      # so it happens before the key exists, in a step without the secret.
+      - name: build xtask
+        run: cargo build --locked --release -p xtask
       # `xtask sign` refuses a key that is not the pair of
       # crates/sirene/release.pub, so a wrong secret fails here.
       - name: sign the archives
@@ -284,7 +298,7 @@ jobs:
           key="$RUNNER_TEMP/release.key"
           trap 'rm -f "$key"' EXIT
           printf '%s' "$ZIPSIGN_KEY" | base64 -d > "$key"
-          cargo run -q --locked -p xtask -- sign --key "$key" dist/*.tar.gz
+          target/release/xtask sign --key "$key" dist/*.tar.gz
       - name: attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -400,8 +414,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        # Default checkout is the released commit. cargo publish --locked must
-        # run from it, not from a newer main.
+        # The default checkout is the triggering commit, which `decide` has
+        # required to be the released commit (a re-run of an existing tag must
+        # sit at the tag). cargo publish --locked must run from it.
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit (moving branch ref; runs alongside id-token: write)
