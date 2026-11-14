@@ -10,6 +10,7 @@ use super::model::{
 };
 use super::{agentflow, text};
 use crate::diagnostic::Diagnostic;
+use crate::lines::MAX_DEPTH;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -66,13 +67,24 @@ impl Ids {
     }
 }
 
-fn merge_metadata(into: &mut Metadata, entries: Metadata) {
+/// The most metadata keys an element keeps. Mermaid reads a few; the cap keeps each merge a
+/// short scan however often an element's metadata is given.
+pub const MAX_META_KEYS: usize = 256;
+
+/// Sets `entries` in `into`. Returns whether a new key was left out past `MAX_META_KEYS`.
+#[must_use]
+fn merge_metadata(into: &mut Metadata, entries: Metadata) -> bool {
+    let mut dropped = false;
     for (k, v) in entries {
-        match into.iter_mut().find(|(key, _)| *key == k) {
-            Some(entry) => entry.1 = v,
-            None => into.push((k, v)),
+        if let Some(entry) = into.iter_mut().find(|(key, _)| *key == k) {
+            entry.1 = v;
+        } else if into.len() < MAX_META_KEYS {
+            into.push((k, v));
+        } else {
+            dropped = true;
         }
     }
+    dropped
 }
 
 /// The label of a `LABEL` node (FLOWMO-6).
@@ -140,6 +152,8 @@ struct Lowerer {
     subgraph_index: HashMap<String, usize>,
     /// The id of the subgraph in `subgraphs` that has each member.
     owners: HashMap<String, String>,
+    /// Subgraph levels at and below each subgraph: 1 for one holding only nodes.
+    heights: HashMap<String, usize>,
     subgraph_count: usize,
     /// Subgraphs that lost a member to one that listed it first.
     lost: Vec<String>,
@@ -149,10 +163,44 @@ struct Lowerer {
     class_index: HashMap<String, usize>,
     /// Whether `MAX_EDGES` has been reported.
     too_many_edges: bool,
+    /// Bytes of edge label text so far, counting each edge of an `&` product.
+    label_bytes: usize,
+    /// Whether `MAX_LABEL_BYTES` has been reported.
+    too_much_label: bool,
+    /// Whether `MAX_META_KEYS` has been reported.
+    too_many_keys: bool,
+    /// Bytes of style and class text copied by `classDef`, `class` and `linkStyle`.
+    style_bytes: usize,
+    /// Whether `MAX_STYLE_BYTES` has been reported.
+    too_much_style: bool,
+}
+
+/// The most style and class text, in bytes, that `classDef`, `class` and `linkStyle` copy onto
+/// their targets. A statement listing many targets copies its text once per target.
+pub const MAX_STYLE_BYTES: usize = 64 << 20;
+
+/// Bytes counted for each copy besides its text, so copies of short text still add up.
+const COPY_OVERHEAD: usize = 32;
+
+/// The bytes counted for copying `styles` onto one target.
+fn style_bytes(styles: &[Style]) -> usize {
+    styles
+        .iter()
+        .map(|s| COPY_OVERHEAD + s.property.len() + s.value.len())
+        .sum::<usize>()
+        + COPY_OVERHEAD
 }
 
 /// The most edges a flowchart has.
 pub const MAX_EDGES: usize = 100_000;
+
+/// The most edge label text, in bytes, across all edges. One label on every edge of an `&`
+/// product counts once per edge, so a short source cannot make gigabytes of labels.
+pub const MAX_LABEL_BYTES: usize = 16 << 20;
+
+/// The most subgraphs nested in one another, by blocks or by listing subgraphs as members: as
+/// many as the parser reads nested blocks.
+pub const MAX_NESTING: usize = MAX_DEPTH + 1;
 
 /// The id of the untitled lane that holds a swimlane diagram's nodes outside every lane.
 pub const DEFAULT_LANE: &str = "__swimlane_default__";
@@ -230,20 +278,26 @@ impl Lowerer {
     /// untitled last lane.
     fn lanes(&mut self) {
         let chart = &self.chart;
-        let nested = |id: &str| {
-            chart
-                .subgraphs
-                .iter()
-                .any(|s| s.members.iter().any(|m| m == id))
-        };
-        let emptied: Vec<String> = chart
+        let members: HashSet<&str> = chart
+            .subgraphs
+            .iter()
+            .flat_map(|s| s.members.iter().map(String::as_str))
+            .collect();
+        let nested = |id: &str| members.contains(id);
+        let ends: HashSet<&str> = chart
+            .edges
+            .iter()
+            .flat_map(|e| [e.from.as_str(), e.to.as_str()])
+            .collect();
+        let lost: HashSet<&str> = self.lost.iter().map(String::as_str).collect();
+        let emptied: HashSet<String> = chart
             .subgraphs
             .iter()
             .filter(|s| {
                 s.members.is_empty()
-                    && self.lost.contains(&s.id)
+                    && lost.contains(s.id.as_str())
                     && !nested(&s.id)
-                    && !chart.edges.iter().any(|e| e.from == s.id || e.to == s.id)
+                    && !ends.contains(s.id.as_str())
             })
             .map(|s| s.id.clone())
             .collect();
@@ -269,10 +323,15 @@ impl Lowerer {
             );
         }
         let chart = &self.chart;
+        let members: HashSet<&str> = chart
+            .subgraphs
+            .iter()
+            .flat_map(|s| s.members.iter().map(String::as_str))
+            .collect();
         let loose: Vec<String> = chart
             .nodes
             .iter()
-            .filter(|n| chart.parent(&n.id).is_none())
+            .filter(|n| !members.contains(n.id.as_str()))
             .map(|n| n.id.clone())
             .collect();
         if !loose.is_empty() {
@@ -381,7 +440,7 @@ impl Lowerer {
         let meta = child(syntax, METADATA).map(|m| self.metadata(&m));
         if let Some(&e) = self.edge_ids.get(&id) {
             if let Some(entries) = meta {
-                self.edge_metadata(e, entries);
+                self.edge_metadata(e, entries, syntax.text_range());
             }
             return None;
         }
@@ -389,7 +448,9 @@ impl Lowerer {
             && let Some(&s) = self.subgraph_index.get(&id)
         {
             let sg = &mut self.subgraphs[s];
-            merge_metadata(&mut sg.metadata, entries.clone());
+            if merge_metadata(&mut sg.metadata, entries.clone()) {
+                self.too_many_keys(syntax.text_range());
+            }
             return None;
         }
         let i = self.node_entry(&id);
@@ -448,14 +509,31 @@ impl Lowerer {
     /// Parses a `METADATA` node's body, reporting malformed entries.
     fn metadata(&mut self, syntax: &SyntaxNode) -> Metadata {
         let body = token(syntax, META_BODY);
-        let (entries, invalid) = text::metadata(body.as_ref().map_or("", |t| t.text()));
+        let (mut entries, invalid) = text::metadata(body.as_ref().map_or("", |t| t.text()));
         for bad in invalid {
             self.error(
                 syntax.text_range(),
                 format!("expected `key: value` in metadata, found `{bad}`"),
             );
         }
+        if entries.len() > MAX_META_KEYS {
+            entries.truncate(MAX_META_KEYS);
+            self.too_many_keys(syntax.text_range());
+        }
         entries
+    }
+
+    /// Warns, once per diagram, that metadata keys past `MAX_META_KEYS` were left out.
+    fn too_many_keys(&mut self, range: TextRange) {
+        if !self.too_many_keys {
+            self.too_many_keys = true;
+            self.warning(
+                range,
+                format!(
+                    "an element has more than {MAX_META_KEYS} metadata keys; leaving out the rest"
+                ),
+            );
+        }
     }
 
     fn node_metadata(&mut self, i: usize, entries: Metadata, range: TextRange) {
@@ -482,7 +560,7 @@ impl Lowerer {
         if let Some(label) = label {
             node.label = label;
         }
-        merge_metadata(&mut node.metadata, entries);
+        let dropped = merge_metadata(&mut node.metadata, entries);
         match shape {
             Some((_, Some(agentflow::Named::Shape(s)))) => node.shape = s,
             Some((name, Some(agentflow::Named::Removed))) => {
@@ -496,9 +574,12 @@ impl Lowerer {
             Some((name, None)) => self.error(range, format!("unknown shape `{name}`")),
             None => {}
         }
+        if dropped {
+            self.too_many_keys(range);
+        }
     }
 
-    fn edge_metadata(&mut self, e: usize, entries: Metadata) {
+    fn edge_metadata(&mut self, e: usize, entries: Metadata, range: TextRange) {
         let edge = &mut self.chart.edges[e];
         for (k, v) in &entries {
             match k.as_str() {
@@ -508,7 +589,9 @@ impl Lowerer {
                 _ => {}
             }
         }
-        merge_metadata(&mut edge.metadata, entries);
+        if merge_metadata(&mut edge.metadata, entries) {
+            self.too_many_keys(range);
+        }
     }
 
     /// FLOWMO-8: one edge per source and target pair.
@@ -542,6 +625,25 @@ impl Lowerer {
                 ));
             }
             return;
+        }
+        let mut label = label;
+        if let Some(l) = &label {
+            let bytes = pairs.saturating_mul(l.text.len());
+            if self.label_bytes.saturating_add(bytes) > MAX_LABEL_BYTES {
+                if !self.too_much_label {
+                    self.too_much_label = true;
+                    self.warning(
+                        syntax.text_range(),
+                        format!(
+                            "edge labels total more than {} MiB; leaving out the rest",
+                            MAX_LABEL_BYTES >> 20
+                        ),
+                    );
+                }
+                label = None;
+            } else {
+                self.label_bytes += bytes;
+            }
         }
         for (i, f) in from.iter().enumerate() {
             for (j, t) in to.iter().enumerate() {
@@ -595,6 +697,9 @@ impl Lowerer {
         self.subgraph_count += 1;
 
         let mut kept = Vec::new();
+        // Subgraph levels above `id`, and the most at and below it once `kept` is added.
+        let above = self.levels_above(&id);
+        let mut height = 1;
         for m in &members.list {
             if *m == id || self.globals.contains(m) {
                 continue;
@@ -618,19 +723,46 @@ impl Lowerer {
                         self.lost.push(id.clone());
                     }
                 }
-                None => kept.push(m.clone()),
+                None => {
+                    let below = self.heights.get(m).copied().unwrap_or(0);
+                    if above + 1 + below > MAX_NESTING {
+                        self.warning(
+                            header.text_range(),
+                            format!("`{m}` in `{id}` nests subgraphs more than {MAX_NESTING} deep"),
+                        );
+                        continue;
+                    }
+                    height = height.max(1 + below);
+                    kept.push(m.clone());
+                }
             }
         }
         for m in &kept {
             self.owners.insert(m.clone(), id.clone());
+        }
+        // Raise the heights of `id` and the subgraphs it sits in.
+        let mut at = id.as_str();
+        loop {
+            let h = self.heights.entry(at.to_owned()).or_insert(0);
+            if *h >= height {
+                break;
+            }
+            *h = height;
+            match self.owners.get(at) {
+                Some(owner) => at = owner,
+                None => break,
+            }
+            height += 1;
         }
         match self.subgraph_index.get(&id) {
             Some(&s) => {
                 let existing = &mut self.subgraphs[s];
                 // `kept` has no members owned before, so none of `existing.members`.
                 existing.members.extend(kept);
-                if let Some(meta) = meta {
-                    merge_metadata(&mut existing.metadata, meta);
+                if let Some(meta) = meta
+                    && merge_metadata(&mut existing.metadata, meta)
+                {
+                    self.too_many_keys(header.text_range());
                 }
             }
             None => {
@@ -649,6 +781,20 @@ impl Lowerer {
             }
         }
         id
+    }
+
+    /// How many subgraphs `id` sits in. Nesting stays within `MAX_NESTING`, so this is a short
+    /// walk.
+    fn levels_above(&self, id: &str) -> usize {
+        let mut n = 0;
+        let mut at = id;
+        while let Some(owner) = self.owners.get(at)
+            && n <= MAX_NESTING
+        {
+            n += 1;
+            at = owner;
+        }
+        n
     }
 
     /// Whether subgraph `id`, or a resolved subgraph it sits in at any depth, is `listed`.
@@ -718,13 +864,38 @@ impl Lowerer {
         styles
     }
 
+    /// Counts `bytes` of style or class text copied onto one more target. Returns false, warning
+    /// once, past `MAX_STYLE_BYTES`.
+    fn copy_styles(&mut self, bytes: usize, range: TextRange) -> bool {
+        match self.style_bytes.checked_add(bytes) {
+            Some(total) if total <= MAX_STYLE_BYTES => {
+                self.style_bytes = total;
+                true
+            }
+            _ => {
+                if !self.too_much_style {
+                    self.too_much_style = true;
+                    self.warning(
+                        range,
+                        "styles and classes applied total more than 64 MiB; leaving out the rest",
+                    );
+                }
+                false
+            }
+        }
+    }
+
     /// FLOWMO-11.
     fn class_def_stmt(&mut self, stmt: &SyntaxNode) {
         let (Some(names), Some(style)) = (child(stmt, ID_LIST), token(stmt, STYLE_TEXT)) else {
             return;
         };
         let styles = self.styles(&style);
+        let bytes = style_bytes(&styles);
         for name in tokens(&names).filter(|t| t.kind() == IDENT) {
+            if !self.copy_styles(bytes, name.text_range()) {
+                break;
+            }
             let name = name.text();
             match self.class_index.get(name) {
                 Some(&i) => self.chart.classes[i].styles.extend(styles.iter().cloned()),
@@ -747,6 +918,9 @@ impl Lowerer {
         };
         let class = class.text().to_owned();
         for t in tokens(&ids).filter(|t| t.kind() == IDENT) {
+            if !self.copy_styles(COPY_OVERHEAD + class.len(), t.text_range()) {
+                break;
+            }
             let id = t.text();
             let mut found = false;
             if let Some(&i) = self.node_index.get(id) {
@@ -799,6 +973,9 @@ impl Lowerer {
             .and(token(stmt, IDENT))
             .map(|t| t.text().to_owned());
         let styles = token(stmt, STYLE_TEXT).map(|t| self.styles(&t));
+        let bytes = COPY_OVERHEAD
+            + styles.as_deref().map_or(0, style_bytes)
+            + curve.as_ref().map_or(0, String::len);
         if token(stmt, DEFAULT_KW).is_some() {
             if let Some(curve) = curve {
                 self.chart.default_curve = Some(curve);
@@ -812,6 +989,9 @@ impl Lowerer {
             return;
         };
         for t in tokens(&list).filter(|t| t.kind() == NUMBER) {
+            if !self.copy_styles(bytes, t.text_range()) {
+                break;
+            }
             let count = self.chart.edges.len();
             let Some(edge) = t
                 .text()

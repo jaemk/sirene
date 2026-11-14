@@ -277,6 +277,7 @@ fn split_unquoted(s: &str, is_sep: impl Fn(char) -> bool, single: bool) -> Vec<&
 /// ones, and the trimmed text of any entry without a `:`.
 pub(crate) fn metadata(body: &str) -> (Vec<(String, String)>, Vec<String>) {
     let mut entries: Vec<(String, String)> = Vec::new();
+    let mut index: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     let mut invalid = Vec::new();
     for part in metadata_parts(body) {
         let part = part.trim();
@@ -289,9 +290,12 @@ pub(crate) fn metadata(body: &str) -> (Vec<(String, String)>, Vec<String>) {
         };
         let key = key.trim().to_owned();
         let value = yaml_value(value);
-        match entries.iter_mut().find(|(k, _)| *k == key) {
-            Some(entry) => entry.1 = value,
-            None => entries.push((key, value)),
+        match index.get(&key) {
+            Some(&i) => entries[i].1 = value,
+            None => {
+                index.insert(key.clone(), entries.len());
+                entries.push((key, value));
+            }
         }
     }
     (entries, invalid)

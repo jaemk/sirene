@@ -13,6 +13,80 @@ pub(crate) struct Base<'a> {
     pub pos: usize,
     pub builder: GreenNodeBuilder<'static>,
     pub diagnostics: Vec<Diagnostic>,
+    /// The next `}%%`, for directives.
+    directive: Next,
+}
+
+/// Whether only spaces come between the start of `pos`'s line and `pos`. Reads back only over
+/// the spaces, so it costs nothing on a long line.
+pub(crate) fn only_space_before(src: &str, pos: usize) -> bool {
+    src[..pos]
+        .chars()
+        .rev()
+        .take_while(|&c| c != '\n')
+        .all(scan::is_space)
+}
+
+/// The next match of a needle at or after a position. A later search from a position no further
+/// than that match reuses it, so unclosed openers on many lines do not each rescan the rest.
+#[derive(Default)]
+pub(crate) struct Next {
+    from: usize,
+    at: Option<Option<usize>>,
+}
+
+impl Next {
+    /// The offset in `src` of the first `needle` at or after `pos`.
+    pub fn find(&mut self, src: &str, pos: usize, needle: &str) -> Option<usize> {
+        if let Some(at) = self.at
+            && pos >= self.from
+            && at.is_none_or(|a| pos <= a)
+        {
+            return at;
+        }
+        let at = src[pos..].find(needle).map(|i| pos + i);
+        self.from = pos;
+        self.at = Some(at);
+        at
+    }
+}
+
+/// The `}` closing a metadata body, as `scan::meta_body_len` finds it, for searches from many
+/// positions. Which quotes open strings depends on where a search starts, so the quotes are
+/// counted from the start of the text, and a search reuses an earlier one that started with
+/// the same count's parity.
+#[derive(Default)]
+pub(crate) struct MetaClose {
+    /// How far quotes are counted, and whether an odd number come before there.
+    counted: usize,
+    odd: bool,
+    /// By parity: where a search started, and what it found.
+    found: [Option<(usize, Option<usize>)>; 2],
+}
+
+impl MetaClose {
+    /// The offset in `src` of the `}` closing a body that starts at `pos`.
+    pub fn find(&mut self, src: &str, pos: usize) -> Option<usize> {
+        if pos < self.counted {
+            (self.counted, self.odd) = (0, false);
+        }
+        let quotes = src.as_bytes()[self.counted..pos]
+            .iter()
+            .filter(|&&b| b == b'"')
+            .count();
+        self.odd ^= quotes % 2 == 1;
+        self.counted = pos;
+        let slot = &mut self.found[usize::from(self.odd)];
+        if let Some((from, at)) = *slot
+            && pos >= from
+            && at.is_none_or(|a| pos <= a)
+        {
+            return at;
+        }
+        let at = scan::meta_body_len(&src[pos..]).map(|i| pos + i);
+        *slot = Some((pos, at));
+        at
+    }
 }
 
 /// How deep blocks nest before a parser stops reading into them (LANGS-8). Parsing, lowering,
@@ -194,6 +268,7 @@ impl<'a> Base<'a> {
             pos: 0,
             builder: GreenNodeBuilder::new(),
             diagnostics: Vec::new(),
+            directive: Next::default(),
         }
     }
 
@@ -292,9 +367,7 @@ impl<'a> Base<'a> {
     }
 
     fn at_line_start(&self) -> bool {
-        let before = &self.src[..self.pos];
-        let line = before.rfind('\n').map_or(before, |i| &before[i + 1..]);
-        line.chars().all(scan::is_space)
+        only_space_before(self.src, self.pos)
     }
 
     /// Frontmatter, trivia, and a `HEADER` holding one of `headers` (each a whole word, per
@@ -358,9 +431,10 @@ impl<'a> Base<'a> {
                 self.token(NEWLINE, nl);
             } else if r.starts_with(';') {
                 self.token(SEMI, 1);
-            } else if let Some(body) = r.strip_prefix("%%{") {
-                match body.find("}%%") {
-                    Some(i) => self.token(DIRECTIVE, i + 6),
+            } else if r.starts_with("%%{") {
+                let from = self.pos + 3;
+                match self.directive.find(self.src, from, "}%%") {
+                    Some(at) => self.token(DIRECTIVE, at - from + 6),
                     None => {
                         let start = self.pos;
                         self.token(DIRECTIVE, scan::line_len(r));
@@ -602,6 +676,28 @@ impl<'a> Base<'a> {
 mod tests {
     use super::*;
     use crate::syntax::SyntaxNode;
+
+    /// Searches from every position, forward and then backward, agree with a fresh scan.
+    #[test]
+    fn closers_match_a_fresh_scan() {
+        for src in [
+            "a } \"}\" } x",
+            "\"a\" @{ \"}\n\" } \" }",
+            "}}\"\"}\"}",
+            "no closer \" here",
+            "",
+        ] {
+            let mut meta = MetaClose::default();
+            let mut next = Next::default();
+            let fresh = |p: usize| scan::meta_body_len(&src[p..]).map(|i| p + i);
+            let plain = |p: usize| src[p..].find('}').map(|i| p + i);
+            let order: Vec<usize> = (0..=src.len()).chain((0..=src.len()).rev()).collect();
+            for p in order {
+                assert_eq!(meta.find(src, p), fresh(p), "{src:?} at {p}");
+                assert_eq!(next.find(src, p, "}"), plain(p), "{src:?} at {p}");
+            }
+        }
+    }
 
     #[test]
     fn brace_blocks() {

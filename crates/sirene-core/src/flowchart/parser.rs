@@ -8,7 +8,7 @@ use rowan::{GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::scan::{self, Opener, Stroke};
 use crate::diagnostic::Diagnostic;
-use crate::lines::{MAX_DEPTH, end_block_len, too_deep};
+use crate::lines::{MAX_DEPTH, MetaClose, Next, end_block_len, too_deep};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -19,6 +19,7 @@ pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
         diagnostics: Vec::new(),
         agentflow: false,
         stop: None,
+        closers: Closers::default(),
     };
     p.root();
     (p.builder.finish(), p.diagnostics)
@@ -35,6 +36,18 @@ struct Parser<'a> {
     /// `(from, at)`: the first label stop character at or after `from` is at `at`, so labels
     /// starting in between need not scan again (a stop may be far ahead of many labels).
     stop: Option<(usize, usize)>,
+    /// The next closer of each opener that may span lines, so unclosed openers on many lines
+    /// do not each rescan the rest.
+    closers: Closers,
+}
+
+#[derive(Default)]
+struct Closers {
+    directive: Next,
+    quote: Next,
+    md_quote: Next,
+    brace: Next,
+    meta: MetaClose,
 }
 
 /// Mermaid's other diagram types, by the keyword that starts them.
@@ -160,9 +173,7 @@ impl<'a> Parser<'a> {
 
     /// Whether only inline whitespace precedes the cursor on its line.
     fn at_line_start(&self) -> bool {
-        let before = &self.src[..self.pos];
-        let line = before.rfind('\n').map_or(before, |i| &before[i + 1..]);
-        line.chars().all(scan::is_space)
+        crate::lines::only_space_before(self.src, self.pos)
     }
 
     /// Wraps the rest of the statement in an `ERROR` node and reports `message`.
@@ -290,8 +301,9 @@ impl<'a> Parser<'a> {
 
     fn directive(&mut self) {
         let r = self.rest();
-        match r[3..].find("}%%") {
-            Some(i) => self.token(DIRECTIVE, i + 6),
+        let from = self.pos + 3;
+        match self.closers.directive.find(self.src, from, "}%%") {
+            Some(at) => self.token(DIRECTIVE, at - from + 6),
             None => {
                 let start = self.pos;
                 self.token(DIRECTIVE, scan::line_len(r));
@@ -513,12 +525,17 @@ impl<'a> Parser<'a> {
     /// A `"..."` or `` "`...`" `` string at the cursor; unclosed strings end at end of line.
     fn string(&mut self) {
         let r = self.rest();
-        let kind = if r.starts_with("\"`") {
-            MD_STRING
+        // As `scan::string_len` reads it.
+        let (kind, len) = if r.starts_with("\"`") {
+            let from = self.pos + 2;
+            let at = self.closers.md_quote.find(self.src, from, "`\"");
+            (MD_STRING, at.map(|at| at - from + 4))
         } else {
-            STRING
+            let from = self.pos + 1;
+            let at = self.closers.quote.find(self.src, from, "\"");
+            (STRING, at.map(|at| at - from + 2))
         };
-        match scan::string_len(r) {
+        match len {
             Some(n) => self.token(kind, n),
             None => {
                 let start = self.pos;
@@ -533,7 +550,8 @@ impl<'a> Parser<'a> {
         self.start(METADATA);
         let open = self.pos;
         self.token(META_OPEN, 2);
-        match scan::meta_body_len(self.rest()) {
+        let from = self.pos;
+        match self.closers.meta.find(self.src, from).map(|at| at - from) {
             Some(n) => {
                 if n > 0 {
                     self.token(META_BODY, n);
@@ -935,7 +953,13 @@ impl<'a> Parser<'a> {
             let open = self.pos;
             self.token(L_BRACE, 1);
             let r = self.rest();
-            match r.find('}') {
+            let from = self.pos;
+            match self
+                .closers
+                .brace
+                .find(self.src, from, "}")
+                .map(|at| at - from)
+            {
                 Some(n) => {
                     if n > 0 {
                         self.token(ACC_TEXT, n);

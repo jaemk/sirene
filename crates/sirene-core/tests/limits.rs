@@ -166,6 +166,109 @@ fn flowchart_chain() {
     check(&s, &[]);
 }
 
+/// One long label on every edge of an `&` product is left out past the label budget, so a
+/// short source does not copy and measure it tens of thousands of times.
+#[test]
+fn label_product() {
+    let side = |p: &str| {
+        (0..300)
+            .map(|i| format!("{p}{i}"))
+            .collect::<Vec<_>>()
+            .join(" & ")
+    };
+    let label = "x".repeat(30_000);
+    let src = format!("flowchart LR\n{} -->|{label}| {}\n", side("a"), side("b"));
+    let l = diagram::lower(&src);
+    let messages: Vec<_> = l.diagnostics.iter().map(|d| d.message.as_str()).collect();
+    assert_eq!(
+        messages,
+        ["edge labels total more than 16 MiB; leaving out the rest"]
+    );
+    // Under the budget, the label is kept on every edge.
+    let src = format!("flowchart LR\na & b -->|{label}| c & d\n");
+    assert!(diagram::lower(&src).diagnostics.is_empty());
+}
+
+/// Metadata past `MAX_META_KEYS` per element is left out, reported once.
+#[test]
+fn metadata_keys() {
+    let keys = |p: &str| {
+        (0..300)
+            .map(|i| format!("{p}{i}: v"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let mut src = String::from("flowchart LR\n");
+    for i in 0..2_000 {
+        src.push_str(&format!("a@{{ {} }}\n", keys(&format!("k{i}_"))));
+    }
+    let l = diagram::lower(&src);
+    let messages: Vec<_> = l.diagnostics.iter().map(|d| d.message.as_str()).collect();
+    assert_eq!(
+        messages,
+        ["an element has more than 256 metadata keys; leaving out the rest"]
+    );
+    assert!(
+        diagram::lower("flowchart LR\na@{ a: 1, b: 2 }\na@{ b: 3 }\n")
+            .diagnostics
+            .is_empty()
+    );
+}
+
+/// `classDef`, `class` and `linkStyle` lines naming many targets stop copying past the style
+/// budget, reported once.
+#[test]
+fn style_product() {
+    let names = vec!["a"; 200_000].join(",");
+    let long = "x".repeat(400_000);
+    let budget = "styles and classes applied total more than 64 MiB; leaving out the rest";
+    for src in [
+        format!("flowchart LR\na\nclassDef {names} stroke:{long}\n"),
+        format!("flowchart LR\na\nclass {names} {long}\n"),
+        format!(
+            "flowchart LR\na --> b\nlinkStyle {} stroke:{long}\n",
+            vec!["0"; 200_000].join(",")
+        ),
+    ] {
+        let l = diagram::lower(&src);
+        let messages: Vec<_> = l.diagnostics.iter().map(|d| d.message.as_str()).collect();
+        assert_eq!(messages, [budget]);
+    }
+    let src =
+        "flowchart LR\na --> b\nclassDef c,d fill:#f00\nclass a,b c\nlinkStyle 0 stroke:red\n";
+    assert!(diagram::lower(src).diagnostics.is_empty());
+}
+
+/// Subgraphs that list one another nest at most 65 deep, in either declaration order.
+#[test]
+fn subgraph_chain() {
+    let chain = |next: fn(usize) -> usize| {
+        let mut src = String::from("flowchart LR\n");
+        for i in 1..20_000 {
+            src.push_str(&format!("subgraph s{i}\ns{}\nend\n", next(i)));
+        }
+        diagram::lower(&src).diagnostics
+    };
+    // Each subgraph lists the next before it is declared, so each opens deeper in the chain.
+    let down = chain(|i| i + 1);
+    // Each subgraph lists the one before, so each wraps the chain so far.
+    let up = chain(|i| i - 1);
+    for d in [&down, &up] {
+        assert!(!d.is_empty());
+        assert!(
+            d.iter()
+                .all(|d| d.message.ends_with("nests subgraphs more than 65 deep")),
+            "{:?}",
+            d.first()
+        );
+    }
+    assert!(
+        diagram::lower("flowchart LR\nsubgraph a\nb\nend\nsubgraph c\na\nend\n")
+            .diagnostics
+            .is_empty()
+    );
+}
+
 /// A `&` product past the edge cap is left out, reported once.
 #[test]
 fn flowchart_edge_product() {
@@ -193,6 +296,20 @@ fn block_spaces() {
     );
 }
 
+/// Many cells in groups nested to the limit are sized in time.
+#[test]
+fn block_deep_cells() {
+    let cells: Vec<String> = (0..20_000).map(|i| format!("c{i}")).collect();
+    let src = nest(
+        "block-beta",
+        8,
+        |i| format!("block:b{i}"),
+        &cells.join(" "),
+        "end",
+    );
+    check(&src, &[]);
+}
+
 /// Unclosed strings and metadata on many lines do not each rescan the rest.
 #[test]
 fn unclosed_lines() {
@@ -202,6 +319,19 @@ fn unclosed_lines() {
     assert!(lower(&format!("block-beta\n{}", lines("a --\"x\n"))) >= 1);
     assert!(lower(&format!("mindmap\n{}", lines("  a((\"`x\n"))) >= 1);
     assert!(lower(&format!("mindmap\n{}", lines("  a@{\n"))) >= 1);
+    for line in [
+        "%%{x\n",
+        "a[\"`x]\n",
+        "a@{ label: \"x\n",
+        "a@{\n",
+        "accDescr {\n",
+    ] {
+        assert!(
+            lower(&format!("flowchart TD\n{}", lines(line))) >= 1,
+            "{line:?}"
+        );
+    }
+    assert!(lower(&format!("stateDiagram-v2\n{}", lines("%%{x\n"))) >= 1);
 }
 
 /// C4 boundaries and relation styles, and ER and requirement classes, are looked up near
@@ -391,7 +521,7 @@ fn kanban_levels() {
 fn block_blocks() {
     check(
         &nested("block-beta", |i| format!("block:b{i}"), "a", "end"),
-        &["blocks nested more than 12 deep"],
+        &["blocks nested more than 8 deep"],
     );
 }
 

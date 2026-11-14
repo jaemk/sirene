@@ -404,6 +404,44 @@ fn edge_paths_outside_the_layout_contract() {
 }
 
 #[test]
+fn paths_off_the_canvas_keep_only_corners() {
+    let p = Point::new;
+    // On the canvas, every cell.
+    assert_eq!(
+        cells(&[p(0, 0), p(2, 0), p(2, 1)], 4, 4),
+        [p(0, 0), p(1, 0), p(2, 0), p(2, 1)]
+    );
+    // A long run across a small canvas: the cells within one of it, and its end.
+    let run = cells(&[p(-1_000_000, 1), p(1_000_000, 1)], 3, 3);
+    assert_eq!(run.len(), 1 + 5 + 1);
+    assert_eq!(&run[1..6], [p(-1, 1), p(0, 1), p(1, 1), p(2, 1), p(3, 1)]);
+    assert_eq!(run[6], p(1_000_000, 1));
+    // A run that never comes near: its ends only; a run back toward it.
+    assert_eq!(cells(&[p(0, 50), p(9, 50)], 3, 3), [p(0, 50), p(9, 50)]);
+    assert_eq!(
+        cells(&[p(0, 9), p(0, 2)], 3, 3),
+        [p(0, 9), p(0, 3), p(0, 2)]
+    );
+    // Extreme coordinates do not overflow.
+    let far = cells(&[p(i32::MIN, 0), p(i32::MAX, 0)], 2, 2);
+    assert_eq!(far.len(), 1 + 4 + 1);
+    // Drawn through the canvas, a far path shows only its visible part.
+    let chart = flowchart::parse("flowchart\nA --- B\n").lower().flowchart;
+    let away = (Rect::new(-1_000_000, 0, 1, 1), false);
+    let mut canvas = Canvas::new(4, 1);
+    let line = [p(-1_000_000, 0), p(1_000_000, 0)];
+    draw_edge(
+        &mut canvas,
+        &chart.edges[0],
+        &line,
+        away,
+        (Rect::new(1_000_000, 0, 1, 1), false),
+        None,
+    );
+    assert_eq!(canvas.render(Charset::Unicode), "────\n");
+}
+
+#[test]
 fn control_characters_become_spaces() {
     let mut chart = flowchart::parse("flowchart\nA\n").lower().flowchart;
     chart.nodes[0].label = Label::plain("a\tb");
