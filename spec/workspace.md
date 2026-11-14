@@ -102,3 +102,8 @@ and the musl build on Linux unless `SIRENE_TARGET` names another. If a release h
 build and `SIRENE_TARGET` is unset, Linux falls back once to the gnu build. It refuses an unsupported OS or architecture before any request, and a tarball
 whose checksum is not in `SHA256SUMS` or does not match. When `gh` is present it checks the
 build provenance attestation, reporting but not failing on a mismatch.
+The verified executable is copied to an exclusively created temporary file in the install
+directory, made executable, then renamed over `sirene`. Failed staging leaves the old binary
+unchanged; the temporary file is cleaned up. A destination symlink is replaced without writing
+through it. A directory destination, including a symlink to a directory, is refused rather than
+installing a nested `sirene/sirene`.

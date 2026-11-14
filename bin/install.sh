@@ -79,7 +79,8 @@ asset="sirene-${version}-${target}.tar.gz"
 url="https://github.com/${REPO}/releases/download/v${version}/${asset}"
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+staged=""
+trap 'rm -rf "$tmp"; if [ -n "$staged" ]; then rm -f "$staged"; fi' EXIT
 
 # This script is served from `main` but installs the latest RELEASE, whose
 # asset set may predate what main builds. If the musl leg is missing, fall back
@@ -130,13 +131,21 @@ tar -xzf "$tmp/$asset" -C "$tmp" || err "could not extract $asset"
 [ -f "$tmp/sirene" ] || err "archive did not contain a 'sirene' binary"
 
 mkdir -p "$INSTALL_DIR" || err "could not create install directory: ${INSTALL_DIR}"
-if command -v install >/dev/null 2>&1 && install -m 0755 "$tmp/sirene" "$INSTALL_DIR/sirene" 2>/dev/null; then
+destination="$INSTALL_DIR/sirene"
+[ ! -d "$destination" ] || err "${destination} is a directory; refusing to install"
+# Stage beside the destination so the final rename is on the same filesystem.
+# Never copy through an existing command symlink or truncate the old executable.
+staged="$(mktemp "$INSTALL_DIR/.sirene.XXXXXX")" || err "could not create temporary file in ${INSTALL_DIR}"
+if command -v install >/dev/null 2>&1 && install -m 0755 "$tmp/sirene" "$staged" 2>/dev/null; then
 	:
-elif cp "$tmp/sirene" "$INSTALL_DIR/sirene" 2>/dev/null && chmod 0755 "$INSTALL_DIR/sirene" 2>/dev/null; then
+elif cp "$tmp/sirene" "$staged" 2>/dev/null && chmod 0755 "$staged" 2>/dev/null; then
 	:
 else
 	err "could not write to ${INSTALL_DIR}; check permissions or set SIRENE_INSTALL_DIR to a writable directory"
 fi
+[ ! -d "$destination" ] || err "${destination} is a directory; refusing to install"
+mv -f "$staged" "$destination" || err "could not replace ${destination}"
+staged=""
 
 echo "sirene-install: installed sirene ${version} to ${INSTALL_DIR}/sirene"
 case ":${PATH}:" in

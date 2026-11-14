@@ -15,6 +15,10 @@ It downloads the release binary for this platform, checks it against the release
 | `SIRENE_INSTALL_DIR` | `~/.local/bin` | where to put `sirene` |
 | `SIRENE_TARGET` | this platform's, musl on Linux | the release target triple |
 
+The verified binary is staged in the install directory, then renamed into place. A failed
+copy keeps the existing binary; a symlink at `sirene` is replaced without changing its target.
+A directory at that path, including a symlink to a directory, is refused.
+
 On Linux the default is the static musl build, which runs on any distribution but has no GUI.
 For the editor, install the glibc build, which needs the system's X11 or Wayland and Vulkan
 libraries:
