@@ -328,7 +328,7 @@ pub fn gen_key(dir: &Path) -> Result<(PathBuf, PathBuf), String> {
     getrandom::fill(&mut seed).map_err(|e| format!("could not read random bytes: {e}"))?;
     let key = zipsign_api::SigningKey::from_bytes(&seed);
     fs::create_dir_all(dir).map_err(|e| context(dir, e))?;
-    write_new(&private, &key.to_keypair_bytes())?;
+    write_private_new(&private, &key.to_keypair_bytes())?;
     write_new(&public, key.verifying_key().as_bytes())?;
     Ok((private, public))
 }
@@ -389,6 +389,18 @@ fn write_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .create_new(true)
         .open(path)
         .map_err(|e| context(path, e))?;
+    f.write_all(bytes).map_err(|e| context(path, e))
+}
+
+fn write_private_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut f = options.open(path).map_err(|e| context(path, e))?;
     f.write_all(bytes).map_err(|e| context(path, e))
 }
 

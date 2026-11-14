@@ -6,13 +6,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-14
+
 ### Added
 
 - `sirene ascii FILE.md` prints each diagram block of a Markdown file, with diagnostics at
   positions in the file, instead of reading the whole file as one Mermaid diagram.
 - Mermaid class diagrams: `link A "url"`, `click A href "url"`, `callback A "fn"`, and
   `click A call fn(args)` set the class's link or callback, with an optional tooltip.
-- Release tarballs are signed with zipsign (`cargo xtask sign`, `cargo xtask gen-key`).
+- Release tarballs are signed with zipsign (`cargo xtask sign`, `cargo xtask gen-key --out DIR`).
 
 ### Changed
 
@@ -85,8 +87,6 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `-o -` writes the SVG or PNG to stdout instead of to a file named `-`.
 - Reading UTF-16 or other non-UTF-8 input fails with a message naming the problem instead of
   `stream did not contain valid UTF-8`.
-- `sirene update` aborts when `gh` cannot reach GitHub to check the build provenance, instead of
-  continuing with a note.
 - A missing short file name such as `pdf` is no longer refused as a mistyped command.
 - Mermaid quadrant charts: `x-axis Low -->` with no high label draws `Low ⟶`, as in Mermaid.
 - Mermaid gantt charts: a huge duration is an error instead of overflowing, and `excludes` is

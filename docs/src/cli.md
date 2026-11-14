@@ -143,7 +143,7 @@ build stays a GUI build. Before anything is replaced it is checked against the r
 
 ```
 $ sirene update --check
-update available: 0.2.0 -> 0.3.0 (target x86_64-unknown-linux-gnu)
+update available: 0.4.0 -> 0.4.1 (target x86_64-unknown-linux-gnu)
 ```
 
 It never downgrades. A sirene installed by Homebrew or `cargo install` is refused with the
