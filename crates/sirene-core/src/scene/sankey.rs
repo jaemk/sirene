@@ -85,9 +85,28 @@ pub fn sankey(sankey: &Sankey, metrics: &impl TextMetrics, theme: &Theme) -> Sce
     let title_size = fs * 1.2;
     let layout = sankey.layout();
     let top = MARGIN + if title.is_some() { lh + 16.0 } else { 0.0 };
-    let width = (sankey.width + 2.0 * MARGIN)
-        .max(title.map_or(0.0, |t| metrics.width(t, title_size)) + 2.0 * MARGIN);
-    let left = (width - sankey.width) / 2.0;
+    let label = |name: &str, value: f64| {
+        if sankey.show_values {
+            format!("{name} {}", sankey.format_value(value))
+        } else {
+            name.to_owned()
+        }
+    };
+    // Labels point toward the middle, but a long label can cross the opposite edge of the
+    // chart. Measure both sides before positioning anything so no text is clipped.
+    let (mut min_x, mut max_x) = (0.0_f32, sankey.width);
+    for (name, n) in sankey.nodes.iter().zip(&layout.nodes) {
+        let w = metrics.width(&label(name, n.value), small);
+        if n.x0 < sankey.width / 2.0 {
+            max_x = max_x.max(n.x1 + LABEL_GAP + w);
+        } else {
+            min_x = min_x.min(n.x0 - LABEL_GAP - w);
+        }
+    }
+    let content_width = max_x - min_x;
+    let width =
+        content_width.max(title.map_or(0.0, |t| metrics.width(t, title_size))) + 2.0 * MARGIN;
+    let left = MARGIN - min_x + (width - 2.0 * MARGIN - content_width) / 2.0;
     let height = top + sankey.height + MARGIN;
     let at = |x: f32, y: f32| Pt::new(left + x, top + y);
 
@@ -177,11 +196,7 @@ pub fn sankey(sankey: &Sankey, metrics: &impl TextMetrics, theme: &Theme) -> Sce
             None,
         );
         // One line, the value after the name, as Mermaid's label reads.
-        let label = if sankey.show_values {
-            format!("{name} {}", sankey.format_value(n.value))
-        } else {
-            name.clone()
-        };
+        let label = label(name, n.value);
         let w = metrics.width(&label, small);
         let x = if n.x0 < sankey.width / 2.0 {
             b.x + LABEL_GAP + w / 2.0
@@ -202,6 +217,7 @@ pub fn sankey(sankey: &Sankey, metrics: &impl TextMetrics, theme: &Theme) -> Sce
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scene::Approx;
 
     #[test]
     fn sub_curves() {
@@ -225,5 +241,46 @@ mod tests {
         assert_eq!(blend(a, b, 0.0), a);
         assert_eq!(blend(a, b, 1.0), b);
         assert_eq!(blend(a, b, 0.5).r, 128);
+    }
+
+    #[test]
+    fn long_labels_and_title_fit_the_scene() {
+        let source = "source".repeat(30);
+        let target = "target".repeat(30);
+        let src = format!("sankey\n{source},{target},1\n");
+        let (mut chart, diagnostics) = crate::sankey::parse(&src).lower();
+        assert!(diagnostics.is_empty());
+        chart.prefix = "prefix".repeat(20);
+        chart.suffix = "suffix".repeat(20);
+        chart.title = Some("title".repeat(200));
+        let scene = sankey(&chart, &Approx, &Theme::LIGHT);
+        let mut count = 0;
+        for el in &scene.elements {
+            if let Primitive::Text {
+                text, center, size, ..
+            } = &el.primitive
+            {
+                let half = Approx.width(text, *size) / 2.0;
+                assert!(center.x - half >= MARGIN - 0.01, "{text}");
+                assert!(center.x + half <= scene.width - MARGIN + 0.01, "{text}");
+                count += 1;
+            }
+        }
+        assert_eq!(count, 3);
+        assert!(scene.width > chart.width + 2.0 * MARGIN);
+
+        // Also exercise the labels without a title dominating the scene width.
+        chart.title = None;
+        let scene = sankey(&chart, &Approx, &Theme::LIGHT);
+        for el in &scene.elements {
+            if let Primitive::Text {
+                text, center, size, ..
+            } = &el.primitive
+            {
+                let half = Approx.width(text, *size) / 2.0;
+                assert!(center.x - half >= MARGIN - 0.01, "{text}");
+                assert!(center.x + half <= scene.width - MARGIN + 0.01, "{text}");
+            }
+        }
     }
 }

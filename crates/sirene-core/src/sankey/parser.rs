@@ -114,6 +114,10 @@ impl Parser<'_> {
         if r.starts_with('"') {
             match quoted_len(r) {
                 Some(n) => {
+                    if n == 2 {
+                        self.fail(&format!("expected the {what} name"));
+                        return false;
+                    }
                     self.token(STRING, n);
                     true
                 }
@@ -174,6 +178,8 @@ mod tests {
         let e = |s: &str| tree(&format!("sankey\n{s}\n")).1;
         assert_eq!(e(",B,1"), ["expected the source name"]);
         assert_eq!(e("A,,1"), ["expected the target name"]);
+        assert_eq!(e("\"\",B,1"), ["expected the source name"]);
+        assert_eq!(e("A,\"\",1"), ["expected the target name"]);
         assert_eq!(
             e("A"),
             ["expected `,` and the next field: a row is `source,target,value`"]

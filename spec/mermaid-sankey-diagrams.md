@@ -16,7 +16,7 @@ the corpus under `crates/sirene-core/tests/fixtures/sankey/` (LANGS-6).
 The parser shares `crate::lines` with the other Mermaid parsers and is lossless. A row with a
 missing name, a missing `,`, more than three fields, a value that is not a number, or a quoted
 field not closed on its line is an error. Tests: `snapshots`, `syntax_errors`, and the parser's
-unit tests.
+unit tests. An empty quoted field is a missing name too.
 
 ## MSANKEY-2 Model
 
@@ -30,6 +30,8 @@ warning and ignored; an unknown key is ignored.
 
 A negative value, a value over 1e30, a link from a node to itself, and a link that closes a cycle (named in the
 message) are errors and the link is left out; a node that only such links named is not drawn.
+Cycle checks and the text of their descriptions share a cumulative work budget of 1,000,000;
+if it is exhausted, lowering reports an error at that row and ignores it and subsequent links.
 `Sankey::format_value` rounds to two decimals and adds the prefix and suffix. Tests: `model`,
 `errors`, and the module's unit tests.
 
@@ -37,8 +39,9 @@ message) are errors and the link is left out; a node that only such links named 
 
 `Sankey::layout` follows d3-sankey as Mermaid configures it: a node's column is its depth
 (`left`), its height from the right (`right`), or, for `justify`, its depth with sinks in the last
-column, and `center` moves a source to just before its first target. Node heights are their value
-(the larger of what flows in and out) on one scale chosen so the fullest column fits the height
+column, and `center` moves a source to just before its first target. The effective node width is
+capped at the flow area's width so columns do not reverse. Node heights are their value (the larger
+of what flows in and out) on one scale chosen so the fullest column fits the height
 with `node_padding` between nodes; six rounds of relaxation toward linked nodes, with collisions
 resolved after each, place nodes vertically, and links stack on each node in the order of the
 node at their other end. Each link is a band as wide as its value along a cubic between its nodes,

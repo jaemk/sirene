@@ -12,8 +12,15 @@ use crate::syntax::{SyntaxNode, SyntaxToken};
 
 /// The largest link value drawn.
 const MAX_VALUE: f64 = 1e30;
+// A series of cycle checks can otherwise traverse a large graph once per row. This also
+// bounds the bytes copied into cycle descriptions, which may repeat long node names.
+const CYCLE_WORK_LIMIT: usize = 1_000_000;
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Sankey, Vec<Diagnostic>) {
+    lower_with_budget(root, CYCLE_WORK_LIMIT)
+}
+
+fn lower_with_budget(root: &SyntaxNode, mut budget: usize) -> (Sankey, Vec<Diagnostic>) {
     let mut s = Sankey::default();
     let mut diagnostics = Vec::new();
     for el in root.children_with_tokens() {
@@ -68,11 +75,30 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sankey, Vec<Diagnostic>) {
         out.resize(s.nodes.len(), Vec::new());
         reached.resize(s.nodes.len(), false);
         let closes = if a == b || reached[a] {
-            path(&out, b, a)
+            path(&out, b, a, &mut budget)
         } else {
-            None
+            Ok(None)
+        };
+        let Ok(closes) = closes else {
+            diagnostics.push(Diagnostic::new(
+                row.text_range(),
+                "sankey cycle check work limit exceeded; ignoring remaining links",
+            ));
+            break;
         };
         if let Some(path) = closes {
+            // Charge for every name before building the message, including repeated and long
+            // names, so repeated rejected links cannot allocate unbounded diagnostic text.
+            let cost = std::iter::once(&a).chain(&path).try_fold(0usize, |n, &i| {
+                n.checked_add(s.nodes[i].len())?.checked_add(8)
+            });
+            if cost.is_none_or(|cost| !spend(&mut budget, cost)) {
+                diagnostics.push(Diagnostic::new(
+                    row.text_range(),
+                    "sankey cycle check work limit exceeded; ignoring remaining links",
+                ));
+                break;
+            }
             let names: Vec<String> = std::iter::once(&a)
                 .chain(&path)
                 .map(|&i| format!("`{}`", s.nodes[i]))
@@ -180,18 +206,38 @@ fn node(s: &mut Sankey, index: &mut HashMap<String, usize>, name: &str) -> usize
 
 /// The nodes on a path of links (`out`, the targets per source) from `from` to `to`, both
 /// included, if there is one; a node always reaches itself.
-fn path(out: &[Vec<usize>], from: usize, to: usize) -> Option<Vec<usize>> {
+fn spend(budget: &mut usize, amount: usize) -> bool {
+    if let Some(left) = budget.checked_sub(amount) {
+        *budget = left;
+        true
+    } else {
+        false
+    }
+}
+
+fn path(
+    out: &[Vec<usize>],
+    from: usize,
+    to: usize,
+    budget: &mut usize,
+) -> Result<Option<Vec<usize>>, ()> {
+    if !spend(budget, 1) {
+        return Err(());
+    }
     if from == to {
-        return Some(vec![from]);
+        return Ok(Some(vec![from]));
     }
     if out[from].is_empty() {
-        return None;
+        return Ok(None);
     }
     // Breadth first, remembering how each node was reached.
     let mut came: HashMap<usize, usize> = HashMap::new();
     let mut queue = VecDeque::from([from]);
     while let Some(i) = queue.pop_front() {
         for &target in &out[i] {
+            if !spend(budget, 1) {
+                return Err(());
+            }
             if target == from || came.contains_key(&target) {
                 continue;
             }
@@ -205,14 +251,47 @@ fn path(out: &[Vec<usize>], from: usize, to: usize) -> Option<Vec<usize>> {
                 }
                 path.reverse();
                 path.push(to);
-                return Some(path);
+                return Ok(Some(path));
             }
             queue.push_back(target);
         }
     }
-    None
+    Ok(None)
 }
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
     node.children_with_tokens().filter_map(|e| e.into_token())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sankey::parse;
+
+    #[test]
+    fn repeated_reachability_searches_stop_at_the_work_limit() {
+        let src = "sankey\nA,B,1\nB,C,1\nC,D,1\nB,C,1\nB,C,1\nB,C,1\nE,F,1\n";
+        let parsed = parse(src);
+        assert!(parsed.diagnostics().is_empty());
+        let (model, diagnostics) = lower_with_budget(&parsed.syntax(), 5);
+        assert_eq!(model.links.len(), 4);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("work limit exceeded"));
+        assert!(!model.nodes.iter().any(|n| n == "E"));
+    }
+
+    #[test]
+    fn cycle_descriptions_are_also_bounded() {
+        let src = "sankey\nA,LongNodeName,1\nLongNodeName,C,1\nC,A,1\nC,A,1\n";
+        let parsed = parse(src);
+        let (model, diagnostics) = lower_with_budget(&parsed.syntax(), 60);
+        assert_eq!(model.links.len(), 2);
+        assert_eq!(diagnostics.len(), 2);
+        assert!(
+            diagnostics[0]
+                .message
+                .contains("`C` -> `A` -> `LongNodeName` -> `C`")
+        );
+        assert!(diagnostics[1].message.contains("work limit exceeded"));
+    }
 }

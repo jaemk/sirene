@@ -95,7 +95,8 @@ impl Sankey {
 
         // Columns.
         let x = depth.iter().max().map_or(1, |d| d + 1);
-        let dx = self.node_width;
+        // Leave enough room for every column, even when nodeWidth exceeds width.
+        let dx = self.node_width.min(self.width / x as f32);
         let kx = if x > 1 {
             (self.width - dx) / (x - 1) as f32
         } else {
@@ -176,25 +177,29 @@ impl Sankey {
 
 impl State<'_> {
     fn initialize(&mut self, columns: &[Vec<usize>]) {
+        // Normalize by a node value before scaling to screen coordinates. Casting an
+        // input value to f32 first loses small but otherwise valid flows entirely.
+        let scale = self.nodes.iter().map(|n| n.value).fold(0.0_f64, f64::max);
+        let normalized = |v: f64| if scale > 0.0 { v / scale } else { 0.0 };
         let ky = columns
             .iter()
             .filter(|c| !c.is_empty())
             .map(|c| {
-                let total: f64 = c.iter().map(|&i| self.nodes[i].value).sum();
-                (self.height - (c.len() - 1) as f32 * self.py) / total as f32
+                let total: f64 = c.iter().map(|&i| normalized(self.nodes[i].value)).sum();
+                f64::from(self.height - (c.len() - 1) as f32 * self.py) / total
             })
             .filter(|k| k.is_finite())
-            .fold(f32::INFINITY, f32::min);
+            .fold(f64::INFINITY, f64::min);
         let ky = if ky.is_finite() { ky.max(0.0) } else { 0.0 };
         for (k, l) in self.s.links.iter().enumerate() {
-            self.widths[k] = l.value as f32 * ky;
+            self.widths[k] = (normalized(l.value) * ky) as f32;
         }
         for column in columns {
             let mut y = 0.0;
             for &i in column {
                 let node = &mut self.nodes[i];
                 node.y0 = y;
-                node.y1 = y + node.value as f32 * ky;
+                node.y1 = y + (normalized(node.value) * ky) as f32;
                 y = node.y1 + self.py;
             }
             let gap = (self.height - y + self.py) / (column.len() + 1) as f32;
@@ -303,16 +308,16 @@ impl State<'_> {
     fn relax_left_to_right(&mut self, columns: &mut [Vec<usize>], alpha: f32, beta: f32) {
         for column in columns.iter_mut().skip(1) {
             for &t in column.iter() {
-                let (mut y, mut w) = (0.0f32, 0.0f32);
+                let (mut y, mut w) = (0.0f64, 0.0f64);
                 for &k in &self.into[t] {
                     let s = self.s.links[k].source;
-                    let v = self.s.links[k].value as f32
-                        * (self.nodes[t].layer as f32 - self.nodes[s].layer as f32);
-                    y += self.target_top(s, t) * v;
+                    let v = f64::from(self.widths[k])
+                        * (self.nodes[t].layer as f64 - self.nodes[s].layer as f64);
+                    y += f64::from(self.target_top(s, t)) * v;
                     w += v;
                 }
                 if w > 0.0 {
-                    let dy = (y / w - self.nodes[t].y0) * alpha;
+                    let dy = (y / w - f64::from(self.nodes[t].y0)) as f32 * alpha;
                     self.shift(t, dy);
                     self.reorder_node_links(t);
                 }
@@ -325,16 +330,16 @@ impl State<'_> {
     fn relax_right_to_left(&mut self, columns: &mut [Vec<usize>], alpha: f32, beta: f32) {
         for c in (0..columns.len().saturating_sub(1)).rev() {
             for &s in &columns[c] {
-                let (mut y, mut w) = (0.0f32, 0.0f32);
+                let (mut y, mut w) = (0.0f64, 0.0f64);
                 for &k in &self.out[s] {
                     let t = self.s.links[k].target;
-                    let v = self.s.links[k].value as f32
-                        * (self.nodes[t].layer as f32 - self.nodes[s].layer as f32);
-                    y += self.source_top(s, t) * v;
+                    let v = f64::from(self.widths[k])
+                        * (self.nodes[t].layer as f64 - self.nodes[s].layer as f64);
+                    y += f64::from(self.source_top(s, t)) * v;
                     w += v;
                 }
                 if w > 0.0 {
-                    let dy = (y / w - self.nodes[s].y0) * alpha;
+                    let dy = (y / w - f64::from(self.nodes[s].y0)) as f32 * alpha;
                     self.shift(s, dy);
                     self.reorder_node_links(s);
                 }
@@ -468,6 +473,38 @@ mod tests {
         }
         assert!((l.links[0].width + l.links[1].width - h(0)).abs() < 0.01);
         assert!(l.links[0].y0 < l.links[1].y0 || l.nodes[1].y0 > l.nodes[2].y0);
+    }
+
+    #[test]
+    fn very_small_values_keep_their_proportions() {
+        let layout = |v| sankey(&[(0, 1, 3.0 * v), (0, 2, v)], 3).layout();
+        let ordinary = layout(1.0);
+        for tiny in [1e-100, 1e-320] {
+            let small = layout(tiny);
+            for (a, b) in ordinary.nodes.iter().zip(&small.nodes) {
+                assert!((a.y0 - b.y0).abs() < 0.02, "{a:?} {b:?}");
+                assert!((a.y1 - b.y1).abs() < 0.02, "{a:?} {b:?}");
+            }
+            for (a, b) in ordinary.links.iter().zip(&small.links) {
+                assert!((a.width - b.width).abs() < 0.02, "{a:?} {b:?}");
+            }
+        }
+        let zero = sankey(&[(0, 1, 0.0)], 2).layout();
+        assert!(zero.links[0].width.is_finite());
+        assert_eq!(zero.links[0].width, 0.0);
+    }
+
+    #[test]
+    fn wide_nodes_fit_without_reversing_columns() {
+        let mut s = sankey(&[(0, 1, 1.0), (1, 2, 1.0)], 3);
+        s.width = 100.0;
+        s.node_width = 200.0;
+        let layout = s.layout();
+        for n in &layout.nodes {
+            assert!(n.x0 >= 0.0 && n.x1 <= s.width + 0.001, "{n:?}");
+        }
+        assert!(layout.nodes[0].x1 <= layout.nodes[1].x0 + 0.001);
+        assert!(layout.nodes[1].x1 <= layout.nodes[2].x0 + 0.001);
     }
 
     /// d3-sankey's levels: step from every node at once until none are left.
