@@ -89,13 +89,18 @@ pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
     // As in Mermaid, slices under 1% are left out and the others fill the circle; percentages
     // stay shares of the whole total.
     let shown = |v: f64| total > 0.0 && v / total >= 0.01;
-    let drawn: f64 = ordered.iter().map(|s| s.value).filter(|&v| shown(v)).sum();
+    let drawn: f64 = ordered
+        .iter()
+        .map(|s| s.value)
+        .filter(|&v| shown(v))
+        .map(|v| v / total)
+        .sum();
     let mut angle = -FRAC_PI_2;
     for (i, s) in ordered.iter().enumerate() {
         if !shown(s.value) {
             continue;
         }
-        let share = (s.value / drawn) as f32;
+        let share = (s.value / total / drawn) as f32;
         let sweep = share * TAU;
         let start = angle;
         angle += sweep;

@@ -13,6 +13,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Pie, Vec<Diagnostic>) {
     let mut diagnostics = Vec::new();
     let mut title = None;
     let mut labels = HashSet::new();
+    let mut total = 0.0_f64;
     for el in root.children_with_tokens() {
         if el.kind() == FRONTMATTER
             && let Some(tok) = el.as_token()
@@ -35,17 +36,29 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Pie, Vec<Diagnostic>) {
                     diagnostics.push(Diagnostic::new(number.text_range(), "invalid slice value"));
                     continue;
                 };
-                if value < 0.0 {
+                if !value.is_finite() {
+                    diagnostics.push(Diagnostic::new(
+                        number.text_range(),
+                        "slice value is too large",
+                    ));
+                } else if value < 0.0 {
                     diagnostics.push(Diagnostic::new(
                         number.text_range(),
                         format!("`{label}` has a negative value; a slice must be 0 or more"),
                     ));
-                } else if !labels.insert(label.clone()) {
+                } else if labels.contains(&label) {
                     diagnostics.push(Diagnostic::warning(
                         stmt.text_range(),
                         format!("`{label}` is already a slice; skipping this one"),
                     ));
+                } else if !(total + value).is_finite() {
+                    diagnostics.push(Diagnostic::new(
+                        number.text_range(),
+                        "pie slice total is too large",
+                    ));
                 } else {
+                    total += value;
+                    labels.insert(label.clone());
                     pie.slices.push(Slice { label, value });
                 }
             }

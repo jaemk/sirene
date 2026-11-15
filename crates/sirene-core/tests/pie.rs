@@ -159,6 +159,49 @@ fn errors() {
 }
 
 #[test]
+fn oversized_values_and_totals_are_rejected_without_reserving_labels() {
+    let huge = "9".repeat(400);
+    let large = format!("1{}", "0".repeat(308));
+    let src = format!(
+        "pie\n  \"huge\": {huge}\n  \"huge\": 1\n  \"large\": {large}\n  \"overflow\": {large}\n  \"overflow\": 1\n  \"huge\": 2\n"
+    );
+    let parsed = pie::parse(&src);
+    let (pie, diagnostics) = parsed.lower();
+    let messages: Vec<_> = diagnostics
+        .iter()
+        .map(|d| (d.severity, d.message.as_str()))
+        .collect();
+    assert_eq!(
+        messages,
+        [
+            (Severity::Error, "slice value is too large"),
+            (Severity::Error, "pie slice total is too large"),
+            (
+                Severity::Warning,
+                "`huge` is already a slice; skipping this one"
+            ),
+        ]
+    );
+    assert_eq!(
+        &src[usize::from(diagnostics[0].range.start())..usize::from(diagnostics[0].range.end())],
+        huge
+    );
+    assert_eq!(
+        &src[usize::from(diagnostics[1].range.start())..usize::from(diagnostics[1].range.end())],
+        large
+    );
+    assert_eq!(
+        pie.slices
+            .iter()
+            .map(|s| s.label.as_str())
+            .collect::<Vec<_>>(),
+        ["huge", "large", "overflow"]
+    );
+    assert!(pie.total().is_finite());
+    assert_eq!(percent(pie.slices[1].value, pie.total()), 100);
+}
+
+#[test]
 fn syntax_errors() {
     let errors = |src: &str| -> Vec<String> {
         diagram::lower(src)
@@ -190,6 +233,20 @@ fn filled_paths(s: &Scene) -> usize {
         .iter()
         .filter(|e| matches!(&e.primitive, Primitive::Path { fill: Some(_), .. }))
         .count()
+}
+
+#[test]
+fn large_finite_slices_render_with_their_shares() {
+    let large = format!("1{}", "0".repeat(308));
+    let half = format!("5{}", "0".repeat(307));
+    let src = format!("pie\n  \"large\": {large}\n  \"half\": {half}\n");
+    let lowered = diagram::lower(&src);
+    assert!(lowered.diagnostics.is_empty());
+    let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+    let labels = texts(&scene);
+    assert!(labels.iter().any(|(label, _)| label == "67%"));
+    assert!(labels.iter().any(|(label, _)| label == "33%"));
+    assert_eq!(filled_paths(&scene), 4);
 }
 
 /// MPIE-3: slices with percentages, a legend to the right, and the title above.
