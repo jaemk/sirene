@@ -10,20 +10,27 @@ fn wrap(s: &str, max: usize) -> Vec<String> {
     let max = max.max(1);
     let mut out: Vec<String> = Vec::new();
     let mut line = String::new();
+    let mut line_len = 0;
     for word in s.split_whitespace() {
-        let mut word: Vec<char> = word.chars().collect();
-        if !line.is_empty() && line.chars().count() + 1 + word.len() <= max {
+        let word_len = word.chars().count();
+        if !line.is_empty() && line_len + 1 + word_len <= max {
             line.push(' ');
-            line.extend(word.drain(..));
+            line.push_str(word);
+            line_len += 1 + word_len;
             continue;
         }
         if !line.is_empty() {
             out.push(std::mem::take(&mut line));
+            line_len = 0;
         }
-        while word.len() > max {
-            out.push(word.drain(..max).collect());
+        for ch in word.chars() {
+            if line_len == max {
+                out.push(std::mem::take(&mut line));
+                line_len = 0;
+            }
+            line.push(ch);
+            line_len += 1;
         }
-        line.extend(word);
     }
     if !line.is_empty() || out.is_empty() {
         out.push(line);
@@ -123,6 +130,15 @@ mod tests {
         assert_eq!(wrap("Data Offset", 7), ["Data", "Offset"]);
         assert_eq!(wrap("URG", 1), ["U", "R", "G"]);
         assert_eq!(wrap("", 3), [""]);
+    }
+
+    #[test]
+    fn wrapping_long_unicode_words_preserves_characters_and_word_boundaries() {
+        let word = "é界".repeat(20_000);
+        let lines = wrap(&format!("{word} end"), 3);
+        assert!(lines.iter().all(|line| line.chars().count() <= 3));
+        assert_eq!(lines[..lines.len() - 1].concat(), word);
+        assert_eq!(lines.last().unwrap(), "end");
     }
 
     #[test]

@@ -7,7 +7,15 @@ use crate::lines::unquote_escaped;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
+// A field label is copied into each row crossed by the field. Bound that expansion for
+// parsed input before building the rows or rendering them.
+const LABEL_BYTES_LIMIT: usize = 1024 * 1024;
+
 pub(crate) fn lower(root: &SyntaxNode) -> (Packet, Vec<Diagnostic>) {
+    lower_with_limit(root, LABEL_BYTES_LIMIT)
+}
+
+fn lower_with_limit(root: &SyntaxNode, limit: usize) -> (Packet, Vec<Diagnostic>) {
     let mut p = Packet::default();
     let mut diagnostics = Vec::new();
     let mut title = None;
@@ -44,6 +52,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Packet, Vec<Diagnostic>) {
     }
     // The next bit a field should start at.
     let mut next = 0u32;
+    let mut label_bytes = 0usize;
     for stmt in root.children() {
         match stmt.kind() {
             TITLE_STMT => title = text_of(&stmt, TEXT).filter(|s| !s.is_empty()),
@@ -105,11 +114,19 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Packet, Vec<Diagnostic>) {
                         continue;
                     }
                 }
-                p.fields.push(Field {
-                    start,
-                    end,
-                    label: unquote_escaped(label.text()),
-                });
+                let label = unquote_escaped(label.text());
+                let rows = (end / p.bits_per_row - start / p.bits_per_row + 1) as usize;
+                let expanded = label.len().checked_mul(rows);
+                let total = expanded.and_then(|bytes| label_bytes.checked_add(bytes));
+                let Some(total) = total.filter(|&total| total <= limit) else {
+                    diagnostics.push(Diagnostic::new(
+                        range,
+                        "packet expanded label size limit exceeded; ignoring field",
+                    ));
+                    continue;
+                };
+                label_bytes = total;
+                p.fields.push(Field { start, end, label });
                 next = end + 1;
             }
             ACC_TITLE_STMT => p.acc_title = text_of(&stmt, ACC_TEXT),
@@ -131,4 +148,49 @@ fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
 
 fn text_of(node: &SyntaxNode, kind: SyntaxKind) -> Option<String> {
     token(node, kind).map(|t| t.text().trim().to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expanded_labels_have_a_cumulative_limit() {
+        let src = "---\nconfig:\n  packet:\n    bitsPerRow: 1\n---\npacket\n0-1: \"ab\"\n+1: \"cd\"\n+2: \"xyz\"\n+1: \"e\"\n";
+        let parsed = crate::packet::parse(src);
+        assert!(parsed.diagnostics().is_empty());
+        let (packet, diagnostics) = lower_with_limit(&parsed.syntax(), 7);
+        assert_eq!(
+            packet
+                .fields
+                .iter()
+                .map(|f| (f.start, f.end, f.label.as_str()))
+                .collect::<Vec<_>>(),
+            [(0, 1, "ab"), (2, 2, "cd"), (3, 3, "e")]
+        );
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("expanded label size limit"));
+    }
+
+    #[test]
+    fn mixed_relative_and_range_syntax_has_no_field() {
+        let parsed = crate::packet::parse("packet\n+2-100: \"x\"\n+1: \"ok\"\n");
+        let (packet, diagnostics) = parsed.lower();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(packet.fields.len(), 1);
+        assert_eq!(packet.fields[0].label, "ok");
+        assert_eq!(packet.fields[0].start, 0);
+    }
+
+    #[test]
+    fn long_label_crossing_many_rows_hits_production_limit() {
+        let src = format!(
+            "---\nconfig:\n  packet:\n    bitsPerRow: 1\n---\npacket\n0-9999: \"{}\"\n",
+            "x".repeat(105)
+        );
+        let (packet, diagnostics) = crate::packet::parse(&src).lower();
+        assert!(packet.fields.is_empty());
+        assert_eq!(diagnostics.len(), 1);
+        assert!(diagnostics[0].message.contains("expanded label size limit"));
+    }
 }

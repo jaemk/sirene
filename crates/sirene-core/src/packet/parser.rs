@@ -68,7 +68,8 @@ impl Parser<'_> {
     /// `START: "label"`, `START-END: "label"`, or `+BITS: "label"`.
     fn field(&mut self) {
         self.start(FIELD);
-        if self.rest().starts_with('+') {
+        let relative = self.rest().starts_with('+');
+        if relative {
             self.token(PLUS, 1);
         }
         let n = digits(self.rest());
@@ -80,6 +81,11 @@ impl Parser<'_> {
         self.token(NUMBER, n);
         self.ws();
         if self.rest().starts_with('-') {
+            if relative {
+                self.fail("a bit count after `+` cannot have an end bit");
+                self.finish();
+                return;
+            }
             self.token(DASH, 1);
             self.ws();
             let n = digits(self.rest());
@@ -143,6 +149,10 @@ mod tests {
     fn errors() {
         let e = |s: &str| tree(&format!("packet\n  {s}\n")).1;
         assert_eq!(e("+: \"x\""), ["expected a bit count after `+`"]);
+        assert_eq!(
+            e("+2-100: \"x\""),
+            ["a bit count after `+` cannot have an end bit"]
+        );
         assert_eq!(e("0-: \"x\""), ["expected the last bit after `-`"]);
         assert_eq!(e("0 \"x\""), ["expected `:` and a quoted label"]);
         assert_eq!(

@@ -32,12 +32,15 @@ before is left out. A field ending before it starts, one of `+0` bits, and one p
 (`packet::MAX_BIT`) are errors and left out. `Packet::rows` splits the fields into rows of
 `bits_per_row`, a field crossing a row's end continuing on the next row, and `Packet::column`
 gives a bit's place in its row, mirrored when descending. Tests: `bits`, `errors`, and the
-module's unit tests.
+module's unit tests. Lowering limits the total expanded label size to 1 MiB, counting a label's
+UTF-8 bytes once per row it crosses; a field exceeding the limit is reported and omitted. This
+limit applies to parsed diagrams; callers constructing `Packet` directly control their own data.
 
 ## MPKT-3 Drawing
 
-Each row is `bits_per_row` bits of 32 pixels by 32, 5 pixels apart. Each field's part in a row is
-a box in the node colors across its bits, with its label wrapped inside. With `show_bits`, the
+Each row is `bits_per_row` bits of at least 32 pixels wide and 32 pixels high, 5 pixels apart.
+Bit cells widen when a glyph would not fit, and rows grow to fit wrapped labels. Each field's
+part in a row is a box in the node colors across its bits, with its label wrapped inside. With `show_bits`, the
 first and last bit numbers sit over their bits above the box. The title is centered above. Every
 element is owned by the diagram. Tests: `drawing`.
 
