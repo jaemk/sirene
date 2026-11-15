@@ -97,6 +97,13 @@ pub struct Lowered {
 
 /// Parses flowchart source. Never fails; problems are reported as diagnostics.
 pub fn parse(src: &str) -> Parse {
+    parse_with_limit(src, u32::MAX as usize)
+}
+
+fn parse_with_limit(src: &str, limit: usize) -> Parse {
+    if let Some((green, diagnostics)) = crate::lines::limited_tree(src, limit) {
+        return Parse { green, diagnostics };
+    }
     // A lone `\r` ends a line, as in Mermaid; the tree keeps the source's byte offsets.
     let src = &*crate::lines::lone_cr_as_lf(src);
     let (green, diagnostics) = parser::parse(src);
@@ -107,4 +114,15 @@ pub fn parse(src: &str) -> Parse {
         diagnostics.len()
     );
     Parse { green, diagnostics }
+}
+
+#[cfg(test)]
+mod source_limit_tests {
+    #[test]
+    fn rejects_before_normalizing_carriage_returns() {
+        let parsed = super::parse_with_limit("flowchart\rA", 5);
+        assert_eq!(parsed.syntax().text().to_string(), "");
+        assert_eq!(parsed.diagnostics.len(), 1);
+        assert!(parsed.diagnostics[0].message.contains("limit of 5 bytes"));
+    }
 }

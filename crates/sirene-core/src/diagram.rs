@@ -397,6 +397,16 @@ pub fn lower(src: &str) -> Lowered {
 
 /// [`lower`], reading `src` as `lang` when given instead of detecting it (DOT-5).
 pub fn lower_as(src: &str, lang: Option<Lang>) -> Lowered {
+    lower_as_with_limit(src, lang, u32::MAX as usize)
+}
+
+fn lower_as_with_limit(src: &str, lang: Option<Lang>, limit: usize) -> Lowered {
+    if let Some(diagnostic) = crate::lines::source_limit(src, limit) {
+        return Lowered {
+            diagnostics: vec![diagnostic],
+            ..Default::default()
+        };
+    }
     // Graphviz reads a lone `\r` as a space, and Mermaid as a line break.
     let mut kind = Kind::of_lang(src, lang);
     let mermaid = crate::lines::lone_cr_as_lf(src);
@@ -683,6 +693,22 @@ fn lower_diagram(src: &str, kind: Kind) -> Lowered {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn oversized_source_skips_normalization_and_theme_processing() {
+        let src = "flowchart\r%%{init: broken}%%\nA";
+        for lang in [
+            None,
+            Some(Lang::Mermaid),
+            Some(Lang::Dot),
+            Some(Lang::PlantUml),
+        ] {
+            let lowered = lower_as_with_limit(src, lang, 5);
+            assert_eq!(lowered.diagnostics.len(), 1);
+            assert!(lowered.diagnostics[0].message.contains("limit of 5 bytes"));
+            assert_eq!(lowered.theme, ThemeConfig::default());
+        }
+    }
 
     #[test]
     fn kinds() {

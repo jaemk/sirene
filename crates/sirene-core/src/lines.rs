@@ -135,7 +135,7 @@ pub(crate) fn oversized(src: &str) -> Option<(GreenNode, Vec<Diagnostic>)> {
     limited_tree(src, u32::MAX as usize)
 }
 
-fn limited_tree(src: &str, limit: usize) -> Option<(GreenNode, Vec<Diagnostic>)> {
+pub(crate) fn limited_tree(src: &str, limit: usize) -> Option<(GreenNode, Vec<Diagnostic>)> {
     let diagnostic = source_limit(src, limit)?;
     let mut builder = GreenNodeBuilder::new();
     builder.start_node(ROOT.into());
