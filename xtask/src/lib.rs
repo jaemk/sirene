@@ -106,6 +106,11 @@ enum Command {
 
 /// Runs the command line `args` (including the program name), printing to `out`.
 pub fn run(args: impl IntoIterator<Item = OsString>, out: &mut impl Write) -> Result<()> {
+    run_command(args, out)?;
+    out.flush().map_err(Error::from)
+}
+
+fn run_command(args: impl IntoIterator<Item = OsString>, out: &mut impl Write) -> Result<()> {
     let cli = match Cli::try_parse_from(args) {
         Ok(cli) => cli,
         Err(e) if !e.use_stderr() => {

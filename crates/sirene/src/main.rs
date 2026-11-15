@@ -433,9 +433,10 @@ fn markdown_file(file: &Option<PathBuf>) -> Option<&PathBuf> {
 
 /// Runs `run` on Markdown file `md`'s diagram blocks (CLI-12); with `watch`, again whenever it
 /// changes, never returning.
-fn markdown_blocks(md: &Path, watch: bool, run: impl Fn() -> bool) -> ExitCode {
+fn markdown_blocks(md: &Path, watch: bool, run: impl Fn() -> Done) -> ExitCode {
     if !watch {
-        return if run() {
+        let done = run();
+        return if done.written && done.clean {
             ExitCode::SUCCESS
         } else {
             ExitCode::FAILURE
@@ -445,17 +446,52 @@ fn markdown_blocks(md: &Path, watch: bool, run: impl Fn() -> bool) -> ExitCode {
     // The first pass always runs, so a missing file is reported.
     let mut seen = None;
     loop {
-        let now = stamp(md);
-        if seen.as_ref() != Some(&now) {
-            run();
-            // Adding links changes the file; that is not a change to render again.
-            seen = Some(stamp(md));
-        }
+        markdown_watch_pass(md, &mut seen, &run, Instant::now());
         if output::failed() {
             return ExitCode::FAILURE;
         }
         std::thread::sleep(POLL);
     }
+}
+
+/// Retry failed Markdown renders without requiring another source edit. Record the stamp after
+/// each pass because adding links can itself change the Markdown file, even on a partial failure.
+fn markdown_watch_pass(
+    md: &Path,
+    seen: &mut Option<WatchEntry>,
+    run: &impl Fn() -> Done,
+    clock: Instant,
+) {
+    let now = stamp(md);
+    let same = seen.as_ref().is_some_and(|entry| entry.stamp == now);
+    if same
+        && seen
+            .as_ref()
+            .is_some_and(|entry| entry.retry.is_none_or(|(at, _)| clock < at))
+    {
+        return;
+    }
+    let retry = if run().written {
+        None
+    } else {
+        let delay = if same {
+            seen.as_ref()
+                .and_then(|entry| {
+                    entry
+                        .retry
+                        .map(|(_, delay)| (delay * 2).min(Duration::from_secs(30)))
+                })
+                .unwrap_or(Duration::from_secs(2))
+        } else {
+            Duration::from_secs(2)
+        };
+        Some((clock + delay, delay))
+    };
+    *seen = Some(WatchEntry {
+        stamp: stamp(md),
+        missing: false,
+        retry,
+    });
 }
 
 #[cfg(feature = "gui")]
@@ -1374,6 +1410,40 @@ mod tests {
         );
         assert_eq!(std::fs::read(output).unwrap(), b"ok");
         assert_eq!(attempts.get(), 7);
+    }
+
+    /// ERRORH-4: Markdown watches retry transient failures and ignore their own link edits.
+    #[test]
+    fn markdown_watch_retries_and_ignores_own_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("a.md");
+        std::fs::write(&input, "source").unwrap();
+        let attempts = std::cell::Cell::new(0);
+        let run = || {
+            attempts.set(attempts.get() + 1);
+            if attempts.get() == 1 {
+                // A partial pass may have inserted links before another output failed.
+                std::fs::write(&input, "source with link").unwrap();
+            }
+            Done {
+                written: attempts.get() >= 3,
+                clean: false,
+            }
+        };
+        let mut seen = None;
+        let start = Instant::now();
+        for (seconds, expected) in [(0, 1), (1, 1), (2, 2), (5, 2), (6, 3), (50, 3)] {
+            markdown_watch_pass(
+                &input,
+                &mut seen,
+                &run,
+                start + Duration::from_secs(seconds),
+            );
+            assert_eq!(attempts.get(), expected);
+        }
+        std::fs::write(&input, "edited source with new content").unwrap();
+        markdown_watch_pass(&input, &mut seen, &run, start + Duration::from_secs(51));
+        assert_eq!(attempts.get(), 4);
     }
 
     /// The first input to claim an output keeps it; later ones are left out with a reason.

@@ -268,14 +268,17 @@ pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
 }
 
 /// Prints each diagram block of Markdown file `md` as text, a blank line between them, and
-/// their diagnostics. Returns whether the file was read and had no errors.
-pub fn print_ascii(md: &Path, charset: Charset) -> bool {
+/// their diagnostics. Reports output completion separately from input diagnostics.
+pub fn print_ascii(md: &Path, charset: Charset) -> crate::Done {
     let name = md.display().to_string();
     let src = match crate::read_text(md) {
         Ok(src) => src,
         Err(e) => {
             diagnostic!("error: {}", e.report());
-            return false;
+            return crate::Done {
+                written: false,
+                clean: false,
+            };
         }
     };
     let blocks = markdown::mermaid_blocks(&src);
@@ -283,6 +286,7 @@ pub fn print_ascii(md: &Path, charset: Charset) -> bool {
         diagnostic!("{name}: no diagram blocks");
     }
     let mut ok = true;
+    let mut written = true;
     let mut out = String::new();
     for (i, block) in blocks.iter().enumerate() {
         let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
@@ -299,6 +303,7 @@ pub fn print_ascii(md: &Path, charset: Charset) -> bool {
                         .report()
                 );
                 ok = false;
+                written = false;
             }
         }
         if !out.ends_with('\n') {
@@ -315,27 +320,33 @@ pub fn print_ascii(md: &Path, charset: Charset) -> bool {
             "error: {}",
             Error::with_source("cannot write the drawing", e).report()
         );
-        return false;
+        return crate::Done {
+            written: false,
+            clean: false,
+        };
     }
-    ok
+    crate::Done { written, clean: ok }
 }
 
 /// Renders each diagram block of Markdown file `md` with `render` to an image beside it (or
 /// in `out`), named by [`image_path`]; with `link`, adds an image link after each rendered
-/// block. Returns whether everything was read, written, and free of errors.
+/// block. Reports output completion separately from input diagnostics.
 pub fn render(
     md: &Path,
     out: Option<&Path>,
     ext: &str,
     link: bool,
     render: &impl Fn(&Lowered) -> Result<Vec<u8>>,
-) -> bool {
+) -> crate::Done {
     let name = md.display().to_string();
     let src = match crate::read_text(md) {
         Ok(src) => src,
         Err(e) => {
             diagnostic!("error: {}", e.report());
-            return false;
+            return crate::Done {
+                written: false,
+                clean: false,
+            };
         }
     };
     if let Some(dir) = out {
@@ -344,11 +355,17 @@ pub fn render(
                 "error: {} is not a directory; a Markdown file renders one image per block into one",
                 dir.display()
             );
-            return false;
+            return crate::Done {
+                written: false,
+                clean: false,
+            };
         }
         if let Err(e) = std::fs::create_dir_all(dir) {
             diagnostic!("error: cannot create {}: {e}", dir.display());
-            return false;
+            return crate::Done {
+                written: false,
+                clean: false,
+            };
         }
     }
     let blocks = markdown::mermaid_blocks(&src);
@@ -356,6 +373,7 @@ pub fn render(
         diagnostic!("{name}: no diagram blocks");
     }
     let mut ok = true;
+    let mut completed = true;
     let mut links = Vec::new();
     for (i, block) in blocks.into_iter().enumerate() {
         let n = i + 1;
@@ -374,6 +392,7 @@ pub fn render(
             Err(message) => {
                 diagnostic!("error: {}", message.report());
                 ok = false;
+                completed = false;
                 links.push((block, None));
             }
         }
@@ -383,12 +402,18 @@ pub fn render(
         if linked != src {
             if let Err(e) = crate::write_file(md, linked.as_bytes(), true) {
                 diagnostic!("error: cannot write {name}: {e}");
-                return false;
+                return crate::Done {
+                    written: false,
+                    clean: false,
+                };
             }
             diagnostic!("linked the images in {name}");
         }
     }
-    ok
+    crate::Done {
+        written: completed,
+        clean: ok,
+    }
 }
 
 #[cfg(test)]

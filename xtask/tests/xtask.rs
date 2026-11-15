@@ -320,3 +320,42 @@ fn command_output_errors_retain_io_causes() {
         .unwrap();
     assert_eq!(io.kind(), std::io::ErrorKind::BrokenPipe);
 }
+
+/// ERRORH-4: buffered output can fail only when it is flushed.
+#[test]
+fn command_output_flush_errors_retain_io_causes() {
+    use std::error::Error as _;
+    struct FailsOnFlush(Vec<u8>);
+    impl std::io::Write for FailsOnFlush {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Err(std::io::ErrorKind::BrokenPipe.into())
+        }
+    }
+    for args in [
+        vec!["xtask", "--help"],
+        vec![
+            "xtask",
+            "cask",
+            "--sha256",
+            "0000000000000000000000000000000000000000000000000000000000000000",
+            "--url",
+            "https://example.com",
+            "--homepage",
+            "https://example.com",
+        ],
+    ] {
+        let mut out = FailsOnFlush(Vec::new());
+        let error = xtask::run(args.into_iter().map(OsString::from), &mut out).unwrap_err();
+        assert!(!out.0.is_empty());
+        let io = error
+            .source()
+            .unwrap()
+            .downcast_ref::<std::io::Error>()
+            .unwrap();
+        assert_eq!(io.kind(), std::io::ErrorKind::BrokenPipe);
+    }
+}
