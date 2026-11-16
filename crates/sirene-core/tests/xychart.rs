@@ -304,3 +304,23 @@ fn drawing() {
     let w = |k: usize| r[k].2 - r[k].0;
     assert!((w(1) - 2.0 * w(0)).abs() < 0.01);
 }
+
+#[test]
+fn extreme_numeric_inputs_are_safe() {
+    let huge = "9".repeat(400);
+    let src = format!("xychart-beta\nx-axis 0 --> {huge}\nline [1, {huge}]\nline [2]\n");
+    let (c, diagnostics) = lowered(&src);
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(c.series.len(), 1);
+    assert_eq!(c.series[0].values, [2.0]);
+    assert!(matches!(c.x_axis, XAxis::Categories(_)));
+
+    let tiny = format!("0.{}5", "0".repeat(323));
+    let src = format!("xychart-beta\ny-axis -{tiny} --> {tiny}\nline [-{tiny}, {tiny}]\n");
+    let result = diagram::lower(&src);
+    assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
+    let scene = result.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+    let description = format!("{scene:?}");
+    assert!(!description.contains("NaN"));
+    assert!(!description.contains("inf"));
+}

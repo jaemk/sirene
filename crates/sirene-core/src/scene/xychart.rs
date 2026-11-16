@@ -7,7 +7,7 @@ use super::paint::{Painter, Px};
 use super::shapes::{self, BoxF};
 use super::{Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle};
 use crate::flowchart::{Label, Span};
-use crate::xychart::{SeriesKind, XAxis, XyChart, format_number, ticks};
+use crate::xychart::{SeriesKind, XAxis, XyChart, format_number, fraction, ticks};
 
 const MARGIN: f32 = 16.0;
 /// Length of the value axis.
@@ -47,7 +47,7 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     let small = fs - 2.0;
     let n = chart.positions();
     let (lo, hi) = chart.y_bounds();
-    let frac = |v: f64| (((v - lo) / (hi - lo)) as f32).clamp(0.0, 1.0);
+    let frac = |v: f64| (fraction(v, lo, hi) as f32).clamp(0.0, 1.0);
     let title = chart
         .title
         .as_deref()
@@ -79,7 +79,7 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     let center = |i: usize| (i as f32 + 0.5) * band;
     let x_along = |x: f64, min: f64, max: f64| {
         let f = if max > min {
-            ((x - min) / (max - min)) as f32
+            fraction(x, min, max) as f32
         } else {
             0.5
         };
@@ -143,13 +143,54 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     if side_title.is_some() {
         top += lh + 4.0;
     }
+    // Point labels sit above vertical points. Reserve room above even for a point at the
+    // maximum value, without moving the title or legend.
+    if !chart.horizontal
+        && chart
+            .series
+            .iter()
+            .any(|s| s.labels.iter().take(n).any(Option::is_some))
+    {
+        top += 6.0 + lh;
+    }
     let (gutter, plot_w, plot_h, foot) = if chart.horizontal {
         (cat_w + TICK + TICK_GAP, VALUE_LEN * 1.5, cat_len, lh)
     } else {
         (value_w + TICK + TICK_GAP, cat_len, VALUE_LEN, cat_h)
     };
+    // Measure point and axis title overhangs before positioning the plot.
+    let mut left = 0.0_f32;
+    let mut right = plot_w;
+    if !chart.horizontal {
+        for s in &chart.series {
+            let len = s.values.len().min(n);
+            for (i, label) in s.labels.iter().take(len).enumerate() {
+                if let Some(label) = label {
+                    let c = position(i, len);
+                    let half = metrics.width(label, small) / 2.0;
+                    left = left.min(c - half);
+                    right = right.max(c + half);
+                }
+            }
+        }
+        left = left.min(-cat_w / 2.0);
+    } else {
+        for s in &chart.series {
+            for (&v, label) in s.values.iter().zip(&s.labels).take(n) {
+                if let Some(label) = label {
+                    right = right.max(frac(v) * plot_w + 8.0 + metrics.width(label, small));
+                }
+            }
+        }
+    }
+    if let Some(t) = foot_title {
+        let half = metrics.width(t, fs) / 2.0;
+        left = left.min(plot_w / 2.0 - half);
+        right = right.max(plot_w / 2.0 + half);
+    }
+    let plot_x = MARGIN + gutter + (-left - gutter).max(0.0);
     let plot = BoxF {
-        x: MARGIN + gutter,
+        x: plot_x,
         y: top,
         w: plot_w,
         h: plot_h,
@@ -167,10 +208,11 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     } else {
         cat_w / 2.0
     };
-    let content_w = plot.right() + overhang + MARGIN;
+    let content_w = (plot.right() + overhang).max(plot.x + right) + MARGIN;
     let width = content_w
         .max(title.map_or(0.0, |t| metrics.width(t, title_size)) + 2.0 * MARGIN)
-        .max(legend_w + 2.0 * MARGIN);
+        .max(legend_w + 2.0 * MARGIN)
+        .max(side_title.map_or(0.0, |t| metrics.width(t, fs)) + 2.0 * MARGIN);
     let height = bottom + MARGIN;
 
     // A point from a place along the category axis and a value's fraction of the value axis.
@@ -368,4 +410,54 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
 fn rect(b: BoxF) -> Vec<Segment> {
     let (r, bottom) = (b.right(), b.bottom());
     shapes::polygon(&[(b.x, b.y), (r, b.y), (r, bottom), (b.x, bottom)])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scene::Approx;
+    use crate::xychart::Series;
+
+    #[test]
+    fn point_and_axis_titles_fit_scene_in_both_orientations() {
+        let label = "a very long point label ".repeat(20);
+        let x_title = "a very long x axis title ".repeat(20);
+        let y_title = "a very long y axis title ".repeat(20);
+        for horizontal in [false, true] {
+            let chart = XyChart {
+                horizontal,
+                x_title: Some(x_title.clone()),
+                y_title: Some(y_title.clone()),
+                series: vec![Series {
+                    kind: SeriesKind::Line,
+                    name: None,
+                    values: vec![0.0, 1.0],
+                    labels: vec![Some(label.clone()), Some(label.clone())],
+                }],
+                ..XyChart::default()
+            };
+            let scene = xychart(&chart, &Approx, &Theme::default());
+            let mut found = 0;
+            for element in &scene.elements {
+                if let Primitive::Text {
+                    text, center, size, ..
+                } = &element.primitive
+                    && (text == &label || text == &x_title || text == &y_title)
+                {
+                    found += 1;
+                    let half = Approx.width(text, *size) / 2.0;
+                    assert!(
+                        center.x - half >= 0.0 && center.x + half <= scene.width,
+                        "{horizontal}: {center:?}, {half}, {}",
+                        scene.width
+                    );
+                    assert!(
+                        center.y - Theme::default().line_height / 2.0 >= 0.0
+                            && center.y + Theme::default().line_height / 2.0 <= scene.height
+                    );
+                }
+            }
+            assert_eq!(found, 4);
+        }
+    }
 }

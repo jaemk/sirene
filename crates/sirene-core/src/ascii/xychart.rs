@@ -6,6 +6,10 @@ use crate::xychart::{SeriesKind, XyChart, format_number};
 
 /// Cells across the value axis.
 const FIELD: usize = 24;
+// The ordinary table repeats every column's width for every position. Switch to a
+// series-oriented outline before that expansion becomes large.
+const TABLE_BUDGET: usize = 1_000_000;
+const MAX_TITLE_PADDING: usize = 256;
 
 /// Eighth blocks, from one eighth to seven.
 const EIGHTHS: [char; 7] = ['▏', '▎', '▍', '▌', '▋', '▊', '▉'];
@@ -45,7 +49,7 @@ fn marker(share: f64, charset: Charset) -> String {
 pub fn render(chart: &XyChart, options: &Options) -> String {
     let n = chart.positions();
     let (lo, hi) = chart.y_bounds();
-    let share = |v: f64| (v - lo) / (hi - lo);
+    let share = |v: f64| crate::xychart::fraction(v, lo, hi);
     let labels = chart.x_labels();
     let label_w = labels
         .iter()
@@ -53,6 +57,30 @@ pub fn render(chart: &XyChart, options: &Options) -> String {
         .chain(chart.x_title.as_deref().map(width))
         .max()
         .unwrap_or(0) as usize;
+    // Estimate the table before building its n × series cells. Widths are display
+    // cells; multiplying by four also bounds UTF-8 bytes for the repeated padding.
+    let mut row_width = label_w;
+    for s in &chart.series {
+        let mut value_w = 0usize;
+        for (i, v) in s.values.iter().take(n).enumerate() {
+            let mut w = width(&format_number(*v)) as usize;
+            if let Some(Some(label)) = s.labels.get(i) {
+                w = w.saturating_add(1).saturating_add(width(label) as usize);
+            }
+            value_w = value_w.max(w);
+        }
+        let header_w = s.name.as_deref().map(width).unwrap_or(20) as usize;
+        row_width = row_width
+            .saturating_add(2)
+            .saturating_add(header_w.max(FIELD.saturating_add(1).saturating_add(value_w)));
+    }
+    if row_width
+        .saturating_mul(n.saturating_add(1))
+        .saturating_mul(4)
+        > TABLE_BUDGET
+    {
+        return render_compact(chart, &labels, lo, hi, options);
+    }
     // Each series' cells: the field and the value (and a line's point label).
     let mut columns: Vec<(String, Vec<String>)> = Vec::new();
     let (mut lines, mut bars) = (0, 0);
@@ -70,9 +98,9 @@ pub fn render(chart: &XyChart, options: &Options) -> String {
         let values: Vec<String> = s
             .values
             .iter()
-            .zip(&s.labels)
             .take(n)
-            .map(|(v, l)| match l {
+            .enumerate()
+            .map(|(i, v)| match s.labels.get(i).and_then(Option::as_ref) {
                 Some(l) => format!("{} {l}", format_number(*v)),
                 None => format_number(*v),
             })
@@ -140,7 +168,7 @@ pub fn render(chart: &XyChart, options: &Options) -> String {
         .filter(|t| !t.is_empty())
     {
         let w = rows.iter().map(|r| width(r)).max().unwrap_or(0);
-        out.push_str(&" ".repeat(((w - width(t)).max(0) / 2) as usize));
+        out.push_str(&" ".repeat((((w - width(t)).max(0) / 2) as usize).min(MAX_TITLE_PADDING)));
         out.push_str(t);
         out.push_str("\n\n");
     }
@@ -151,9 +179,101 @@ pub fn render(chart: &XyChart, options: &Options) -> String {
     out
 }
 
+/// An outline whose work is proportional to the supplied labels and values, rather than
+/// the product of positions and series. Position numbers relate the two lists.
+fn render_compact(
+    chart: &XyChart,
+    labels: &[String],
+    lo: f64,
+    hi: f64,
+    options: &Options,
+) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+    if let Some(title) = chart
+        .title
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        let _ = writeln!(out, "{title}\n");
+    }
+    if let Some(title) = &chart.x_title {
+        let _ = writeln!(out, "{title}:");
+    }
+    for (i, label) in labels.iter().enumerate() {
+        let _ = writeln!(out, "{}: {label}", i + 1);
+    }
+    let (mut lines, mut bars) = (0, 0);
+    for series in &chart.series {
+        let kind = match series.kind {
+            SeriesKind::Line => {
+                lines += 1;
+                format!("line {lines}")
+            }
+            SeriesKind::Bar => {
+                bars += 1;
+                format!("bar {bars}")
+            }
+        };
+        let _ = writeln!(out, "\n{}:", series.name.as_deref().unwrap_or(&kind));
+        for (i, &value) in series.values.iter().take(labels.len()).enumerate() {
+            let share = crate::xychart::fraction(value, lo, hi);
+            let field = match series.kind {
+                SeriesKind::Line => marker(share, options.charset),
+                SeriesKind::Bar => bar(share, options.charset),
+            };
+            let _ = write!(out, "{}: {field} {}", i + 1, format_number(value));
+            if let Some(Some(label)) = series.labels.get(i) {
+                let _ = write!(out, " {label}");
+            }
+            out.push('\n');
+        }
+    }
+    let span = format!("{} to {}", format_number(lo), format_number(hi));
+    let _ = writeln!(
+        out,
+        "\n{}",
+        match &chart.y_title {
+            Some(title) => format!("{title}: {span}"),
+            None => span,
+        }
+    );
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn large_sparse_table_uses_compact_outline() {
+        use crate::xychart::{Series, XAxis};
+        let long_label = "x".repeat(10_000);
+        let mut categories = vec![long_label.clone()];
+        categories.extend((1..1000).map(|i| format!("category{i}")));
+        let chart = XyChart {
+            x_axis: XAxis::Categories(categories),
+            series: (0..1000)
+                .map(|i| Series {
+                    kind: SeriesKind::Line,
+                    name: Some(format!("series{i}")),
+                    values: vec![1.0],
+                    labels: vec![Some("point".into())],
+                })
+                .collect(),
+            ..XyChart::default()
+        };
+        let rendered = render(&chart, &Options::default());
+        assert_eq!(rendered.matches(&long_label).count(), 1);
+        assert_eq!(rendered.matches("point").count(), 1000);
+        assert!(rendered.contains("series999:"));
+        assert!(
+            rendered.len() < 200_000,
+            "output was {} bytes",
+            rendered.len()
+        );
+    }
 
     #[test]
     fn fields() {

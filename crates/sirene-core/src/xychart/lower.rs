@@ -39,13 +39,23 @@ pub(crate) fn lower(root: &SyntaxNode) -> (XyChart, Vec<Diagnostic>) {
                 let mut values = Vec::new();
                 let mut labels = Vec::new();
                 let mut seen_bracket = false;
+                let mut valid = true;
                 for t in tokens(&node) {
                     match t.kind() {
                         L_BRACKET => seen_bracket = true,
-                        NUMBER => {
-                            values.push(t.text().parse::<f64>().unwrap_or(0.0));
-                            labels.push(None);
-                        }
+                        NUMBER => match t.text().parse::<f64>() {
+                            Ok(v) if v.is_finite() => {
+                                values.push(v);
+                                labels.push(None);
+                            }
+                            _ => {
+                                diagnostics.push(Diagnostic::new(
+                                    t.text_range(),
+                                    "XY chart values must be finite; ignoring this series",
+                                ));
+                                valid = false;
+                            }
+                        },
                         STRING if seen_bracket => {
                             if let Some(l) = labels.last_mut() {
                                 *l = Some(text::unquote(t.text()).to_owned());
@@ -53,6 +63,9 @@ pub(crate) fn lower(root: &SyntaxNode) -> (XyChart, Vec<Diagnostic>) {
                         }
                         _ => {}
                     }
+                }
+                if !valid {
+                    continue;
                 }
                 let name = tokens(&node)
                     .take_while(|t| t.kind() != L_BRACKET)
@@ -109,10 +122,23 @@ fn axis(c: &mut XyChart, node: &SyntaxNode, diagnostics: &mut Vec<Diagnostic>) {
         .find(|t| matches!(t.kind(), TEXT | STRING))
         .map(|t| text::unquote(t.text()).trim().to_owned())
         .filter(|s| !s.is_empty());
-    let numbers: Vec<f64> = tokens(node)
-        .filter(|t| t.kind() == NUMBER)
-        .map(|t| t.text().parse::<f64>().unwrap_or(0.0))
-        .collect();
+    let mut numbers = Vec::new();
+    let mut valid = true;
+    for t in tokens(node).filter(|t| t.kind() == NUMBER) {
+        match t.text().parse::<f64>() {
+            Ok(v) if v.is_finite() => numbers.push(v),
+            _ => {
+                diagnostics.push(Diagnostic::new(
+                    t.text_range(),
+                    "XY chart axis values must be finite; ignoring this range",
+                ));
+                valid = false;
+            }
+        }
+    }
+    if !valid {
+        numbers.clear();
+    }
     let range = match numbers[..] {
         [lo, hi] if lo > hi => {
             diagnostics.push(Diagnostic::warning(
