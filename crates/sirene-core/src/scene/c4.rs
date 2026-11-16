@@ -189,12 +189,22 @@ pub fn c4(c: &C4, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Sc
         }
     }
     // Elements side by side in a row are spread apart to fit the label of a relation between them.
-    let row = |i: usize| {
-        let parent = c.node_parent[i];
-        let k = (0..i).filter(|&j| c.node_parent[j] == parent).count();
-        (parent, k / c.shapes_in_row)
-    };
-    let index = |id: &str| c.chart.nodes.iter().position(|n| n.id == id);
+    let mut seen = std::collections::HashMap::new();
+    let rows: Vec<_> = c
+        .node_parent
+        .iter()
+        .map(|&parent| {
+            let k = seen.entry(parent).or_insert(0usize);
+            *k += 1;
+            (parent, (*k - 1) / c.shapes_in_row)
+        })
+        .collect();
+    let row = |i: usize| rows[i];
+    let mut first = std::collections::HashMap::new();
+    for (i, n) in c.chart.nodes.iter().enumerate() {
+        first.entry(n.id.as_str()).or_insert(i);
+    }
+    let index = |id: &str| first.get(id).copied();
     let gap_x = chart
         .edges
         .iter()
@@ -224,11 +234,9 @@ pub fn c4(c: &C4, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Sc
     };
     let nodes: Vec<Rect> = placed.nodes.iter().map(|&r| rect(r)).collect();
     let clusters: Vec<Rect> = placed.boundaries.iter().map(|&r| rect(r)).collect();
+    let rects = super::block::ids(&c.chart, &nodes, &clusters);
     let center = |id: &str| -> Option<Point> {
-        let r = match c.chart.nodes.iter().position(|n| n.id == id) {
-            Some(i) => nodes[i],
-            None => clusters[c.chart.subgraphs.iter().position(|s| s.id == id)?],
-        };
+        let r = *rects.get(id)?;
         Some(Point::new(r.x + (r.w - 1) / 2, r.y + (r.h - 1) / 2))
     };
     let edges = chart

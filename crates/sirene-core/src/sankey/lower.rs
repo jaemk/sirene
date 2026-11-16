@@ -1,7 +1,7 @@
 //! Collects a sankey diagram's nodes and links, leaving out any link that would close a cycle
 //! (MSANKEY-2).
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::{Align, Link, LinkColor, Sankey};
 use crate::diagnostic::Diagnostic;
@@ -39,8 +39,9 @@ fn lower_with_budget(root: &SyntaxNode, mut budget: usize) -> (Sankey, Vec<Diagn
         }
     }
     let mut index = HashMap::new();
-    // Kept links out of each node, for the cycle check.
+    // Targets of kept links out of each node, each once, for the cycle check.
     let mut out: Vec<Vec<usize>> = Vec::new();
+    let mut edges: HashSet<(usize, usize)> = HashSet::new();
     // Whether each node is the target of a kept link: one that is not cannot be reached.
     let mut reached: Vec<bool> = Vec::new();
     for row in root.children().filter(|r| r.kind() == FLOW) {
@@ -74,7 +75,10 @@ fn lower_with_budget(root: &SyntaxNode, mut budget: usize) -> (Sankey, Vec<Diagn
         let b = node(&mut s, &mut index, target);
         out.resize(s.nodes.len(), Vec::new());
         reached.resize(s.nodes.len(), false);
-        let closes = if a == b || reached[a] {
+        // A link along a kept one adds no path, so it cannot close a cycle.
+        let closes = if edges.contains(&(a, b)) {
+            Ok(None)
+        } else if a == b || reached[a] {
             path(&out, b, a, &mut budget)
         } else {
             Ok(None)
@@ -114,7 +118,9 @@ fn lower_with_budget(root: &SyntaxNode, mut budget: usize) -> (Sankey, Vec<Diagn
             ));
             continue;
         }
-        out[a].push(b);
+        if edges.insert((a, b)) {
+            out[a].push(b);
+        }
         reached[b] = true;
         s.links.push(Link {
             source: a,
@@ -270,14 +276,28 @@ mod tests {
 
     #[test]
     fn repeated_reachability_searches_stop_at_the_work_limit() {
-        let src = "sankey\nA,B,1\nB,C,1\nC,D,1\nB,C,1\nB,C,1\nB,C,1\nE,F,1\n";
+        // `B,D` searches from `D` through `E`, spending the rest; `B,E` then stops.
+        let src = "sankey\nA,B,1\nB,C,1\nC,D,1\nD,E,1\nB,D,1\nB,E,1\nX,Y,1\n";
         let parsed = parse(src);
         assert!(parsed.diagnostics().is_empty());
         let (model, diagnostics) = lower_with_budget(&parsed.syntax(), 5);
-        assert_eq!(model.links.len(), 4);
+        assert_eq!(model.links.len(), 5);
         assert_eq!(diagnostics.len(), 1);
         assert!(diagnostics[0].message.contains("work limit exceeded"));
-        assert!(!model.nodes.iter().any(|n| n == "E"));
+        assert!(!model.nodes.iter().any(|n| n == "X"));
+    }
+
+    /// A link repeating a kept one is kept without a search, so repeats cost no budget.
+    #[test]
+    fn repeated_links_are_kept_without_searching() {
+        let src = "sankey\nA,B,1\nB,C,1\nC,D,1\nB,C,1\nB,C,1\nB,C,1\nE,F,1\n";
+        let parsed = parse(src);
+        let (model, diagnostics) = lower_with_budget(&parsed.syntax(), 2);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert_eq!(model.links.len(), 7);
+        let (_, diagnostics) =
+            lower_with_budget(&parse("sankey\nA,B,1\nB,A,1\nB,A,1\n").syntax(), 100);
+        assert_eq!(diagnostics.len(), 2, "{diagnostics:?}");
     }
 
     #[test]

@@ -3,6 +3,8 @@
 
 mod parser;
 
+use std::collections::HashMap;
+
 use rowan::{GreenNode, TextRange};
 
 pub(crate) use parser::HEADERS;
@@ -163,8 +165,8 @@ impl Wardley {
 
     /// Adds `node`, or updates the node with its id: its position, kind, and decorators, and
     /// its label offset when given.
-    fn add(&mut self, node: Node) -> usize {
-        match self.nodes.iter().position(|n| n.id == node.id) {
+    fn add(&mut self, ids: &mut HashMap<String, usize>, node: Node) -> usize {
+        match ids.get(&node.id).copied() {
             Some(i) => {
                 let old = &mut self.nodes[i];
                 let offset = node.label_offset.or(old.label_offset);
@@ -177,6 +179,7 @@ impl Wardley {
                 i
             }
             None => {
+                ids.insert(node.id.clone(), self.nodes.len());
                 self.nodes.push(node);
                 self.nodes.len() - 1
             }
@@ -235,6 +238,8 @@ fn offset(node: &SyntaxNode) -> Option<(f32, f32)> {
 /// Lowers coordinates and reports values out of range.
 struct Lowering {
     diagnostics: Vec<Diagnostic>,
+    /// Each node's index by id.
+    ids: HashMap<String, usize>,
 }
 
 impl Lowering {
@@ -282,6 +287,7 @@ impl Parse {
         let mut map = Wardley::default();
         let mut lw = Lowering {
             diagnostics: self.diagnostics.clone(),
+            ids: HashMap::new(),
         };
         for el in root.children_with_tokens() {
             if el.kind() == FRONTMATTER
@@ -372,21 +378,24 @@ impl Parse {
                     "market" => Some(Strategy::Market),
                     _ => None,
                 });
-                map.add(Node {
-                    label: id.clone(),
-                    id,
-                    x,
-                    y,
-                    kind: if kw == "anchor" {
-                        NodeKind::Anchor
-                    } else {
-                        NodeKind::Component
+                map.add(
+                    &mut lw.ids,
+                    Node {
+                        label: id.clone(),
+                        id,
+                        x,
+                        y,
+                        kind: if kw == "anchor" {
+                            NodeKind::Anchor
+                        } else {
+                            NodeKind::Component
+                        },
+                        label_offset: offset(n),
+                        inertia: decorators.iter().any(|d| d == "inertia"),
+                        strategy,
+                        pipeline_parent: false,
                     },
-                    label_offset: offset(n),
-                    inertia: decorators.iter().any(|d| d == "inertia"),
-                    strategy,
-                    pipeline_parent: false,
-                });
+                );
             }
         }
         for n in &of("note") {
@@ -401,9 +410,11 @@ impl Parse {
                 });
             }
         }
+        // Each pipeline's index by its parent node.
+        let mut pipelines = HashMap::new();
         for n in &of("pipeline") {
             let Some(parent_name) = name(n) else { continue };
-            let Some(parent) = map.nodes.iter().position(|p| p.id == parent_name) else {
+            let Some(&parent) = lw.ids.get(&parent_name) else {
                 lw.diagnostics.push(Diagnostic::new(
                     n.text_range(),
                     format!("unknown component `{parent_name}`: declare it before its pipeline"),
@@ -422,33 +433,42 @@ impl Parse {
                 else {
                     continue;
                 };
-                let i = map.add(Node {
-                    id: format!("{parent_name}_{label}"),
-                    label,
-                    x,
-                    y,
-                    kind: NodeKind::PipelineComponent,
-                    label_offset: offset(&c),
-                    inertia: false,
-                    strategy: None,
-                    pipeline_parent: false,
-                });
+                let i = map.add(
+                    &mut lw.ids,
+                    Node {
+                        id: format!("{parent_name}_{label}"),
+                        label,
+                        x,
+                        y,
+                        kind: NodeKind::PipelineComponent,
+                        label_offset: offset(&c),
+                        inertia: false,
+                        strategy: None,
+                        pipeline_parent: false,
+                    },
+                );
                 components.push(i);
             }
             // A pipeline declared again keeps its place, as Mermaid's `Map.set` does.
             let pipeline = Pipeline { parent, components };
-            match map
-                .pipelines
-                .iter_mut()
-                .find(|p| p.parent == pipeline.parent)
-            {
-                Some(old) => *old = pipeline,
-                None => map.pipelines.push(pipeline),
+            match pipelines.get(&parent) {
+                Some(&old) => map.pipelines[old] = pipeline,
+                None => {
+                    pipelines.insert(parent, map.pipelines.len());
+                    map.pipelines.push(pipeline);
+                }
             }
         }
-        for n in &of("->") {
-            self.link(&mut map, &mut lw, n);
+        // The first node with each label, for link ends that are not ids.
+        let mut labels = HashMap::new();
+        for (i, node) in map.nodes.iter().enumerate() {
+            labels.entry(node.label.clone()).or_insert(i);
         }
+        for n in &of("->") {
+            self.link(&mut map, &mut lw, &labels, n);
+        }
+        // Each trend's index by its node.
+        let mut trends = HashMap::new();
         for n in &of("evolve") {
             let Some(id) = name(n) else { continue };
             let Some(target) = tokens(n)
@@ -457,7 +477,7 @@ impl Parse {
             else {
                 continue;
             };
-            let Some(node) = map.nodes.iter().position(|p| p.id == id) else {
+            let Some(&node) = lw.ids.get(&id) else {
                 lw.diagnostics.push(Diagnostic::warning(
                     n.text_range(),
                     format!("unknown component `{id}`; ignoring the `evolve`"),
@@ -468,9 +488,12 @@ impl Parse {
                 continue;
             };
             let y = map.nodes[node].y;
-            match map.trends.iter_mut().find(|t| t.node == node) {
-                Some(old) => *old = Trend { node, x, y },
-                None => map.trends.push(Trend { node, x, y }),
+            match trends.get(&node) {
+                Some(&old) => map.trends[old] = Trend { node, x, y },
+                None => {
+                    trends.insert(node, map.trends.len());
+                    map.trends.push(Trend { node, x, y });
+                }
             }
         }
         if let Some(n) = of("annotations").first() {
@@ -514,13 +537,23 @@ impl Parse {
     }
 
     /// Adds a link statement's link, or warns about an unknown end.
-    fn link(&self, map: &mut Wardley, lw: &mut Lowering, n: &SyntaxNode) {
+    fn link(
+        &self,
+        map: &mut Wardley,
+        lw: &mut Lowering,
+        labels: &HashMap<String, usize>,
+        n: &SyntaxNode,
+    ) {
         let names: Vec<String> = tokens(n)
             .filter(|t| matches!(t.kind(), IDENT | STRING))
             .map(|t| unquote(t.text()))
             .collect();
         let [from, to] = &names[..] else { return };
-        let ends: Vec<Option<usize>> = [from, to].iter().map(|s| map.resolve(s)).collect();
+        // As `Wardley::resolve`: the node with that id, else the first with that label.
+        let ends: Vec<Option<usize>> = [from, to]
+            .iter()
+            .map(|s| lw.ids.get(*s).or_else(|| labels.get(*s)).copied())
+            .collect();
         let (Some(source), Some(target)) = (ends[0], ends[1]) else {
             let unknown = if ends[0].is_none() { from } else { to };
             lw.diagnostics.push(Diagnostic::warning(

@@ -189,16 +189,24 @@ pub fn write(scene: &Scene, options: Options) -> crate::Result<Vec<u8>> {
         text_rendering,
         ..usvg::Options::default()
     };
-    let tree = usvg::Tree::from_str(&super::svg::write(scene), &options)
+    let phase = crate::profile::Phase::start("png.svg");
+    let svg = super::svg::write(scene);
+    drop(phase);
+    let phase = crate::profile::Phase::start("png.parse");
+    let tree = usvg::Tree::from_str(&svg, &options)
         .map_err(|e| crate::Error::with_source("cannot draw the diagram", e))?;
+    drop(phase);
     // Nonzero, as usvg rejects an empty SVG size above.
     let mut pixmap = Pixmap::new(w as u32, h as u32)
         .ok_or_else(|| crate::Error::new(format!("cannot allocate a {w}x{h} image")))?;
+    let phase = crate::profile::Phase::start("png.render");
     resvg::render(
         &tree,
         Transform::from_scale(scale, scale),
         &mut pixmap.as_mut(),
     );
+    drop(phase);
+    let _phase = crate::profile::Phase::start("png.encode");
     let bytes = pixmap
         .encode_png()
         .map_err(|e| crate::Error::with_source("cannot encode PNG", e))?;

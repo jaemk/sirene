@@ -138,6 +138,25 @@ pub(crate) fn string_len(s: &str) -> Option<usize> {
     }
 }
 
+/// [`string_len`], but `None` when the string is not closed on its line. Scans no further than
+/// the closing quote or the line's end, so items on a long line are each read once.
+pub(crate) fn line_string_len(s: &str) -> Option<usize> {
+    if let Some(body) = s.strip_prefix("\"`") {
+        for (i, c) in body.match_indices(['`', '\n']) {
+            if c == "\n" {
+                return None;
+            }
+            if body[i + 1..].starts_with('"') {
+                return Some(i + 4);
+            }
+        }
+        return None;
+    }
+    let body = s.strip_prefix('"')?;
+    let end = body.find(['"', '\n'])?;
+    (body.as_bytes()[end] == b'"').then_some(end + 2)
+}
+
 /// Length of a metadata body after `@{`, up to (not including) the closing `}`, if closed.
 /// Braces inside double-quoted strings are ignored.
 pub(crate) fn meta_body_len(s: &str) -> Option<usize> {
@@ -476,6 +495,28 @@ mod tests {
         assert_eq!(string_len("\"abc"), None);
         assert_eq!(string_len("\"`a *b*`\" x"), Some(9));
         assert_eq!(string_len("\"`abc\""), None);
+    }
+
+    /// `line_string_len` matches `string_len` on the line alone.
+    #[test]
+    fn line_strings() {
+        for s in [
+            "\"abc\" x",
+            "\"abc\nd\"",
+            "\"abc\r\nd\"",
+            "\"a\r\" b",
+            "\"abc",
+            "\"`a *b*`\" x",
+            "\"`a` b`\"",
+            "\"`a\n`\"",
+            "\"`a`\n\"",
+            "\"`abc\"",
+            "\"`",
+            "x\"",
+            "\"\"",
+        ] {
+            assert_eq!(line_string_len(s), string_len(&s[..line_len(s)]), "{s:?}");
+        }
     }
 
     #[test]

@@ -1,6 +1,8 @@
 //! Block diagram to scene (MBLOCK-3): the grid places the blocks and groups, and they draw as a
 //! flowchart's nodes, subgraphs, and edges do; a block arrow is drawn here.
 
+use std::collections::HashMap;
+
 use super::paint::{self, Px};
 use super::shapes::{self, BoxF};
 use super::style;
@@ -84,11 +86,9 @@ pub fn block(b: &Block, metrics: &impl TextMetrics, theme: &Theme) -> crate::Res
             })
         })
         .collect();
+    let rects = ids(chart, &nodes, &clusters);
     let center = |id: &str| -> Option<Point> {
-        let r = match chart.nodes.iter().position(|n| n.id == id) {
-            Some(i) => nodes[i],
-            None => clusters[chart.subgraphs.iter().position(|s| s.id == id)?],
-        };
+        let r = *rects.get(id)?;
         Some(Point::new(r.x + (r.w - 1) / 2, r.y + (r.h - 1) / 2))
     };
     let edges = chart
@@ -127,7 +127,9 @@ pub fn block(b: &Block, metrics: &impl TextMetrics, theme: &Theme) -> crate::Res
     };
     let (mut scene, off) = paint::draw(chart, &layout, metrics, theme)?;
 
-    // Block arrows go under their labels.
+    // Block arrows go under their labels: before their node's first element, or last.
+    let mut arrows: Vec<Option<Vec<Element>>> = vec![None; b.arrows.len()];
+    let defs = style::Defs::new(&chart.classes);
     for (i, dirs) in b.arrows.iter().enumerate() {
         let Some(dirs) = dirs else { continue };
         let r = layout.nodes[i];
@@ -140,18 +142,13 @@ pub fn block(b: &Block, metrics: &impl TextMetrics, theme: &Theme) -> crate::Res
         let n = &chart.nodes[i];
         let mut classes = vec!["default"];
         classes.extend(n.classes.iter().map(String::as_str));
-        let s = style::resolve(&[], &classes, &n.styles, &chart.classes);
+        let s = style::resolve(&[], &classes, &n.styles, &defs);
         let stroke = Stroke {
             width: s.stroke_width.unwrap_or(1.0),
             color: s.stroke.unwrap_or(theme.node_stroke),
             dash: s.dash.flatten(),
         };
         let fill = s.fill.unwrap_or(theme.node_fill);
-        let at = scene
-            .elements
-            .iter()
-            .position(|e| e.owner == Owner::Node(i))
-            .unwrap_or(scene.elements.len());
         let shapes: Vec<Element> = arrow(bx, dirs)
             .into_iter()
             .map(|points| Element {
@@ -163,9 +160,39 @@ pub fn block(b: &Block, metrics: &impl TextMetrics, theme: &Theme) -> crate::Res
                 },
             })
             .collect();
-        scene.elements.splice(at..at, shapes);
+        arrows[i] = Some(shapes);
+    }
+    if arrows.iter().any(Option::is_some) {
+        let elements = std::mem::take(&mut scene.elements);
+        let mut out = Vec::with_capacity(elements.len());
+        for e in elements {
+            if let Owner::Node(i) = e.owner
+                && let Some(shapes) = arrows.get_mut(i).and_then(Option::take)
+            {
+                out.extend(shapes);
+            }
+            out.push(e);
+        }
+        out.extend(arrows.into_iter().flatten().flatten());
+        scene.elements = out;
     }
     Ok(scene)
+}
+
+/// Each node's rectangle by id, then each subgraph's under an id no node has.
+pub(super) fn ids<'a>(
+    chart: &'a crate::flowchart::Flowchart,
+    nodes: &[Rect],
+    clusters: &[Rect],
+) -> HashMap<&'a str, Rect> {
+    let mut rects = HashMap::new();
+    for (s, r) in chart.subgraphs.iter().zip(clusters).rev() {
+        rects.insert(s.id.as_str(), *r);
+    }
+    for (n, r) in chart.nodes.iter().zip(nodes).rev() {
+        rects.insert(n.id.as_str(), *r);
+    }
+    rects
 }
 
 /// How many heads point across and how many up or down.

@@ -363,6 +363,7 @@ pub(super) fn draw(
     theme: &Theme,
 ) -> crate::Result<(Scene, Pt)> {
     let px = Px { metrics, theme };
+    let defs = style::Defs::new(&chart.classes);
     let title = chart
         .title
         .as_deref()
@@ -414,7 +415,7 @@ pub(super) fn draw(
     for i in order {
         let s = &chart.subgraphs[i];
         let classes: Vec<&str> = s.classes.iter().map(String::as_str).collect();
-        let r = style::resolve(&[], &classes, &s.styles, &chart.classes);
+        let r = style::resolve(&[], &classes, &s.styles, &defs);
         let b = at(layout.clusters[i]);
         if chart.agentflow {
             // An agentflow `flow`: unfilled, rounded, thin (MAGF-2).
@@ -493,12 +494,7 @@ pub(super) fn draw(
         .iter()
         .map(|e| {
             let classes: Vec<&str> = e.classes.iter().map(String::as_str).collect();
-            style::resolve(
-                &chart.default_edge_styles,
-                &classes,
-                &e.styles,
-                &chart.classes,
-            )
+            style::resolve(&chart.default_edge_styles, &classes, &e.styles, &defs)
         })
         .collect();
     let mut reach = Reach::default();
@@ -531,7 +527,7 @@ pub(super) fn draw(
     {
         let mut classes = vec!["default"];
         classes.extend(n.classes.iter().map(String::as_str));
-        let s = style::resolve(&[], &classes, &n.styles, &chart.classes);
+        let s = style::resolve(&[], &classes, &n.styles, &defs);
         let lines = px.label_lines(&n.label, Some(n.shape));
         let mut o = o;
         if chart.agentflow && n.shape == Shape::Collapsed {

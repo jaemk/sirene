@@ -225,13 +225,14 @@ pub fn git_graph(graph: &GitGraph, metrics: &impl TextMetrics, theme: &Theme) ->
         .iter()
         .map(|c| c.tags.iter().map(|t| p.label_width(t)).collect())
         .collect();
-    let on_lane = |k: usize| {
-        graph
-            .commits
-            .iter()
-            .enumerate()
-            .filter(move |(_, c)| c.branch == k)
-    };
+    // Each lane's commits, by index.
+    let mut lane_commits: Vec<Vec<usize>> = vec![Vec::new(); lanes];
+    for (i, c) in graph.commits.iter().enumerate() {
+        if let Some(l) = lane_commits.get_mut(c.branch) {
+            l.push(i);
+        }
+    }
+    let on_lane = |k: usize| lane_commits[k].iter().map(|&i| (i, &graph.commits[i]));
 
     // Each commit's position along its lane, each lane's across, and where lanes start and end.
     let mut along = Vec::with_capacity(graph.commits.len());

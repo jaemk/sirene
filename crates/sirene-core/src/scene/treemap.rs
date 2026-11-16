@@ -235,7 +235,7 @@ pub fn treemap(treemap: &Treemap, metrics: &impl TextMetrics, theme: &Theme) -> 
     for &i in &order {
         let item = &treemap.items[i];
         let (a, b) = at(&cells[i]);
-        let r = style::resolve(&item.styles, &[], &[], &[]);
+        let r = style::resolve(&item.styles, &[], &[], &style::Defs::default());
         let c = colors[item.name.as_str()];
         p.path(
             owner,
@@ -307,7 +307,7 @@ pub fn treemap(treemap: &Treemap, metrics: &impl TextMetrics, theme: &Theme) -> 
     for &i in &leaves {
         let item = &treemap.items[i];
         let (a, b) = at(&cells[i]);
-        let r = style::resolve(&item.styles, &[], &[], &[]);
+        let r = style::resolve(&item.styles, &[], &[], &style::Defs::default());
         let parent = item
             .parent
             .and_then(|p| colors.get(treemap.items[p].name.as_str()));

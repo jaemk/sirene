@@ -27,6 +27,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   linear time per relation, sequence lifelines no longer scan every activation per row, ASCII
   canvas cells take half the memory, and long lines of quoted items, xychart categories, or
   `;`-joined sequence statements are read in linear time. Output is unchanged.
+- Block, C4, Wardley, journey, git, and styled flowchart drawings look up ids, classes,
+  sections, and lanes by index instead of scanning per item; one-line block rows are read in
+  linear time; sankey cycle checks skip links that repeat a kept one. Output is unchanged.
 
 ### Fixed
 

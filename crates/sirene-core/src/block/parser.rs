@@ -207,7 +207,7 @@ impl Parser<'_> {
             self.token(SHAPE_OPEN, len);
             self.start(LABEL);
             match self.rest().chars().next() {
-                Some('"') => match scan::string_len(&self.rest()[..scan::line_len(self.rest())]) {
+                Some('"') => match scan::line_string_len(self.rest()) {
                     Some(n) => {
                         let kind = if self.rest().starts_with("\"`") {
                             MD_STRING
@@ -225,8 +225,14 @@ impl Parser<'_> {
                     }
                 },
                 _ => {
-                    let n =
-                        scan::shape_text_len(self.rest(), opener).min(scan::line_len(self.rest()));
+                    // Within the line, measuring the line only when the text reaches its end.
+                    let r = self.rest();
+                    let n = scan::shape_text_len(r, opener);
+                    let n = if r[..n].contains('\n') || r[..n].ends_with('\r') {
+                        n.min(scan::line_len(r))
+                    } else {
+                        n
+                    };
                     self.token(TEXT, n);
                 }
             }

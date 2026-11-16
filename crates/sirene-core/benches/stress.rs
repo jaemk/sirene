@@ -41,9 +41,10 @@ impl log::Log for Phases {
 
 static PHASES: Phases = Phases(Mutex::new(Vec::new()));
 
-/// The phase timings of one run of lowering, scene building, and text drawing, summed per
+/// The phase timings of one run of lowering, scene building, text drawing, and with `--png`
+/// PNG writing, summed per
 /// phase in first-seen order, with how many times each ran.
-fn phases(src: &str, lang: Option<Lang>) -> String {
+fn phases(src: &str, lang: Option<Lang>, with_png: bool) -> String {
     if let Ok(mut p) = PHASES.0.lock() {
         p.clear();
     }
@@ -51,6 +52,9 @@ fn phases(src: &str, lang: Option<Lang>) -> String {
     let lowered = diagram::lower_as(src, lang);
     let _ = lowered.diagram.scene(&Approx, &Theme::LIGHT);
     let _ = lowered.diagram.ascii(&Options::default());
+    if with_png {
+        png(&lowered, Duration::ZERO);
+    }
     log::set_max_level(log::LevelFilter::Off);
     let records = PHASES.0.lock().map(|p| p.clone()).unwrap_or_default();
     let mut sums: Vec<(String, u128, usize)> = Vec::new();
@@ -360,6 +364,7 @@ fn main() {
         let mut bytes = 0;
         let mut errors = 0;
         let mut breakdown = String::new();
+        let mut pngs = Vec::new();
         for size in [n, n * 4] {
             let src = (shape.source)(size);
             bytes = src.len();
@@ -388,25 +393,32 @@ fn main() {
             });
             let mut row = vec![lower, scene, ascii];
             if args.png {
-                row.push(png(&lowered, budget));
+                let (t, pixels) = png(&lowered, budget);
+                row.push(t);
+                pngs.push(pixels);
             }
             times.push(row);
             areas.push(area(&lowered));
             if args.phases && size > n {
-                breakdown = phases(&src, shape.lang);
+                breakdown = phases(&src, shape.lang, args.png);
             }
         }
         // How much the text drawing grew: ASCII time growing as fast is output-bound.
         let area_grow = areas[1] as f64 / areas[0].max(1) as f64;
+        // How much the image grew: PNG time growing as fast is output-bound too.
+        let pixel_grow = match pngs[..] {
+            [a, b] => b as f64 / a.max(1) as f64,
+            _ => 1.0,
+        };
         let mut line = format!("{:<28} {:>6} {:>7}", shape.name, n, bytes);
         let phases = ["lower", "scene", "ascii", "png"];
         for (p, (small, large)) in times[0].iter().zip(&times[1]).enumerate() {
             let grow = large.as_secs_f64() / small.as_secs_f64().max(1e-7);
             // Growth is noise below a tenth of a millisecond.
-            let limit = if p == 2 {
-                args.flag.max(2.0 * area_grow)
-            } else {
-                args.flag
+            let limit = match p {
+                2 => args.flag.max(2.0 * area_grow),
+                3 => args.flag.max(2.0 * pixel_grow),
+                _ => args.flag,
             };
             let bad = (grow > limit && *large > Duration::from_micros(500)) || *large > slow;
             let _ = write!(
@@ -428,6 +440,9 @@ fn main() {
             }
         }
         let _ = write!(line, " | text {area_grow:>5.1}x");
+        if args.png {
+            let _ = write!(line, " pixels {pixel_grow:>5.1}x");
+        }
         if errors > 0 {
             line.push_str(&format!("  ({errors} errors at 4x)"));
         }
@@ -453,18 +468,27 @@ fn area(lowered: &diagram::Lowered) -> usize {
     rows * cols
 }
 
+/// The time to write the PNG, at a scale that fits as the CLI's does, and its pixel count.
 #[cfg(feature = "png")]
-fn png(lowered: &diagram::Lowered, budget: Duration) -> Duration {
+fn png(lowered: &diagram::Lowered, budget: Duration) -> (Duration, u64) {
     use sirene_core::scene::png::{self, FontMetrics, Quality};
     let Ok(scene) = lowered.diagram.scene(&FontMetrics, &Theme::LIGHT) else {
-        return Duration::ZERO;
+        return (Duration::ZERO, 0);
     };
-    time(budget, || {
-        let _ = black_box(png::write(&scene, png::Options::new(Quality::Normal)));
-    })
+    let mut options = png::Options::new(Quality::Normal);
+    options.scale = png::fit(&scene, options.scale);
+    if let Err(e) = png::write(&scene, options) {
+        eprintln!("png: {e}");
+    }
+    let side = |v: f32| (v * options.scale).ceil() as u64;
+    let pixels = side(scene.width) * side(scene.height);
+    let t = time(budget, || {
+        let _ = black_box(png::write(&scene, options));
+    });
+    (t, pixels)
 }
 
 #[cfg(not(feature = "png"))]
-fn png(_: &diagram::Lowered, _: Duration) -> Duration {
-    Duration::ZERO
+fn png(_: &diagram::Lowered, _: Duration) -> (Duration, u64) {
+    (Duration::ZERO, 0)
 }

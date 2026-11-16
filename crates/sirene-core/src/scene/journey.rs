@@ -152,11 +152,16 @@ pub fn journey(journey: &Journey, metrics: &impl TextMetrics, theme: &Theme) -> 
             theme.font_size,
         );
     }
-    // Sections, spanning their tasks.
+    // Sections, spanning their tasks: each section's first and last task.
+    let mut spans: Vec<Option<(usize, usize)>> = vec![None; sections.len()];
+    for (i, (s, _, _)) in tasks.iter().enumerate() {
+        if let Some(span) = spans.get_mut(*s) {
+            *span = Some(span.map_or((i, i), |(a, _)| (a, i)));
+        }
+    }
     for (s, lines) in sections.iter().enumerate() {
         let Some(lines) = lines else { continue };
-        let idx: Vec<usize> = (0..tasks.len()).filter(|&i| tasks[i].0 == s).collect();
-        let (Some(&a), Some(&b)) = (idx.first(), idx.last()) else {
+        let Some((a, b)) = spans[s] else {
             continue;
         };
         let bx = BoxF {

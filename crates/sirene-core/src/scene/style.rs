@@ -1,7 +1,23 @@
 //! `style`, `classDef`, and `linkStyle` declarations applied to drawing (DISPLA-6).
 
+use std::collections::HashMap;
+
 use super::Color;
 use crate::flowchart::{ClassDef, Style};
+
+/// `classDef` styles by class name, in declaration order.
+#[derive(Debug, Default)]
+pub(super) struct Defs<'a>(HashMap<&'a str, Vec<&'a [Style]>>);
+
+impl<'a> Defs<'a> {
+    pub(super) fn new(defs: &'a [ClassDef]) -> Defs<'a> {
+        let mut by_name: HashMap<&str, Vec<&[Style]>> = HashMap::new();
+        for d in defs {
+            by_name.entry(d.name.as_str()).or_default().push(&d.styles);
+        }
+        Defs(by_name)
+    }
+}
 
 /// Style overrides; `None` keeps the theme's value.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -15,17 +31,12 @@ pub(super) struct Resolved {
 
 /// Applies `base`, then the named classes in order, then the inline styles; later declarations
 /// win.
-pub(super) fn resolve(
-    base: &[Style],
-    classes: &[&str],
-    styles: &[Style],
-    defs: &[ClassDef],
-) -> Resolved {
+pub(super) fn resolve(base: &[Style], classes: &[&str], styles: &[Style], defs: &Defs) -> Resolved {
     let mut out = Resolved::default();
     apply_all(&mut out, base);
     for name in classes {
-        for def in defs.iter().filter(|d| d.name == *name) {
-            apply_all(&mut out, &def.styles);
+        for styles in defs.0.get(name).into_iter().flatten() {
+            apply_all(&mut out, styles);
         }
     }
     apply_all(&mut out, styles);
@@ -247,18 +258,23 @@ mod tests {
                 name: "b".into(),
                 styles: vec![style("fill", "green"), style("stroke-width", "3px")],
             },
+            // A class declared again adds to the first declaration.
+            ClassDef {
+                name: "a".into(),
+                styles: vec![style("stroke-dasharray", "4 2")],
+            },
         ];
         let r = resolve(
             &[style("fill", "white"), style("color", "red")],
             &["a", "b", "missing"],
             &[style("stroke", "#000"), style("color", "white")],
-            &defs,
+            &Defs::new(&defs),
         );
         assert_eq!(r.fill, parse_color("green"));
         assert_eq!(r.stroke, parse_color("#000"));
         assert_eq!(r.stroke_width, Some(3.0));
         assert_eq!(r.color, parse_color("white"));
-        assert_eq!(r.dash, None);
+        assert!(matches!(r.dash, Some(Some(_))), "{:?}", r.dash);
     }
 
     #[test]
@@ -275,7 +291,7 @@ mod tests {
                 style("stroke-width", "wide"),
                 style("font-size", "20px"),
             ],
-            &[],
+            &Defs::default(),
         );
         assert_eq!(
             r,
@@ -288,7 +304,8 @@ mod tests {
 
     #[test]
     fn stroke_widths() {
-        let width = |v: &str| resolve(&[], &[], &[style("stroke-width", v)], &[]).stroke_width;
+        let width =
+            |v: &str| resolve(&[], &[], &[style("stroke-width", v)], &Defs::default()).stroke_width;
         assert_eq!(width("0"), Some(0.0));
         assert_eq!(width(" 2.5px "), Some(2.5));
         assert_eq!(width("32"), Some(32.0));
@@ -300,7 +317,8 @@ mod tests {
 
     #[test]
     fn dash_arrays() {
-        let dash = |v: &str| resolve(&[], &[], &[style("stroke-dasharray", v)], &[]).dash;
+        let dash =
+            |v: &str| resolve(&[], &[], &[style("stroke-dasharray", v)], &Defs::default()).dash;
         assert_eq!(dash("5 3"), Some(Some((5.0, 3.0))));
         assert_eq!(dash("5px,3px,1"), Some(Some((5.0, 3.0))));
         assert_eq!(dash("4"), Some(Some((4.0, 4.0))));
