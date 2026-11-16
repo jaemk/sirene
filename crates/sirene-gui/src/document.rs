@@ -625,11 +625,12 @@ fn parse(
     lang: Option<Lang>,
 ) -> (Flowchart, Option<Diagram>, Vec<Problem>, ThemeConfig) {
     let lowered = diagram::lower_as(source, lang);
+    let lines = sirene_core::diagnostic::LineIndex::new(source);
     let problems = lowered
         .diagnostics
         .iter()
         .map(|d| {
-            let (line, column) = d.line_col(source);
+            let (line, column) = lines.line_col(d);
             Problem {
                 range: d.range.into(),
                 line,

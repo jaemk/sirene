@@ -160,7 +160,7 @@ chains, and checks the diagnostics; `skipped_blocks_keep_their_text` checks the 
 `scale` bench in `crates/sirene-core/benches/scale.rs` times reading, scene building, and text
 drawing of large inputs at two sizes ten times apart. The `stress` bench in
 `crates/sirene-core/benches/stress.rs` times every diagram kind, statements joined on one line,
-and dense graph shapes at two sizes four times apart, and flags phases that grow faster than
+sources with errors on every line, and dense graph shapes at two sizes four times apart, and flags phases that grow faster than
 linearly (ASCII drawing and PNG writing only past twice their output's growth in cells or
 pixels); `--png` adds PNG writing, at a scale that fits as the CLI's does.
 

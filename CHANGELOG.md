@@ -32,6 +32,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   linear time; sankey cycle checks skip links that repeat a kept one. Output is unchanged.
 - The editor paints only what lies in the drawing area, and outlines, prunes, zooms to, and
   styles a large selection without looking up each selected node by scanning every node.
+- Diagnostic lines and columns for the editor, `check`, and Markdown blocks come from one
+  `diagnostic::LineIndex` per source instead of a scan from the start per diagnostic.
 
 ### Fixed
 

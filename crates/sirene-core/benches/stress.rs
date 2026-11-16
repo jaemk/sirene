@@ -272,6 +272,14 @@ const SHAPES: &[Shape] = &[
     } },
     Shape { name: "dot_records", lang: D, size: 200, source: |n| lines("digraph {\nnode [shape=record]", n, "}\n", |i| format!("r{i} [label=\"<p0> a{i}|{{<p1> b|c}}|<p2> d\"];\nr{i}:p2 -> r{}:p0;", i + 1)) },
     Shape { name: "dot_html", lang: D, size: 200, source: |n| lines("digraph {", n, "}\n", |i| format!("h{i} [label=<<table><tr><td>a{i}</td><td><b>b</b></td></tr></table>>];\nh{i} -> h{};", i + 1)) },
+    // Errors on every line, to catch recovery that rescans the rest of the text.
+    Shape { name: "errors_flowchart", lang: M, size: 300, source: |n| lines("flowchart TD", n, "", |i| format!("n{i}[unclosed {i}\nn{i} -->\n%%{{ bad\nn{i}(\"open")) },
+    Shape { name: "errors_sequence", lang: M, size: 300, source: |n| lines("sequenceDiagram", n, "", |i| format!("A ->> : m{i}\nalt\nnote over\nparticipant \"P{i}")) },
+    Shape { name: "errors_class", lang: M, size: 300, source: |n| lines("classDiagram", n, "", |i| format!("class C{i} {{\n  +m{i}(\n}}\nC{i} <|-- \nclass \"x")) },
+    Shape { name: "errors_state", lang: M, size: 300, source: |n| lines("stateDiagram-v2", n, "", |i| format!("state s{i} {{\ns{i} -->\nnote right of\n")) },
+    Shape { name: "errors_unclosed_strings", lang: M, size: 300, source: |n| lines("flowchart TD", n, "", |i| format!("a{i}[\"b{i} --> c{i}[`d")) },
+    Shape { name: "errors_dot", lang: D, size: 300, source: |n| lines("digraph {", n, "", |i| format!("n{i} -> ;\nn{i} [label=\"x\nn{i} [shape=]\n{{")) },
+    Shape { name: "errors_puml", lang: P, size: 300, source: |n| lines("@startuml", n, "", |i| format!("class C{i} {{\nC{i} -->\nnote left\n:act{i}\nif (x")) },
     Shape { name: "dot_attrs", lang: D, size: 300, source: |n| lines("digraph {\nrankdir=LR", n, "}\n", |i| format!("n{i} [shape=box, color=red, style=filled, fillcolor=\"#eeeeee\", label=\"Node {i}\"];\nn{i} -> n{} [label=\"e{i}\", color=blue, style=dashed];", i + 1)) },
 ];
 

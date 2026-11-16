@@ -17,8 +17,9 @@ pub fn report(
     at: impl Fn(usize, usize) -> (usize, usize),
 ) -> bool {
     let mut errors = false;
+    let lines = sirene_core::diagnostic::LineIndex::new(src);
     for d in &lowered.diagnostics {
-        let (line, col) = d.line_col(src);
+        let (line, col) = lines.line_col(d);
         let (line, col) = at(line, col);
         let severity = match d.severity {
             Severity::Error => {
