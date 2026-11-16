@@ -34,16 +34,7 @@ impl Viewer {
     /// The scene box around everything drawn for `items`.
     fn scene_bounds(&mut self, items: &[Item], window: &Window) -> Option<(Pt, Pt)> {
         let scene = self.scene(window);
-        items
-            .iter()
-            .filter_map(|i| self.owner(i))
-            .filter_map(|o| scene.bounds(o))
-            .reduce(|(a, b), (c, d)| {
-                (
-                    Pt::new(a.x.min(c.x), a.y.min(c.y)),
-                    Pt::new(b.x.max(d.x), b.y.max(d.y)),
-                )
-            })
+        scene.bounds_of(&self.owners(items))
     }
 
     /// Zooms `scene` to fit a drawing area of `view` when it is larger, the first time the area

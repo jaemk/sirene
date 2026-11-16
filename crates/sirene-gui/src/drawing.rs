@@ -111,6 +111,30 @@ impl Viewer {
         }
     }
 
+    /// The scene owners of those `items` that exist, in order, looking nodes up by id once
+    /// rather than per item.
+    pub fn owners(&self, items: &[Item]) -> Vec<Owner> {
+        let chart = &self.doc.chart;
+        let mut ids: Option<std::collections::HashMap<&str, usize>> = None;
+        items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Node(id) => {
+                    let ids = ids.get_or_insert_with(|| {
+                        let mut ids = std::collections::HashMap::new();
+                        // The first node with an id, as `owner` finds.
+                        for (i, n) in chart.nodes.iter().enumerate() {
+                            ids.entry(n.id.as_str()).or_insert(i);
+                        }
+                        ids
+                    });
+                    ids.get(id.as_str()).copied().map(Owner::Node)
+                }
+                Item::Edge(_) => self.owner(item),
+            })
+            .collect()
+    }
+
     /// The window bounds of what is drawn for `item` (top left, bottom right).
     pub fn item_bounds(
         &mut self,
@@ -149,11 +173,13 @@ impl Viewer {
 
     /// Drops selected items that no longer exist, and a label field whose item is gone.
     pub(crate) fn prune(&mut self) {
-        let selection = std::mem::take(&mut self.selection);
-        self.selection = selection
-            .into_iter()
-            .filter(|i| self.owner(i).is_some())
-            .collect();
+        let ids: std::collections::HashSet<&str> =
+            self.doc.chart.nodes.iter().map(|n| n.id.as_str()).collect();
+        let edges = self.doc.chart.edges.len();
+        self.selection.retain(|i| match i {
+            Item::Node(id) => ids.contains(id.as_str()),
+            Item::Edge(e) => *e < edges,
+        });
         if self
             .label
             .as_ref()

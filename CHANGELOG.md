@@ -30,6 +30,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Block, C4, Wardley, journey, git, and styled flowchart drawings look up ids, classes,
   sections, and lanes by index instead of scanning per item; one-line block rows are read in
   linear time; sankey cycle checks skip links that repeat a kept one. Output is unchanged.
+- The editor paints only what lies in the drawing area, and outlines, prunes, zooms to, and
+  styles a large selection without looking up each selected node by scanning every node.
 
 ### Fixed
 

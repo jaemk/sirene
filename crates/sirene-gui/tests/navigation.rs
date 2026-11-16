@@ -122,6 +122,32 @@ fn zoom_to_selection(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn owners_of_items_that_exist(cx: &mut TestAppContext) {
+    use sirene_core::scene::Owner;
+    let (viewer, cx) = open_src(cx, "flowchart LR\nA --> B\n");
+    let items = [
+        node("B"),
+        Item::Edge(0),
+        node("gone"),
+        Item::Edge(5),
+        node("A"),
+        node("B"),
+    ];
+    let owners = viewer.read_with(cx, |v, _| v.owners(&items));
+    let expected = [
+        Owner::Node(1),
+        Owner::Edge(0),
+        Owner::Node(0),
+        Owner::Node(1),
+    ];
+    assert_eq!(owners, expected);
+    let one = viewer.read_with(cx, |v, _| {
+        items.iter().filter_map(|i| v.owner(i)).collect::<Vec<_>>()
+    });
+    assert_eq!(one, expected);
+}
+
+#[gpui::test]
 fn arrow_keys_pan(cx: &mut TestAppContext) {
     let (viewer, cx) = open_src(cx, "flowchart\nA --> B\n");
     let pan = |cx: &mut VisualTestContext| zoom_pan(&viewer, cx).1;

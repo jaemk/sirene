@@ -33,10 +33,20 @@ impl Scene {
 
     /// The bounding box (top left, bottom right) of the paths drawn for `owner`.
     pub fn bounds(&self, owner: Owner) -> Option<(Pt, Pt)> {
+        self.bounds_where(|o| o == owner)
+    }
+
+    /// The bounding box of the paths drawn for any of `owners`, in one pass over the scene.
+    pub fn bounds_of(&self, owners: &[Owner]) -> Option<(Pt, Pt)> {
+        let owners: std::collections::HashSet<Owner> = owners.iter().copied().collect();
+        self.bounds_where(|o| owners.contains(&o))
+    }
+
+    fn bounds_where(&self, mut keep: impl FnMut(Owner) -> bool) -> Option<(Pt, Pt)> {
         let mut points = self
             .elements
             .iter()
-            .filter(|e| e.owner == owner)
+            .filter(|e| keep(e.owner))
             .filter_map(|e| match &e.primitive {
                 Primitive::Path { segments, .. } => Some(flatten(segments)),
                 Primitive::Text { .. } => None,
@@ -148,6 +158,26 @@ mod tests {
         assert_eq!(s.hit(Pt::new(s.width / 2.0, 20.0), 2.0), None);
         assert_eq!(s.hit(Pt::new(1.0, s.height - 1.0), 2.0), None);
         assert_eq!(s.bounds(Owner::Diagram), None);
+    }
+
+    #[test]
+    fn bounds_of_several_owners_join() {
+        let s = scene("flowchart LR\n    A --> B\n    C\n");
+        let (a, b) = (
+            s.bounds(Owner::Node(0)).unwrap(),
+            s.bounds(Owner::Node(1)).unwrap(),
+        );
+        let joined = (
+            Pt::new(a.0.x.min(b.0.x), a.0.y.min(b.0.y)),
+            Pt::new(a.1.x.max(b.1.x), a.1.y.max(b.1.y)),
+        );
+        assert_eq!(
+            s.bounds_of(&[Owner::Node(1), Owner::Node(0), Owner::Node(1)]),
+            Some(joined)
+        );
+        assert_eq!(s.bounds_of(&[Owner::Node(2)]), s.bounds(Owner::Node(2)));
+        assert_eq!(s.bounds_of(&[]), None);
+        assert_eq!(s.bounds_of(&[Owner::Diagram]), None);
     }
 
     #[test]

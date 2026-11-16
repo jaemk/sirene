@@ -67,7 +67,7 @@ fn paint_icon(
         ),
         zoom,
     };
-    paint::paint(icon, &at, font, window, cx);
+    paint::paint(icon, &at, None, font, window, cx);
 }
 
 /// The bar: a row of buttons that add a node of their shape, linked from the selected node.

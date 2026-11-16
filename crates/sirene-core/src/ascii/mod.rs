@@ -120,6 +120,7 @@ pub fn render(chart: &Flowchart, options: &Options) -> crate::Result<String> {
     let chart = plain.as_ref().unwrap_or(chart);
     let graph = chart.layout_graph(&Cells)?;
     let layout = layout::layout(&graph, &CONFIG)?;
+    let _phase = crate::profile::Phase::start("ascii.draw");
     Ok(draw(chart, &layout, options))
 }
 

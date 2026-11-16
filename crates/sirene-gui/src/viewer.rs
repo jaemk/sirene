@@ -17,7 +17,7 @@ use gpui::{
     ScrollEvent, Subscription, Task, Window, WindowAppearance, canvas, div, prelude::*, px,
 };
 use sirene_core::Severity;
-use sirene_core::scene::{Owner, Scene, Theme};
+use sirene_core::scene::{Scene, Theme};
 
 use crate::document::{Disk, Document};
 use crate::drawing::{Drag, Item, LabelEdit};
@@ -840,11 +840,7 @@ impl Render for Viewer {
         let font = window.text_style().font();
         let rule = paint::color(theme.cluster_stroke);
         let accent = paint::color(theme.accent);
-        let selected: Vec<Owner> = self
-            .selection
-            .iter()
-            .filter_map(|i| self.owner(i))
-            .collect();
+        let selected = self.owners(&self.selection);
         let band = self.rubber_band(window);
         let ring = self.drawing_focused(window);
         let field = self.label_field(window, px(160.0));
@@ -897,7 +893,7 @@ impl Render for Viewer {
                     },
                     move |bounds, (zoom, pan), window, cx| {
                         let at = place(&scene, zoom, pan, bounds);
-                        paint::paint(&scene, &at, &font, window, cx);
+                        paint::paint(&scene, &at, Some(&bounds), &font, window, cx);
                         paint::outline(&scene, &selected, &at, accent, window);
                         if let Some((from, to)) = band {
                             paint::line(from, to, accent, window);

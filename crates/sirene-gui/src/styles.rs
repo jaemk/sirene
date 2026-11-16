@@ -337,19 +337,27 @@ impl Render for StylePanel {
         } else {
             sirene_core::scene::Theme::LIGHT.cluster_stroke
         });
-        let mut names: Vec<String> = Vec::new();
-        for c in &chart.classes {
-            if !names.contains(&c.name) {
-                names.push(c.name.clone());
+        let mut seen = std::collections::HashSet::new();
+        let names: Vec<String> = (chart.classes.iter())
+            .filter(|c| seen.insert(c.name.as_str()))
+            .map(|c| c.name.clone())
+            .collect();
+        // The selected nodes, the first with each id, or `None` when one is gone.
+        let picked: Option<Vec<_>> = {
+            let mut by_id = std::collections::HashMap::new();
+            for n in &chart.nodes {
+                by_id.entry(n.id.as_str()).or_insert(n);
             }
-        }
-        let has = |id: &String, name: &str| {
-            chart
-                .node(id)
-                .is_some_and(|n| n.classes.iter().any(|c| c == name))
+            nodes
+                .iter()
+                .map(|id| by_id.get(id.as_str()).copied())
+                .collect()
         };
         let rows = names.iter().enumerate().map(|(i, name)| {
-            let on = !nodes.is_empty() && nodes.iter().all(|id| has(id, name));
+            let on = !nodes.is_empty()
+                && picked
+                    .as_ref()
+                    .is_some_and(|p| p.iter().all(|n| n.classes.iter().any(|c| c == name)));
             let swatch = |property| {
                 class_value(&chart, name, property)
                     .and_then(|v| parse_color(&v))

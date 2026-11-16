@@ -29,7 +29,8 @@ re-read every 500ms and on the Reload action, and the drawing updates when the c
 
 Paths are filled and stroked with gpui paths (arcs and cubics included, dashes kept); text is
 shaped with the window's default font and centered on its point. Painting scales every length by
-the zoom.
+the zoom. A primitive whose bounding box (control points, arc ellipses, half the stroke, and two
+ems a character of text) lies wholly outside the drawing area is skipped.
 
 ## GUISHE-5 Actions and keys
 
