@@ -592,7 +592,7 @@ impl Document {
 }
 
 /// Whether two paths identify the same file, including hard links on Unix.
-fn same_path(a: &Path, b: &Path) -> bool {
+pub(crate) fn same_path(a: &Path, b: &Path) -> bool {
     if a == b
         || matches!((std::fs::canonicalize(a), std::fs::canonicalize(b)), (Ok(a), Ok(b)) if a == b)
     {

@@ -31,6 +31,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   typed so far (`dot`, `plantuml`, `mermaid`), not the first keystroke's.
 - Desktop app: a writable file in a directory that does not allow a new file is saved in place
   instead of failing.
+- Desktop app: an export to the open document's own file is refused instead of replacing the
+  diagram's source with the image.
 
 ## [0.4.0] - 2026-11-14
 

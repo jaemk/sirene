@@ -44,6 +44,24 @@ impl Format {
     }
 }
 
+/// Writes `doc`'s diagram to `path` in `format`, at fine quality for PNG. A path that is the
+/// document's own file is refused, so an export never replaces the diagram's source.
+fn export_file(doc: &Document, format: Format, theme: &Theme, path: &Path) -> Result<()> {
+    if doc
+        .path
+        .as_deref()
+        .is_some_and(|own| crate::document::same_path(own, path))
+    {
+        return Err(Error::new(format!(
+            "cannot export to {}: it is the diagram's own file",
+            path.display()
+        )));
+    }
+    let bytes = format.render(doc, theme, Quality::Fine)?;
+    crate::document::write_atomic(path, &bytes)
+        .map_err(|e| Error::with_source(format!("cannot write {}", path.display()), e))
+}
+
 impl Viewer {
     /// The file name an export suggests: the document's, with the format's extension; for a
     /// Markdown file's block, `STEM-N` as `sirene svg FILE.md` names it.
@@ -65,12 +83,7 @@ impl Viewer {
 
     /// Writes the drawing to `path`, reporting the outcome in the status bar.
     pub fn export_to(&mut self, format: Format, path: &Path, cx: &mut Context<Self>) -> bool {
-        let written = format
-            .render(&self.doc, &self.theme(), Quality::Fine)
-            .and_then(|bytes| {
-                crate::document::write_atomic(path, &bytes)
-                    .map_err(|e| Error::with_source(format!("cannot write {}", path.display()), e))
-            });
+        let written = export_file(&self.doc, format, &self.theme(), path);
         let ok = written.is_ok();
         self.notice = Some(match written {
             Ok(()) => {
@@ -152,5 +165,35 @@ impl Viewer {
             },
         );
         cx.notify();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An export to the document's own file is refused and leaves it as it was; another path
+    /// gets the drawing.
+    #[test]
+    fn export_refuses_the_documents_own_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.mmd");
+        std::fs::write(&path, "flowchart LR\nA --> B\n").unwrap();
+        let doc = Document::open(&path);
+        let err = export_file(&doc, Format::Svg, &Theme::LIGHT, &path).unwrap_err();
+        assert_eq!(
+            err.report(),
+            format!(
+                "cannot export to {}: it is the diagram's own file",
+                path.display()
+            )
+        );
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "flowchart LR\nA --> B\n"
+        );
+        let svg = dir.path().join("a.svg");
+        export_file(&doc, Format::Svg, &Theme::LIGHT, &svg).unwrap();
+        assert!(std::fs::read_to_string(&svg).unwrap().starts_with("<svg"));
     }
 }

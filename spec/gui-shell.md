@@ -115,7 +115,8 @@ ExportPng and ExportSvg ask for a path (in the document's directory; for Untitle
 directory, or the home directory when that is the filesystem root, as for an app started from
 Finder; named after the document with `.png` or `.svg`, else `diagram`) and write the drawing
 there in the window's theme: PNG as `sirene png` writes it at fine quality (DISPLA-12), SVG as
-`sirene svg` does. CopyImage puts the drawing on the clipboard as a PNG at normal quality. The
+`sirene svg` does. A path that is the document's own file is refused (`cannot export to PATH:
+it is the diagram's own file`) and left as it was. CopyImage puts the drawing on the clipboard as a PNG at normal quality. The
 status bar shows `exported PATH`, `copied the drawing as an image`, or the error (`cannot write
 PATH: REASON`) until the document next changes; a cancelled dialog changes nothing. Tests:
 `crates/sirene-gui/tests/export.rs`.
