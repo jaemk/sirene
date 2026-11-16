@@ -295,7 +295,7 @@ pub fn print_ascii(md: &Path, charset: Charset) -> crate::Done {
         if i > 0 {
             out.push('\n');
         }
-        match lowered.diagram.ascii(&Options { charset }) {
+        match lowered.ascii(&Options { charset }) {
             Ok(drawing) => out.push_str(&drawing),
             Err(e) => {
                 diagnostic!(

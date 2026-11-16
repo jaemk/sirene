@@ -19,8 +19,8 @@ use std::time::{Duration, Instant, SystemTime};
 use clap::{Parser, Subcommand, ValueEnum};
 use sirene_core::ascii::{Charset, Options};
 use sirene_core::diagram::{self, Lang, Lowered};
-use sirene_core::scene::png::{self, FontMetrics};
-use sirene_core::scene::{self, Approx, Theme};
+use sirene_core::scene::Theme;
+use sirene_core::scene::png;
 use sirene_core::{Error, Result};
 
 /// Mermaid, PlantUML, and Graphviz DOT diagram editor and viewer.
@@ -328,9 +328,7 @@ fn run(cli: Cli) -> ExitCode {
                 return markdown_blocks(md, watch, || markdown::print_ascii(md, charset));
             }
             convert(file, None, None, watch, |l| {
-                l.diagram
-                    .ascii(&Options { charset })
-                    .map(String::into_bytes)
+                l.ascii(&Options { charset }).map(String::into_bytes)
             })
         }
         Some(Command::Svg {
@@ -340,10 +338,7 @@ fn run(cli: Cli) -> ExitCode {
             theme,
             output,
         }) => {
-            let render = |l: &Lowered| {
-                let scene = l.diagram.scene(&Approx, &l.theme.apply(&theme.theme()))?;
-                Ok(scene::svg::write(&scene).into_bytes())
-            };
+            let render = |l: &Lowered| l.svg(&theme.theme()).map(String::into_bytes);
             let output = match stdout_dash(&file, output) {
                 Ok(output) => output,
                 Err(e) => {
@@ -368,14 +363,7 @@ fn run(cli: Cli) -> ExitCode {
             output,
         }) => {
             let quality = quality.quality();
-            let render = |l: &Lowered| {
-                let scene = l
-                    .diagram
-                    .scene(&FontMetrics, &l.theme.apply(&theme.theme()))?;
-                // A given scale is kept (and may be too large); the quality's own shrinks to fit.
-                let scale = scale.unwrap_or_else(|| png::fit(&scene, quality.scale()));
-                png::write(&scene, png::Options { scale, quality })
-            };
+            let render = |l: &Lowered| l.png(&theme.theme(), quality, scale);
             let to_stdout = output.as_deref() == Some(Path::new("-"));
             let output = match stdout_dash(&file, output) {
                 Ok(output) => output,

@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `diagram::Lowered::ascii`, `svg`, `png` (feature `png`), and `scene` render a diagram from
+  `sirene-core` alone, with the diagram's own theme applied, as the CLI does. The CLI calls
+  them, and a test checks its output against them for each file in `examples/`.
+
 ## [0.5.0] - 2026-11-16
 
 ### Added

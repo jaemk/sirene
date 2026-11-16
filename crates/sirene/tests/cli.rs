@@ -475,6 +475,53 @@ fn diagram_themes() {
         .stdout(predicate::str::contains("fill=\"#cdffb2\""));
 }
 
+/// The CLI writes what `sirene_core` alone renders from the file (WORKSP-10).
+#[test]
+fn output_matches_the_library() {
+    use sirene_core::ascii::Options;
+    use sirene_core::diagram::{self, Lang};
+    use sirene_core::scene::{Theme, png::Quality};
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
+    for name in [
+        "architecture.mmd",
+        "build-graph.dot",
+        "checkout.puml",
+        "ci-pipeline.mmd",
+        "fulfillment.puml",
+        "login.mmd",
+        "order-lifecycle.mmd",
+        "request-timing.puml",
+        "shapes.mmd",
+        "shop-model.puml",
+        "styling.mmd",
+    ] {
+        let path = examples.join(name);
+        let src = std::fs::read_to_string(&path).unwrap();
+        let lowered = diagram::lower_as(&src, Lang::of_path(&path));
+        let file = path.to_str().unwrap();
+        let out = |args: &[&str]| {
+            let output = sirene().args(args).output().unwrap();
+            assert!(output.status.success(), "{name}: {args:?}");
+            output.stdout
+        };
+        assert_eq!(
+            out(&["ascii", file]),
+            lowered.ascii(&Options::default()).unwrap().into_bytes(),
+            "{name}"
+        );
+        assert_eq!(
+            out(&["svg", "--theme", "dark", file, "-o", "-"]),
+            lowered.svg(&Theme::DARK).unwrap().into_bytes(),
+            "{name}"
+        );
+        assert_eq!(
+            out(&["png", "--quality", "draft", file, "-o", "-"]),
+            lowered.png(&Theme::LIGHT, Quality::Draft, None).unwrap(),
+            "{name}"
+        );
+    }
+}
+
 /// The width and height in a PNG's header.
 fn png_size(bytes: &[u8]) -> (u32, u32) {
     assert!(bytes.starts_with(b"\x89PNG\r\n\x1a\n"), "not a PNG");

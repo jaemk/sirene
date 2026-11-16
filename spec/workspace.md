@@ -107,3 +107,13 @@ directory, made executable, then renamed over `sirene`. Failed staging leaves th
 unchanged; the temporary file is cleaned up. A destination symlink is replaced without writing
 through it. A directory destination, including a symlink to a directory, is refused rather than
 installing a nested `sirene/sirene`.
+
+## WORKSP-10 Library rendering
+
+`sirene-core` renders a diagram without the CLI. `diagram::lower_as` reads a source, with
+`Lang::of_path` picking DOT or PlantUML from a file extension. `Lowered::ascii`, `Lowered::svg`,
+and `Lowered::png` (feature `png`) apply the diagram's own theme settings over the given theme
+and return what `sirene ascii`, `sirene svg`, and `sirene png` write for the same file and
+options; the CLI calls them. `markdown::mermaid_blocks` finds a Markdown file's diagram blocks,
+each lowered with `lower_as(&block.code, Some(block.lang))`. Reading the file (UTF-8, size
+limit), choosing output paths, and Markdown image links stay in the CLI.

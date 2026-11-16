@@ -349,6 +349,40 @@ pub struct Lowered {
     pub theme: ThemeConfig,
 }
 
+impl Lowered {
+    /// The drawing in `theme` with the diagram's own theme settings applied over it, as
+    /// `sirene svg` and `sirene png` draw it.
+    pub fn scene(&self, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Scene> {
+        self.diagram.scene(metrics, &self.theme.apply(theme))
+    }
+
+    /// The drawing as text, as `sirene ascii` prints it.
+    pub fn ascii(&self, options: &Options) -> crate::Result<String> {
+        self.diagram.ascii(options)
+    }
+
+    /// A standalone SVG document, with text measured by [`scene::Approx`], as `sirene svg`
+    /// writes it.
+    pub fn svg(&self, theme: &Theme) -> crate::Result<String> {
+        Ok(scene::svg::write(&self.scene(&scene::Approx, theme)?))
+    }
+
+    /// A PNG drawn with the embedded font, as `sirene png` writes it. With no `scale`, the
+    /// quality's own scale is used, shrunk so the image fits in the largest side
+    /// [`scene::png::write`] draws; a given `scale` is kept.
+    #[cfg(feature = "png")]
+    pub fn png(
+        &self,
+        theme: &Theme,
+        quality: scene::png::Quality,
+        scale: Option<f32>,
+    ) -> crate::Result<Vec<u8>> {
+        let scene = self.scene(&scene::png::FontMetrics, theme)?;
+        let scale = scale.unwrap_or_else(|| scene::png::fit(&scene, quality.scale()));
+        scene::png::write(&scene, scene::png::Options { scale, quality })
+    }
+}
+
 impl From<flowchart::Lowered> for Lowered {
     fn from(l: flowchart::Lowered) -> Self {
         Lowered {
