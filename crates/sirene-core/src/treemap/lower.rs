@@ -9,6 +9,9 @@ use crate::lines::{self, MAX_DEPTH};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
+const STYLE_BUDGET: usize = 1_000_000;
+const GEOMETRY_LIMIT: f32 = 10_000.0;
+
 pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
     let src = root.to_string();
     let mut t = Treemap::default();
@@ -32,13 +35,24 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
 
     // Classes first, so an item may use one defined below it.
     let mut classes: HashMap<String, Vec<Style>> = HashMap::new();
+    let mut style_budget = STYLE_BUDGET;
+    let mut style_limit_reported = false;
     for stmt in root.children().filter(|s| s.kind() == CLASSDEF_STMT) {
         let (styles, _) = text::styles(&text_of(&stmt, STYLE_TEXT).unwrap_or_default());
+        let cost = style_cost(&styles);
         for name in stmt
             .children()
             .filter(|n| n.kind() == ID_LIST)
             .flat_map(|l| tokens(&l).filter(|t| t.kind() == IDENT).collect::<Vec<_>>())
         {
+            if cost > style_budget {
+                if !style_limit_reported {
+                    diagnostics.push(Diagnostic::new(stmt.text_range(), "treemap expanded styles exceed the 1000000-byte limit; ignoring excess styles"));
+                    style_limit_reported = true;
+                }
+                continue;
+            }
+            style_budget -= cost;
             classes
                 .entry(name.text().to_owned())
                 .or_default()
@@ -46,11 +60,18 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
         }
     }
 
+    // Cache costs once: a large class can be referenced many times.
+    let class_costs: HashMap<_, _> = classes
+        .iter()
+        .map(|(name, styles)| (name.clone(), style_cost(styles)))
+        .collect();
+
     // The open sections, each with its indentation.
     let mut stack: Vec<(usize, usize)> = Vec::new();
     // Each item's line.
     let mut ranges = Vec::new();
     let mut too_deep = false;
+    let mut total = 0.0_f64;
     for stmt in root.children() {
         match stmt.kind() {
             TITLE_STMT => title = text_of(&stmt, TEXT).filter(|s| !s.is_empty()),
@@ -62,7 +83,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
                 };
                 let name = name.text()[1..name.text().len() - 1].to_owned();
                 let value = match token(&stmt, NUMBER) {
-                    Some(n) => match n.text().replace(',', "").parse::<f64>() {
+                    Some(n) => match n.text().replace([',', '_'], "").parse::<f64>() {
                         Ok(v) if v.is_finite() => Some(v),
                         _ => {
                             diagnostics.push(Diagnostic::new(
@@ -82,7 +103,19 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
                     .map(|c| c.text().to_owned());
                 let styles = match &class {
                     Some(c) => match classes.get(c) {
-                        Some(s) => s.clone(),
+                        Some(s) => {
+                            let cost = class_costs[c];
+                            if cost > style_budget {
+                                if !style_limit_reported {
+                                    diagnostics.push(Diagnostic::new(stmt.text_range(), "treemap expanded styles exceed the 1000000-byte limit; ignoring excess styles"));
+                                    style_limit_reported = true;
+                                }
+                                Vec::new()
+                            } else {
+                                style_budget -= cost;
+                                s.clone()
+                            }
+                        }
                         None => {
                             diagnostics.push(Diagnostic::warning(
                                 stmt.text_range(),
@@ -109,6 +142,17 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
                         ));
                     }
                     continue;
+                }
+                if let Some(v) = value {
+                    let next = total + v.max(0.0);
+                    if !next.is_finite() {
+                        diagnostics.push(Diagnostic::new(
+                            stmt.text_range(),
+                            "treemap total exceeds the finite numeric range; ignoring this item",
+                        ));
+                        continue;
+                    }
+                    total = next;
                 }
                 let i = t.items.len();
                 let parent = stack.last().map(|&(p, _)| p);
@@ -153,15 +197,25 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Treemap, Vec<Diagnostic>) {
 fn config(t: &mut Treemap, k: &str, v: &str) -> Option<()> {
     let n = v.parse::<f32>().ok().filter(|n| n.is_finite());
     match k {
-        "padding" => t.padding = n.filter(|&n| n >= 0.0)?,
-        "diagramPadding" => t.diagram_padding = n.filter(|&n| n >= 0.0)?,
+        "padding" => t.padding = n.filter(|&n| (0.0..=GEOMETRY_LIMIT).contains(&n))?,
+        "diagramPadding" => {
+            t.diagram_padding = n.filter(|&n| (0.0..=GEOMETRY_LIMIT).contains(&n))?
+        }
         "showValues" => t.show_values = v.parse().ok()?,
-        "nodeWidth" => t.width = n.filter(|&n| n > 0.0)? * 10.0,
-        "nodeHeight" => t.height = n.filter(|&n| n > 0.0)? * 10.0,
+        "nodeWidth" => t.width = n.filter(|&n| n > 0.0 && n <= GEOMETRY_LIMIT / 10.0)? * 10.0,
+        "nodeHeight" => t.height = n.filter(|&n| n > 0.0 && n <= GEOMETRY_LIMIT / 10.0)? * 10.0,
         "valueFormat" => t.value_format = Format::parse(v)?,
         _ => {}
     }
     Some(())
+}
+
+fn style_cost(styles: &[Style]) -> usize {
+    styles.iter().fold(0usize, |cost, style| {
+        cost.saturating_add(std::mem::size_of::<Style>())
+            .saturating_add(style.property.len())
+            .saturating_add(style.value.len())
+    })
 }
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {

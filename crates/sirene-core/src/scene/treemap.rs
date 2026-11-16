@@ -74,21 +74,24 @@ fn fit_leaf(
         return None;
     }
     let mut size = s.label;
-    while metrics.width(label, size) > aw && size > s.min_label {
-        size -= 1.0;
-    }
-    while size + s.gap + s.value_for(size) > ah && size > s.min_label {
+    while (metrics.width(label, size) > aw || size > ah) && size > s.min_label {
         size -= 1.0;
     }
     if metrics.width(label, size) > aw || ah < size {
         return None;
     }
-    let value = value.and_then(|v| {
-        let vs = s.value_for(size);
-        let top = h / 2.0 + size / 2.0 + s.gap;
-        (metrics.width(v, vs) <= aw && top + vs <= h - 4.0).then_some(vs)
-    });
-    Some((size, value))
+    let label_only = size;
+    if let Some(v) = value {
+        while size >= s.min_label {
+            let vs = s.value_for(size);
+            let top = h / 2.0 + size / 2.0 + s.gap;
+            if metrics.width(v, vs) <= aw && top + vs <= h - s.padding {
+                return Some((size, Some(vs)));
+            }
+            size -= 1.0;
+        }
+    }
+    Some((label_only, None))
 }
 
 /// `s` cut short with `...` to fit `max` at `size`, or empty when even `...` does not fit.
@@ -165,7 +168,7 @@ pub fn treemap(treemap: &Treemap, metrics: &impl TextMetrics, theme: &Theme) -> 
     let dp = treemap.diagram_padding;
     let top = dp + if title.is_some() { lh + 16.0 } else { 0.0 };
     let width = (treemap.width + 2.0 * dp)
-        .max(title.map_or(0.0, |t| metrics.width(t, title_size)) + 2.0 * dp);
+        .max(title.map_or(0.0, |t| metrics.styled_width(t, title_size, BOLD)) + 2.0 * dp);
     let left = (width - treemap.width) / 2.0;
     let height = top + treemap.height + dp;
     let at = |c: &Cell| {
@@ -248,18 +251,37 @@ pub fn treemap(treemap: &Treemap, metrics: &impl TextMetrics, theme: &Theme) -> 
         let w = b.x - a.x;
         let value =
             (treemap.show_values && values[i] > 0.0).then(|| treemap.format_value(values[i]));
-        let room = if value.is_some() {
-            w - 6.0 - 50.0
+        let header_height = (b.y - a.y).min(HEADER);
+        let value = value
+            .filter(|v| header_height >= 12.0 && metrics.styled_width(v, 10.0, ITALIC) + 22.0 <= w);
+        let value_width = value
+            .as_ref()
+            .map_or(0.0, |v| metrics.styled_width(v, 10.0, ITALIC));
+        let room = w
+            - 12.0
+            - if value.is_some() {
+                value_width + 10.0
+            } else {
+                0.0
+            };
+        let label = if header_height >= 12.0 {
+            truncate(metrics, &item.name, 12.0, room)
         } else {
-            w - 12.0
+            String::new()
         };
-        let label = truncate(metrics, &item.name, 12.0, room.max(15.0));
+        // Prefer the section name if both text elements cannot fit side by side.
+        let value = if label.is_empty() { None } else { value };
+        let label = if value.is_none() && header_height >= 12.0 {
+            truncate(metrics, &item.name, 12.0, w - 12.0)
+        } else {
+            label
+        };
         if !label.is_empty() {
             let lw = metrics.styled_width(&label, 12.0, BOLD);
             text(
                 &mut p,
                 &label,
-                Pt::new(a.x + 6.0 + lw / 2.0, a.y + HEADER / 2.0),
+                Pt::new(a.x + 6.0 + lw / 2.0, a.y + header_height / 2.0),
                 12.0,
                 ink,
                 BOLD,
@@ -270,7 +292,7 @@ pub fn treemap(treemap: &Treemap, metrics: &impl TextMetrics, theme: &Theme) -> 
             text(
                 &mut p,
                 &v,
-                Pt::new(b.x - 10.0 - vw / 2.0, a.y + HEADER / 2.0),
+                Pt::new(b.x - 10.0 - vw / 2.0, a.y + header_height / 2.0),
                 10.0,
                 ink,
                 ITALIC,
@@ -279,7 +301,7 @@ pub fn treemap(treemap: &Treemap, metrics: &impl TextMetrics, theme: &Theme) -> 
     }
 
     let leaves: Vec<usize> = (0..treemap.items.len())
-        .filter(|&i| treemap.items[i].children.is_empty())
+        .filter(|&i| !treemap.items[i].is_section())
         .collect();
     let sizes = Sizes::new(leaves.len());
     for &i in &leaves {
@@ -362,6 +384,117 @@ mod tests {
         assert!(small.0 < 38.0);
         assert!(fit_leaf(&Approx, "A", None, 12.0, 300.0, &s).is_none());
         assert_eq!(Sizes::new(21).label, 16.0);
+        assert_eq!(
+            fit_leaf(&Approx, "A", None, 100.0, 50.0, &s),
+            Some((38.0, None))
+        );
+        assert_eq!(
+            fit_leaf(
+                &Approx,
+                "A",
+                Some("an impossibly long value that cannot fit even at the minimum size"),
+                100.0,
+                50.0,
+                &s
+            ),
+            Some((38.0, None))
+        );
+    }
+
+    #[test]
+    fn section_text_fits_and_empty_sections_are_not_drawn() {
+        let (mut t, _) = crate::treemap::parse(
+            "treemap-beta\n\"A long section\"\n  \"leaf\": 123456789\n\"empty\"\n",
+        )
+        .lower();
+        t.width = 80.0;
+        t.height = 60.0;
+        let scene = treemap(&t, &Approx, &Theme::default());
+        let cell = t.layout()[0];
+        let left = (scene.width - t.width) / 2.0 + cell.x0;
+        let right = (scene.width - t.width) / 2.0 + cell.x1;
+        let texts: Vec<_> = scene
+            .elements
+            .iter()
+            .filter_map(|e| match &e.primitive {
+                Primitive::Text {
+                    text,
+                    center,
+                    size,
+                    style,
+                    ..
+                } if *style == BOLD || *style == ITALIC => Some((text, center, size, style)),
+                _ => None,
+            })
+            .collect();
+        assert!(!texts.is_empty());
+        for (text, center, size, style) in &texts {
+            let half = Approx.styled_width(text, **size, **style) / 2.0;
+            assert!(center.x - half >= left && center.x + half <= right);
+            assert_ne!(text.as_str(), "empty");
+        }
+        if texts.len() == 2 {
+            let a = &texts[0];
+            let b = &texts[1];
+            assert!(
+                a.1.x + Approx.styled_width(a.0, *a.2, *a.3) / 2.0
+                    <= b.1.x - Approx.styled_width(b.0, *b.2, *b.3) / 2.0
+            );
+        }
+    }
+
+    #[test]
+    fn section_label_and_value_do_not_overlap() {
+        let (mut t, _) =
+            crate::treemap::parse("treemap-beta\n\"section\"\n  \"leaf\": 123\n").lower();
+        t.width = 200.0;
+        let scene = treemap(&t, &Approx, &Theme::default());
+        let texts: Vec<_> = scene
+            .elements
+            .iter()
+            .filter_map(|e| match &e.primitive {
+                Primitive::Text {
+                    text,
+                    center,
+                    size,
+                    style,
+                    ..
+                } if *style == BOLD || *style == ITALIC => Some((text, center, size, style)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts.len(), 2);
+        assert_eq!(texts[0].0, "section");
+        assert_eq!(texts[1].0, "123");
+        assert!(
+            texts[0].1.x + Approx.styled_width(texts[0].0, *texts[0].2, *texts[0].3) / 2.0
+                <= texts[1].1.x - Approx.styled_width(texts[1].0, *texts[1].2, *texts[1].3) / 2.0
+        );
+    }
+
+    #[test]
+    fn title_width_uses_bold_metrics() {
+        struct BoldWide;
+        impl TextMetrics for BoldWide {
+            fn width(&self, text: &str, size: f32) -> f32 {
+                Approx.width(text, size)
+            }
+            fn styled_width(&self, text: &str, size: f32, style: TextStyle) -> f32 {
+                self.width(text, size) * if style.bold { 2.0 } else { 1.0 }
+            }
+        }
+        let t = Treemap {
+            title: Some("A long title".into()),
+            width: 1.0,
+            ..Treemap::default()
+        };
+        let theme = Theme::default();
+        let scene = treemap(&t, &BoldWide, &theme);
+        assert!(
+            scene.width
+                >= BoldWide.styled_width(t.title.as_deref().unwrap(), theme.font_size * 1.2, BOLD)
+                    + 2.0 * t.diagram_padding
+        );
     }
 
     #[test]

@@ -5,6 +5,10 @@ use super::sankey::bar;
 use super::{Charset, Options, width};
 use crate::treemap::Treemap;
 
+// Limit padding on each line so a single long label cannot multiply the output size by the
+// number of items. Labels and values themselves are always preserved in full.
+const MAX_ALIGNMENT_PADDING: i32 = 256;
+
 /// One outline line: the guides and name, and the item's value.
 struct Line {
     name: String,
@@ -89,8 +93,8 @@ pub fn render(treemap: &Treemap, options: &Options) -> String {
         let share = if total > 0.0 { v / total } else { 0.0 };
         let row = format!(
             "{name}{}  {}{value}  {}",
-            " ".repeat((name_w - width(name)).max(0) as usize),
-            " ".repeat((value_w - width(value)).max(0) as usize),
+            " ".repeat((name_w - width(name)).clamp(0, MAX_ALIGNMENT_PADDING) as usize),
+            " ".repeat((value_w - width(value)).clamp(0, MAX_ALIGNMENT_PADDING) as usize),
             bar(share, options.charset)
         );
         rows.push(row.trim_end().to_owned());
@@ -148,6 +152,35 @@ mod tests {
         assert_eq!(
             out,
             "s     4  ############\n+- b  3  #########\n`- a  1  ###\n\nc     4  ############\n"
+        );
+    }
+
+    #[test]
+    fn long_name_does_not_expand_every_row() {
+        let long_name = "x".repeat(10_000);
+        let mut items = vec![Item {
+            name: long_name.clone(),
+            value: Some(1.0),
+            ..Item::default()
+        }];
+        items.extend((0..1_000).map(|_| Item {
+            name: "short".into(),
+            value: Some(1.0),
+            ..Item::default()
+        }));
+        let out = render(
+            &Treemap {
+                items,
+                ..Treemap::default()
+            },
+            &Options::default(),
+        );
+        assert!(out.contains(&long_name));
+        assert_eq!(out.matches("short").count(), 1_000);
+        assert!(
+            out.len() < 400_000,
+            "output expanded to {} bytes",
+            out.len()
         );
     }
 }

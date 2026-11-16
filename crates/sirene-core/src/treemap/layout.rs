@@ -73,8 +73,7 @@ impl Treemap {
         let roots = self.by_value(self.roots(), &values);
         let p = f64::from(self.padding) / 2.0;
         let inner = area.inset(-p, -p, -p, -p);
-        let total: f64 = roots.iter().map(|&i| values[i]).sum();
-        squarify(&roots, &values, total, inner, &mut rects);
+        squarify(&roots, &values, inner, &mut rects);
         for &i in &roots {
             self.position(i, p, &values, &mut rects);
         }
@@ -105,7 +104,7 @@ impl Treemap {
             SECTION_PADDING - q,
         );
         let children = self.by_value(item.children.iter().copied(), values);
-        squarify(&children, values, values[i], inner, rects);
+        squarify(&children, values, inner, rects);
         for &c in &children {
             self.position(c, q, values, rects);
         }
@@ -114,7 +113,15 @@ impl Treemap {
 
 /// Tiles `r` with `ids` in rows of near-square cells, as d3's `treemapSquarify` with the golden
 /// ratio.
-fn squarify(ids: &[usize], values: &[f64], total: f64, r: Rect, out: &mut [Rect]) {
+fn squarify(ids: &[usize], values: &[f64], r: Rect, out: &mut [Rect]) {
+    // Normalize each sibling group before squaring or summing. This preserves ratios for
+    // very small inputs and prevents intermediate overflow for large ones.
+    let scale = ids.iter().map(|&i| values[i]).fold(0.0_f64, f64::max);
+    let scaled: Vec<f64> = ids
+        .iter()
+        .map(|&i| if scale > 0.0 { values[i] / scale } else { 0.0 })
+        .collect();
+    let total: f64 = scaled.iter().sum();
     let ratio = (1.0 + 5f64.sqrt()) / 2.0;
     let Rect {
         mut x0,
@@ -129,7 +136,7 @@ fn squarify(ids: &[usize], values: &[f64], total: f64, r: Rect, out: &mut [Rect]
         // The next item with a value starts the row.
         let mut sum;
         loop {
-            sum = values[ids[i1]];
+            sum = scaled[i1];
             i1 += 1;
             if sum != 0.0 || i1 >= n {
                 break;
@@ -141,7 +148,7 @@ fn squarify(ids: &[usize], values: &[f64], total: f64, r: Rect, out: &mut [Rect]
         let mut min_ratio = (max / beta).max(beta / min);
         // Add items while the row's worst aspect ratio holds or improves.
         while i1 < n {
-            let v = values[ids[i1]];
+            let v = scaled[i1];
             sum += v;
             min = min.min(v);
             max = max.max(v);
@@ -162,10 +169,13 @@ fn squarify(ids: &[usize], values: &[f64], total: f64, r: Rect, out: &mut [Rect]
             } else {
                 y1
             };
-            let k = if sum > 0.0 { (x1 - x0) / sum } else { 0.0 };
             let mut x = x0;
-            for &id in row {
-                let w = values[id] * k;
+            for (offset, &id) in row.iter().enumerate() {
+                let w = if sum > 0.0 {
+                    (x1 - x0) * (scaled[i0 + offset] / sum)
+                } else {
+                    0.0
+                };
                 out[id] = Rect {
                     x0: x,
                     y0,
@@ -182,10 +192,13 @@ fn squarify(ids: &[usize], values: &[f64], total: f64, r: Rect, out: &mut [Rect]
             } else {
                 x1
             };
-            let k = if sum > 0.0 { (y1 - y0) / sum } else { 0.0 };
             let mut y = y0;
-            for &id in row {
-                let h = values[id] * k;
+            for (offset, &id) in row.iter().enumerate() {
+                let h = if sum > 0.0 {
+                    (y1 - y0) * (scaled[i0 + offset] / sum)
+                } else {
+                    0.0
+                };
                 out[id] = Rect {
                     x0,
                     y0: y,

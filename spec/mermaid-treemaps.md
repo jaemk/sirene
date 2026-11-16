@@ -27,7 +27,10 @@ From `config.treemap`: `padding` (10), `diagram_padding` (8), `show_values` (on 
 (`valueFormat`, a d3-format subset in `treemap::Format`; default `,`). A bad config value is a
 warning and ignored.
 
-A value that is not a number is an error and its item is left out. A section with no items and a
+A value that is not a number, or that would make the nonnegative total exceed the finite
+`f64` range, is an error and its item is left out. Geometry options are limited to 10,000
+drawing units (including the tenfold width and height scaling). Expanded class styles are
+limited to 1,000,000 bytes; excess styles are ignored with a diagnostic. A section with no items and a
 class with no `classDef` are warnings. `Treemap::values` gives each item's value, a section's being
 the sum of its items. Tests: `model`, `errors`, and the module's unit tests.
 

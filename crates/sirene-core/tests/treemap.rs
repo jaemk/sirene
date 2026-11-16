@@ -240,3 +240,56 @@ fn drawing() {
     assert!(fills.iter().all(|&f| rgb(f) == rgb(fills[0])));
     assert!(fills[0].a > fills[1].a);
 }
+
+#[test]
+fn numeric_limits_and_separators() {
+    let huge = "9".repeat(308);
+    let src = format!("treemap-beta\n\"first\": {huge}\n\"second\": {huge}\n\"small\": 1_000\n");
+    let (t, diagnostics) = lowered(&src);
+    assert!(diagnostics.iter().any(|(_, m)| m.contains("total exceeds")));
+    assert_eq!(t.items.len(), 2);
+    assert_eq!(t.items[1].value, Some(1000.0));
+    assert!(t.values().iter().all(|v| v.is_finite()));
+    assert!(
+        t.layout()
+            .iter()
+            .all(|c| [c.x0, c.y0, c.x1, c.y1].iter().all(|n| n.is_finite()))
+    );
+}
+
+#[test]
+fn tiny_values_keep_their_proportions() {
+    let tiny = format!("0.{}1", "0".repeat(199));
+    let twice = format!("0.{}2", "0".repeat(199));
+    let (t, d) = lowered(&format!("treemap-beta\n\"a\": {tiny}\n\"b\": {twice}\n"));
+    assert!(d.is_empty(), "{d:?}");
+    let cells = t.layout();
+    let area = |c: &sirene_core::treemap::Cell| (c.x1 - c.x0) * (c.y1 - c.y0);
+    assert!(area(&cells[1]) > area(&cells[0]) * 1.8);
+}
+
+#[test]
+fn geometry_and_expanded_styles_are_bounded() {
+    let src = format!(
+        "---\nconfig:\n  treemap:\n    nodeWidth: 1e38\n    padding: 1e38\n---\ntreemap-beta\nclassDef c fill:{}\n{}",
+        "x".repeat(20000),
+        "\"a\": 1:::c\n".repeat(100)
+    );
+    let (t, d) = lowered(&src);
+    assert_eq!(t.width, 1000.0);
+    assert_eq!(t.padding, 10.0);
+    assert!(d.iter().any(|(_, m)| m.contains("expanded styles")));
+    assert!(t.items.iter().any(|i| i.styles.is_empty()));
+}
+
+#[test]
+fn subnormal_sibling_has_finite_geometry() {
+    let tiny = format!("0.{}5", "0".repeat(323));
+    let (t, d) = lowered(&format!("treemap-beta\n\"large\": 1\n\"tiny\": {tiny}\n"));
+    assert!(d.is_empty(), "{d:?}");
+    assert!(
+        t.layout()
+            .iter()
+            .all(|c| [c.x0, c.y0, c.x1, c.y1].iter().all(|n| n.is_finite()))
+    );
+}
