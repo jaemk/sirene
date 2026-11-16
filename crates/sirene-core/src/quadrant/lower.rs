@@ -23,7 +23,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (QuadrantChart, Vec<Diagnostic>) {
     }
     // Points with the statement they came from, styled once every `classDef` is known.
     let mut points: Vec<(Point, SyntaxNode)> = Vec::new();
-    let mut classes: HashMap<String, Vec<Style>> = HashMap::new();
+    let mut classes: HashMap<String, PointStyle> = HashMap::new();
     for stmt in root.children() {
         match stmt.kind() {
             TITLE_STMT => title = text_of(&stmt, TEXT).filter(|s| !s.is_empty()),
@@ -59,7 +59,17 @@ pub(crate) fn lower(root: &SyntaxNode) -> (QuadrantChart, Vec<Diagnostic>) {
                 }
             }
             CLASSDEF_STMT => {
-                let (styles, _) = text::styles(&text_of(&stmt, STYLE_TEXT).unwrap_or_default());
+                let mut resolved = PointStyle::default();
+                if let Some(t) = token(&stmt, STYLE_TEXT) {
+                    let (styles, invalid) = text::styles(t.text());
+                    for s in invalid {
+                        diagnostics.push(Diagnostic::warning(
+                            t.text_range(),
+                            format!("ignoring `{s}`: expected `name: value`"),
+                        ));
+                    }
+                    apply(&mut resolved, &styles, t.text_range(), &mut diagnostics);
+                }
                 for id in stmt
                     .children()
                     .filter(|n| n.kind() == ID_LIST)
@@ -67,10 +77,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (QuadrantChart, Vec<Diagnostic>) {
                     .filter_map(|e| e.into_token())
                     .filter(|t| t.kind() == IDENT)
                 {
-                    classes
-                        .entry(id.text().to_owned())
-                        .or_default()
-                        .extend(styles.iter().cloned());
+                    merge(classes.entry(id.text().to_owned()).or_default(), resolved);
                 }
             }
             POINT_STMT => {
@@ -86,7 +93,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (QuadrantChart, Vec<Diagnostic>) {
     for (mut p, stmt) in points {
         if let Some(c) = &p.class {
             match classes.get(c) {
-                Some(styles) => apply(&mut p.style, styles, stmt.text_range(), &mut diagnostics),
+                Some(style) => merge(&mut p.style, *style),
                 None => diagnostics.push(Diagnostic::warning(
                     stmt.text_range(),
                     format!(
@@ -110,6 +117,14 @@ pub(crate) fn lower(root: &SyntaxNode) -> (QuadrantChart, Vec<Diagnostic>) {
     }
     q.title = title;
     (q, diagnostics)
+}
+
+/// Later valid declarations replace only the properties they set.
+fn merge(target: &mut PointStyle, later: PointStyle) {
+    target.radius = later.radius.or(target.radius);
+    target.color = later.color.or(target.color);
+    target.stroke_color = later.stroke_color.or(target.stroke_color);
+    target.stroke_width = later.stroke_width.or(target.stroke_width);
 }
 
 /// A point from its name, class, and coordinates, without its styles.
@@ -187,10 +202,12 @@ fn apply(
     }
 }
 
-/// A non-negative length in pixels, with an optional `px` unit.
+/// A non-negative length up to 10,000 pixels, with an optional `px` unit.
 fn length(v: &str) -> Option<f32> {
     let n = v.strip_suffix("px").unwrap_or(v).trim();
-    n.parse::<f32>().ok().filter(|n| n.is_finite() && *n >= 0.0)
+    n.parse::<f32>()
+        .ok()
+        .filter(|n| n.is_finite() && (0.0..=10_000.0).contains(n))
 }
 
 /// The first `TEXT` or `STRING`, unquoted and trimmed; `None` when empty.
@@ -210,4 +227,47 @@ fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
 
 fn text_of(node: &SyntaxNode, kind: SyntaxKind) -> Option<String> {
     token(node, kind).map(|t| t.text().trim().to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::quadrant::parse;
+
+    #[test]
+    fn class_styles_are_validated_once_and_combined_before_inline_overrides() {
+        let src = "quadrantChart\nA:::hot: [0.2, 0.3] radius: 7\nB:::hot: [0.4, 0.5]\nclassDef hot bogus, radius: 4, color: red\nclassDef hot radius: nope, stroke-width: 2\n";
+        let (q, diagnostics) = parse(src).lower();
+        assert_eq!(q.points.len(), 2);
+        assert_eq!(q.points[0].style.radius, Some(7.0));
+        assert_eq!(q.points[1].style.radius, Some(4.0));
+        assert_eq!(q.points[0].style.stroke_width, Some(2.0));
+        assert_eq!(q.points[1].style.stroke_width, Some(2.0));
+        assert_eq!(q.points[0].style.color, q.points[1].style.color);
+        assert!(q.points[0].style.color.is_some());
+        assert_eq!(diagnostics.len(), 2);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("expected `name: value`"))
+        );
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("radius: nope"))
+        );
+    }
+
+    #[test]
+    fn oversized_style_lengths_are_ignored() {
+        let src = "quadrantChart\nclassDef hot radius: 10001, stroke-width: 10000\nA:::hot: [0, 0] stroke-width: 10001, radius: 10000\n";
+        let (q, diagnostics) = parse(src).lower();
+        assert_eq!(q.points[0].style.radius, Some(10_000.0));
+        assert_eq!(q.points[0].style.stroke_width, Some(10_000.0));
+        assert_eq!(diagnostics.len(), 2);
+        assert!(
+            diagnostics
+                .iter()
+                .all(|d| d.message.contains("not a valid value"))
+        );
+    }
 }

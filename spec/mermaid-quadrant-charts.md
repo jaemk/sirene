@@ -31,12 +31,14 @@ replaces an earlier one. A point has a name, `x` and `y` from 0 to 1, its class,
 first (wherever it appears) and then its own styles. A coordinate that is not a number is an
 error and the point is skipped; one outside 0 to 1 is a warning and is clamped. An unknown style,
 a bad value, a style without `:`, and a class with no `classDef` are warnings and ignored.
+Class styles are validated once at their definition; later valid definitions override the same
+properties. Radius and stroke width must be between 0 and 10,000 pixels inclusive.
 `Axis::placed` puts each label at the middle of its half, or a low label alone at the middle of
 the axis. Tests: `points`, `styles`, `errors`.
 
 ## MQUAD-3 Drawing
 
-A 400-pixel square split into four quadrants, each a tint of the theme's node stroke color
+A square, at least 400 pixels wide and enlarged as needed for quadrant labels, split into four quadrants, each a tint of the theme's node stroke color
 (`quadrant-1` darkest, `quadrant-3` lightest), with a 1-pixel line between them and a 2-pixel
 border. Quadrant labels wrap to their quadrant and sit at its top, or in its middle when there are
 no points. The x-axis labels are below the square and the y-axis labels left of it. Each point is
