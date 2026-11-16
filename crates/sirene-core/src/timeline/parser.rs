@@ -49,12 +49,15 @@ fn keyword(s: &str, kw: &str) -> bool {
 /// The length of text at the start of `s` up to the next separating `:` (one followed by
 /// whitespace or the end of the line) or the end of the line, without trailing whitespace.
 pub(crate) fn text_len(s: &str) -> usize {
-    let line = &s[..scan::line_len(s)];
-    let end = line
-        .char_indices()
-        .find(|&(i, c)| c == ':' && line[i + 1..].chars().next().is_none_or(char::is_whitespace))
-        .map_or(line.len(), |(i, _)| i);
-    scan::trim_end_len(line, end)
+    let mut chars = s.char_indices().peekable();
+    let mut end = s.len();
+    while let Some((i, c)) = chars.next() {
+        if c == '\n' || (c == ':' && chars.peek().is_none_or(|&(_, c)| c.is_whitespace())) {
+            end = i;
+            break;
+        }
+    }
+    scan::trim_end_len(s, end)
 }
 
 impl Parser<'_> {
@@ -172,5 +175,24 @@ mod tests {
         assert_eq!(text_len("10:30 : x"), 5);
         assert_eq!(text_len("a:"), 1);
         assert_eq!(text_len("tail  \nnext"), 4);
+        assert_eq!(text_len("é: next"), "é".len());
+        assert_eq!(text_len("one\rtwo\r\nnext"), "one\rtwo".len());
+        assert_eq!(text_len("one:two\nnext"), "one:two".len());
+    }
+
+    #[test]
+    fn many_events_keep_the_source_and_all_events() {
+        let src = format!("timeline\nperiod{}\n", " : item".repeat(10_000));
+        let (green, diagnostics) = parse(&src);
+        let root = SyntaxNode::new_root(green);
+        assert!(diagnostics.is_empty());
+        assert_eq!(root.to_string(), src);
+        assert_eq!(
+            root.descendants_with_tokens()
+                .filter_map(|e| e.into_token())
+                .filter(|t| t.kind() == EVENT)
+                .count(),
+            10_000
+        );
     }
 }

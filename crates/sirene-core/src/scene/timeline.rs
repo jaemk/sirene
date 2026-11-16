@@ -36,7 +36,8 @@ struct Painter<'a, M> {
 
 impl<M: TextMetrics> Painter<'_, M> {
     fn width(&self, text: &str) -> f32 {
-        self.metrics.width(text, self.theme.font_size)
+        self.metrics
+            .styled_width(text, self.theme.font_size, TextStyle::default())
     }
 
     /// `text` broken at spaces to fit `max`; a longer word keeps a line of its own.
@@ -200,6 +201,18 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 .map(|n| p.block(n, MIN_W))
         })
         .collect();
+    // `periods()` groups periods by section. Record their ranges once instead of scanning
+    // every period for every section.
+    let mut next = 0;
+    let ranges: Vec<_> = timeline
+        .sections
+        .iter()
+        .map(|section| {
+            let start = next;
+            next += section.periods.len();
+            start..next
+        })
+        .collect();
     let section_color = |s: usize| if named { s } else { 0 };
     let event_stroke = |k: usize| Some(scale_color(theme, k));
 
@@ -213,15 +226,14 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
             .collect();
         for (s, block) in sections.iter().enumerate() {
             let Some(block) = block else { continue };
-            let cols: Vec<usize> = (0..periods.len()).filter(|&i| periods[i].0 == s).collect();
+            let cols = ranges[s].clone();
             if cols.is_empty() {
                 continue;
             }
-            let span: f32 =
-                cols.iter().map(|&i| col_w[i]).sum::<f32>() + GAP * (cols.len() - 1) as f32;
+            let span: f32 = col_w[cols.clone()].iter().sum::<f32>() + GAP * (cols.len() - 1) as f32;
             if block.w > span {
                 let extra = (block.w - span) / cols.len() as f32;
-                for &i in &cols {
+                for i in cols {
                     col_w[i] += extra;
                 }
             }
@@ -245,11 +257,12 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
         // Sections.
         for (s, block) in sections.iter().enumerate() {
             let Some(block) = block else { continue };
-            let cols: Vec<usize> = (0..periods.len()).filter(|&i| periods[i].0 == s).collect();
-            let (x0, x1) = match (cols.first(), cols.last()) {
-                (Some(&a), Some(&b)) => (col_x[a], col_x[b] + col_w[b]),
-                _ => continue,
-            };
+            let cols = ranges[s].clone();
+            if cols.is_empty() {
+                continue;
+            }
+            let (a, b) = (cols.start, cols.end - 1);
+            let (x0, x1) = (col_x[a], col_x[b] + col_w[b]);
             let b = BoxF {
                 x: x0,
                 y: top,
@@ -310,28 +323,40 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
         };
         let axis_x = period_x + period_w + AXIS_GAP;
         let events_x = axis_x + AXIS_GAP;
+        let mut row_h: Vec<f32> = periods
+            .iter()
+            .map(|(_, _, b, events)| events.iter().map(|e| e.h).fold(b.h, f32::max))
+            .collect();
+        // A section's label must fit in the span of its rows before later rows are placed.
+        for (s, block) in sections.iter().enumerate() {
+            let Some(block) = block else { continue };
+            let rows = ranges[s].clone();
+            if rows.is_empty() {
+                continue;
+            }
+            let span = row_h[rows.clone()].iter().sum::<f32>() + GAP * (rows.len() - 1) as f32;
+            row_h[rows.end - 1] += (block.h - span).max(0.0);
+        }
         let mut y = top;
         let mut row_y = Vec::with_capacity(periods.len());
-        let mut row_h = Vec::with_capacity(periods.len());
-        for (_, _, b, events) in &periods {
-            let h = events.iter().map(|e| e.h).fold(b.h, f32::max);
+        for &h in &row_h {
             row_y.push(y);
-            row_h.push(h);
             y += h + GAP;
         }
         let bottom = (y - GAP).max(top);
         for (s, block) in sections.iter().enumerate() {
             let Some(block) = block else { continue };
-            let rows: Vec<usize> = (0..periods.len()).filter(|&i| periods[i].0 == s).collect();
-            let (y0, y1) = match (rows.first(), rows.last()) {
-                (Some(&a), Some(&b)) => (row_y[a], row_y[b] + row_h[b]),
-                _ => continue,
-            };
+            let rows = ranges[s].clone();
+            if rows.is_empty() {
+                continue;
+            }
+            let (a, b) = (rows.start, rows.end - 1);
+            let (y0, y1) = (row_y[a], row_y[b] + row_h[b]);
             let b = BoxF {
                 x: MARGIN,
                 y: y0,
                 w: section_w,
-                h: (y1 - y0).max(block.h),
+                h: y1 - y0,
             };
             p.boxed(b, &block.lines, scale_color(theme, section_color(s)), None);
         }
@@ -373,8 +398,11 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
         width = right + MARGIN;
         height = bottom + 2.0 * HEAD + MARGIN;
     }
-    let width =
-        width.max(title.map_or(0.0, |t| metrics.width(t, theme.font_size * 1.2)) + 2.0 * MARGIN);
+    let width = width.max(
+        title.map_or(0.0, |t| {
+            metrics.styled_width(t, theme.font_size * 1.2, TextStyle::default())
+        }) + 2.0 * MARGIN,
+    );
     let mut elements = p.elements;
     if let Some(t) = title {
         elements.insert(
@@ -396,5 +424,58 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
         height,
         background: theme.background,
         elements,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scene::Approx;
+
+    #[test]
+    fn tall_section_fits_before_next_section() {
+        let source = "timeline TD\nsection one<br>two<br>three<br>four<br>five<br>six<br>seven<br>eight\nA : event\nsection next\nB : event\n";
+        let (timeline, diagnostics) = crate::timeline::parse(source).lower();
+        assert!(diagnostics.is_empty());
+        let scene = super::timeline(&timeline, &Approx, &Theme::LIGHT);
+        let position = |name: &str| {
+            scene
+                .elements
+                .iter()
+                .find_map(|e| match &e.primitive {
+                    Primitive::Text { text, center, .. } if text == name => Some(*center),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        let last = position("eight");
+        let next = position("next");
+        assert!(next.y - last.y >= Theme::LIGHT.line_height + GAP);
+        assert!(last.y >= MARGIN && next.y <= scene.height - MARGIN);
+    }
+
+    #[test]
+    fn boxes_and_title_use_rendered_styled_width() {
+        struct Wider;
+        impl TextMetrics for Wider {
+            fn width(&self, text: &str, _: f32) -> f32 {
+                text.len() as f32
+            }
+            fn styled_width(&self, text: &str, _: f32, _: TextStyle) -> f32 {
+                text.len() as f32 * 20.0
+            }
+        }
+        let p = Painter {
+            metrics: &Wider,
+            theme: &Theme::LIGHT,
+            elements: Vec::new(),
+        };
+        let block = p.block(&vec!["abcdefghij".into()], MIN_W);
+        assert!(block.w >= 200.0 + 2.0 * PAD);
+        let (timeline, diagnostics) =
+            crate::timeline::parse("timeline\ntitle abcdefghijklmnopqrst\nA\n").lower();
+        assert!(diagnostics.is_empty());
+        let scene = super::timeline(&timeline, &Wider, &Theme::LIGHT);
+        assert!(scene.width >= 400.0 + 2.0 * MARGIN);
     }
 }

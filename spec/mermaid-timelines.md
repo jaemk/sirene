@@ -36,7 +36,8 @@ is a box above its periods, spanning them. Each section takes the next of eight 
 there are no named sections, each period does instead. Columns are as wide as their text, up to
 200 pixels, past which text wraps at spaces. `TD`: the periods in a column, top to bottom, each
 with its events in a row to its right, across a vertical arrow beside them; a section's box is
-to the left of its periods, spanning them. Every element is owned by the diagram. Tests:
+to the left of its periods, spanning them; rows grow when necessary to fit the section label.
+Every element is owned by the diagram. Tests:
 `drawing`.
 
 ## TIMELI-4 ASCII

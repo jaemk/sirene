@@ -274,24 +274,48 @@ fn numbers() {
 /// `s` split into lines at `<br>` (any case, with an optional `/`), each trimmed.
 pub(crate) fn split_br(s: &str) -> Vec<String> {
     let mut out = Vec::new();
-    let mut rest = s;
-    loop {
-        let lower = rest.to_ascii_lowercase();
-        let found = ["<br>", "<br/>", "<br />"]
-            .iter()
-            .filter_map(|b| lower.find(b).map(|i| (i, b.len())))
-            .min();
-        match found {
-            Some((i, n)) => {
-                out.push(rest[..i].trim().to_owned());
-                rest = &rest[i + n..];
+    let bytes = s.as_bytes();
+    let mut start = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        let rest = &bytes[i..];
+        let n = if rest.len() >= 4 && rest[0] == b'<' && rest[1..3].eq_ignore_ascii_case(b"br") {
+            if rest[3] == b'>' {
+                4
+            } else if rest[3..].starts_with(b"/>") {
+                5
+            } else if rest[3..].starts_with(b" />") {
+                6
+            } else {
+                0
             }
-            None => {
-                out.push(rest.trim().to_owned());
-                return out;
-            }
+        } else {
+            0
+        };
+        if n > 0 {
+            out.push(s[start..i].trim().to_owned());
+            i += n;
+            start = i;
+        } else {
+            i += 1;
         }
     }
+    out.push(s[start..].trim().to_owned());
+    out
+}
+
+#[cfg(test)]
+#[test]
+fn split_br_preserves_text_and_recognizes_supported_tags() {
+    assert_eq!(
+        split_br("  café <BR> <bR/>λ<Br /> <br  /> end<br>"),
+        ["café", "", "λ", "<br  /> end", ""]
+    );
+    let many = "é<BR />".repeat(10_000);
+    let parts = split_br(&many);
+    assert_eq!(parts.len(), 10_001);
+    assert!(parts[..10_000].iter().all(|s| s == "é"));
+    assert_eq!(parts[10_000], "");
 }
 
 impl<'a> Base<'a> {

@@ -55,8 +55,16 @@ pub fn render(timeline: &Timeline, options: &Options) -> String {
         .iter()
         .map(|s| s.name.as_ref().filter(|_| !s.periods.is_empty()).map(wrap))
         .collect();
-    let in_section =
-        |s: usize| -> Vec<usize> { (0..periods.len()).filter(|&i| periods[i].0 == s).collect() };
+    let mut next = 0;
+    let ranges: Vec<_> = timeline
+        .sections
+        .iter()
+        .map(|s| {
+            let start = next;
+            next += s.periods.len();
+            start..next
+        })
+        .collect();
     // Boxes to draw, and the lines between them.
     let mut boxes: Vec<(Rect, &[String])> = Vec::new();
     let mut vlines: Vec<(i32, i32, i32)> = Vec::new();
@@ -67,11 +75,11 @@ pub fn render(timeline: &Timeline, options: &Options) -> String {
             .map(|(_, l, ev)| ev.iter().map(|e| box_w(e)).fold(box_w(l), i32::max))
             .collect();
         for (s, name) in sections.iter().enumerate() {
-            let (Some(name), cols) = (name, in_section(s)) else {
+            let (Some(name), cols) = (name, ranges[s].clone()) else {
                 continue;
             };
-            let span = cols.iter().map(|&i| col_w[i] + 1).sum::<i32>() - 1;
-            if let Some(&last) = cols.last()
+            let span = cols.clone().map(|i| col_w[i] + 1).sum::<i32>() - 1;
+            if let Some(last) = cols.last()
                 && box_w(name) > span
             {
                 col_w[last] += box_w(name) - span;
@@ -91,10 +99,11 @@ pub fn render(timeline: &Timeline, options: &Options) -> String {
             .unwrap_or(0);
         let period_h = periods.iter().map(|(_, l, _)| box_h(l)).max().unwrap_or(0);
         for (s, name) in sections.iter().enumerate() {
-            let (Some(name), cols) = (name, in_section(s)) else {
+            let (Some(name), cols) = (name, ranges[s].clone()) else {
                 continue;
             };
-            if let (Some(&a), Some(&b)) = (cols.first(), cols.last()) {
+            if let Some(b) = cols.clone().last() {
+                let a = cols.start;
                 let r = Rect::new(col_x[a], 0, col_x[b] + col_w[b] - col_x[a], section_h);
                 boxes.push((r, name));
             }
@@ -128,21 +137,32 @@ pub fn render(timeline: &Timeline, options: &Options) -> String {
         let period_x = if section_w > 0 { section_w + 1 } else { 0 };
         let axis = period_x + period_w + 1;
         let events_x = axis + 2;
+        let mut row_h: Vec<i32> = periods
+            .iter()
+            .map(|(_, l, events)| events.iter().map(|e| box_h(e)).fold(box_h(l), i32::max))
+            .collect();
+        for (s, name) in sections.iter().enumerate() {
+            if let Some(name) = name {
+                let rows = ranges[s].clone();
+                let span = rows.clone().map(|i| row_h[i] + 1).sum::<i32>() - 1;
+                if let Some(last) = rows.last() {
+                    row_h[last] += (box_h(name) - span).max(0);
+                }
+            }
+        }
         let mut row_y = Vec::new();
-        let mut row_h = Vec::new();
         let mut y = 0;
-        for (_, l, events) in &periods {
-            let h = events.iter().map(|e| box_h(e)).fold(box_h(l), i32::max);
+        for &h in &row_h {
             row_y.push(y);
-            row_h.push(h);
             y += h + 1;
         }
         for (s, name) in sections.iter().enumerate() {
-            let (Some(name), rows) = (name, in_section(s)) else {
+            let (Some(name), rows) = (name, ranges[s].clone()) else {
                 continue;
             };
-            if let (Some(&a), Some(&b)) = (rows.first(), rows.last()) {
-                let h = (row_y[b] + row_h[b] - row_y[a]).max(box_h(name));
+            if let Some(b) = rows.clone().last() {
+                let a = rows.start;
+                let h = row_y[b] + row_h[b] - row_y[a];
                 boxes.push((Rect::new(0, row_y[a], section_w, h), name));
             }
         }
@@ -210,5 +230,22 @@ mod tests {
         let long = vec!["one two three four five six seven eight".to_owned()];
         assert_eq!(wrap(&long), ["one two three four five", "six seven eight"]);
         assert_eq!(wrap(&vec!["a".to_owned(), "b".to_owned()]), ["a", "b"]);
+    }
+
+    #[test]
+    fn tall_vertical_sections_do_not_overlap_following_sections() {
+        let src = "timeline TD\nsection one<br>two<br>three<br>four<br>five<br>six<br>seven<br>eight\nA : event\nsection next\nB : event\n";
+        let (timeline, diagnostics) = crate::timeline::parse(src).lower();
+        assert!(diagnostics.is_empty());
+        for charset in [super::super::Charset::Unicode, super::super::Charset::Ascii] {
+            let rendered = render(&timeline, &Options { charset });
+            let positions: Vec<_> = [
+                "one", "two", "three", "four", "five", "six", "seven", "eight", "next",
+            ]
+            .iter()
+            .map(|word| rendered.find(word).expect(word))
+            .collect();
+            assert!(positions.windows(2).all(|p| p[0] < p[1]), "{rendered}");
+        }
     }
 }
