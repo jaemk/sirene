@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-16
+
 ### Added
 
 - Logging through `SIRENE_LOG` or `RUST_LOG`, with module filters, severity labels, and `-vv`
