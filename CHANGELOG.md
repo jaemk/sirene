@@ -12,6 +12,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   for trace output. Logs go to stderr and keep rendered stdout unchanged.
 - A shared, cloneable `sirene_core::Error` that retains typed causes and reports the full
   causal chain.
+- Phase timings for reading, layout stages, and drawing, logged at trace level under
+  `sirene_core::profile` (e.g. `SIRENE_LOG=off,sirene_core::profile=trace`). The `stress` bench
+  prints them per shape with `--phases`.
 
 ### Changed
 

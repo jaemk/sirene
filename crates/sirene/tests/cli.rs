@@ -65,6 +65,35 @@ fn logging_environment_and_verbose_precedence() {
         .stderr(predicate::str::contains("reading <stdin>").not());
 }
 
+/// ERRORH-8: phase timings print with their target enabled and stay out of other trace output.
+#[test]
+fn phase_timings_follow_their_target() {
+    let source = "flowchart TD\nA --> B\n";
+    sirene()
+        .arg("ascii")
+        .env("SIRENE_LOG", "off,sirene_core::profile=trace")
+        .write_stdin(source)
+        .assert()
+        .success()
+        .stdout(AB)
+        .stderr(predicate::str::contains(
+            "sirene_core::profile: phase layout.order ",
+        ))
+        .stderr(predicate::str::contains(
+            "sirene_core::profile: phase ascii ",
+        ))
+        .stderr(predicate::str::contains("reading <stdin>").not());
+    sirene()
+        .arg("ascii")
+        .env("SIRENE_LOG", "trace,sirene_core::profile=off")
+        .write_stdin(source)
+        .assert()
+        .success()
+        .stdout(AB)
+        .stderr(predicate::str::contains("TRACE sirene: lowering"))
+        .stderr(predicate::str::contains("sirene_core::profile").not());
+}
+
 #[test]
 fn logging_rejects_invalid_configuration_without_echoing_it() {
     sirene()

@@ -71,3 +71,14 @@ size guards, non-flowchart mouse selection, failing streams, partial traversal f
 confirmation/dialog failures, settings persistence, and logging precedence/filtering. Existing
 rendering snapshots and GUI behavior remain covered by the repository test suite. The full
 check includes formatting, Clippy, workspace/headless tests, and the coverage gate (WORKSP-5).
+
+## ERRORH-8 Phase timing
+
+Lowering, scene building, text drawing, PNG writing, and the layout stages (build, order,
+ports, position, and each gap's track assignment) log their duration at trace level under the
+`sirene_core::profile` target as `phase <name> <ns> ns`, e.g.
+`SIRENE_LOG=off,sirene_core::profile=trace`. A phase that runs more than once logs once per
+run. Nothing is measured unless the target is enabled. `sirene_core::profile::parse` reads a
+record back. The `stress` bench's `--phases` option prints the summed timings of one run at
+the larger size per shape. Tests: `crates/sirene-core/tests/profile.rs`,
+`phase_timings_follow_their_target` in `crates/sirene/tests/cli.rs`.

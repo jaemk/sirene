@@ -8,6 +8,7 @@ mod route;
 use std::collections::{HashMap, HashSet};
 
 use crate::flowchart::{Compass, Direction, EdgeOrder, RankEnd};
+use crate::profile::Phase;
 use position::{Link, Span};
 use rank::RankEdge;
 use route::Jog;
@@ -212,6 +213,7 @@ struct Incident {
 
 /// Lays out `graph`.
 pub fn layout(graph: &Graph, config: &Config) -> crate::Result<Layout> {
+    let _phase = Phase::start("layout");
     let valid = |item: Item| match item {
         Item::Node(n) => n < graph.nodes.len(),
         Item::Cluster(c) => c < graph.clusters.len(),
@@ -1423,12 +1425,16 @@ impl<'a, 'b> Placer<'a, 'b> {
     }
 
     fn run(mut self) -> crate::Result<Placed> {
+        let phase = Phase::start("layout.build");
         let count = self.build()?;
         let segments = self.segments();
         self.init_layers(count, &segments);
+        drop(phase);
+        let phase = Phase::start("layout.order");
         let pairs: Vec<(usize, usize)> = segments.iter().map(|&(u, v, _)| (u, v)).collect();
         let fixed = self.ordered(&segments);
         order::order(&mut self.layers, &pairs, self.elems.len(), &fixed);
+        drop(phase);
         let keys = if self.has_lanes() {
             let keys = self.lane_keys();
             for layer in &mut self.layers {
@@ -1438,6 +1444,7 @@ impl<'a, 'b> Placer<'a, 'b> {
         } else {
             Vec::new()
         };
+        let phase = Phase::start("layout.ports");
         self.mark_straight();
         // A straight flat edge is as long as an edge between ranks.
         let room = (2 * self.sp.rank_gap - self.sp.node_gap).max(0);
@@ -1452,6 +1459,7 @@ impl<'a, 'b> Placer<'a, 'b> {
         let flat_ends = self.flat_ends();
         self.fit_ports(&inc, &flat_ends);
         let (offsets, flat_offsets) = self.ports(&segments, &inc, &flat_ends)?;
+        drop(phase);
         let spans: Vec<Span> = (0..self.elems.len())
             .map(|e| {
                 let el = self.elems[e];
@@ -1497,6 +1505,7 @@ impl<'a, 'b> Placer<'a, 'b> {
             };
             (x, width, bands, min_main)
         } else {
+            let phase = Phase::start("layout.position");
             let mut x = position::position(
                 &self.layers,
                 &spans,
@@ -1504,6 +1513,7 @@ impl<'a, 'b> Placer<'a, 'b> {
                 self.sp.node_gap,
                 self.sp.edge_gap,
             );
+            drop(phase);
 
             // Cross-axis extent and padding.
             let lo = (0..x.len())
@@ -1614,7 +1624,9 @@ impl<'a, 'b> Placer<'a, 'b> {
                     flat: true,
                 }))
                 .collect();
+            let phase = Phase::start("layout.tracks");
             let (tracks, k) = route::tracks(&jogs);
+            drop(phase);
             for (&i, t) in segs.iter().zip(&tracks) {
                 track_of[i] = *t;
             }

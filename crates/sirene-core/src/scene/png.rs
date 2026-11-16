@@ -167,6 +167,7 @@ pub fn fit(scene: &Scene, scale: f32) -> f32 {
 
 /// Draws `scene` as a PNG with `options.scale` pixels per scene unit.
 pub fn write(scene: &Scene, options: Options) -> crate::Result<Vec<u8>> {
+    let _phase = crate::profile::Phase::start("png");
     let Options { scale, quality } = options;
     if !(scale.is_finite() && scale > 0.0) {
         return Err(crate::Error::new(format!(

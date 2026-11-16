@@ -273,6 +273,7 @@ impl Diagram {
 
     /// The drawing, with text measured by `metrics` (DISPLA-1).
     pub fn scene(&self, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Scene> {
+        let _phase = crate::profile::Phase::start("scene");
         Ok(match self {
             Diagram::Graph(f) => return scene::flowchart(f, metrics, theme),
             Diagram::Sequence(s) => scene::sequence(s, metrics, theme),
@@ -306,6 +307,7 @@ impl Diagram {
 
     /// The drawing as text (ASCIIR-1).
     pub fn ascii(&self, options: &Options) -> crate::Result<String> {
+        let _phase = crate::profile::Phase::start("ascii");
         Ok(match self {
             Diagram::Graph(f) => return ascii::render(f, options),
             Diagram::Sequence(s) => ascii::sequence(s, options),
@@ -401,6 +403,7 @@ pub fn lower_as(src: &str, lang: Option<Lang>) -> Lowered {
 }
 
 fn lower_as_with_limit(src: &str, lang: Option<Lang>, limit: usize) -> Lowered {
+    let _phase = crate::profile::Phase::start("lower");
     if let Some(diagnostic) = crate::lines::source_limit(src, limit) {
         return Lowered {
             diagnostics: vec![diagnostic],

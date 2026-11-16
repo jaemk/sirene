@@ -4,15 +4,77 @@
 //!
 //! Run with `cargo bench -p sirene-core --bench stress`; arguments filter shapes by name
 //! (`cargo bench -p sirene-core --bench stress -- flowchart sequence`). `--png` also times PNG
-//! rasterizing (needs `--features png`), and `--base N` scales every size.
+//! rasterizing (needs `--features png`), and `--base N` scales every size. `--phases` adds a line
+//! per shape with the phase timings (ERRORH-8) of one run at the larger size, such as layout
+//! ordering and track assignment, to find which part of a flagged phase grew.
 
 use std::fmt::Write as _;
 use std::hint::black_box;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use sirene_core::ascii::Options;
 use sirene_core::diagram::{self, Lang};
+use sirene_core::profile;
 use sirene_core::scene::{Approx, Theme};
+
+/// Collects phase timings while the log level allows them; they are off while timing.
+struct Phases(Mutex<Vec<(String, u128)>>);
+
+impl log::Log for Phases {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.target() == profile::TARGET
+    }
+
+    fn log(&self, record: &log::Record) {
+        let message = record.args().to_string();
+        if let (true, Some((name, ns))) =
+            (self.enabled(record.metadata()), profile::parse(&message))
+            && let Ok(mut phases) = self.0.lock()
+        {
+            phases.push((name.to_string(), ns));
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+static PHASES: Phases = Phases(Mutex::new(Vec::new()));
+
+/// The phase timings of one run of lowering, scene building, and text drawing, summed per
+/// phase in first-seen order, with how many times each ran.
+fn phases(src: &str, lang: Option<Lang>) -> String {
+    if let Ok(mut p) = PHASES.0.lock() {
+        p.clear();
+    }
+    log::set_max_level(log::LevelFilter::Trace);
+    let lowered = diagram::lower_as(src, lang);
+    let _ = lowered.diagram.scene(&Approx, &Theme::LIGHT);
+    let _ = lowered.diagram.ascii(&Options::default());
+    log::set_max_level(log::LevelFilter::Off);
+    let records = PHASES.0.lock().map(|p| p.clone()).unwrap_or_default();
+    let mut sums: Vec<(String, u128, usize)> = Vec::new();
+    for (name, ns) in records {
+        match sums.iter_mut().find(|(n, _, _)| *n == name) {
+            Some(s) => {
+                s.1 += ns;
+                s.2 += 1;
+            }
+            None => sums.push((name, ns, 1)),
+        }
+    }
+    sums.iter()
+        .map(|(name, ns, runs)| {
+            let ms = *ns as f64 / 1e6;
+            if *runs > 1 {
+                format!("{name} {ms:.2} (x{runs})")
+            } else {
+                format!("{name} {ms:.2}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" | ")
+}
 
 /// A stress shape: its name, the language it is read as, and its source at a size.
 struct Shape {
@@ -230,6 +292,7 @@ fn ms(d: Duration) -> String {
 struct Args {
     filters: Vec<String>,
     png: bool,
+    phases: bool,
     base: f64,
     flag: f64,
 }
@@ -238,6 +301,7 @@ fn args() -> Args {
     let mut a = Args {
         filters: Vec::new(),
         png: false,
+        phases: false,
         base: 1.0,
         flag: 8.0,
     };
@@ -246,6 +310,7 @@ fn args() -> Args {
         match arg.as_str() {
             "--bench" => {}
             "--png" => a.png = true,
+            "--phases" => a.phases = true,
             "--base" => a.base = it.next().and_then(|v| v.parse().ok()).unwrap_or(1.0),
             "--flag" => a.flag = it.next().and_then(|v| v.parse().ok()).unwrap_or(8.0),
             _ => a.filters.push(arg),
@@ -256,6 +321,10 @@ fn args() -> Args {
 
 fn main() {
     let args = args();
+    if args.phases {
+        let _ = log::set_logger(&PHASES);
+        log::set_max_level(log::LevelFilter::Off);
+    }
     let budget = Duration::from_millis(300);
     // A phase slower than this at the larger size is flagged whatever its growth.
     let slow = Duration::from_millis(500);
@@ -290,6 +359,7 @@ fn main() {
         let mut areas = Vec::new();
         let mut bytes = 0;
         let mut errors = 0;
+        let mut breakdown = String::new();
         for size in [n, n * 4] {
             let src = (shape.source)(size);
             bytes = src.len();
@@ -322,6 +392,9 @@ fn main() {
             }
             times.push(row);
             areas.push(area(&lowered));
+            if args.phases && size > n {
+                breakdown = phases(&src, shape.lang);
+            }
         }
         // How much the text drawing grew: ASCII time growing as fast is output-bound.
         let area_grow = areas[1] as f64 / areas[0].max(1) as f64;
@@ -359,6 +432,9 @@ fn main() {
             line.push_str(&format!("  ({errors} errors at 4x)"));
         }
         println!("{line}");
+        if !breakdown.is_empty() {
+            println!("    {breakdown}");
+        }
     }
     println!("\nflagged ({}):", flagged.len());
     for f in &flagged {

@@ -37,6 +37,7 @@ pub mod mindmap;
 pub mod packet;
 pub mod pie;
 pub mod plantuml;
+pub mod profile;
 pub mod quadrant;
 pub mod radar;
 pub mod railroad;

@@ -225,3 +225,10 @@ but keep explicit module filters. General levels apply to sirene's own crates; a
 module filter can enable a dependency. Invalid configuration prints an error and exits 2.
 Logs go to stderr, leaving rendered stdout unchanged. No extra logs are printed without flags
 or environment configuration. Operational errors include their underlying causes.
+
+Trace logging of `sirene_core::profile` prints how long each stage of drawing took (reading,
+layout ordering, edge routing, text or image output):
+
+```sh
+SIRENE_LOG=off,sirene_core::profile=trace sirene ascii diagram.mmd > /dev/null
+```
