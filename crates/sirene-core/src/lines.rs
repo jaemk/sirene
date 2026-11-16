@@ -420,9 +420,11 @@ impl<'a> Base<'a> {
 
     /// The length of a `"..."` string at the cursor, closed on the same line.
     pub fn string_len(&self) -> Option<usize> {
-        let r = self.rest();
-        let line = &r[..scan::line_len(r)];
-        line.strip_prefix('"')?.find('"').map(|i| i + 2)
+        // Up to the closing quote or the line's end only, so items of a long line are not
+        // each scanned to its end.
+        let r = self.rest().strip_prefix('"')?;
+        let end = r.find(['"', '\n'])?;
+        (r.as_bytes()[end] == b'"').then_some(end + 2)
     }
 
     fn at_line_start(&self) -> bool {

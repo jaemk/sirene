@@ -28,14 +28,17 @@ pub(super) const fn glyph(unicode: char, ascii: char) -> Glyph {
     Glyph { unicode, ascii }
 }
 
+/// One grid cell, kept small since a canvas can hold millions: glyphs are indices into the
+/// canvas's table, offset by one so 0 is none.
 #[derive(Debug, Clone, Copy, Default)]
 struct Cell {
-    mask: u8,
-    line: Option<Line>,
-    /// Shown instead of the line character while the mask is unchanged.
-    glyph: Option<(Glyph, u8)>,
-    arrow: Option<Glyph>,
     text: Option<char>,
+    /// Shown instead of the line character while the mask is `glyph_mask`.
+    glyph: u16,
+    arrow: u16,
+    mask: u8,
+    glyph_mask: u8,
+    line: Option<Line>,
     /// The second cell of a wide character.
     tail: bool,
 }
@@ -47,6 +50,8 @@ pub(super) struct Canvas {
     width: i32,
     height: i32,
     cells: Vec<Cell>,
+    /// The distinct glyphs and arrows the cells refer to.
+    glyphs: Vec<Glyph>,
     /// The size asked for, when it was more than `MAX_CELLS` and the canvas is cut off.
     cut: Option<(i32, i32)>,
 }
@@ -64,6 +69,7 @@ impl Canvas {
             width: columns as i32,
             height: rows as i32,
             cells: vec![Cell::default(); columns * rows],
+            glyphs: Vec::new(),
             cut: (columns < w || rows < h).then_some((width, height)),
         }
     }
@@ -126,15 +132,32 @@ impl Canvas {
 
     /// Shows `g` at a cell until more lines join it.
     pub fn glyph(&mut self, x: i32, y: i32, g: Glyph) {
+        let k = self.intern(g);
         if let Some(c) = self.cell(x, y) {
-            c.glyph = Some((g, c.mask));
+            c.glyph = k;
+            c.glyph_mask = c.mask;
         }
     }
 
     pub fn arrow(&mut self, x: i32, y: i32, g: Glyph) {
+        let k = self.intern(g);
         if let Some(c) = self.cell(x, y) {
-            c.arrow = Some(g);
+            c.arrow = k;
         }
+    }
+
+    /// `g`'s index in the glyph table plus one. Drawings use a few dozen glyphs at most, so a
+    /// scan is cheap; past `u16` they would all show as the last one.
+    fn intern(&mut self, g: Glyph) -> u16 {
+        let i = match self.glyphs.iter().position(|&h| h == g) {
+            Some(i) => i,
+            None if self.glyphs.len() < usize::from(u16::MAX) => {
+                self.glyphs.push(g);
+                self.glyphs.len() - 1
+            }
+            None => self.glyphs.len() - 1,
+        };
+        (i + 1) as u16
     }
 
     /// Writes text from `(x, y)`; wide characters take two cells and zero-width ones are
@@ -184,13 +207,14 @@ impl Canvas {
 
     pub fn render(&self, charset: Charset) -> String {
         let mut out = String::new();
+        let mut line = String::new();
         for row in self.cells.chunks(self.width.max(1) as usize) {
-            let mut line = String::new();
+            line.clear();
             for c in row {
                 if c.tail {
                     continue;
                 }
-                line.push(char_of(c, charset));
+                line.push(char_of(c, &self.glyphs, charset));
             }
             out.push_str(line.trim_end());
             out.push('\n');
@@ -211,16 +235,18 @@ fn pick(g: Glyph, charset: Charset) -> char {
     }
 }
 
-fn char_of(c: &Cell, charset: Charset) -> char {
+fn char_of(c: &Cell, glyphs: &[Glyph], charset: Charset) -> char {
     if let Some(t) = c.text {
         return t;
     }
-    if let Some(a) = c.arrow {
+    let at = |k: u16| usize::from(k).checked_sub(1).and_then(|i| glyphs.get(i));
+    if let Some(&a) = at(c.arrow) {
         return pick(a, charset);
     }
-    match c.glyph {
-        Some((g, mask)) if mask == c.mask => return pick(g, charset),
-        _ => {}
+    if c.glyph_mask == c.mask
+        && let Some(&g) = at(c.glyph)
+    {
+        return pick(g, charset);
     }
     if c.mask == 0 {
         return ' ';

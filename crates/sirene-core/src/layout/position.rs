@@ -157,8 +157,9 @@ impl Placer<'_> {
         };
         let mut desired = Vec::with_capacity(layer.len());
         let mut weights = Vec::with_capacity(layer.len());
+        let mut values = Vec::new();
         for &e in layer {
-            let mut values = Vec::new();
+            values.clear();
             if matches!(toward, Toward::Up | Toward::Both) {
                 for &i in &self.up[e] {
                     let l = &self.links[i];

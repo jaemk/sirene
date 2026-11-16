@@ -20,6 +20,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   their underlying causes.
 - Production crates reject explicit panic, unwrap, expect, and unreachable calls through
   Clippy; tests can still use them.
+- Faster layout and drawing of large diagrams: edge track assignment orders a gap's routes in
+  linear time per relation, sequence lifelines no longer scan every activation per row, ASCII
+  canvas cells take half the memory, and long lines of quoted items, xychart categories, or
+  `;`-joined sequence statements are read in linear time. Output is unchanged.
 
 ### Fixed
 

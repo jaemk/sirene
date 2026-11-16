@@ -158,7 +158,10 @@ an error and is ignored (MGANTT-3). An ASCII drawing is cut off at 2^22 cells (A
 Tests: `crates/sirene-core/tests/limits.rs` draws a source at each limit and 2,000-statement
 chains, and checks the diagnostics; `skipped_blocks_keep_their_text` checks the trees. The
 `scale` bench in `crates/sirene-core/benches/scale.rs` times reading, scene building, and text
-drawing of large inputs at two sizes ten times apart.
+drawing of large inputs at two sizes ten times apart. The `stress` bench in
+`crates/sirene-core/benches/stress.rs` times every diagram kind, statements joined on one line,
+and dense graph shapes at two sizes four times apart, and flags phases that grow faster than
+linearly (ASCII drawing only past twice its output's growth); `--png` adds rasterizing.
 
 ## LANGS-9 Source text
 

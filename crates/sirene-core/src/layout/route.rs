@@ -1,6 +1,7 @@
 //! Track assignment for the cross-axis part of routes in a gap between ranks (LAYOUT-8).
 
-use std::collections::{BTreeSet, HashMap};
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 
 /// A route segment through a gap, entering at cross position `top` and leaving at `bottom`.
 #[derive(Debug, Clone, Copy)]
@@ -49,7 +50,11 @@ pub(super) fn tracks(jogs: &[Jog]) -> (Vec<Option<usize>>, usize) {
     }
     let order = topological(&after, &before);
     let mut track = vec![None; jogs.len()];
-    let mut rows: Vec<Vec<Jog>> = Vec::new();
+    // Each track's extent and its jogs. The extent rules out most tracks without a scan.
+    let mut rows: Vec<(i32, i32, Vec<Jog>)> = Vec::new();
+    let overlaps = |(lo, hi, row): &(i32, i32, Vec<Jog>), j: Jog| {
+        *lo <= j.hi() && j.lo() <= *hi && row.iter().any(|o| o.hi() >= j.lo() && j.hi() >= o.lo())
+    };
     let mut assigned = vec![None; m];
     for &a in &order {
         let j = jogs[moving[a]];
@@ -60,16 +65,16 @@ pub(super) fn tracks(jogs: &[Jog]) -> (Vec<Option<usize>>, usize) {
             .max()
             .unwrap_or(0);
         let mut t = min;
-        while rows
-            .get(t)
-            .is_some_and(|row| row.iter().any(|o| o.hi() >= j.lo() && j.hi() >= o.lo()))
-        {
+        while rows.get(t).is_some_and(|row| overlaps(row, j)) {
             t += 1;
         }
         if rows.len() <= t {
-            rows.resize(t + 1, Vec::new());
+            rows.resize(t + 1, (i32::MAX, i32::MIN, Vec::new()));
         }
-        rows[t].push(j);
+        let row = &mut rows[t];
+        row.0 = row.0.min(j.lo());
+        row.1 = row.1.max(j.hi());
+        row.2.push(j);
         assigned[a] = Some(t);
         track[moving[a]] = Some(t);
     }
@@ -137,14 +142,48 @@ fn preferred(jogs: &[Jog], moving: &[usize]) -> Vec<Vec<usize>> {
 fn topological(after: &[Vec<usize>], before: &[Vec<usize>]) -> Vec<usize> {
     let m = after.len();
     let mut waiting: Vec<usize> = before.iter().map(Vec::len).collect();
-    let mut queue: BTreeSet<(usize, usize)> = (0..m).map(|b| (waiting[b], b)).collect();
+    let mut done = vec![false; m];
+    // Nodes with no predecessors left, lowest index first.
+    let mut ready: BinaryHeap<Reverse<usize>> =
+        (0..m).filter(|&b| waiting[b] == 0).map(Reverse).collect();
+    // On a cycle, the remaining nodes by fewest predecessors left, built at the first cycle so
+    // acyclic relations never pay for it. Entries go stale as counts drop; a node's current
+    // entry is the one matching its count.
+    let mut cyclic: Option<BinaryHeap<Reverse<(usize, usize)>>> = None;
     let mut order = Vec::with_capacity(m);
-    while let Some((_, next)) = queue.pop_first() {
+    while order.len() < m {
+        let next = match ready.pop() {
+            Some(Reverse(b)) => b,
+            None => {
+                let heap = cyclic.get_or_insert_with(|| {
+                    (0..m)
+                        .filter(|&b| !done[b])
+                        .map(|b| Reverse((waiting[b], b)))
+                        .collect()
+                });
+                let mut next = None;
+                while let Some(Reverse((w, b))) = heap.pop() {
+                    if !done[b] && w == waiting[b] {
+                        next = Some(b);
+                        break;
+                    }
+                }
+                match next {
+                    Some(b) => b,
+                    None => break,
+                }
+            }
+        };
+        done[next] = true;
         order.push(next);
         for &b in &after[next] {
-            if queue.remove(&(waiting[b], b)) {
+            if !done[b] {
                 waiting[b] -= 1;
-                queue.insert((waiting[b], b));
+                if waiting[b] == 0 {
+                    ready.push(Reverse(b));
+                } else if let Some(heap) = &mut cyclic {
+                    heap.push(Reverse((waiting[b], b)));
+                }
             }
         }
     }
@@ -215,6 +254,53 @@ mod tests {
         // Jogs that must cross get no preference.
         let (t, _) = tracks(&[jog(4, 2), jog(0, 8)]);
         assert_eq!(t, [Some(0), Some(1)]);
+    }
+
+    /// The order matches taking the remaining node with the fewest remaining predecessors, then
+    /// the lowest index, on relations with and without cycles.
+    #[test]
+    fn topological_takes_fewest_waiting_then_lowest() {
+        let reference = |after: &[Vec<usize>], before: &[Vec<usize>]| {
+            let mut waiting: Vec<usize> = before.iter().map(Vec::len).collect();
+            let mut queue: std::collections::BTreeSet<(usize, usize)> =
+                (0..after.len()).map(|b| (waiting[b], b)).collect();
+            let mut order = Vec::new();
+            while let Some((_, next)) = queue.pop_first() {
+                order.push(next);
+                for &b in &after[next] {
+                    if queue.remove(&(waiting[b], b)) {
+                        waiting[b] -= 1;
+                        queue.insert((waiting[b], b));
+                    }
+                }
+            }
+            order
+        };
+        let mut seed = 11u64;
+        let mut next = |m: u64| {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((seed >> 33) % m) as usize
+        };
+        for _ in 0..500 {
+            let m = next(12) + 1;
+            let edges = next(3 * m as u64);
+            let mut after = vec![Vec::new(); m];
+            let mut before = vec![Vec::new(); m];
+            for _ in 0..edges {
+                let (a, b) = (next(m as u64), next(m as u64));
+                if a != b && !after[a].contains(&b) {
+                    after[a].push(b);
+                    before[b].push(a);
+                }
+            }
+            assert_eq!(
+                topological(&after, &before),
+                reference(&after, &before),
+                "{after:?}"
+            );
+        }
     }
 
     #[test]

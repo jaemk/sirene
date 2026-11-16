@@ -55,9 +55,12 @@ fn name_len(s: &str) -> usize {
 /// The length of text at the start of `s` up to one of `stops` or the end of the line, without
 /// trailing whitespace.
 fn text_len(s: &str, stops: &[char]) -> usize {
-    let line = &s[..scan::line_len(s)];
-    let end = line.find(stops).unwrap_or(line.len());
-    scan::trim_end_len(line, end)
+    // Up to the first stop or newline only, so a long list line is not scanned per item.
+    let end = s
+        .find(|c: char| c == '\n' || stops.contains(&c))
+        .unwrap_or(s.len());
+    // Trimming drops the `\r` of a `\r\n` too.
+    scan::trim_end_len(s, end)
 }
 
 /// The length of a number at the start of `s`: an optional sign, then digits with an optional

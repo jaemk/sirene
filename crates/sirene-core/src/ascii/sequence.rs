@@ -214,6 +214,23 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
             _ => None,
         })
         .collect();
+    // Rows in a delay, and each participant's bars, looked up per row below.
+    let rows = canvas.height().max(0) as usize;
+    let row = |y: i32| usize::try_from(y).ok().filter(|&y| y < rows);
+    let mut delayed = vec![false; rows];
+    for &(d0, d1) in &delays {
+        for y in d0.max(0)..=d1.min(rows as i32 - 1) {
+            delayed[y as usize] = true;
+        }
+    }
+    let mut bars_of = vec![Vec::new(); l.x.len()];
+    for b in &l.bars {
+        if let Some(v) = bars_of.get_mut(b.participant) {
+            v.push((c(b.y0), c(b.y1)));
+        }
+    }
+    // How many bars cover each row, as running differences.
+    let mut depth = vec![0i32; rows + 1];
     for (p, &x) in l.x.iter().enumerate() {
         if seq.participants[p].kind == ParticipantKind::Hidden {
             continue;
@@ -221,11 +238,28 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         let col = c(x);
         let y0 = c(l.head_y[p]) + header_h - 1;
         let y1 = c(l.life_end[p]);
+        depth.fill(0);
+        for &(b0, b1) in &bars_of[p] {
+            // A bar ending on the lifeline's last row leaves that row light.
+            let b1 = if b1 == y1 { b1 - 1 } else { b1 };
+            let (b0, b1) = (b0.max(0), b1.min(rows as i32 - 1));
+            if b0 <= b1 {
+                depth[b0 as usize] += 1;
+                depth[b1 as usize + 1] -= 1;
+            }
+        }
+        let mut covered = 0;
+        let mut at = 0usize;
         for y in y0..=y1 {
-            let active = l.bars.iter().any(|b| {
-                b.participant == p && c(b.y0) <= y && y <= c(b.y1) && !(y == c(b.y1) && y == y1)
-            });
-            let line = if delays.iter().any(|&(d0, d1)| d0 <= y && y <= d1) {
+            // Advance the running count to row `y`.
+            while let Some(r) = row(y)
+                && at <= r
+            {
+                covered += depth[at];
+                at += 1;
+            }
+            let active = row(y).is_some() && covered > 0;
+            let line = if row(y).is_some_and(|r| delayed[r]) {
                 Line::Dotted
             } else if active {
                 Line::Heavy

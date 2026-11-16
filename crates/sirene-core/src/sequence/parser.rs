@@ -101,18 +101,22 @@ pub(crate) fn find_arrow(s: &str) -> Option<(usize, usize)> {
 /// Length up to the end of the statement: a newline, or a `;` that is not the end of an entity
 /// such as `#59;` (Mermaid reads a bare `;` as a newline).
 fn line_len(s: &str) -> usize {
-    let line = &s[..scan::line_len(s)];
+    // Scans only to the statement's end, so `;`-joined statements are not each scanned to the
+    // end of the line.
     let mut from = 0;
-    while let Some(i) = line[from..].find(';') {
+    while let Some(i) = s[from..].find([';', '\n']) {
         let at = from + i;
-        let before = &line[..at];
+        if s.as_bytes()[at] == b'\n' {
+            return scan::line_len(&s[..=at]);
+        }
+        let before = &s[..at];
         let word = before.trim_end_matches(|c: char| c.is_alphanumeric() || c == '_');
         if !(word.ends_with('#') && word.len() < before.len()) {
             return at;
         }
         from = at + 1;
     }
-    line.len()
+    s.len()
 }
 
 impl Parser<'_> {
