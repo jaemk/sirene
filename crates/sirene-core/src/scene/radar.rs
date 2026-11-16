@@ -67,6 +67,7 @@ pub fn radar(radar: &Radar, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         .map(str::trim)
         .filter(|t| !t.is_empty());
     let title_size = fs * 1.2;
+    let text_width = |text: &str, size| metrics.styled_width(text, size, TextStyle::default());
     let n = radar.axes.len();
     let radius = radar.width.min(radar.height) / 2.0;
     let [m_top, m_right, m_bottom, m_left] = radar.margins;
@@ -85,12 +86,12 @@ pub fn radar(radar: &Radar, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         .enumerate()
         .map(|(i, a)| {
             let (dx, dy) = direction(i, n);
-            let w = metrics.width(&a.label, small);
+            let w = text_width(&a.label, small);
             (dx * (label_r + w / 2.0), dy * (label_r + lh / 2.0))
         })
         .collect();
     for ((x, y), a) in label_at.iter().zip(&radar.axes) {
-        half_w = half_w.max(x.abs() + metrics.width(&a.label, small) / 2.0);
+        half_w = half_w.max(x.abs() + text_width(&a.label, small) / 2.0);
         half_h = half_h.max(y.abs() + lh / 2.0);
     }
     let legend: Vec<(usize, &str)> = if radar.show_legend {
@@ -108,7 +109,44 @@ pub fn radar(radar: &Radar, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         -(radar.height / 2.0 + m_top) * 0.75,
     );
     for &(_, label) in &legend {
-        half_w = half_w.max(legend_at.x + SWATCH + 6.0 + metrics.width(label, fs));
+        half_w = half_w.max(legend_at.x + SWATCH + 6.0 + text_width(label, fs));
+    }
+    if !legend.is_empty() {
+        let last = legend_at.y + (legend.len() - 1) as f32 * LEGEND_ROW;
+        let extent = (SWATCH / 2.0).max(lh / 2.0);
+        half_h = half_h
+            .max(legend_at.y.abs() + extent)
+            .max(last.abs() + extent);
+    }
+    // A cubic remains inside the convex hull of its endpoints and controls. Include those
+    // controls, since large curve tension can move a curve well outside the axis circle.
+    let bounds = radar.bounds();
+    for c in &radar.curves {
+        let points: Vec<Pt> = c
+            .values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| {
+                let (x, y) = direction(i, n);
+                let distance = radius * crate::radar::share_with_bounds(value, bounds) as f32;
+                Pt::new(x * distance, y * distance)
+            })
+            .collect();
+        for segment in closed_curve(&points, radar.curve_tension) {
+            let mut include = |point: Pt| {
+                half_w = half_w.max(point.x.abs() + 1.0);
+                half_h = half_h.max(point.y.abs() + 1.0);
+            };
+            match segment {
+                Segment::Move(p) | Segment::Line(p) => include(p),
+                Segment::Cubic { c1, c2, to } => {
+                    include(c1);
+                    include(c2);
+                    include(to);
+                }
+                _ => {}
+            }
+        }
     }
     let top = if title.is_some() {
         m_top.max(lh + 16.0)
@@ -116,7 +154,7 @@ pub fn radar(radar: &Radar, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         m_top
     };
     let width = (m_left + 2.0 * half_w + m_right)
-        .max(title.map_or(0.0, |t| metrics.width(t, title_size)) + 32.0);
+        .max(title.map_or(0.0, |t| text_width(t, title_size)) + 32.0);
     let height = top + 2.0 * half_h + m_bottom;
     let center = Pt::new(width / 2.0, top + half_h);
     let at = |i: usize, r: f32| {
@@ -198,7 +236,12 @@ pub fn radar(radar: &Radar, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
             .values
             .iter()
             .enumerate()
-            .map(|(i, &v)| at(i, radius * radar.share(v) as f32))
+            .map(|(i, &v)| {
+                at(
+                    i,
+                    radius * crate::radar::share_with_bounds(v, bounds) as f32,
+                )
+            })
             .collect();
         let color = curve_color(theme, k);
         let stroke = Stroke {
@@ -229,7 +272,7 @@ pub fn radar(radar: &Radar, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
             Some(curve_color(theme, k)),
             None,
         );
-        let w = metrics.width(label, fs);
+        let w = text_width(label, fs);
         text(&mut p, label, Pt::new(x + SWATCH + 6.0 + w / 2.0, y), fs);
     }
 
@@ -244,6 +287,8 @@ pub fn radar(radar: &Radar, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::radar::{Axis, Curve};
+    use crate::scene::Approx;
 
     #[test]
     fn directions() {
@@ -261,5 +306,91 @@ mod tests {
         assert!(matches!(s[1], Segment::Cubic { to, c1, .. } if to == pts[1] && c1 == pts[0]));
         assert!(matches!(s[3], Segment::Cubic { to, .. } if to == pts[0]));
         assert!(closed_curve(&[], 0.2).is_empty());
+    }
+
+    #[test]
+    fn legend_and_tense_curves_fit_in_scene() {
+        let axes = ["a", "b", "c"]
+            .into_iter()
+            .map(|s| Axis {
+                id: s.into(),
+                label: s.into(),
+            })
+            .collect();
+        let curves = (0..40)
+            .map(|i| Curve {
+                id: format!("c{i}"),
+                label: format!("series {i}"),
+                values: vec![1.0, 0.0, 0.0],
+            })
+            .collect();
+        let radar = Radar {
+            axes,
+            curves,
+            width: 100.0,
+            height: 100.0,
+            curve_tension: 10.0,
+            ..Radar::default()
+        };
+        let scene = super::radar(&radar, &Approx, &Theme::LIGHT);
+        for element in &scene.elements {
+            match &element.primitive {
+                Primitive::Text { center, .. } => {
+                    assert!(center.x >= 0.0 && center.x <= scene.width);
+                    assert!(center.y >= 0.0 && center.y <= scene.height);
+                }
+                Primitive::Path { segments, .. } => {
+                    for segment in segments {
+                        if let Segment::Cubic { c1, c2, to } = segment {
+                            for point in [c1, c2, to] {
+                                assert!(point.x >= 0.0 && point.x <= scene.width);
+                                assert!(point.y >= 0.0 && point.y <= scene.height);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn text_bounds_use_styled_metrics() {
+        struct Styled;
+        impl TextMetrics for Styled {
+            fn width(&self, _: &str, _: f32) -> f32 {
+                1.0
+            }
+            fn styled_width(&self, text: &str, _: f32, _: TextStyle) -> f32 {
+                text.len() as f32 * 30.0
+            }
+        }
+        let chart = Radar {
+            title: Some("a deliberately long title".into()),
+            axes: vec![Axis {
+                id: "a".into(),
+                label: "long axis label".into(),
+            }],
+            curves: vec![Curve {
+                id: "c".into(),
+                label: "long legend label".into(),
+                values: vec![1.0],
+            }],
+            ..Radar::default()
+        };
+        let scene = super::radar(&chart, &Styled, &Theme::LIGHT);
+        for element in &scene.elements {
+            if let Primitive::Text {
+                text,
+                center,
+                size,
+                style,
+                ..
+            } = &element.primitive
+            {
+                let half = Styled.styled_width(text, *size, *style) / 2.0;
+                assert!(center.x - half >= 0.0, "{text}");
+                assert!(center.x + half <= scene.width, "{text}");
+            }
+        }
     }
 }

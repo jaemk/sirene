@@ -6,6 +6,10 @@ use crate::flowchart::text;
 use crate::lines::unquote_escaped;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
+use std::collections::HashMap;
+
+// Bound both the expanded values and labels repeated by the renderers and diagnostics.
+const EXPANSION_LIMIT: usize = 1_000_000;
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Radar, Vec<Diagnostic>) {
     let mut r = Radar::default();
@@ -18,8 +22,9 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Radar, Vec<Diagnostic>) {
             title = text::frontmatter_title(tok.text());
             for (k, v) in text::frontmatter_config(tok.text(), "radar") {
                 let n = v.parse::<f32>().ok().filter(|n| n.is_finite());
-                let positive = n.filter(|&n| n > 0.0);
-                let at_least_0 = n.filter(|&n| n >= 0.0);
+                let positive = n.filter(|&n| n > 0.0 && n <= 10_000.0);
+                let at_least_0 = n.filter(|&n| (0.0..=10_000.0).contains(&n));
+                let factor = n.filter(|&n| (0.0..=100.0).contains(&n));
                 let slot = match k.as_str() {
                     "width" => positive.map(|n| r.width = n),
                     "height" => positive.map(|n| r.height = n),
@@ -27,9 +32,9 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Radar, Vec<Diagnostic>) {
                     "marginRight" => at_least_0.map(|n| r.margins[1] = n),
                     "marginBottom" => at_least_0.map(|n| r.margins[2] = n),
                     "marginLeft" => at_least_0.map(|n| r.margins[3] = n),
-                    "axisScaleFactor" => at_least_0.map(|n| r.axis_scale_factor = n),
-                    "axisLabelFactor" => at_least_0.map(|n| r.axis_label_factor = n),
-                    "curveTension" => at_least_0.map(|n| r.curve_tension = n),
+                    "axisScaleFactor" => factor.map(|n| r.axis_scale_factor = n),
+                    "axisLabelFactor" => factor.map(|n| r.axis_label_factor = n),
+                    "curveTension" => factor.map(|n| r.curve_tension = n),
                     _ => Some(()),
                 };
                 if slot.is_none() {
@@ -43,20 +48,36 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Radar, Vec<Diagnostic>) {
     }
 
     // Axes first, so a curve may come before the axes it has values for.
+    let mut axis_index = HashMap::new();
     for stmt in root.children().filter(|s| s.kind() == AXIS_STMT) {
         for e in stmt.children().filter(|e| e.kind() == ENTRY) {
             let (id, label) = id_label(&e);
-            if r.axes.iter().any(|a| a.id == id) {
+            if axis_index.contains_key(&id) {
                 diagnostics.push(Diagnostic::new(
                     e.text_range(),
                     format!("axis `{id}` is already defined; ignoring this one"),
                 ));
                 continue;
             }
+            axis_index.insert(id.clone(), r.axes.len());
             r.axes.push(Axis { id, label });
         }
     }
 
+    // Resolve settings before curves so missing values use the final minimum.
+    for stmt in root.children().filter(|s| s.kind() == SETTING_STMT) {
+        if let Some(d) = option(&mut r, &stmt) {
+            diagnostics.push(d);
+        }
+    }
+    let axis_text = r.axes.iter().fold(0usize, |n, a| {
+        n.saturating_add(a.id.len())
+            .saturating_add(a.label.len())
+            .saturating_add(4)
+    });
+    let mut values_budget = EXPANSION_LIMIT;
+    let mut text_budget = EXPANSION_LIMIT;
+    let mut stopped = false;
     for stmt in root.children() {
         match stmt.kind() {
             TITLE_STMT => title = text_of(&stmt, TEXT).filter(|s| !s.is_empty()),
@@ -64,15 +85,29 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Radar, Vec<Diagnostic>) {
             ACC_DESCR_STMT => r.acc_descr = text_of(&stmt, ACC_TEXT),
             SERIES_STMT => {
                 for e in stmt.children().filter(|e| e.kind() == ENTRY) {
-                    if token(&e, R_BRACE).is_some() {
-                        let c = curve(&r, &e, &mut diagnostics);
+                    if !stopped && token(&e, R_BRACE).is_some() {
+                        let (id, label) = id_label(&e);
+                        let entries = e.children().filter(|v| v.kind() == VALUE).count();
+                        let text_cost = axis_text.saturating_add(
+                            id.len()
+                                .saturating_add(label.len())
+                                .saturating_add(4)
+                                .saturating_mul(r.axes.len().saturating_add(entries).max(1)),
+                        );
+                        let value_cost = r.axes.len().max(1);
+                        if value_cost > values_budget || text_cost > text_budget {
+                            diagnostics.push(Diagnostic::new(
+                                e.text_range(),
+                                "radar expansion limit exceeded; ignoring remaining curves",
+                            ));
+                            stopped = true;
+                            continue;
+                        }
+                        values_budget -= value_cost;
+                        text_budget -= text_cost;
+                        let c = curve(&r, &axis_index, &e, &mut diagnostics);
                         r.curves.push(c);
                     }
-                }
-            }
-            SETTING_STMT => {
-                if let Some(d) = option(&mut r, &stmt) {
-                    diagnostics.push(d);
                 }
             }
             _ => {}
@@ -114,13 +149,27 @@ fn id_label(e: &SyntaxNode) -> (String, String) {
 
 /// A curve's values in axis order: listed in order, or keyed by axis id. A missing value sits
 /// at the minimum.
-fn curve(r: &Radar, e: &SyntaxNode, diagnostics: &mut Vec<Diagnostic>) -> Curve {
+fn curve(
+    r: &Radar,
+    axis_index: &HashMap<String, usize>,
+    e: &SyntaxNode,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Curve {
     let (id, label) = id_label(e);
     let entries: Vec<(Option<SyntaxToken>, f64, SyntaxNode)> = e
         .children()
         .filter(|v| v.kind() == VALUE)
         .map(|v| {
-            let n = token(&v, NUMBER).map_or(0.0, |t| t.text().parse().unwrap_or(0.0));
+            let n = token(&v, NUMBER).map_or(r.min, |t| match t.text().parse::<f64>() {
+                Ok(n) if n.is_finite() => n,
+                _ => {
+                    diagnostics.push(Diagnostic::new(
+                        t.text_range(),
+                        "curve value must be finite; drawing it at the minimum",
+                    ));
+                    r.min
+                }
+            });
             (token(&v, IDENT), n, v)
         })
         .collect();
@@ -139,7 +188,7 @@ fn curve(r: &Radar, e: &SyntaxNode, diagnostics: &mut Vec<Diagnostic>) -> Curve 
                 continue;
             };
             let key = key.text();
-            match r.axes.iter().position(|a| a.id == key) {
+            match axis_index.get(key).copied() {
                 None => error(
                     node,
                     format!("`{key}` in `{id}` is not an axis; ignoring it"),
@@ -254,4 +303,55 @@ fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
 
 fn text_of(node: &SyntaxNode, kind: SyntaxKind) -> Option<String> {
     token(node, kind).map(|t| t.text().trim().to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::radar::parse;
+
+    #[test]
+    fn final_minimum_applies_to_all_missing_and_nonfinite_values() {
+        let huge = "9".repeat(400);
+        let src = format!(
+            "radar-beta\naxis a, b, c\ncurve listed{{1}}\ncurve keyed{{a: {huge}, b: 3}}\nmin 2\nmax 5\n"
+        );
+        let (chart, diagnostics) = parse(&src).lower();
+        assert_eq!(chart.curves[0].values, [1.0, 2.0, 2.0]);
+        assert_eq!(chart.curves[1].values, [2.0, 3.0, 2.0]);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("must be finite"))
+        );
+        assert!(diagnostics.iter().any(|d| d.message.contains("minimum")));
+    }
+
+    #[test]
+    fn expanded_labels_are_bounded_across_curves() {
+        let label = "x".repeat(10_000);
+        let mut src = format!("radar-beta\naxis a[\"{label}\"]\n");
+        for _ in 0..110 {
+            src.push_str("curve c{1}\n");
+        }
+        let (chart, diagnostics) = parse(&src).lower();
+        assert!(chart.curves.len() < 110);
+        assert_eq!(
+            diagnostics
+                .iter()
+                .filter(|d| d.message.contains("expansion limit"))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn extreme_geometry_config_is_ignored_with_warnings() {
+        let src = "---\nconfig:\n  radar:\n    width: 10001\n    marginTop: 10001\n    curveTension: 101\n    axisScaleFactor: 101\n---\nradar-beta\n";
+        let (chart, diagnostics) = parse(src).lower();
+        assert_eq!(chart.width, 600.0);
+        assert_eq!(chart.margins[0], 50.0);
+        assert_eq!(chart.curve_tension, 0.17);
+        assert_eq!(chart.axis_scale_factor, 1.0);
+        assert_eq!(diagnostics.len(), 4);
+    }
 }

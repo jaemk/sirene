@@ -90,7 +90,7 @@ impl Default for Radar {
 
 impl Radar {
     /// The values at the center and at the rim: `min`, and `max` or the largest value. The rim
-    /// is always above the center.
+    /// is above the center unless the minimum is already `f64::MAX`.
     pub fn bounds(&self) -> (f64, f64) {
         let lo = self.min;
         let hi = self.max.unwrap_or_else(|| {
@@ -99,14 +99,42 @@ impl Radar {
                 .flat_map(|c| c.values.iter().copied())
                 .fold(f64::NEG_INFINITY, f64::max)
         });
-        if hi > lo { (lo, hi) } else { (lo, lo + 1.0) }
+        if hi > lo {
+            (lo, hi)
+        } else {
+            let next = lo + 1.0;
+            let hi = if next > lo && next.is_finite() {
+                next
+            } else if lo < f64::MAX {
+                lo.next_up()
+            } else {
+                lo
+            };
+            (lo, hi)
+        }
     }
 
     /// How far out `v` sits, from 0 at the center to 1 at the rim; values outside the bounds
     /// sit on them.
     pub fn share(&self, v: f64) -> f64 {
-        let (lo, hi) = self.bounds();
-        ((v - lo) / (hi - lo)).clamp(0.0, 1.0)
+        share_with_bounds(v, self.bounds())
+    }
+}
+
+/// Normalize with bounds already computed once for a rendering pass.
+pub(crate) fn share_with_bounds(v: f64, (lo, hi): (f64, f64)) -> f64 {
+    if v <= lo || hi <= lo || v.is_nan() {
+        return 0.0;
+    }
+    if v >= hi {
+        return 1.0;
+    }
+    let range = hi - lo;
+    if range.is_finite() {
+        (v - lo) / range
+    } else {
+        // Halve before subtracting so opposite extreme finite bounds cannot overflow.
+        (v / 2.0 - lo / 2.0) / (hi / 2.0 - lo / 2.0)
     }
 }
 
@@ -179,5 +207,26 @@ mod tests {
         assert_eq!(Radar::default().bounds(), (0.0, 1.0));
         r.max = Some(1.0);
         assert_eq!(r.bounds(), (2.0, 3.0));
+    }
+
+    #[test]
+    fn extreme_bounds_and_shares_stay_finite() {
+        let mut r = Radar {
+            min: -1e308,
+            max: Some(1e308),
+            ..Radar::default()
+        };
+        assert_eq!(r.share(-1e308), 0.0);
+        assert_eq!(r.share(0.0), 0.5);
+        assert_eq!(r.share(1e308), 1.0);
+        r.min = 1e308;
+        r.max = None;
+        let (lo, hi) = r.bounds();
+        assert!(hi.is_finite() && hi > lo);
+        assert_eq!(r.share(lo), 0.0);
+        assert_eq!(r.share(hi), 1.0);
+        r.min = f64::MAX;
+        assert_eq!(r.bounds(), (f64::MAX, f64::MAX));
+        assert_eq!(r.share(f64::MAX), 0.0);
     }
 }

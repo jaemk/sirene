@@ -2,7 +2,7 @@
 //! minimum to the maximum.
 
 use super::{Charset, Options, width};
-use crate::radar::Radar;
+use crate::radar::{Radar, share_with_bounds};
 use crate::xychart::format_number;
 
 /// Cells across a bar.
@@ -36,6 +36,7 @@ fn pad(s: &str, w: i32) -> String {
 
 /// Renders `radar` as text (MRADAR-4).
 pub fn render(radar: &Radar, options: &Options) -> String {
+    let bounds = radar.bounds();
     let axis_w = radar
         .axes
         .iter()
@@ -58,7 +59,7 @@ pub fn render(radar: &Radar, options: &Options) -> String {
                     "{}  {}  {} {}",
                     pad(first, axis_w),
                     pad(&c.label, curve_w),
-                    bar(radar.share(v), options.charset),
+                    bar(share_with_bounds(v, bounds), options.charset),
                     format_number(v)
                 );
                 rows.push(row);
@@ -68,7 +69,7 @@ pub fn render(radar: &Radar, options: &Options) -> String {
         rows.extend(radar.axes.iter().map(|a| a.label.clone()));
     }
     if !radar.axes.is_empty() {
-        let (lo, hi) = radar.bounds();
+        let (lo, hi) = bounds;
         rows.push(String::new());
         rows.push(format!("{} to {}", format_number(lo), format_number(hi)));
     }
@@ -135,5 +136,34 @@ mod tests {
                 "x   a    {full} 4\n    bee  {none} 0\nyy  a    {half} 2\n    bee  {quarter} 1\n\n0 to 4\n"
             )
         );
+    }
+
+    #[test]
+    fn extreme_range_draws_midpoint_at_half_width() {
+        let r = Radar {
+            axes: vec![Axis {
+                id: "a".into(),
+                label: "a".into(),
+            }],
+            curves: vec![Curve {
+                id: "c".into(),
+                label: "c".into(),
+                values: vec![0.0],
+            }],
+            min: -1e308,
+            max: Some(1e308),
+            ..Radar::default()
+        };
+        let out = render(
+            &r,
+            &Options {
+                charset: Charset::Ascii,
+            },
+        );
+        assert!(out.contains(&format!(
+            "{}{} 0",
+            "#".repeat(FIELD / 2),
+            " ".repeat(FIELD / 2)
+        )));
     }
 }

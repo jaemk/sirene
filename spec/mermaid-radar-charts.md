@@ -32,15 +32,24 @@ curves (`Curve`: id, label, and one value per axis in axis order), `show_legend`
 `polygon`), `ticks` (5 unless set, 1 to 100), and from `config.radar` the `width` and `height`
 (600), the margins (50 each), `axis_scale_factor` (1), `axis_label_factor` (1.05), and
 `curve_tension` (0.17). A bad config value is a warning and ignored.
+Widths and heights must be positive and at most 10,000; margins must be between 0 and 10,000.
+Scale factors and curve tension must be between 0 and 100. Values outside these bounds are
+ignored with a warning.
 
-All axes are read before any curve, so a curve may come first. A repeated axis id is an error and
+All axes and settings are read before any curve, so a curve may come first and missing values
+use the final minimum. Nonfinite curve values are errors and use the minimum. A repeated axis id is an error and
 ignored. Listed values map to the axes in order; fewer values than axes is an error and the rest
 sit at `min`, and more is an error and the extras are ignored. Keyed values map by axis id; a key
 that is not an axis, a repeated key (the first wins), a value without a key among keyed ones, and
 an axis with no value (sitting at `min`) are errors. A bad option value is an error and ignored,
 as is a `max` at or under `min`. `Radar::bounds` gives the center and rim values (`min`, and
-`max` or the largest value, the rim always above the center), and `Radar::share` a value's place
+`max` or the largest value, the rim above the center except when the minimum is the largest
+finite `f64`, where both bounds are equal), and `Radar::share` a value's place
 between them, clamped. Tests: `model`, `errors`, and the module's unit tests.
+
+To bound model expansion and repeated rendering and diagnostic text, at most 1,000,000 curve
+values and 1,000,000 bytes of estimated repeated axis and curve text are accepted. When either
+budget is exhausted, an error identifies the first skipped curve and remaining curves are ignored.
 
 ## MRADAR-3 Drawing
 
