@@ -94,7 +94,10 @@ fn edits_draw(name: &str, src: &str, lang: Option<Lang>) {
         let wide = format!("é{}", lines[i].replace('\n', "日\n"));
         let mut edited = lines.clone();
         edited[i] = &wide;
-        draw(&edited.concat(), &format!("with non-ASCII around line {}", i + 1));
+        draw(
+            &edited.concat(),
+            &format!("with non-ASCII around line {}", i + 1),
+        );
     }
 }
 
