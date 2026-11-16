@@ -30,8 +30,8 @@ Save (secondary-s) writes the text to the document's file, replacing it through 
 in the same directory, and the document is no longer edited. The text is synced to disk before
 the rename, the file keeps its permissions, owner, and group, and a symlinked file stays a symlink
 (its target is written). An unresolvable symlink is not replaced. Each save creates its own
-temporary file without disturbing existing files. When the owner cannot be kept (another user's file), the file is overwritten in place
-instead. A read-only file is not saved: `cannot write PATH: the file is read-only`. Save As (secondary-shift-s), and
+temporary file without disturbing existing files. When the owner cannot be kept (another user's file), or the directory does not allow a new file,
+the file is overwritten in place instead. A read-only file is not saved: `cannot write PATH: the file is read-only`. Save As (secondary-shift-s), and
 Save on an Untitled document, ask for a path first (starting in the directory an export would,
 GUISHE-9, with `diagram.mmd` for Untitled); the window then shows that file. A failed
 write leaves the document edited and shows the error in the status bar.
@@ -284,7 +284,8 @@ the whole file, and disk changes and Reload work on the whole file, keeping the 
   and the drawing's undo history, and fits the drawing.
 - A file with no diagram blocks shows an empty source and says so in the status bar; the first
   edit adds a block at the end of the file (MARKDO-4), named `dot`, `plantuml`, or `mermaid` for
-  the language the edit's text is detected as.
+  the language its code is detected as. The name is detected again on each later edit, so it
+  follows the code as it is typed.
 - Save As to a diagram file (`.mmd`, `.puml`, `.dot`, ...) writes the shown block alone and
   edits that file from then on, after asking when the Markdown file has unsaved edits; Save As
   of a diagram to a Markdown file writes it in a block named for the diagram's language (its

@@ -27,6 +27,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Failed terminal writes, directory traversal, confirmation input, and file dialogs are
   reported as errors. Settings persistence failures remain observable in the editor.
 - Parsers reject source beyond their representable byte limit with a diagnostic.
+- Editor: the block added to a Markdown file with none is named for the language of the code
+  typed so far (`dot`, `plantuml`, `mermaid`), not the first keystroke's.
+- Desktop app: a writable file in a directory that does not allow a new file is saved in place
+  instead of failing.
 
 ## [0.4.0] - 2026-11-14
 

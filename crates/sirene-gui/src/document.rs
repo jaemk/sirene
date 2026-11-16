@@ -72,6 +72,9 @@ pub struct Markdown {
     pub blocks: Vec<Block>,
     /// The block shown, an index into `blocks`.
     pub block: usize,
+    /// The text before the block the editor appended to a file with none. That block's info
+    /// string is detected from its code, so it follows the code as it is typed.
+    pub appended: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -117,6 +120,7 @@ impl Document {
                 blocks: mermaid_blocks(&source),
                 text: source.clone(),
                 block: 0,
+                appended: None,
             });
         let (code, lang) = match &markdown {
             Some(md) => md
@@ -299,16 +303,23 @@ impl Document {
         if source == self.source {
             return false;
         }
-        (self.chart, self.other, self.problems, self.theme) = parse(&source, self.lang());
         if let Some(md) = &mut self.markdown {
-            // The code goes back in its block; a file with no block gets one at the end.
-            md.text = match md.blocks.get(md.block) {
-                Some(block) => block.replace_code(&md.text, &source),
-                None => append_block(&md.text, fence_info(&source, None), &source),
+            // The code goes back in its block; a file with no block gets one at the end, whose
+            // language is detected again on each edit.
+            md.text = match (&md.appended, md.blocks.get(md.block)) {
+                (Some(before), _) => append_block(before, fence_info(&source, None), &source),
+                (None, Some(block)) => block.replace_code(&md.text, &source),
+                (None, None) => {
+                    let text = append_block(&md.text, fence_info(&source, None), &source);
+                    md.appended = Some(std::mem::take(&mut md.text));
+                    text
+                }
             };
             md.blocks = mermaid_blocks(&md.text);
             md.block = md.block.min(md.blocks.len().saturating_sub(1));
         }
+        // Parsed after the block is placed, so a changed info string changes the language.
+        (self.chart, self.other, self.problems, self.theme) = parse(&source, self.lang());
         self.source = source;
         true
     }
@@ -493,6 +504,7 @@ impl Document {
                     blocks: mermaid_blocks(&text),
                     text,
                     block: 0,
+                    appended: None,
                 })
             }
             (markdown, _) => markdown.clone(),
@@ -695,7 +707,18 @@ fn write_atomic_with(
         // Match ordinary creation, including the caller's umask.
         builder.permissions(std::fs::Permissions::from_mode(0o666));
     }
-    let mut file = builder.tempfile_in(parent)?;
+    let mut file = match builder.tempfile_in(parent) {
+        Ok(file) => file,
+        // A writable file in a directory that is not: write the file itself.
+        Err(e) if meta.is_some() && e.kind() == std::io::ErrorKind::PermissionDenied => {
+            log::debug!(
+                "cannot create a file beside {}; writing in place",
+                path.display()
+            );
+            return write_in_place(&path, text);
+        }
+        Err(e) => return Err(e),
+    };
     if let Some(meta) = &meta {
         file.as_file().set_permissions(meta.permissions())?;
         if keep_owner(file.as_file(), meta).is_err() {
@@ -1109,6 +1132,58 @@ mod tests {
         // The in-place write's own failure is reported.
         let gone = dir.path().join("gone").join("a.mmd");
         assert!(write_in_place(&gone, b"x").is_err());
+    }
+
+    /// A writable file in a directory that is not is saved in place.
+    #[cfg(unix)]
+    #[test]
+    fn saves_in_place_in_a_read_only_directory() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("shared");
+        std::fs::create_dir(&sub).unwrap();
+        let path = sub.join("a.mmd");
+        std::fs::write(&path, "flowchart LR\nA\n").unwrap();
+        std::fs::set_permissions(&sub, std::fs::Permissions::from_mode(0o555)).unwrap();
+        // Root may create files anywhere, so the directory would not refuse.
+        let refused = tempfile::tempfile_in(&sub).is_err();
+        let mut d = Document::open(&path);
+        d.set_source("flowchart LR\nA --> B\n".into());
+        let saved = d.save();
+        std::fs::set_permissions(&sub, std::fs::Permissions::from_mode(0o755)).unwrap();
+        saved.unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "flowchart LR\nA --> B\n"
+        );
+        if refused {
+            assert_eq!(std::fs::read_dir(&sub).unwrap().count(), 1);
+        }
+    }
+
+    /// The block added to a Markdown file with none takes its language from the code typed so
+    /// far, not from the first keystroke.
+    #[test]
+    fn appended_block_follows_the_typed_language() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("notes.md");
+        std::fs::write(&path, "# Notes\n").unwrap();
+        let mut d = Document::open(&path);
+        let typed = "digraph { a -> b }\n";
+        for end in 1..=typed.len() {
+            d.set_source(typed[..end].to_owned());
+        }
+        assert_eq!(d.lang(), Some(Lang::Dot));
+        assert!(d.problems.is_empty(), "{:?}", d.problems);
+        let md = d.markdown.as_ref().unwrap();
+        assert_eq!(md.blocks.len(), 1);
+        assert!(md.text.starts_with("# Notes\n"), "{}", md.text);
+        assert!(
+            md.text.contains("```dot\ndigraph { a -> b }\n```"),
+            "{}",
+            md.text
+        );
     }
 
     #[test]
