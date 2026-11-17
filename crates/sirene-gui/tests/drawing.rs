@@ -409,6 +409,77 @@ fn subgraphs_and_missing_items(cx: &mut TestAppContext) {
 
 /// ERRORH-1: scene owners from non-graph diagrams never index the flowchart model.
 #[gpui::test]
+fn sequence_diagrams(cx: &mut TestAppContext) {
+    let src = "sequenceDiagram\n    participant A as Alice\n    A->>B: hi\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Clicking selects participants and messages, and their source (WYSIWY-21).
+    let a = center(&viewer, cx, &node("A"));
+    click(cx, a, Modifiers::none());
+    assert_eq!(selection(&viewer, cx), [node("A")]);
+    assert_eq!(selected_source(&viewer, cx), "A");
+    let m = center(&viewer, cx, &Item::Edge(0));
+    click(cx, m, Modifiers::none());
+    assert_eq!(selection(&viewer, cx), [Item::Edge(0)]);
+    assert_eq!(selected_source(&viewer, cx), "A->>B: hi");
+
+    // Renaming a message and a participant.
+    double_click(cx, m);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("hi"));
+    cx.simulate_input("hello; there");
+    keys(cx, "enter");
+    let b = center(&viewer, cx, &node("B"));
+    double_click(cx, b);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("B"));
+    cx.simulate_input("Bob");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "sequenceDiagram\n    participant A as Alice\n    participant B as Bob\n    A->>B: hello#59; there\n"
+    );
+
+    // Dragging between participants adds a message, with its text open.
+    let (a, b) = (
+        center(&viewer, cx, &node("A")),
+        center(&viewer, cx, &node("B")),
+    );
+    drag(cx, b, a);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(1)]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some(""));
+    cx.simulate_input("back");
+    keys(cx, "enter");
+    assert!(source(&viewer, cx).ends_with("    A->>B: hello#59; there\n    B->>A: back\n"));
+
+    // Adding a participant from the selected one adds a message to it.
+    let a = center(&viewer, cx, &node("A"));
+    click(cx, a, Modifiers::none());
+    cx.dispatch_action(AddNode);
+    cx.run_until_parked();
+    assert_eq!(selection(&viewer, cx), [node("P1")]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("New node"));
+    cx.simulate_input("Carol");
+    keys(cx, "enter");
+    assert!(
+        source(&viewer, cx).ends_with("    participant P1 as Carol\n    A->>P1:\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+
+    // Deleting a participant takes its messages; undo brings them back.
+    let before = source(&viewer, cx);
+    let b = center(&viewer, cx, &node("B"));
+    click(cx, b, Modifiers::none());
+    cx.dispatch_action(Delete);
+    cx.run_until_parked();
+    assert_eq!(
+        source(&viewer, cx),
+        "sequenceDiagram\n    participant A as Alice\n    participant P1 as Carol\n    A->>P1:\n"
+    );
+    assert!(selection(&viewer, cx).is_empty());
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), before);
+}
+
+#[gpui::test]
 fn read_only_scene_nodes_ignore_graph_selection(cx: &mut TestAppContext) {
     use sirene_core::scene::{Owner, Pt};
     for source in [

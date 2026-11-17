@@ -69,7 +69,7 @@ pub(crate) fn build(
     let Some(viewer) = viewer.upgrade() else {
         return menu;
     };
-    let (nodes, edges, chart, src, subgraph, focus, read_only) = {
+    let (nodes, edges, chart, src, subgraph, focus, read_only, sequence) = {
         let v = viewer.read(cx);
         (
             v.selected_nodes(),
@@ -79,9 +79,29 @@ pub(crate) fn build(
             v.menu_subgraph.clone(),
             v.drawing_focus.clone(),
             v.doc.read_only(),
+            v.doc.sequence().is_some(),
         )
     };
     let mut menu = menu.action_context(focus);
+    // A sequence diagram: participants and messages (WYSIWY-21).
+    if sequence {
+        let label = if nodes.len() == 1 && edges.is_empty() {
+            "Add Participant With Message"
+        } else {
+            "Add Participant"
+        };
+        menu = menu.menu(label, Box::new(AddNode));
+        if nodes.len() + edges.len() == 1 {
+            menu = menu.menu("Rename", Box::new(Rename));
+        }
+        if !nodes.is_empty() || !edges.is_empty() {
+            menu = menu.menu("Delete", Box::new(Delete));
+        }
+        return menu
+            .separator()
+            .menu("Select All", Box::new(SelectAll))
+            .menu("Fit Window", Box::new(FitWindow));
+    }
     // A diagram type without an edit module: only what does not edit (LANGS-5).
     if let Some(why) = read_only {
         return menu

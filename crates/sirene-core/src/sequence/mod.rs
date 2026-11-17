@@ -1,5 +1,6 @@
 //! Mermaid sequence diagrams (MSEQ-*): participants exchanging messages over time.
 
+pub mod edit;
 pub(crate) mod layout;
 mod lower;
 mod parser;

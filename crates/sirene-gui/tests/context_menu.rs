@@ -50,6 +50,25 @@ fn first_item(cx: &mut VisualTestContext, at: Point<Pixels>) {
 }
 
 #[gpui::test]
+fn sequence_diagram_menu(cx: &mut TestAppContext) {
+    let src = "sequenceDiagram\n    A->>B: hi\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Flowchart edits stay refused (WYSIWY-21).
+    select(&viewer, cx, vec![node("A")]);
+    cx.dispatch_action(SetShape {
+        shape: Shape::Diamond,
+    });
+    assert_eq!(source(&viewer, cx), src);
+    // The first item adds a participant with a message from the one right-clicked.
+    let b = center(&viewer, cx, &node("B"));
+    first_item(cx, b);
+    assert_eq!(
+        source(&viewer, cx),
+        "sequenceDiagram\n    A->>B: hi\n    participant P1 as New node\n    B->>P1:\n"
+    );
+}
+
+#[gpui::test]
 fn shapes_and_links_for_the_selected_nodes(cx: &mut TestAppContext) {
     let (viewer, cx) = open_src(cx, SRC);
     select(&viewer, cx, vec![node("A"), node("C")]);

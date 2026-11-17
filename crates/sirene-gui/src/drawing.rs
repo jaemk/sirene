@@ -78,7 +78,8 @@ impl Viewer {
 
     /// The item drawn at window position `p`.
     pub fn item_at(&mut self, p: Point<Pixels>, window: &Window) -> Option<Item> {
-        if self.doc.other.is_some() {
+        let sequence = self.doc.sequence().is_some();
+        if self.doc.other.is_some() && !sequence {
             return None;
         }
         let at = self.placement(window);
@@ -86,7 +87,11 @@ impl Viewer {
             f32::from(p.x - at.origin.x) / at.zoom,
             f32::from(p.y - at.origin.y) / at.zoom,
         );
-        match self.scene(window).hit(q, SLOP / at.zoom)? {
+        let owner = self.scene(window).hit(q, SLOP / at.zoom)?;
+        if sequence {
+            return self.sequence_item(owner);
+        }
+        match owner {
             Owner::Node(i) => self
                 .doc
                 .chart
@@ -100,6 +105,9 @@ impl Viewer {
 
     /// The scene owner of `item`, while it exists.
     pub fn owner(&self, item: &Item) -> Option<Owner> {
+        if self.doc.sequence().is_some() {
+            return self.sequence_owner(item);
+        }
         let chart = &self.doc.chart;
         match item {
             Item::Node(id) => chart
@@ -114,6 +122,12 @@ impl Viewer {
     /// The scene owners of those `items` that exist, in order, looking nodes up by id once
     /// rather than per item.
     pub fn owners(&self, items: &[Item]) -> Vec<Owner> {
+        if self.doc.sequence().is_some() {
+            return items
+                .iter()
+                .filter_map(|i| self.sequence_owner(i))
+                .collect();
+        }
         let chart = &self.doc.chart;
         let mut ids: Option<std::collections::HashMap<&str, usize>> = None;
         items
@@ -158,12 +172,16 @@ impl Viewer {
         self.selection = items;
         if let [item] = self.selection.as_slice() {
             let chart = &self.doc.chart;
-            let range = match item {
-                Item::Node(id) => chart.node(id).and_then(|n| n.mentions.first().copied()),
-                Item::Edge(i) => chart.edges.get(*i).map(|e| e.range),
+            let range = if self.doc.sequence().is_some() {
+                self.sequence_range(item)
+            } else {
+                match item {
+                    Item::Node(id) => chart.node(id).and_then(|n| n.mentions.first().copied()),
+                    Item::Edge(i) => chart.edges.get(*i).map(|e| e.range),
+                }
+                .map(|r| usize::from(r.start())..usize::from(r.end()))
             };
-            if let Some(r) = range {
-                let range = usize::from(r.start())..usize::from(r.end());
+            if let Some(range) = range {
                 self.source
                     .update(cx, |s, cx| s.set_selected_range(range, cx));
             }
@@ -173,13 +191,19 @@ impl Viewer {
 
     /// Drops selected items that no longer exist, and a label field whose item is gone.
     pub(crate) fn prune(&mut self) {
-        let ids: std::collections::HashSet<&str> =
-            self.doc.chart.nodes.iter().map(|n| n.id.as_str()).collect();
-        let edges = self.doc.chart.edges.len();
-        self.selection.retain(|i| match i {
-            Item::Node(id) => ids.contains(id.as_str()),
-            Item::Edge(e) => *e < edges,
-        });
+        if self.doc.sequence().is_some() {
+            let mut selection = std::mem::take(&mut self.selection);
+            selection.retain(|i| self.sequence_owner(i).is_some());
+            self.selection = selection;
+        } else {
+            let ids: std::collections::HashSet<&str> =
+                self.doc.chart.nodes.iter().map(|n| n.id.as_str()).collect();
+            let edges = self.doc.chart.edges.len();
+            self.selection.retain(|i| match i {
+                Item::Node(id) => ids.contains(id.as_str()),
+                Item::Edge(e) => *e < edges,
+            });
+        }
         if self
             .label
             .as_ref()
@@ -195,6 +219,11 @@ impl Viewer {
             self.refused("edit the drawing", Some(why), cx);
             return;
         }
+        self.record(edit, window, cx);
+    }
+
+    /// Applies `edit` as one undoable drawing change, whatever the diagram's type.
+    pub(crate) fn record(&mut self, edit: TextEdit, window: &mut Window, cx: &mut Context<Self>) {
         let before = self.doc.source.clone();
         let after = edit.apply(&before);
         self.history.push((before, after));
@@ -267,6 +296,7 @@ impl Viewer {
                 }
                 // Double-clicking empty space adds a node there, in the subgraph under the
                 // pointer if any (WYSIWY-15).
+                None if self.doc.sequence().is_some() => self.add_participant(None, window, cx),
                 None => {
                     let scope = self.subgraph_at(e.position, window);
                     self.add_linked(Shape::Rect, Link::None, scope, window, cx);
@@ -290,7 +320,9 @@ impl Viewer {
                 }
                 self.drag = match item {
                     // A read-only drawing pans from anywhere.
-                    _ if self.doc.read_only().is_some() => Some(Drag::Pan { last: e.position }),
+                    _ if self.doc.read_only().is_some() && self.doc.sequence().is_none() => {
+                        Some(Drag::Pan { last: e.position })
+                    }
                     Item::Node(from) => Some(Drag::Connect {
                         from,
                         start: e.position,
@@ -341,7 +373,16 @@ impl Viewer {
         };
         let moved = e.position - start;
         let far = f32::from(moved.x).hypot(f32::from(moved.y)) > DRAG;
-        if far {
+        // On a sequence diagram: a message to the participant released on, or to a new one.
+        if far && self.doc.sequence().is_some() {
+            match self.item_at(e.position, window) {
+                Some(Item::Node(to)) => self.add_message(&from, &to, window, cx),
+                None if self.viewport.get().contains(&e.position) => {
+                    self.add_participant(Some(from), window, cx);
+                }
+                _ => {}
+            }
+        } else if far {
             match self.item_at(e.position, window) {
                 Some(Item::Node(to)) => {
                     let edit = edit::add_edge(&self.doc.source, &from, &to);
@@ -385,6 +426,10 @@ impl Viewer {
 
     pub(crate) fn delete(&mut self, _: &Delete, window: &mut Window, cx: &mut Context<Self>) {
         if self.label.is_some() {
+            return;
+        }
+        if self.doc.sequence().is_some() {
+            self.sequence_delete(window, cx);
             return;
         }
         if let Some(why) = self.doc.read_only() {
@@ -442,6 +487,16 @@ impl Viewer {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // Shapes, links into a new node, and subgraphs do not apply: a participant, with a
+        // message from the linked one.
+        if self.doc.sequence().is_some() {
+            let from = match link {
+                Link::From(from) => Some(from),
+                Link::None | Link::To(_) => None,
+            };
+            self.add_participant(from, window, cx);
+            return;
+        }
         if let Some(why) = self.doc.read_only() {
             self.refused("add a node", Some(why), cx);
             return;
@@ -857,17 +912,21 @@ impl Viewer {
 
     /// Opens the label field over `item` (WYSIWY-10).
     pub fn edit_label(&mut self, item: Item, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(why) = self.doc.read_only() {
-            self.refused("rename", Some(why), cx);
-            return;
-        }
-        let chart = &self.doc.chart;
-        let text = match &item {
-            Item::Node(id) => chart.node(id).map(|n| n.label.text.clone()),
-            Item::Edge(i) => chart
-                .edges
-                .get(*i)
-                .map(|e| e.label.as_ref().map(|l| l.text.clone()).unwrap_or_default()),
+        let text = if self.doc.sequence().is_some() {
+            self.sequence_label(&item)
+        } else {
+            if let Some(why) = self.doc.read_only() {
+                self.refused("rename", Some(why), cx);
+                return;
+            }
+            let chart = &self.doc.chart;
+            match &item {
+                Item::Node(id) => chart.node(id).map(|n| n.label.text.clone()),
+                Item::Edge(i) => chart
+                    .edges
+                    .get(*i)
+                    .map(|e| e.label.as_ref().map(|l| l.text.clone()).unwrap_or_default()),
+            }
         };
         let Some(text) = text else {
             return;
@@ -908,12 +967,18 @@ impl Viewer {
         };
         let text = label.input.read(cx).value().replace("<br>", "\n");
         let src = &self.doc.source;
-        let edit = match &label.item {
-            Item::Node(id) => edit::set_node_label(src, id, &text),
-            Item::Edge(i) => edit::set_edge_label(src, *i, &text),
-        };
-        if let Some(edit) = edit {
-            self.apply(edit, window, cx);
+        if self.doc.sequence().is_some() {
+            if let Some(edit) = self.sequence_rename(&label.item, &text) {
+                self.record(edit, window, cx);
+            }
+        } else {
+            let edit = match &label.item {
+                Item::Node(id) => edit::set_node_label(src, id, &text),
+                Item::Edge(i) => edit::set_edge_label(src, *i, &text),
+            };
+            if let Some(edit) = edit {
+                self.apply(edit, window, cx);
+            }
         }
         window.focus(&self.drawing_focus, cx);
         cx.notify();

@@ -56,6 +56,9 @@ struct Painter<'a, M> {
     metrics: &'a M,
     theme: &'a Theme,
     elements: Vec<Element>,
+    /// Who what is drawn next belongs to: participant `i`'s header and lifeline are
+    /// `Owner::Node(i)`, the `n`th message `Owner::Edge(n)` (DISPLA-1).
+    owner: Owner,
 }
 
 fn solid(width: f32, color: Color) -> Stroke {
@@ -108,7 +111,7 @@ impl<M: TextMetrics> Painter<'_, M> {
 
     fn path(&mut self, segments: Vec<Segment>, fill: Option<Color>, stroke: Option<Stroke>) {
         self.elements.push(Element {
-            owner: Owner::Diagram,
+            owner: self.owner,
             primitive: Primitive::Path {
                 segments,
                 fill,
@@ -122,7 +125,7 @@ impl<M: TextMetrics> Painter<'_, M> {
             return;
         }
         self.elements.push(Element {
-            owner: Owner::Diagram,
+            owner: self.owner,
             primitive: Primitive::Text {
                 text: text.to_owned(),
                 center,
@@ -398,6 +401,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         metrics,
         theme,
         elements: Vec::new(),
+        owner: Owner::Diagram,
     };
     let lh = theme.line_height;
     let title = seq
@@ -521,6 +525,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         if seq.participants[i].kind == ParticipantKind::Hidden {
             continue;
         }
+        p.owner = Owner::Node(i);
         let mut y0 = l.head_y[i] + header_h;
         let y1 = l.life_end[i];
         for &(d0, d1) in &delays {
@@ -546,6 +551,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
             Some(solid(1.0, lifeline)),
         );
     }
+    p.owner = Owner::Diagram;
     let mut bars = l.bars.clone();
     bars.sort_by(|a, b| a.x.total_cmp(&b.x));
     for bar in &bars {
@@ -608,7 +614,13 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     }
 
     // Messages and notes.
+    let mut message = 0;
     for (k, place) in l.events.iter().enumerate() {
+        p.owner = Owner::Diagram;
+        if let Event::Message(_) = &seq.events[k] {
+            p.owner = Owner::Edge(message);
+            message += 1;
+        }
         match (*place, &seq.events[k]) {
             (Placed::Message { x0, x1, y, label_y }, Event::Message(m)) => {
                 let stroke = match m.arrow.line {
@@ -697,6 +709,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
 
     // Headers, and crosses where lifelines end early.
     for (i, part) in seq.participants.iter().enumerate() {
+        p.owner = Owner::Node(i);
         let (w, h) = headers[i];
         let x = l.x[i] - w / 2.0;
         let top = BoxF {
@@ -728,6 +741,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
             p.header(part.kind, &part.label, bottom);
         }
     }
+    p.owner = Owner::Diagram;
 
     let width = l
         .width

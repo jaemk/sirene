@@ -76,7 +76,16 @@ fn snapshots() {
             for theme in [Theme::LIGHT, Theme::DARK] {
                 let s = lowered.diagram.scene(&Approx, &theme).unwrap();
                 assert!(!s.elements.is_empty(), "{name}");
-                assert!(s.elements.iter().all(|e| e.owner == Owner::Diagram));
+                // Participants are owned as nodes and messages as edges (WYSIWY-21).
+                let Diagram::Sequence(seq) = &lowered.diagram else {
+                    unreachable!()
+                };
+                assert!(s.elements.iter().all(|e| match e.owner {
+                    Owner::Node(i) => i < seq.participants.len(),
+                    Owner::Edge(n) => n < seq.messages().count(),
+                    Owner::Diagram => true,
+                    Owner::Cluster(_) => false,
+                }));
                 assert!(s.width > 0.0 && s.height > 0.0);
             }
         }

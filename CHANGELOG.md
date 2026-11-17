@@ -19,6 +19,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `sirene ascii --width N` exits 1 when a drawing is wider than N columns, still printing it.
   `ascii::columns` measures a drawing's width.
 - CI checks `sirene-core`'s API against its latest release with `cargo semver-checks`.
+- The editor edits Mermaid sequence diagrams on the drawing: select, rename, add, and delete
+  participants and messages, with undo. `sequence::edit` holds the source edits, and the scene
+  owns participants as nodes and messages as edges.
 
 ### Changed
 

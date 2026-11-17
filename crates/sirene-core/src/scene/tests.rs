@@ -46,6 +46,36 @@ fn distance_to_outline(p: Pt, polygon: &[Pt]) -> f32 {
 }
 
 #[test]
+fn sequence_owners() {
+    let seq = crate::sequence::parse(
+        "sequenceDiagram\nparticipant A as Alice\nNote over A: n\nA->>B: one\nB-->>A: two\n",
+    )
+    .lower()
+    .0;
+    let s = sequence(&seq, &Approx, &Theme::LIGHT);
+    let label = |owner| {
+        owned(&s, owner)
+            .into_iter()
+            .filter_map(|p| match p {
+                Primitive::Text { text, .. } => Some(text.as_str()),
+                Primitive::Path { .. } => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    // Each header is drawn twice, at the top and the bottom.
+    assert_eq!(label(Owner::Node(0)), ["Alice", "Alice"]);
+    assert_eq!(label(Owner::Node(1)), ["B", "B"]);
+    assert_eq!(label(Owner::Edge(0)), ["one"]);
+    assert_eq!(label(Owner::Edge(1)), ["two"]);
+    assert!(label(Owner::Edge(2)).is_empty());
+    // The note is the diagram's.
+    assert_eq!(label(Owner::Diagram), ["n"]);
+    let (lo, hi) = s.bounds(Owner::Edge(0)).unwrap();
+    let mid = Pt::new((lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0);
+    assert_eq!(s.hit(mid, 4.0), Some(Owner::Edge(0)));
+}
+
+#[test]
 fn approx_metrics() {
     assert_eq!(Approx.width("abc", 10.0), 18.0);
     assert_eq!(Approx.width("日本", 10.0), 24.0);

@@ -7,8 +7,13 @@ use sirene_core::diagram::{self, Diagram, Kind, Lang};
 use sirene_core::flowchart::Flowchart;
 use sirene_core::markdown::{Block, append_block, is_markdown, mermaid_blocks};
 use sirene_core::scene::{Scene, TextMetrics, Theme};
+use sirene_core::sequence::Sequence;
 use sirene_core::theme::ThemeConfig;
 use sirene_core::{Error, Result, Severity};
+
+/// Why a sequence diagram refuses the other drawing edits (WYSIWY-21).
+pub const SEQUENCE_EDITS: &str =
+    "sequence diagrams take only adding, renaming, and deleting participants and messages";
 
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
@@ -204,7 +209,8 @@ impl Document {
     pub fn read_only(&self) -> Option<&'static str> {
         match Kind::of_lang(&self.source, self.lang()) {
             Kind::Flowchart => None,
-            Kind::Sequence => Some("drawing edits are not supported for sequence diagrams yet"),
+            // Edited through `sequence` instead (WYSIWY-21).
+            Kind::Sequence => Some(SEQUENCE_EDITS),
             Kind::State => Some("drawing edits are not supported for state diagrams yet"),
             Kind::Class => Some("drawing edits are not supported for class diagrams yet"),
             Kind::Er => Some("drawing edits are not supported for ER diagrams yet"),
@@ -245,6 +251,19 @@ impl Document {
             Kind::Requirement => {
                 Some("drawing edits are not supported for requirement diagrams yet")
             }
+        }
+    }
+
+    /// The Mermaid sequence diagram the document holds, which takes its own drawing edits:
+    /// adding, renaming, and deleting participants and messages (WYSIWY-21).
+    pub fn sequence(&self) -> Option<&Sequence> {
+        match &self.other {
+            Some(Diagram::Sequence(s))
+                if Kind::of_lang(&self.source, self.lang()) == Kind::Sequence =>
+            {
+                Some(s)
+            }
+            _ => None,
         }
     }
 

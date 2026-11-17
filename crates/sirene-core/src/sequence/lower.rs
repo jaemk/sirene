@@ -14,6 +14,13 @@ use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Sequence, Vec<Diagnostic>) {
+    lower_with_messages(root).0
+}
+
+/// `lower`, and the range of the statement each message came from, in order.
+pub(crate) fn lower_with_messages(
+    root: &SyntaxNode,
+) -> ((Sequence, Vec<Diagnostic>), Vec<TextRange>) {
     let mut l = Lower::default();
     for el in root.children_with_tokens() {
         if el.kind() == FRONTMATTER
@@ -48,7 +55,8 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sequence, Vec<Diagnostic>) {
             _ => {}
         }
     }
-    l.finish()
+    let messages = std::mem::take(&mut l.messages);
+    (l.finish(), messages)
 }
 
 /// Whether `stmt` may be in a `box`: a declaration without `create`, or the closing `end`. A
@@ -88,6 +96,8 @@ struct Lower {
     counter: (u32, u32),
     /// The index of each participant id.
     ids: std::collections::HashMap<String, usize>,
+    /// The statement of each message, in order.
+    messages: Vec<TextRange>,
 }
 
 fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
@@ -282,6 +292,7 @@ impl Lower {
         self.counter = (n.saturating_add(step), step);
         let number = self.numbering.then_some(n);
         let text = text_of(stmt, TEXT).map_or_else(Vec::new, |t| display(&t));
+        self.messages.push(stmt.text_range());
         self.seq.events.push(Event::Message(Message {
             from,
             to,

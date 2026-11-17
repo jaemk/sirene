@@ -278,9 +278,11 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
     let seq = Document::from_source(None, "sequenceDiagram\n  A->>B: hi\n".to_owned());
     assert_eq!(
         seq.read_only(),
-        Some("drawing edits are not supported for sequence diagrams yet")
+        Some(
+            "sequence diagrams take only adding, renaming, and deleting participants and messages"
+        )
     );
-    assert!(seq.chart.nodes.is_empty() && seq.other.is_some());
+    assert!(seq.chart.nodes.is_empty() && seq.sequence().is_some());
     let pie = Document::from_source(None, "pie\n  \"a\" : 1\n".to_owned());
     assert_eq!(
         pie.read_only(),

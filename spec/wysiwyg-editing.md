@@ -298,3 +298,26 @@ the whole file, and disk changes and Reload work on the whole file, keeping the 
 - Export suggests `STEM-N.png` or `.svg`, as `sirene png FILE.md` names block N.
 
 Tests: `crates/sirene-gui/tests/markdown.rs`.
+
+## WYSIWY-21 Sequence diagrams
+
+A Mermaid sequence diagram takes drawing edits through `sirene_core::sequence::edit`;
+participants are selected as nodes (by id) and messages as edges (by their place among the
+messages, as lowering counts them).
+
+- Clicking selects a participant (its header or lifeline) or a message, and selects its source:
+  the participant's first mention, or the message statement.
+- Double-click or Rename edits a participant's label (the alias of its last declaration, or a new
+  `participant ID as LABEL` before its first mention; a label equal to the id drops the alias) or
+  a message's text. `;`, `#`, and `<` are written as entity codes, and line breaks as `<br>`.
+- Dragging from a participant to another adds a message `FROM->>TO:` at the end, selected with
+  its text open; to empty space it adds a participant too. Add Node, or a double-click on empty
+  space, adds a participant `P1`, `P2`, ..., with a message to it from the one selected node.
+- Delete removes the selected messages, and the selected participants with every statement that
+  mentions them.
+- Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits (shapes, subgraphs,
+  layout hints, styles, moves) stay refused, with the reason `sequence diagrams take only
+  adding, renaming, and deleting participants and messages`. The right-click menu holds Add
+  Participant, Rename, Delete, Select All, and Fit Window.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/sequence/edit.rs`.
