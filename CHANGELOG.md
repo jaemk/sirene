@@ -12,11 +12,18 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `sirene-core` alone, with the diagram's own theme applied, as the CLI does. The CLI calls
   them, and a test checks its output against them for each file in `examples/`.
 - `source::read` reads a diagram file as UTF-8 of at most 64 MiB, as the CLI and editor do.
+- `sirene-core` builds and renders on `wasm32-unknown-unknown`, checked in CI by rendering the
+  examples under Node.
 
 ### Changed
 
 - The editor names UTF-16 files and the first invalid UTF-8 byte when it cannot open a file,
   as the CLI does.
+
+### Fixed
+
+- `sirene-core` no longer panics laying out a graph or reading a gantt chart on
+  `wasm32-unknown-unknown`, which has no clock.
 
 ## [0.5.0] - 2026-11-16
 

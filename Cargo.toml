@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "xtask"]
+members = ["crates/*", "xtask", "wasm-smoke"]
 
 [workspace.package]
 version = "0.5.1-dev"

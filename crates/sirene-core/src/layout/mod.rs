@@ -225,7 +225,9 @@ pub fn layout(graph: &Graph, config: &Config) -> crate::Result<Layout> {
             )));
         }
     }
-    let start = std::time::Instant::now();
+    let start = log::log_enabled!(log::Level::Debug)
+        .then(crate::profile::now)
+        .flatten();
     let out = Builder::new(graph, config).run()?;
     log::debug!(
         "laid out {} nodes, {} clusters, {} edges ({} routed) in {}x{} cells, {:.1?}",
@@ -235,7 +237,7 @@ pub fn layout(graph: &Graph, config: &Config) -> crate::Result<Layout> {
         out.edges.iter().filter(|e| e.is_some()).count(),
         out.size.w,
         out.size.h,
-        start.elapsed()
+        start.map(|s| s.elapsed()).unwrap_or_default()
     );
     Ok(out)
 }

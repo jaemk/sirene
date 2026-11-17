@@ -13,7 +13,8 @@ The repository root is a virtual Cargo workspace. The three published crates liv
   display lists; no layout or drawing logic.
 - `sirene`: the `sirene` binary (CLI entrypoint and GUI launcher).
 
-The fourth member, `xtask/`, holds packaging and release-signing tasks and is not published.
+Two more members are not published: `xtask/` holds packaging and release-signing tasks, and
+`wasm-smoke/` renders the examples on WebAssembly (WORKSP-11).
 
 ## WORKSP-2
 
@@ -117,5 +118,14 @@ and the editor read files and stdin through it. `diagram::lower_as` reads a sour
 and `Lowered::png` (feature `png`) apply the diagram's own theme settings over the given theme
 and return what `sirene ascii`, `sirene svg`, and `sirene png` write for the same file and
 options; the CLI calls them. `markdown::mermaid_blocks` finds a Markdown file's diagram blocks,
-each lowered with `lower_as(&block.code, Some(block.lang))`. Choosing output paths and Markdown image links stay
-in the CLI.
+each lowered with `lower_as(&block.code, Some(block.lang))`. Choosing output paths and
+Markdown image links stay in the CLI.
+
+## WORKSP-11 WebAssembly
+
+`sirene-core`, with or without `png`, builds for `wasm32-unknown-unknown` and renders there.
+That target has no clock: phase timings and layout timing logs are skipped, and a gantt chart
+read through `diagram::lower` is read at the Unix epoch (`gantt::Parse::lower_at` takes the
+date). CI's `wasm` job builds `wasm-smoke` for the target and runs it under Node with
+`scripts/wasm-smoke.mjs`; it renders each file in `examples/` and a gantt chart as ASCII, SVG,
+and PNG, and a panic fails the job.

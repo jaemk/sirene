@@ -42,6 +42,18 @@ jobs:
           tool: cargo-llvm-cov
       - run: bash scripts/ci.sh
 
+  # sirene-core on wasm32-unknown-unknown: build, then render the examples under Node (WORKSP-11).
+  wasm:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - run: cargo build -p wasm-smoke --target wasm32-unknown-unknown --locked
+      - run: node scripts/wasm-smoke.mjs
+
   # RustSec advisory scan of Cargo.lock; ignores are in .cargo/audit.toml.
   audit:
     runs-on: ubuntu-24.04

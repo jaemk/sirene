@@ -20,8 +20,18 @@ impl Phase {
         let on = log::log_enabled!(target: TARGET, log::Level::Trace);
         Phase {
             name,
-            start: on.then(Instant::now),
+            start: if on { now() } else { None },
         }
+    }
+}
+
+/// The current instant, or `None` on `wasm32-unknown-unknown`, which has no clock and panics in
+/// `Instant::now` (WORKSP-11).
+pub(crate) fn now() -> Option<Instant> {
+    if cfg!(all(target_family = "wasm", target_os = "unknown")) {
+        None
+    } else {
+        Some(Instant::now())
     }
 }
 

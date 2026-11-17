@@ -268,11 +268,16 @@ impl Parse {
         &self.diagnostics
     }
 
-    /// Lowers the tree to a [`Gantt`], read now (UTC).
+    /// Lowers the tree to a [`Gantt`], read now (UTC). On `wasm32-unknown-unknown`, which has
+    /// no clock, it is read at the Unix epoch; use [`Parse::lower_at`] there (WORKSP-11).
     pub fn lower(&self) -> (Gantt, Vec<Diagnostic>) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_or(0, |d| d.as_millis() as i64);
+        let now = if cfg!(all(target_family = "wasm", target_os = "unknown")) {
+            0
+        } else {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_millis() as i64)
+        };
         self.lower_at(now)
     }
 
