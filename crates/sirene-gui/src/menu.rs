@@ -2,9 +2,9 @@
 
 use gpui::component::menu::PopupMenu;
 use gpui::{Context, WeakEntity, Window, px};
-use sirene_core::er;
 use sirene_core::flowchart::edit::Line;
 use sirene_core::flowchart::{Arrow, Direction, Flowchart, Node, Shape, Stroke};
+use sirene_core::{er, requirement};
 
 use crate::document::Graph;
 use crate::drawing::Item;
@@ -13,7 +13,8 @@ use crate::viewer::Viewer;
 use crate::{
     AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, Group, KeepTogether,
     LongerEdge, MoveEarlier, MoveLater, MoveTo, Rename, ReverseEdge, SelectAll, SetArrows,
-    SetCardinality, SetDirection, SetIdentifying, SetShape, SetStroke, ShorterEdge, Ungroup,
+    SetCardinality, SetDirection, SetIdentifying, SetRelationshipType, SetShape, SetStroke,
+    ShorterEdge, Ungroup,
 };
 
 /// The directions in Direction, with their names.
@@ -71,7 +72,7 @@ pub(crate) fn build(
     let Some(viewer) = viewer.upgrade() else {
         return menu;
     };
-    let (nodes, edges, chart, src, subgraph, focus, read_only, adds, er) = {
+    let (nodes, edges, chart, src, subgraph, focus, read_only, adds, graph) = {
         let v = viewer.read(cx);
         // A diagram with its own edits: its Add Node item, unlinked and linked.
         let adds = match v.doc.graph() {
@@ -81,9 +82,11 @@ pub(crate) fn build(
             Some(Graph::State) => Some(("Add State", "Add State With Transition")),
             Some(Graph::Class) => Some(("Add Class", "Add Class With Relation")),
             Some(Graph::Er) => Some(("Add Entity", "Add Entity With Relationship")),
+            Some(Graph::Requirement) => {
+                Some(("Add Requirement", "Add Requirement With Relationship"))
+            }
             None => None,
         };
-        let er = v.doc.graph() == Some(Graph::Er);
         (
             v.selected_nodes(),
             v.selected_edges(),
@@ -93,7 +96,7 @@ pub(crate) fn build(
             v.drawing_focus.clone(),
             v.doc.read_only(),
             adds,
-            er,
+            v.doc.graph(),
         )
     };
     let mut menu = menu.action_context(focus);
@@ -103,12 +106,20 @@ pub(crate) fn build(
         let linked = nodes.len() == 1 && edges.is_empty();
         let label = if linked { add_linked } else { add };
         menu = menu.menu(label, Box::new(AddNode));
-        if nodes.len() + edges.len() == 1 {
+        // A requirement diagram's relationship is labeled by its type, set below.
+        let named = graph != Some(Graph::Requirement) || edges.is_empty();
+        if nodes.len() + edges.len() == 1 && named {
             menu = menu.menu("Rename", Box::new(Rename));
         }
-        // An ER diagram's relationships: each end's cardinality, and the line (WYSIWY-24).
-        if er && !edges.is_empty() {
-            menu = cardinality_items(menu, &edges, &chart, window, cx);
+        if !edges.is_empty() {
+            match graph {
+                // An ER diagram's relationships: each end's cardinality, and the line
+                // (WYSIWY-24).
+                Some(Graph::Er) => menu = cardinality_items(menu, &edges, &chart, window, cx),
+                // A requirement diagram's relationships: their type (WYSIWY-25).
+                Some(Graph::Requirement) => menu = type_items(menu, &edges, &src, window, cx),
+                _ => {}
+            }
         }
         if !nodes.is_empty() || !edges.is_empty() {
             menu = menu.menu("Delete", Box::new(Delete));
@@ -207,6 +218,34 @@ fn cardinality_items(
                 identifying: !identifying,
             }),
         )
+}
+
+/// A Type submenu for the selected relationships of a requirement diagram, with the one
+/// selected relationship's checked.
+fn type_items(
+    menu: PopupMenu,
+    edges: &[usize],
+    src: &str,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    let current = match edges {
+        [i] => requirement::edit::relationship_type(src, *i),
+        _ => None,
+    };
+    menu.submenu("Type", window, cx, move |m, _, _| {
+        requirement::edit::RELATIONSHIPS
+            .iter()
+            .fold(m, |m, &(name, kind)| {
+                m.menu_with_check(
+                    name,
+                    current.as_deref() == Some(kind),
+                    Box::new(SetRelationshipType {
+                        kind: kind.to_owned(),
+                    }),
+                )
+            })
+    })
 }
 
 /// The four directions, with `current` checked, for the diagram or `subgraph`.

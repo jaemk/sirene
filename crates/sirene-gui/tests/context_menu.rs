@@ -129,6 +129,26 @@ fn er_diagram_menu(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn requirement_diagram_menu(cx: &mut TestAppContext) {
+    let src = "requirementDiagram\n    requirement r {\n    }\n    element e {\n    }\n    e - satisfies -> r\n";
+    let (viewer, cx) = open_src(cx, src);
+    // On a relationship: Add Requirement, Type > Contains, ..., Verifies (WYSIWY-25).
+    let rel = center(&viewer, cx, &Item::Edge(0));
+    pick(cx, rel, "down down enter down down down down enter");
+    assert_eq!(source(&viewer, cx), src.replace("satisfies", "verifies"));
+    // The first item on a node adds a requirement with a relationship from it.
+    let e = center(&viewer, cx, &node("e"));
+    first_item(cx, e);
+    assert!(
+        source(&viewer, cx).ends_with(
+            "    requirement \"New requirement\" {\n    }\n    e - traces -> \"New requirement\"\n"
+        ),
+        "{}",
+        source(&viewer, cx)
+    );
+}
+
+#[gpui::test]
 fn shapes_and_links_for_the_selected_nodes(cx: &mut TestAppContext) {
     let (viewer, cx) = open_src(cx, SRC);
     select(&viewer, cx, vec![node("A"), node("C")]);

@@ -174,8 +174,8 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     assert_eq!(status(&viewer, cx), format!("Can't delete: {why}"));
     viewer.read_with(cx, |v, _| assert_eq!(v.selection, [node("A")]));
     assert_eq!(source(&viewer, cx), src);
-    // Flowcharts stay editable; state, class, and ER diagrams take their own edits (WYSIWY-22
-    // to WYSIWY-24).
+    // Flowcharts stay editable; state, class, ER, and requirement diagrams take their own edits
+    // (WYSIWY-22 to WYSIWY-25).
     let flow = Document::from_source(None, "flowchart\n  A\n".to_owned());
     assert_eq!(flow.read_only(), None);
     let state = Document::from_source(None, "stateDiagram-v2\n  A --> B\n".to_owned());
@@ -206,8 +206,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     );
     assert_eq!(
         req.read_only(),
-        Some("drawing edits are not supported for requirement diagrams yet")
+        Some(sirene_gui::document::REQUIREMENT_EDITS)
     );
+    assert_eq!(req.graph(), Some(sirene_gui::document::Graph::Requirement));
+    assert!(req.own_edits());
     assert_eq!(req.chart.edges.len(), 1);
     let dot = Document::from_source(None, "digraph { a -> b }\n".to_owned());
     assert_eq!(

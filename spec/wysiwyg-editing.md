@@ -396,3 +396,27 @@ without quotes.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/context_menu.rs`,
 `crates/sirene-core/src/er/edit.rs`.
+
+## WYSIWY-25 Requirement diagrams
+
+A Mermaid requirement diagram takes drawing edits through `sirene_core::requirement::edit`;
+requirements, elements, and relationships are selected as the flowchart's nodes and edges are.
+A node's id is its name, without quotes.
+
+- Double-click or Rename on a requirement or element edits its name, which is rewritten in every
+  statement that names it. A name that is not a plain word is quoted; one already taken, or one
+  that would go in a `class` or `style` list and is not a plain word, is refused.
+- A relationship is labeled by its type, so it has no label field; the right-click menu on
+  relationships holds Type (Contains, Copies, Derives, Satisfies, Verifies, Refines, Traces).
+- Dragging from a node to another adds `FROM - traces -> TO` at the end, selected. Dragging to
+  empty space adds a requirement too. Add Node, or a double-click on empty space, adds
+  `requirement "New requirement" {}` (numbered when taken), with a relationship to it from the
+  one selected node.
+- Delete removes the selected relationships, and the selected nodes with every statement that
+  names them (their names are dropped from `class` and `style` lists).
+- Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
+  the reason `requirement diagrams take only adding, renaming, connecting, and deleting
+  requirements and relationships, and setting relationship types`.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/context_menu.rs`,
+`crates/sirene-core/src/requirement/edit.rs`.

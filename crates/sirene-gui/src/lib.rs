@@ -229,6 +229,14 @@ pub struct SetIdentifying {
     pub identifying: bool,
 }
 
+/// Set the type (`satisfies`, `traces`, ...) of the selected relationships of a requirement
+/// diagram (WYSIWY-25).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetRelationshipType {
+    pub kind: String,
+}
+
 /// Add an edge from each selected node to node `id` (WYSIWY-14).
 #[derive(Clone, PartialEq, Debug, gpui::Action)]
 #[action(namespace = sirene, no_json)]

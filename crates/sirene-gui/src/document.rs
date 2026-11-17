@@ -26,6 +26,9 @@ pub const CLASS_EDITS: &str =
 /// Why an ER diagram refuses the other drawing edits (WYSIWY-24).
 pub const ER_EDITS: &str = "ER diagrams take only adding, renaming, connecting, and deleting entities and relationships, and setting cardinalities";
 
+/// Why a requirement diagram refuses the other drawing edits (WYSIWY-25).
+pub const REQUIREMENT_EDITS: &str = "requirement diagrams take only adding, renaming, connecting, and deleting requirements and relationships, and setting relationship types";
+
 /// A diagram drawn from `Document::chart` that takes its own drawing edits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Graph {
@@ -35,6 +38,8 @@ pub enum Graph {
     Class,
     /// A Mermaid ER diagram (WYSIWY-24).
     Er,
+    /// A Mermaid requirement diagram (WYSIWY-25).
+    Requirement,
 }
 
 /// The text of a new document (WYSIWY-7).
@@ -271,9 +276,7 @@ impl Document {
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Dot => Some("drawing edits are not supported for DOT yet"),
             Kind::PlantUml => Some("drawing edits are not supported for PlantUML yet"),
-            Kind::Requirement => {
-                Some("drawing edits are not supported for requirement diagrams yet")
-            }
+            Kind::Requirement => Some(REQUIREMENT_EDITS),
         }
     }
 
@@ -292,7 +295,7 @@ impl Document {
 
     /// The kind of graph the document holds when it is drawn from `chart` and takes its own
     /// drawing edits: adding, renaming, connecting, and deleting nodes and edges (WYSIWY-22,
-    /// WYSIWY-23, WYSIWY-24).
+    /// WYSIWY-23, WYSIWY-24, WYSIWY-25).
     pub fn graph(&self) -> Option<Graph> {
         if self.other.is_some() {
             return None;
@@ -301,6 +304,7 @@ impl Document {
             Kind::State => Some(Graph::State),
             Kind::Class => Some(Graph::Class),
             Kind::Er => Some(Graph::Er),
+            Kind::Requirement => Some(Graph::Requirement),
             _ => None,
         }
     }

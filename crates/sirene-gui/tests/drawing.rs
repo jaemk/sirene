@@ -11,7 +11,7 @@ use sirene_core::flowchart::Arrow;
 use sirene_gui::document::Document;
 use sirene_gui::drawing::Item;
 use sirene_gui::viewer::Viewer;
-use sirene_gui::{AddNode, Delete, Deselect, SetCardinality, SetIdentifying};
+use sirene_gui::{AddNode, Delete, Deselect, SetCardinality, SetIdentifying, SetRelationshipType};
 
 const SRC: &str = "flowchart TD\n    A[Alpha] --> B[Beta]\n";
 
@@ -688,6 +688,59 @@ fn er_diagrams(cx: &mut TestAppContext) {
     cx.dispatch_action(Delete);
     cx.run_until_parked();
     assert!(!source(&viewer, cx).contains("E1"));
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), before);
+}
+
+#[gpui::test]
+fn requirement_diagrams(cx: &mut TestAppContext) {
+    let src = "requirementDiagram\n    requirement r {\n        id: 1\n    }\n    element e {\n    }\n    e - satisfies -> r\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Renaming a requirement renames it everywhere (WYSIWY-25).
+    let r = center(&viewer, cx, &node("r"));
+    double_click(cx, r);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("r"));
+    cx.simulate_input("speed");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        src.replace("requirement r", "requirement speed")
+            .replace("-> r", "-> speed")
+    );
+    // A relationship's label is its type: no field opens.
+    let rel = center(&viewer, cx, &Item::Edge(0));
+    double_click(cx, rel);
+    assert_eq!(field(&viewer, cx), None);
+    keys(cx, "escape");
+
+    // Dragging between nodes adds a `traces` relationship, selected.
+    let (speed, e) = (
+        center(&viewer, cx, &node("speed")),
+        center(&viewer, cx, &node("e")),
+    );
+    drag(cx, speed, e);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(1)]);
+    cx.dispatch_action(SetRelationshipType {
+        kind: "derives".into(),
+    });
+    assert!(
+        source(&viewer, cx).ends_with("    speed - derives -> e\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+
+    // Adding a requirement, then deleting it.
+    viewer.update(cx, |v, cx| v.select(Vec::new(), cx));
+    cx.dispatch_action(AddNode);
+    cx.run_until_parked();
+    assert_eq!(selection(&viewer, cx), [node("New requirement")]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("New requirement"));
+    keys(cx, "escape");
+    let before = source(&viewer, cx);
+    viewer.update(cx, |v, cx| v.select(vec![node("New requirement")], cx));
+    cx.dispatch_action(Delete);
+    cx.run_until_parked();
+    assert!(!source(&viewer, cx).contains("New requirement"));
     keys(cx, &format!("{SECONDARY}-z"));
     assert_eq!(source(&viewer, cx), before);
 }
