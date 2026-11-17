@@ -154,6 +154,17 @@ $ sirene check guide.md docs/
 guide.md:15:8: error: expected a node after the edge
 ```
 
+`--json` prints the diagnostics to stdout as one JSON array, for editors and CI annotations:
+
+```
+$ sirene check --json guide.md
+[
+  {"file":"guide.md","line":15,"column":8,"severity":"error","message":"expected a node after the edge"}
+]
+```
+
+`--markdown` reads stdin and files of any name as Markdown.
+
 ## `sirene update`
 
 Replaces the running binary with the latest release, or the one `--to VERSION` names, after

@@ -187,3 +187,12 @@ and files as Markdown (CLI-12) whatever their names; diagnostics name stdin `<st
 Directories are scanned as without it. `ascii --markdown --watch` on stdin fails with
 `error: --watch needs a FILE or directory, not stdin`. Test: `markdown_stdin` in
 `crates/sirene/tests/cli.rs`.
+
+## CLI-16 `check --json`
+
+`sirene check --json` prints nothing to stderr and instead writes one JSON array to stdout, one
+object per diagnostic in the order the text form prints them: `{"file", "line", "column",
+"severity", "message"}`. `severity` is `error` or `warning`. A read failure has `file`, `line`,
+and `column` null and the error chain as `message`; a Markdown file without diagram blocks is a
+`warning` with `line` and `column` null. No diagnostics print `[]`. The exit status is as
+without `--json`. Test: `check_json` in `crates/sirene/tests/cli.rs`.

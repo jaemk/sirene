@@ -95,6 +95,9 @@ enum Command {
         /// Read stdin and files as Markdown, whatever their names.
         #[arg(long)]
         markdown: bool,
+        /// Print the diagnostics to stdout as one JSON array instead of to stderr.
+        #[arg(long)]
+        json: bool,
     },
     /// Print a diagram, or each diagram block of a Markdown file, as text.
     Ascii {
@@ -316,13 +319,29 @@ fn run(cli: Cli) -> ExitCode {
     match cli.command {
         None => gui(cli.files),
         Some(Command::Update { check, yes, to }) => update::run(update::Args { check, yes, to }),
-        Some(Command::Check { files, markdown }) => {
+        Some(Command::Check {
+            files,
+            markdown,
+            json,
+        }) => {
             log::info!("checking {} input(s)", files.len());
+            let mut out = if json {
+                markdown::Out::json()
+            } else {
+                markdown::Out::text()
+            };
             // Every file is checked, whatever the ones before it had.
             let failed = files
                 .iter()
-                .filter(|f| !markdown::check(f, markdown))
+                .filter(|f| !markdown::check(&mut out, f, markdown))
                 .count();
+            if let Err(e) = out.finish() {
+                diagnostic!(
+                    "error: {}",
+                    Error::with_source("cannot write <stdout>", e).report()
+                );
+                return ExitCode::FAILURE;
+            }
             if failed == 0 {
                 ExitCode::SUCCESS
             } else {

@@ -1277,6 +1277,61 @@ fn ascii_width() {
 }
 
 #[test]
+fn check_json() {
+    let tmp = tempfile::tempdir().unwrap();
+    let good = tmp.path().join("good.mmd");
+    std::fs::write(&good, "flowchart LR\n  A --> B\n").unwrap();
+    let md = tmp.path().join("doc.md");
+    std::fs::write(&md, "# \"Doc\"\n").unwrap();
+    let missing = tmp.path().join("missing.mmd");
+    let out = sirene()
+        .args(["check", "--json", "-"])
+        .arg(&good)
+        .arg(&md)
+        .arg(&missing)
+        .write_stdin("digraph { b -> }\n")
+        .assert()
+        .code(1)
+        .stderr("")
+        .get_output()
+        .clone();
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert_eq!(lines.len(), 5, "{stdout}");
+    assert_eq!(lines[0], "[");
+    assert!(
+        lines[1].starts_with(
+            r#"  {"file":"<stdin>","line":1,"column":16,"severity":"error","message":"#
+        ),
+        "{stdout}"
+    );
+    let json_path = |p: &std::path::Path| p.display().to_string().replace('\\', "\\\\");
+    assert_eq!(
+        lines[2],
+        format!(
+            r#"  {{"file":"{}","line":null,"column":null,"severity":"warning","message":"no diagram blocks"}},"#,
+            json_path(&md)
+        )
+    );
+    assert!(
+        lines[3].starts_with(&format!(
+            r#"  {{"file":null,"line":null,"column":null,"severity":"error","message":"cannot read {}"#,
+            json_path(&missing)
+        )),
+        "{stdout}"
+    );
+    assert_eq!(lines[4], "]");
+
+    sirene()
+        .args(["check", "--json"])
+        .arg(&good)
+        .assert()
+        .success()
+        .stdout("[]\n")
+        .stderr("");
+}
+
+#[test]
 fn markdown_stdin() {
     let md = "# Doc\n\n```mermaid\nflowchart LR\n  A\n```\n\n```dot\ndigraph { b -> }\n```\n";
     let out = sirene()

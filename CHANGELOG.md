@@ -24,6 +24,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   owns participants as nodes and messages as edges.
 - `sirene ascii --markdown` and `sirene check --markdown` read stdin, or files of any name, as
   Markdown.
+- `sirene check --json` prints the diagnostics to stdout as one JSON array.
 
 ### Changed
 

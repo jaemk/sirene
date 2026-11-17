@@ -8,9 +8,107 @@ use sirene_core::diagram::{self, Lowered};
 use sirene_core::markdown::{self, Block};
 use sirene_core::{Error, Result, Severity};
 
+/// Where `sirene check` reports: stderr as text, or collected for one JSON array on stdout
+/// (CLI-16).
+pub struct Out {
+    json: Option<Vec<String>>,
+}
+
+impl Out {
+    pub fn text() -> Self {
+        Out { json: None }
+    }
+
+    pub fn json() -> Self {
+        Out {
+            json: Some(Vec::new()),
+        }
+    }
+
+    /// One diagnostic: `FILE:LINE:COL: SEVERITY: MESSAGE` with a position, `SEVERITY: MESSAGE`
+    /// without one.
+    fn diagnostic(
+        &mut self,
+        file: Option<&str>,
+        at: Option<(usize, usize)>,
+        severity: &str,
+        message: &str,
+    ) {
+        let Some(records) = &mut self.json else {
+            match (file, at) {
+                (Some(file), Some((line, col))) => {
+                    diagnostic!("{file}:{line}:{col}: {severity}: {message}")
+                }
+                (Some(file), None) => diagnostic!("{file}: {message}"),
+                _ => diagnostic!("{severity}: {message}"),
+            }
+            return;
+        };
+        let string = |s: Option<&str>| s.map_or_else(|| "null".to_owned(), json_string);
+        let number = |n: Option<usize>| n.map_or_else(|| "null".to_owned(), |n| n.to_string());
+        records.push(format!(
+            "{{\"file\":{},\"line\":{},\"column\":{},\"severity\":{},\"message\":{}}}",
+            string(file),
+            number(at.map(|a| a.0)),
+            number(at.map(|a| a.1)),
+            json_string(severity),
+            json_string(message),
+        ));
+    }
+
+    fn error(&mut self, e: &Error) {
+        self.diagnostic(None, None, "error", &e.report());
+    }
+
+    /// Writes the JSON array to stdout, when collecting one.
+    pub fn finish(self) -> std::io::Result<()> {
+        let Some(records) = self.json else {
+            return Ok(());
+        };
+        use std::io::Write;
+        let mut out = std::io::stdout().lock();
+        if records.is_empty() {
+            out.write_all(b"[]\n")?;
+        } else {
+            out.write_all(format!("[\n  {}\n]\n", records.join(",\n  ")).as_bytes())?;
+        }
+        out.flush()
+    }
+}
+
+/// `s` as a JSON string literal.
+fn json_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
 /// Prints `lowered`'s diagnostics as `NAME:LINE:COL: SEVERITY: MESSAGE`, with each position
 /// moved by `at`. Returns whether there was an error.
 pub fn report(
+    name: &str,
+    src: &str,
+    lowered: &Lowered,
+    at: impl Fn(usize, usize) -> (usize, usize),
+) -> bool {
+    report_to(&mut Out::text(), name, src, lowered, at)
+}
+
+/// `report`, to `out`.
+fn report_to(
+    out: &mut Out,
     name: &str,
     src: &str,
     lowered: &Lowered,
@@ -20,7 +118,6 @@ pub fn report(
     let lines = sirene_core::diagnostic::LineIndex::new(src);
     for d in &lowered.diagnostics {
         let (line, col) = lines.line_col(d);
-        let (line, col) = at(line, col);
         let severity = match d.severity {
             Severity::Error => {
                 errors = true;
@@ -28,82 +125,89 @@ pub fn report(
             }
             Severity::Warning => "warning",
         };
-        diagnostic!("{name}:{line}:{col}: {severity}: {}", d.message);
+        out.diagnostic(Some(name), Some(at(line, col)), severity, &d.message);
     }
     errors
 }
 
-/// Checks `path`'s diagrams, printing their diagnostics: a Markdown file's diagram blocks, every
-/// diagram under a directory, or one diagram (stdin for `-`). Returns whether all were read
-/// and had no errors. With `as_markdown`, a file or stdin is read as Markdown whatever its name
-/// (CLI-15).
-pub fn check(path: &Path, as_markdown: bool) -> bool {
+/// Checks `path`'s diagrams, reporting their diagnostics to `out`: a Markdown file's diagram
+/// blocks, every diagram under a directory, or one diagram (stdin for `-`). Returns whether all
+/// were read and had no errors. With `as_markdown`, a file or stdin is read as Markdown whatever
+/// its name (CLI-15).
+pub fn check(out: &mut Out, path: &Path, as_markdown: bool) -> bool {
     let stdin = path.as_os_str() == "-";
     if as_markdown && !path.is_dir() {
-        return check_markdown(path);
+        return check_markdown(out, path);
     }
     if stdin {
-        return check_source(None);
+        return check_source(out, None);
     }
     if path.is_dir() {
         if let Err(e) = std::fs::read_dir(path) {
-            diagnostic!("error: cannot read {}: {e}", path.display());
+            out.error(&Error::with_source(
+                format!("cannot read {}", path.display()),
+                e,
+            ));
             return false;
         }
         let scanned = crate::scan(path, path, "mmd");
         for error in &scanned.errors {
-            diagnostic!("error: {}", error.report());
+            out.error(error);
         }
         if scanned.found.is_empty() {
             if scanned.errors.is_empty() {
-                diagnostic!("{}", crate::no_diagrams(path));
+                let message = crate::no_diagrams(path);
+                let message = message.strip_prefix("error: ").unwrap_or(&message);
+                out.diagnostic(None, None, "error", message);
             }
             return false;
         }
         let failed = scanned
             .found
             .iter()
-            .filter(|(input, _)| !check_source(Some(input)))
+            .filter(|(input, _)| !check_source(out, Some(input)))
             .count();
         return failed == 0 && scanned.errors.is_empty();
     }
     if markdown::is_markdown(path) {
-        return check_markdown(path);
+        return check_markdown(out, path);
     }
-    check_source(Some(path))
+    check_source(out, Some(path))
 }
 
 /// Checks a Markdown file's diagram blocks, or stdin's for `-`.
-fn check_markdown(path: &Path) -> bool {
+fn check_markdown(out: &mut Out, path: &Path) -> bool {
     let (name, src) = match crate::read(Some(path.to_path_buf())) {
         Ok(read) => read,
         Err(e) => {
-            diagnostic!("error: {}", e.report());
+            out.error(&e);
             return false;
         }
     };
     let blocks = markdown::mermaid_blocks(&src);
     log::debug!("{name}: {} diagram block(s)", blocks.len());
     if blocks.is_empty() {
-        diagnostic!("{name}: no diagram blocks");
+        out.diagnostic(Some(&name), None, "warning", "no diagram blocks");
     }
     let mut ok = true;
     for block in &blocks {
         let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
-        ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
+        ok &= !report_to(out, &name, &block.code, &lowered, |l, c| {
+            block.position(l, c)
+        });
     }
     ok
 }
 
 /// Checks one diagram file, or stdin for `None`.
-fn check_source(path: Option<&Path>) -> bool {
+fn check_source(out: &mut Out, path: Option<&Path>) -> bool {
     match crate::read(path.map(Path::to_path_buf)) {
         Ok((name, src)) => {
             let lowered = crate::lower_file(path.filter(|p| p.as_os_str() != "-"), &src);
-            !report(&name, &src, &lowered, |l, c| (l, c))
+            !report_to(out, &name, &src, &lowered, |l, c| (l, c))
         }
-        Err(message) => {
-            diagnostic!("error: {}", message.report());
+        Err(e) => {
+            out.error(&e);
             false
         }
     }
