@@ -107,6 +107,28 @@ fn class_diagram_menu(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn er_diagram_menu(cx: &mut TestAppContext) {
+    let src = "erDiagram\n    A ||--o{ B : has\n";
+    let (viewer, cx) = open_src(cx, src);
+    // On a relationship: Add Entity, Rename, Start > Exactly One, Zero or One.
+    let r = center(&viewer, cx, &Item::Edge(0));
+    pick(cx, r, "down down down enter down enter");
+    assert_eq!(source(&viewer, cx), "erDiagram\n    A |o--o{ B : has\n");
+    // Identifying, after End.
+    let r = center(&viewer, cx, &Item::Edge(0));
+    pick(cx, r, "down down down down down enter");
+    assert_eq!(source(&viewer, cx), "erDiagram\n    A |o..o{ B : has\n");
+    // The first item on an entity adds one with a relationship from it.
+    let b = center(&viewer, cx, &node("B"));
+    first_item(cx, b);
+    assert!(
+        source(&viewer, cx).ends_with("    E1[\"New entity\"]\n    B ||--o{ E1 : \"\"\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+}
+
+#[gpui::test]
 fn shapes_and_links_for_the_selected_nodes(cx: &mut TestAppContext) {
     let (viewer, cx) = open_src(cx, SRC);
     select(&viewer, cx, vec![node("A"), node("C")]);

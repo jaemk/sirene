@@ -297,8 +297,9 @@ impl Viewer {
                 // Double-clicking empty space adds a node there, in the subgraph under the
                 // pointer if any (WYSIWY-15).
                 None if self.doc.sequence().is_some() => self.add_participant(None, window, cx),
-                None if self.doc.is_state() => self.add_state(Link::None, window, cx),
-                None if self.doc.is_class() => self.add_class(Link::None, window, cx),
+                None if let Some(g) = self.doc.graph() => {
+                    self.graph_add(g, Link::None, window, cx);
+                }
                 None => {
                     let scope = self.subgraph_at(e.position, window);
                     self.add_linked(Shape::Rect, Link::None, scope, window, cx);
@@ -384,21 +385,12 @@ impl Viewer {
                 }
                 _ => {}
             }
-        } else if far && self.doc.is_state() {
-            // A transition to the state released on, or to a new state.
+        } else if far && let Some(g) = self.doc.graph() {
+            // An edge to the node released on, or to a new node.
             match self.item_at(e.position, window) {
-                Some(Item::Node(to)) => self.add_transition(&from, &to, window, cx),
+                Some(Item::Node(to)) => self.graph_connect(g, &from, &to, window, cx),
                 None if self.viewport.get().contains(&e.position) => {
-                    self.add_state(Link::From(from), window, cx);
-                }
-                _ => {}
-            }
-        } else if far && self.doc.is_class() {
-            // A relation to the class released on, or to a new class.
-            match self.item_at(e.position, window) {
-                Some(Item::Node(to)) => self.add_relation(&from, &to, window, cx),
-                None if self.viewport.get().contains(&e.position) => {
-                    self.add_class(Link::From(from), window, cx);
+                    self.graph_add(g, Link::From(from), window, cx);
                 }
                 _ => {}
             }
@@ -452,12 +444,8 @@ impl Viewer {
             self.sequence_delete(window, cx);
             return;
         }
-        if self.doc.is_state() {
-            self.state_delete(window, cx);
-            return;
-        }
-        if self.doc.is_class() {
-            self.class_delete(window, cx);
+        if let Some(g) = self.doc.graph() {
+            self.graph_delete(g, window, cx);
             return;
         }
         if let Some(why) = self.doc.read_only() {
@@ -525,16 +513,10 @@ impl Viewer {
             self.add_participant(from, window, cx);
             return;
         }
-        // Shapes and subgraphs do not apply: a state, with a transition to or from the linked
-        // one.
-        if self.doc.is_state() {
-            self.add_state(link, window, cx);
-            return;
-        }
-        // Shapes and namespaces do not apply: a class, with a relation to or from the linked
-        // one.
-        if self.doc.is_class() {
-            self.add_class(link, window, cx);
+        // Shapes and subgraphs do not apply: a node of the diagram's own kind, with an edge to
+        // or from the linked one.
+        if let Some(g) = self.doc.graph() {
+            self.graph_add(g, link, window, cx);
             return;
         }
         if let Some(why) = self.doc.read_only() {
@@ -954,20 +936,11 @@ impl Viewer {
     pub fn edit_label(&mut self, item: Item, window: &mut Window, cx: &mut Context<Self>) {
         let text = if self.doc.sequence().is_some() {
             self.sequence_label(&item)
-        } else if self.doc.is_class() {
-            self.class_label(&item)
+        } else if let Some(g) = self.doc.graph() {
+            self.graph_label(g, &item)
         } else {
-            if let Some(why) = self.doc.read_only()
-                && !self.doc.is_state()
-            {
+            if let Some(why) = self.doc.read_only() {
                 self.refused("rename", Some(why), cx);
-                return;
-            }
-            // A state diagram's start and end states have no label.
-            if self.doc.is_state()
-                && let Item::Node(id) = &item
-                && id.contains(":[*]")
-            {
                 return;
             }
             let chart = &self.doc.chart;
@@ -1022,12 +995,8 @@ impl Viewer {
             if let Some(edit) = self.sequence_rename(&label.item, &text) {
                 self.record(edit, window, cx);
             }
-        } else if self.doc.is_state() {
-            if let Some(edit) = self.state_rename(&label.item, &text) {
-                self.record(edit, window, cx);
-            }
-        } else if self.doc.is_class() {
-            if let Some(edit) = self.class_rename(&label.item, &text) {
+        } else if let Some(g) = self.doc.graph() {
+            if let Some(edit) = self.graph_rename(g, &label.item, &text) {
                 self.record(edit, window, cx);
             }
         } else {

@@ -370,3 +370,29 @@ an id starting `note:`.
   relations`. The right-click menu holds Add Class, Rename, Delete, Select All, and Fit Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/class/edit.rs`.
+
+## WYSIWY-24 ER diagrams
+
+A Mermaid ER diagram takes drawing edits through `sirene_core::er::edit`; entities and
+relationships are selected as the flowchart's nodes and edges are. An entity's id is its name,
+without quotes.
+
+- Double-click or Rename edits an entity's alias (every `[...]` it has is set to `["..."]`, or
+  its first mention gains one; a label equal to the name, or empty, drops them) or a
+  relationship's label, written quoted. An alias is shown as written, so it goes on one line
+  with `"` as `'`; a relationship label writes `#` and `"` as entity codes.
+- Dragging from an entity to another adds `FROM ||--o{ TO : ""` at the end, selected with its
+  label open. A name that is not plain is quoted. Dragging to empty space adds an entity too.
+  Add Node, or a double-click on empty space, adds an entity `E1`, `E2`, ... with the alias
+  `New entity`, with a relationship to it from the one selected entity.
+- The right-click menu on relationships holds Start and End (Exactly One, Zero or One, One or
+  More, Zero or More) and Identifying (a solid line; unchecked, a dotted one). Each rewrites the
+  relationship as symbols, so `one to many` becomes `||--o{`.
+- Delete removes the selected relationships, and the selected entities with every statement
+  that names them (their names are dropped from `class` and `style` lists).
+- Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
+  the reason `ER diagrams take only adding, renaming, connecting, and deleting entities and
+  relationships, and setting cardinalities`.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/context_menu.rs`,
+`crates/sirene-core/src/er/edit.rs`.

@@ -7,10 +7,11 @@ use gpui::{
     Entity, Focusable, Modifiers, MouseButton, MouseDownEvent, MouseUpEvent, Pixels, Point,
     TestAppContext, VisualTestContext, point, px,
 };
+use sirene_core::flowchart::Arrow;
 use sirene_gui::document::Document;
 use sirene_gui::drawing::Item;
 use sirene_gui::viewer::Viewer;
-use sirene_gui::{AddNode, Delete, Deselect};
+use sirene_gui::{AddNode, Delete, Deselect, SetCardinality, SetIdentifying};
 
 const SRC: &str = "flowchart TD\n    A[Alpha] --> B[Beta]\n";
 
@@ -618,6 +619,75 @@ fn class_diagrams(cx: &mut TestAppContext) {
         "classDiagram\n    <<interface>> A\n    class A[\"Shape #35;1\"]\n    class C1[\"Circle\"]\n"
     );
     assert!(selection(&viewer, cx).is_empty());
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), before);
+}
+
+#[gpui::test]
+fn er_diagrams(cx: &mut TestAppContext) {
+    let src = "erDiagram\n    A ||--o{ B : has\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Renaming an entity and a relationship (WYSIWY-24).
+    let a = center(&viewer, cx, &node("A"));
+    double_click(cx, a);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("A"));
+    cx.simulate_input("Customer");
+    keys(cx, "enter");
+    let r = center(&viewer, cx, &Item::Edge(0));
+    double_click(cx, r);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("has"));
+    cx.simulate_input("places");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "erDiagram\n    A[\"Customer\"] ||--o{ B : \"places\"\n"
+    );
+
+    // Dragging between entities adds a relationship, with its label open.
+    let (a, b) = (
+        center(&viewer, cx, &node("A")),
+        center(&viewer, cx, &node("B")),
+    );
+    drag(cx, b, a);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(1)]);
+    cx.simulate_input("owns");
+    keys(cx, "enter");
+    assert!(
+        source(&viewer, cx).ends_with("    B ||--o{ A : \"owns\"\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+
+    // Cardinalities and the line, for the selected relationship.
+    viewer.update(cx, |v, cx| v.select(vec![Item::Edge(1)], cx));
+    cx.dispatch_action(SetCardinality {
+        start: false,
+        marker: Arrow::OneMany,
+    });
+    cx.dispatch_action(SetIdentifying { identifying: false });
+    assert!(
+        source(&viewer, cx).ends_with("    B ||..|{ A : \"owns\"\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+
+    // Adding an entity from the selected one adds a relationship to it; deleting it takes it.
+    let b = center(&viewer, cx, &node("B"));
+    click(cx, b, Modifiers::none());
+    cx.dispatch_action(AddNode);
+    cx.run_until_parked();
+    assert_eq!(selection(&viewer, cx), [node("E1")]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("New entity"));
+    keys(cx, "escape");
+    let before = source(&viewer, cx);
+    assert!(
+        before.ends_with("    E1[\"New entity\"]\n    B ||--o{ E1 : \"\"\n"),
+        "{before}"
+    );
+    viewer.update(cx, |v, cx| v.select(vec![node("E1")], cx));
+    cx.dispatch_action(Delete);
+    cx.run_until_parked();
+    assert!(!source(&viewer, cx).contains("E1"));
     keys(cx, &format!("{SECONDARY}-z"));
     assert_eq!(source(&viewer, cx), before);
 }

@@ -2,16 +2,18 @@
 
 use gpui::component::menu::PopupMenu;
 use gpui::{Context, WeakEntity, Window, px};
+use sirene_core::er;
 use sirene_core::flowchart::edit::Line;
 use sirene_core::flowchart::{Arrow, Direction, Flowchart, Node, Shape, Stroke};
 
+use crate::document::Graph;
 use crate::drawing::Item;
 use crate::refusal;
 use crate::viewer::Viewer;
 use crate::{
     AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, Group, KeepTogether,
     LongerEdge, MoveEarlier, MoveLater, MoveTo, Rename, ReverseEdge, SelectAll, SetArrows,
-    SetDirection, SetShape, SetStroke, ShorterEdge, Ungroup,
+    SetCardinality, SetDirection, SetIdentifying, SetShape, SetStroke, ShorterEdge, Ungroup,
 };
 
 /// The directions in Direction, with their names.
@@ -69,18 +71,19 @@ pub(crate) fn build(
     let Some(viewer) = viewer.upgrade() else {
         return menu;
     };
-    let (nodes, edges, chart, src, subgraph, focus, read_only, adds) = {
+    let (nodes, edges, chart, src, subgraph, focus, read_only, adds, er) = {
         let v = viewer.read(cx);
         // A diagram with its own edits: its Add Node item, unlinked and linked.
-        let adds = if v.doc.sequence().is_some() {
-            Some(("Add Participant", "Add Participant With Message"))
-        } else if v.doc.is_state() {
-            Some(("Add State", "Add State With Transition"))
-        } else if v.doc.is_class() {
-            Some(("Add Class", "Add Class With Relation"))
-        } else {
-            None
+        let adds = match v.doc.graph() {
+            _ if v.doc.sequence().is_some() => {
+                Some(("Add Participant", "Add Participant With Message"))
+            }
+            Some(Graph::State) => Some(("Add State", "Add State With Transition")),
+            Some(Graph::Class) => Some(("Add Class", "Add Class With Relation")),
+            Some(Graph::Er) => Some(("Add Entity", "Add Entity With Relationship")),
+            None => None,
         };
+        let er = v.doc.graph() == Some(Graph::Er);
         (
             v.selected_nodes(),
             v.selected_edges(),
@@ -90,6 +93,7 @@ pub(crate) fn build(
             v.drawing_focus.clone(),
             v.doc.read_only(),
             adds,
+            er,
         )
     };
     let mut menu = menu.action_context(focus);
@@ -101,6 +105,10 @@ pub(crate) fn build(
         menu = menu.menu(label, Box::new(AddNode));
         if nodes.len() + edges.len() == 1 {
             menu = menu.menu("Rename", Box::new(Rename));
+        }
+        // An ER diagram's relationships: each end's cardinality, and the line (WYSIWY-24).
+        if er && !edges.is_empty() {
+            menu = cardinality_items(menu, &edges, &chart, window, cx);
         }
         if !nodes.is_empty() || !edges.is_empty() {
             menu = menu.menu("Delete", Box::new(Delete));
@@ -159,6 +167,46 @@ pub(crate) fn build(
         menu = move_items(menu.separator(), &src, &[Item::Edge(*edge)]);
     }
     menu.separator().menu("Delete", Box::new(Delete))
+}
+
+/// Start and End cardinality submenus and Identifying for the selected relationships of an ER
+/// diagram, with the one selected relationship's checked.
+fn cardinality_items(
+    menu: PopupMenu,
+    edges: &[usize],
+    chart: &Flowchart,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    let one = match edges {
+        [i] => chart.edges.get(*i),
+        _ => None,
+    };
+    let (start, end) = (one.and_then(|e| e.start), one.and_then(|e| e.end));
+    let identifying = one.is_some_and(|e| e.stroke == Stroke::Normal);
+    let ends = move |m: PopupMenu, at_start: bool, current: Option<Arrow>| {
+        er::edit::CARDINALITIES
+            .iter()
+            .fold(m, |m, &(name, marker)| {
+                m.menu_with_check(
+                    name,
+                    current == Some(marker),
+                    Box::new(SetCardinality {
+                        start: at_start,
+                        marker,
+                    }),
+                )
+            })
+    };
+    menu.submenu("Start", window, cx, move |m, _, _| ends(m, true, start))
+        .submenu("End", window, cx, move |m, _, _| ends(m, false, end))
+        .menu_with_check(
+            "Identifying",
+            identifying,
+            Box::new(SetIdentifying {
+                identifying: !identifying,
+            }),
+        )
 }
 
 /// The four directions, with `current` checked, for the diagram or `subgraph`.

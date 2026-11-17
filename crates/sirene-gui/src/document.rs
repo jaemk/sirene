@@ -23,6 +23,20 @@ pub const STATE_EDITS: &str =
 pub const CLASS_EDITS: &str =
     "class diagrams take only adding, renaming, connecting, and deleting classes and relations";
 
+/// Why an ER diagram refuses the other drawing edits (WYSIWY-24).
+pub const ER_EDITS: &str = "ER diagrams take only adding, renaming, connecting, and deleting entities and relationships, and setting cardinalities";
+
+/// A diagram drawn from `Document::chart` that takes its own drawing edits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Graph {
+    /// A Mermaid state diagram (WYSIWY-22).
+    State,
+    /// A Mermaid class diagram (WYSIWY-23).
+    Class,
+    /// A Mermaid ER diagram (WYSIWY-24).
+    Er,
+}
+
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
 
@@ -222,7 +236,7 @@ impl Document {
             // Edited through `state` instead (WYSIWY-22).
             Kind::State => Some(STATE_EDITS),
             Kind::Class => Some(CLASS_EDITS),
-            Kind::Er => Some("drawing edits are not supported for ER diagrams yet"),
+            Kind::Er => Some(ER_EDITS),
             Kind::Git => Some("drawing edits are not supported for git graphs yet"),
             Kind::Timeline => Some("drawing edits are not supported for timelines yet"),
             Kind::Pie => Some("drawing edits are not supported for pie charts yet"),
@@ -276,24 +290,35 @@ impl Document {
         }
     }
 
-    /// Whether the document holds a Mermaid state diagram, which is drawn from `chart` and takes
-    /// its own drawing edits: adding, renaming, connecting, and deleting states and transitions
-    /// (WYSIWY-22).
-    pub fn is_state(&self) -> bool {
-        self.other.is_none() && Kind::of_lang(&self.source, self.lang()) == Kind::State
+    /// The kind of graph the document holds when it is drawn from `chart` and takes its own
+    /// drawing edits: adding, renaming, connecting, and deleting nodes and edges (WYSIWY-22,
+    /// WYSIWY-23, WYSIWY-24).
+    pub fn graph(&self) -> Option<Graph> {
+        if self.other.is_some() {
+            return None;
+        }
+        match Kind::of_lang(&self.source, self.lang()) {
+            Kind::State => Some(Graph::State),
+            Kind::Class => Some(Graph::Class),
+            Kind::Er => Some(Graph::Er),
+            _ => None,
+        }
     }
 
-    /// Whether the document holds a Mermaid class diagram, which is drawn from `chart` and takes
-    /// its own drawing edits: adding, renaming, connecting, and deleting classes and relations
-    /// (WYSIWY-23).
+    /// Whether the document holds a Mermaid state diagram (WYSIWY-22).
+    pub fn is_state(&self) -> bool {
+        self.graph() == Some(Graph::State)
+    }
+
+    /// Whether the document holds a Mermaid class diagram (WYSIWY-23).
     pub fn is_class(&self) -> bool {
-        self.other.is_none() && Kind::of_lang(&self.source, self.lang()) == Kind::Class
+        self.graph() == Some(Graph::Class)
     }
 
     /// Whether drawing edits go through a diagram's own edit module rather than
-    /// `flowchart::edit` (WYSIWY-21, WYSIWY-22, WYSIWY-23).
+    /// `flowchart::edit` (WYSIWY-21 to WYSIWY-24).
     pub fn own_edits(&self) -> bool {
-        self.sequence().is_some() || self.is_state() || self.is_class()
+        self.sequence().is_some() || self.graph().is_some()
     }
 
     /// The drawing of whichever diagram the document holds.

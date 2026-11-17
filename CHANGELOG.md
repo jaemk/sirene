@@ -28,6 +28,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and transitions, with undo. `state::edit` holds the source edits.
 - The editor edits Mermaid class diagrams on the drawing: rename, add, connect, and delete
   classes and relations, with undo. `class::edit` holds the source edits.
+- The editor edits Mermaid ER diagrams on the drawing: rename, add, connect, and delete entities
+  and relationships, and set each end's cardinality and whether a relationship is identifying,
+  with undo. `er::edit` holds the source edits.
 - `sirene ascii --markdown` and `sirene check --markdown` read stdin, or files of any name, as
   Markdown.
 - `sirene check --json` prints the diagnostics to stdout as one JSON array.

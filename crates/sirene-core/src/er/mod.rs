@@ -1,5 +1,6 @@
 //! Mermaid entity relationship diagrams (MER-*), lowered to the flowchart model.
 
+pub mod edit;
 mod lower;
 mod parser;
 

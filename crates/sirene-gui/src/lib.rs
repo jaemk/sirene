@@ -12,10 +12,10 @@
 #![doc = include_str!("../README.md")]
 // The window's behavior: GUISHE-* in spec/gui-shell.md, WYSIWY-* in spec/wysiwyg-editing.md.
 
-pub mod class;
 pub mod document;
 pub mod drawing;
 pub mod export;
+pub mod graph;
 pub mod menu;
 pub mod navigation;
 pub mod paint;
@@ -23,7 +23,6 @@ pub mod refusal;
 pub mod sequence;
 pub mod settings;
 pub mod shape_bar;
-pub mod state;
 pub mod styles;
 pub mod viewer;
 
@@ -211,6 +210,23 @@ pub struct SetStroke {
 pub struct SetArrows {
     pub start: Option<Arrow>,
     pub end: Option<Arrow>,
+}
+
+/// Set the cardinality at the start (or end) of the selected relationships of an ER diagram
+/// (WYSIWY-24).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetCardinality {
+    pub start: bool,
+    pub marker: Arrow,
+}
+
+/// Make the selected relationships of an ER diagram identifying (a solid line) or not
+/// (WYSIWY-24).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetIdentifying {
+    pub identifying: bool,
 }
 
 /// Add an edge from each selected node to node `id` (WYSIWY-14).
