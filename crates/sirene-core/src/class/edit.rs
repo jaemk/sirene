@@ -272,6 +272,81 @@ pub fn set_relation_label(src: &str, edge: usize, label: &str) -> Option<TextEdi
     (edit.apply(src) != src).then_some(edit)
 }
 
+/// The relation kinds, for menus: `(title, line, marker)`. A relation is written with its marker
+/// on the side it had (the right when it had none), e.g. `--|>` or `<|--`.
+pub const RELATION_KINDS: &[(&str, &str, &str)] = &[
+    ("Association", "--", ">"),
+    ("Inheritance", "--", "|>"),
+    ("Composition", "--", "*"),
+    ("Aggregation", "--", "o"),
+    ("Dependency", "..", ">"),
+    ("Realization", "..", "|>"),
+    ("Link", "--", ""),
+    ("Dashed Link", "..", ""),
+];
+
+/// A relation token's parts: left end, line, right end, with `<` and `<|` as `>` and `|>`.
+fn relation_parts(rel: &str) -> Option<(&str, &str, &str)> {
+    let at = rel.find(['-', '.'])?;
+    let (left, rest) = rel.split_at(at);
+    let (line, right) = rest.split_at(2.min(rest.len()));
+    // `*`, `o`, and `()` read the same from either side.
+    let left = match left {
+        "<" => ">",
+        "<|" => "|>",
+        other => other,
+    };
+    Some((left, line, right))
+}
+
+/// The kind of relation `edge`, as a title in [`RELATION_KINDS`]. `None` when there is no such
+/// relation or it has markers at both ends or one no kind has.
+pub fn relation_kind(src: &str, edge: usize) -> Option<&'static str> {
+    let doc = Doc::new(src);
+    let rel = token(&doc.relation(edge)?, RELATION)?;
+    let (left, line, right) = relation_parts(rel.text())?;
+    let marker = match (left, right) {
+        (m, "") | ("", m) => m,
+        _ => return None,
+    };
+    RELATION_KINDS
+        .iter()
+        .find(|(_, l, m)| *l == line && *m == marker)
+        .map(|(title, _, _)| *title)
+}
+
+/// Sets the kind of relation `edge` to `kind`, a title in [`RELATION_KINDS`], keeping the side
+/// its marker is on. `None` when there is no such relation or kind, or nothing changes.
+pub fn set_relation_kind(src: &str, edge: usize, kind: &str) -> Option<TextEdit> {
+    let &(_, line, marker) = RELATION_KINDS.iter().find(|(t, _, _)| *t == kind)?;
+    let doc = Doc::new(src);
+    let rel = token(&doc.relation(edge)?, RELATION)?;
+    let (left, _, right) = relation_parts(rel.text())?;
+    let text = if !left.is_empty() && right.is_empty() {
+        let marker = match marker {
+            ">" => "<",
+            "|>" => "<|",
+            m => m,
+        };
+        format!("{marker}{line}")
+    } else {
+        format!("{line}{marker}")
+    };
+    // `o` at the right is a marker only with whitespace or a quote after it.
+    let after = &src[usize::from(rel.text_range().end())..];
+    let touching = after.starts_with(|c: char| !c.is_whitespace() && c != '"');
+    let text = if text.ends_with('o') && touching {
+        format!("{text} ")
+    } else {
+        text
+    };
+    let edit = TextEdit {
+        range: span(rel.text_range()),
+        text,
+    };
+    (edit.apply(src) != src).then_some(edit)
+}
+
 /// Removes relations `edges` and classes `classes`, with every statement naming one of them
 /// (and their ids from `style` and `cssClass` lists). A note on its own is removed by its id.
 /// `None` when nothing is removed.
@@ -471,6 +546,33 @@ mod tests {
         );
         assert!(set_relation_label(bare, 0, "").is_none());
         assert!(set_relation_label(bare, 9, "x").is_none());
+    }
+
+    #[test]
+    fn sets_relation_kinds() {
+        assert_eq!(relation_kind(SRC, 0), Some("Inheritance"));
+        // The marker stays on its side.
+        let out = apply(SRC, set_relation_kind(SRC, 0, "Composition"));
+        assert!(out.contains("Animal *-- Duck : is"), "{out}");
+        assert_eq!(relation_kind(&out, 0), Some("Composition"));
+        let out = apply(SRC, set_relation_kind(SRC, 0, "Dependency"));
+        assert!(out.contains("Animal <.. Duck : is"), "{out}");
+        let out = apply(SRC, set_relation_kind(SRC, 0, "Dashed Link"));
+        assert!(out.contains("Animal .. Duck : is"), "{out}");
+        // With no marker, or one on the right, it goes on the right.
+        let plain = "classDiagram\n    A -- B\n    A-->B\n";
+        let out = apply(plain, set_relation_kind(plain, 0, "Realization"));
+        assert!(out.contains("A ..|> B"), "{out}");
+        assert_eq!(relation_kind(&out, 0), Some("Realization"));
+        // `o` touching the next class gets a space, so it stays a marker.
+        let out = apply(plain, set_relation_kind(plain, 1, "Aggregation"));
+        assert!(out.contains("A--o B"), "{out}");
+        assert_eq!(relation_kind(&out, 1), Some("Aggregation"));
+        assert!(set_relation_kind(SRC, 0, "Inheritance").is_none());
+        assert!(set_relation_kind(SRC, 0, "Bogus").is_none());
+        assert!(set_relation_kind(SRC, 9, "Link").is_none());
+        let both = "classDiagram\n    A <|--|> B\n";
+        assert_eq!(relation_kind(both, 0), None);
     }
 
     #[test]

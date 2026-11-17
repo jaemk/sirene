@@ -4,7 +4,7 @@ use gpui::component::menu::PopupMenu;
 use gpui::{Context, WeakEntity, Window, px};
 use sirene_core::flowchart::edit::Line;
 use sirene_core::flowchart::{Arrow, Direction, Flowchart, Node, Shape, Stroke};
-use sirene_core::{er, requirement};
+use sirene_core::{class, er, requirement};
 
 use crate::document::Graph;
 use crate::drawing::Item;
@@ -13,8 +13,8 @@ use crate::viewer::Viewer;
 use crate::{
     AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, Group, KeepTogether,
     LongerEdge, MoveEarlier, MoveLater, MoveTo, Rename, ReverseEdge, SelectAll, SetArrows,
-    SetCardinality, SetDirection, SetIdentifying, SetRelationshipType, SetShape, SetStroke,
-    ShorterEdge, Ungroup,
+    SetCardinality, SetDirection, SetIdentifying, SetRelationKind, SetRelationshipType, SetShape,
+    SetStroke, ShorterEdge, Ungroup,
 };
 
 /// The directions in Direction, with their names.
@@ -116,8 +116,11 @@ pub(crate) fn build(
                 // An ER diagram's relationships: each end's cardinality, and the line
                 // (WYSIWY-24).
                 Some(Graph::Er) => menu = cardinality_items(menu, &edges, &chart, window, cx),
-                // A requirement diagram's relationships: their type (WYSIWY-25).
-                Some(Graph::Requirement) => menu = type_items(menu, &edges, &src, window, cx),
+                // A requirement diagram's relationship types (WYSIWY-25) and a class diagram's
+                // relation kinds (WYSIWY-23).
+                Some(g @ (Graph::Requirement | Graph::Class)) => {
+                    menu = kind_items(menu, g, &edges, &src, window, cx)
+                }
                 _ => {}
             }
         }
@@ -220,32 +223,68 @@ fn cardinality_items(
         )
 }
 
-/// A Type submenu for the selected relationships of a requirement diagram, with the one
-/// selected relationship's checked.
-fn type_items(
+/// A submenu `title` of `choices` (`(name, value)`) for the selected edges, with `current`
+/// checked; each item dispatches `action(value)`.
+fn choice_items(
     menu: PopupMenu,
+    title: &'static str,
+    choices: Vec<(&'static str, &'static str)>,
+    current: Option<String>,
+    action: fn(String) -> Box<dyn gpui::Action>,
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    menu.submenu(title, window, cx, move |m, _, _| {
+        choices.iter().fold(m, |m, &(name, value)| {
+            m.menu_with_check(
+                name,
+                current.as_deref() == Some(value),
+                action(value.to_owned()),
+            )
+        })
+    })
+}
+
+/// A Type submenu for the selected relationships of a requirement diagram (WYSIWY-25), or a Kind
+/// submenu for the selected relations of a class diagram (WYSIWY-23), with the one selected
+/// edge's checked.
+fn kind_items(
+    menu: PopupMenu,
+    graph: Graph,
     edges: &[usize],
     src: &str,
     window: &mut Window,
     cx: &mut Context<PopupMenu>,
 ) -> PopupMenu {
-    let current = match edges {
-        [i] => requirement::edit::relationship_type(src, *i),
+    let one = match edges {
+        [i] => Some(*i),
         _ => None,
     };
-    menu.submenu("Type", window, cx, move |m, _, _| {
-        requirement::edit::RELATIONSHIPS
-            .iter()
-            .fold(m, |m, &(name, kind)| {
-                m.menu_with_check(
-                    name,
-                    current.as_deref() == Some(kind),
-                    Box::new(SetRelationshipType {
-                        kind: kind.to_owned(),
-                    }),
-                )
-            })
-    })
+    match graph {
+        Graph::Requirement => choice_items(
+            menu,
+            "Type",
+            requirement::edit::RELATIONSHIPS.to_vec(),
+            one.and_then(|i| requirement::edit::relationship_type(src, i)),
+            |kind| Box::new(SetRelationshipType { kind }),
+            window,
+            cx,
+        ),
+        Graph::Class => choice_items(
+            menu,
+            "Kind",
+            class::edit::RELATION_KINDS
+                .iter()
+                .map(|&(name, _, _)| (name, name))
+                .collect(),
+            one.and_then(|i| class::edit::relation_kind(src, i))
+                .map(str::to_owned),
+            |kind| Box::new(SetRelationKind { kind }),
+            window,
+            cx,
+        ),
+        _ => menu,
+    }
 }
 
 /// The four directions, with `current` checked, for the diagram or `subgraph`.

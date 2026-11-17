@@ -10,7 +10,7 @@ use sirene_core::{class, er, requirement, state};
 use crate::document::Graph;
 use crate::drawing::{Item, Link};
 use crate::viewer::Viewer;
-use crate::{SetCardinality, SetIdentifying, SetRelationshipType};
+use crate::{SetCardinality, SetIdentifying, SetRelationKind, SetRelationshipType};
 
 /// Label of states made by AddNode.
 pub const NEW_STATE: &str = "New state";
@@ -220,6 +220,22 @@ impl Viewer {
         let identifying = a.identifying;
         self.graph_edges(window, cx, |src, i| {
             er::edit::set_identifying(src, i, identifying)
+        });
+    }
+
+    /// Sets the kind of the selected relations of a class diagram (WYSIWY-23).
+    pub(crate) fn set_relation_kind(
+        &mut self,
+        a: &SetRelationKind,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.doc.graph() != Some(Graph::Class) {
+            return;
+        }
+        let kind = a.kind.clone();
+        self.graph_edges(window, cx, |src, i| {
+            class::edit::set_relation_kind(src, i, &kind)
         });
     }
 

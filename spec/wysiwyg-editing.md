@@ -362,14 +362,20 @@ an id starting `note:`.
   its label open; one at a note is refused. An id that is not plain is written in backticks.
   Dragging to empty space adds a class too. Add Node, or a double-click on empty space, adds a
   class `C1`, `C2`, ... labeled `New class`, with a relation to it from the one selected class.
+- The right-click menu on relations holds Kind (Association, Inheritance, Composition,
+  Aggregation, Dependency, Realization, Link, Dashed Link), which rewrites the relation's
+  symbol with the marker on the side it had (the right when it had none), e.g. `<|--` becomes
+  `*--` and `-->` becomes `..|>`. A relation with markers at both ends has none checked.
 - Delete removes the selected relations and notes, and the selected classes with every
   statement that names them (declarations, members, annotations, relations, notes, and clicks;
   their ids are dropped from `style` and `cssClass` lists).
 - Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
   the reason `class diagrams take only adding, renaming, connecting, and deleting classes and
-  relations`. The right-click menu holds Add Class, Rename, Delete, Select All, and Fit Window.
+  relations, and setting relation kinds`. The right-click menu holds Add Class, Rename, Kind (on
+  relations), Delete, Select All, and Fit Window.
 
-Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/class/edit.rs`.
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/context_menu.rs`,
+`crates/sirene-core/src/class/edit.rs`.
 
 ## WYSIWY-24 ER diagrams
 

@@ -97,6 +97,12 @@ fn class_diagram_menu(cx: &mut TestAppContext) {
         shape: Shape::Diamond,
     });
     assert_eq!(source(&viewer, cx), src);
+    // On a relation: Add Class, Rename, Kind > Association, Inheritance, Composition.
+    let r = center(&viewer, cx, &Item::Edge(0));
+    pick(cx, r, "down down down enter down down enter");
+    assert_eq!(source(&viewer, cx), "classDiagram\n    A *-- B\n");
+    cx.simulate_keystrokes(&format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), src);
     // The first item adds a class with a relation from the one right-clicked.
     let b = center(&viewer, cx, &node("B"));
     first_item(cx, b);

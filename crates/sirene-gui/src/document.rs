@@ -20,8 +20,7 @@ pub const STATE_EDITS: &str =
     "state diagrams take only adding, renaming, connecting, and deleting states and transitions";
 
 /// Why a class diagram refuses the other drawing edits (WYSIWY-23).
-pub const CLASS_EDITS: &str =
-    "class diagrams take only adding, renaming, connecting, and deleting classes and relations";
+pub const CLASS_EDITS: &str = "class diagrams take only adding, renaming, connecting, and deleting classes and relations, and setting relation kinds";
 
 /// Why an ER diagram refuses the other drawing edits (WYSIWY-24).
 pub const ER_EDITS: &str = "ER diagrams take only adding, renaming, connecting, and deleting entities and relationships, and setting cardinalities";

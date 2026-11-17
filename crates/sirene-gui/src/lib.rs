@@ -229,6 +229,14 @@ pub struct SetIdentifying {
     pub identifying: bool,
 }
 
+/// Set the kind (`Inheritance`, `Composition`, ...) of the selected relations of a class diagram
+/// (WYSIWY-23).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetRelationKind {
+    pub kind: String,
+}
+
 /// Set the type (`satisfies`, `traces`, ...) of the selected relationships of a requirement
 /// diagram (WYSIWY-25).
 #[derive(Clone, PartialEq, Debug, gpui::Action)]

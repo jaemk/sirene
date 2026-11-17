@@ -191,7 +191,7 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     assert_eq!(
         class.read_only(),
         Some(
-            "class diagrams take only adding, renaming, connecting, and deleting classes and relations"
+            "class diagrams take only adding, renaming, connecting, and deleting classes and relations, and setting relation kinds"
         )
     );
     assert!(class.is_class() && class.own_edits() && !class.is_state());
