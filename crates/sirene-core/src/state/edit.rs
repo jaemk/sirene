@@ -89,16 +89,15 @@ impl<'a> Doc<'a> {
         let close = token(&composite, R_BRACE)?;
         let src = self.src;
         let at = usize::from(close.text_range().start());
+        // The last inner statement's indent, unless it shares the composite's first line.
+        let open = line_start(src, usize::from(composite.text_range().start()));
         let inner = composite
             .children()
             .last()
-            .map(|s| indent(src, usize::from(s.text_range().start())).to_owned())
-            .unwrap_or_else(|| {
-                format!(
-                    "{}    ",
-                    indent(src, usize::from(composite.text_range().start()))
-                )
-            });
+            .map(|s| usize::from(s.text_range().start()))
+            .filter(|&at| line_start(src, at) != open)
+            .map(|at| indent(src, at).to_owned())
+            .unwrap_or_else(|| format!("{}    ", indent(src, open)));
         let nl = self.newline;
         Some(if src[line_start(src, at)..at].trim().is_empty() {
             let start = line_start(src, at);
@@ -109,7 +108,7 @@ impl<'a> Doc<'a> {
         } else {
             TextEdit {
                 range: at..at,
-                text: format!("{nl}{inner}{line}{nl}"),
+                text: format!("{nl}{inner}{line}{nl}{}", indent(src, open)),
             }
         })
     }
@@ -202,7 +201,7 @@ fn normalize(text: &str) -> String {
 }
 
 /// Description text (after `:`) for `text`: lines joined with `<br>`, `#` as an entity code.
-pub fn description_source(text: &str) -> String {
+fn description_source(text: &str) -> String {
     normalize(text).replace('#', "#35;").replace('\n', "<br>")
 }
 
@@ -485,6 +484,10 @@ mod tests {
         // A one-line composite takes the line before its `}`.
         let one = "stateDiagram-v2\n    state W { a }\n";
         let out = apply(one, add_transition(one, "W:[*]start", "a"));
+        assert_eq!(
+            out,
+            "stateDiagram-v2\n    state W { a \n        [*] --> a\n    }\n"
+        );
         assert_eq!(chart(&out).edges.len(), 1, "{out}");
     }
 
@@ -520,6 +523,12 @@ mod tests {
             apply(alias, set_state_label(alias, "B", "")),
             "stateDiagram-v2\n    state \"Old\" as A\n    state B\n"
         );
+        // A state inside a composite stays in it.
+        let inner = "stateDiagram-v2\n    state W {\n        a --> b\n    }\n";
+        let out = apply(inner, set_state_label(inner, "a", "x"));
+        let c = chart(&out);
+        let w = c.subgraphs.iter().find(|s| s.id == "W").unwrap();
+        assert!(w.members.iter().any(|n| n == "a"), "{out}\n{:?}", w.members);
         assert!(set_state_label(SRC, "Idle", "Idle").is_none());
         assert!(set_state_label(SRC, ":[*]start", "x").is_none());
         assert!(set_state_label(SRC, "Nope", "x").is_none());

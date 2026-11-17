@@ -558,6 +558,25 @@ fn state_diagrams(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn state_transitions_inside_composites(cx: &mut TestAppContext) {
+    let src = "stateDiagram-v2\n    state W {\n        [*] --> a\n    }\n    a --> b\n";
+    let (viewer, cx) = open_src(cx, src);
+    // The new transition goes inside W, before `a --> b`, and is the one selected and labeled.
+    let (start, a) = (
+        center(&viewer, cx, &node("W:[*]start")),
+        center(&viewer, cx, &node("a")),
+    );
+    drag(cx, start, a);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(1)]);
+    cx.simulate_input("again");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "stateDiagram-v2\n    state W {\n        [*] --> a\n        [*] --> a : again\n    }\n    a --> b\n"
+    );
+}
+
+#[gpui::test]
 fn read_only_scene_nodes_ignore_graph_selection(cx: &mut TestAppContext) {
     use sirene_core::scene::{Owner, Pt};
     for source in [

@@ -48,8 +48,13 @@ impl Viewer {
             self.refused("connect", Some(edit::TRANSITION_REFUSED), cx);
             return;
         };
+        // The new transition is the one in the inserted text, which is not always the last: one
+        // at a composite's start or end state goes inside the composite.
+        let added = e.range.start..e.range.start + e.text.len();
         self.record(e, window, cx);
-        let Some(n) = self.doc.chart.edges.len().checked_sub(1) else {
+        let Some(n) = (self.doc.chart.edges.iter())
+            .position(|t| added.contains(&usize::from(t.range.start())))
+        else {
             return;
         };
         let item = Item::Edge(n);
