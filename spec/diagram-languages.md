@@ -41,8 +41,8 @@ diagnostic's position is in the source the user wrote, as now.
 `diagram::lower` returns a `diagram::Diagram`: `Graph` (a `Flowchart`) or one of the other models
 (`Sequence`, MSEQ-2; `Git`, MGIT-2; `Timeline`, TIMELI-2; `Pie`, MPIE-2; `Gantt`, MGANTT-3; `Mindmap`, MMIND-2; `Journey`, MJOUR-2; `Quadrant`, MQUAD-2; `XyChart`, MXY-2; `Kanban`, MKAN-2; `Packet`, MPKT-2; `Radar`, MRADAR-2; `Sankey`, MSANKEY-2; `Treemap`, MTREE-2; `Block`, MBLOCK-2; `Architecture`, MARCH-2; `C4`, MC4-2; `Info`, MINFO-2; `Ishikawa`, MISH-2; `Venn`, MVENN-2; `Wardley`, MWARD-2; `TreeView`, MTREEV-2; ZenUML lowers to `Sequence`, MZEN-2). `Diagram::scene` and `Diagram::ascii`
 draw any of them, and the CLI, Markdown rendering, and the editor's drawing and export go through
-them. Only a graph is hit-tested and edited; the others draw read-only (LANGS-5) with every
-element owned by the diagram.
+them. A graph, sequence diagram, mindmap, or timeline is hit-tested and edited; the others draw
+read-only (LANGS-5) with every element owned by the diagram.
 
 ## LANGS-3 Graph model additions
 
@@ -95,12 +95,14 @@ Sequence diagrams take their own edits (WYSIWY-21), as do state diagrams (WYSIWY
 user journeys, quadrant, XY, and radar charts, kanban boards, packet, sankey, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, event modeling, and agentflow diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
 disabled Add Node, Select All, and Fit Window, a press on a node pans instead of connecting, and
 every edit action says `Can't ...: drawing edits are not supported for DOT yet` (or PlantUML,
-use case diagrams, git graphs, timelines, sequence diagrams, pie charts, gantt
-charts, mindmaps, user journeys, quadrant charts, XY charts, kanban boards, packet diagrams,
+use case diagrams, git graphs, pie charts, gantt charts, user journeys, quadrant charts, XY charts, kanban boards, packet diagrams,
 radar charts, sankey diagrams, treemaps, block diagrams, architecture diagrams, C4 diagrams, ZenUML diagrams, ishikawa diagrams, venn diagrams, Wardley maps, tree views, or railroad diagrams; an info diagram says it has
 nothing to edit).
-A sequence diagram, git graph, timeline, pie, gantt, quadrant, XY, or radar chart, mindmap, user
-journey, kanban board, packet, sankey, block, architecture, C4, ZenUML, info, ishikawa, or venn diagram, Wardley map, tree view, railroad diagram, or treemap is drawn from `Document::other` and has nothing to select. Tests: `dot_graphs_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
+A git graph, pie, gantt, quadrant, XY, or radar chart, user journey, kanban board, packet,
+sankey, block, architecture, C4, ZenUML, info, ishikawa, or venn diagram, Wardley map, tree view,
+railroad diagram, or treemap is drawn from `Document::other` and has nothing to select; a
+sequence diagram, mindmap, or timeline is drawn from it too, with its elements owned so they can
+be selected (`Document::scene_edits`). Tests: `dot_graphs_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 

@@ -59,6 +59,6 @@ diagram (LANGS-2).
 
 ## MSEQ-5 Editor
 
-Drawing edits are read-only at first (LANGS-5). The planned edit module hit-tests participants,
-messages, and notes, adds a participant, adds a message between two lifelines by dragging, edits
-labels, and reorders messages.
+`sequence::edit` takes drawing edits (WYSIWY-21): participants and messages are selected,
+participants are added, renamed, reordered, and deleted, a message is added by dragging between
+two lifelines, and message text and arrows are edited.
