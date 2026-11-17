@@ -125,35 +125,74 @@ fn info_plist() {
     );
     assert_eq!(d["NSHighResolutionCapable"].as_boolean(), Some(true));
 
+    // Each language's files open by default, and Markdown as an alternate (MACOSP-3).
     let docs = d["CFBundleDocumentTypes"].as_array().unwrap();
-    assert_eq!(docs.len(), 1);
-    let doc = docs[0].as_dictionary().unwrap();
-    assert_eq!(doc["CFBundleTypeRole"].as_string(), Some("Editor"));
-    assert_eq!(doc["LSHandlerRank"].as_string(), Some("Default"));
+    let docs: Vec<(String, String)> = docs
+        .iter()
+        .map(|doc| {
+            let doc = doc.as_dictionary().unwrap();
+            assert_eq!(doc["CFBundleTypeRole"].as_string(), Some("Editor"));
+            let types = doc["LSItemContentTypes"].as_array().unwrap();
+            assert_eq!(types.len(), 1);
+            (
+                types[0].as_string().unwrap().to_owned(),
+                doc["LSHandlerRank"].as_string().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    let owned = |pairs: &[(&str, &str)]| -> Vec<(String, String)> {
+        pairs
+            .iter()
+            .map(|(a, b)| ((*a).to_owned(), (*b).to_owned()))
+            .collect()
+    };
     assert_eq!(
-        doc["LSItemContentTypes"],
-        Value::Array(vec!["io.github.jaemk.sirene.mermaid".into()])
+        docs,
+        owned(&[
+            ("io.github.jaemk.sirene.mermaid", "Default"),
+            ("io.github.jaemk.sirene.dot", "Default"),
+            ("io.github.jaemk.sirene.plantuml", "Default"),
+            ("net.daringfireball.markdown", "Alternate"),
+        ])
     );
 
     let utis = d["UTImportedTypeDeclarations"].as_array().unwrap();
-    assert_eq!(utis.len(), 1);
-    let uti = utis[0].as_dictionary().unwrap();
+    let utis: Vec<(String, String, Value)> = utis
+        .iter()
+        .map(|uti| {
+            let uti = uti.as_dictionary().unwrap();
+            assert_eq!(
+                uti["UTTypeConformsTo"],
+                Value::Array(vec!["public.plain-text".into()])
+            );
+            let tags = uti["UTTypeTagSpecification"].as_dictionary().unwrap();
+            (
+                uti["UTTypeIdentifier"].as_string().unwrap().to_owned(),
+                uti["UTTypeDescription"].as_string().unwrap().to_owned(),
+                tags["public.filename-extension"].clone(),
+            )
+        })
+        .collect();
+    let exts = |e: &[&str]| Value::Array(e.iter().map(|&e| e.into()).collect());
     assert_eq!(
-        uti["UTTypeIdentifier"].as_string(),
-        Some("io.github.jaemk.sirene.mermaid")
-    );
-    assert_eq!(
-        uti["UTTypeDescription"].as_string(),
-        Some("Mermaid diagram")
-    );
-    assert_eq!(
-        uti["UTTypeConformsTo"],
-        Value::Array(vec!["public.plain-text".into()])
-    );
-    let tags = uti["UTTypeTagSpecification"].as_dictionary().unwrap();
-    assert_eq!(
-        tags["public.filename-extension"],
-        Value::Array(vec!["mmd".into(), "mermaid".into()])
+        utis,
+        [
+            (
+                "io.github.jaemk.sirene.mermaid".to_owned(),
+                "Mermaid diagram".to_owned(),
+                exts(&["mmd", "mermaid"]),
+            ),
+            (
+                "io.github.jaemk.sirene.dot".to_owned(),
+                "Graphviz DOT graph".to_owned(),
+                exts(&["dot", "gv"]),
+            ),
+            (
+                "io.github.jaemk.sirene.plantuml".to_owned(),
+                "PlantUML diagram".to_owned(),
+                exts(&["puml", "plantuml", "pu", "iuml"]),
+            ),
+        ]
     );
 }
 

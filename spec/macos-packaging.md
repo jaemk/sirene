@@ -31,10 +31,18 @@ MACOSP-3.
 
 ## MACOSP-3 Document types
 
-`UTImportedTypeDeclarations` declares `io.github.jaemk.sirene.mermaid` ("Mermaid diagram"), conforming to
-`public.plain-text`, for the extensions `mmd` and `mermaid`. `CFBundleDocumentTypes` lists that
-type with role `Editor` and handler rank `Default`, so Finder offers the app for those files and
-opens them through GUISHE-1.
+`UTImportedTypeDeclarations` declares, each conforming to `public.plain-text`, the extensions of
+LANGS-1 that the app draws:
+
+| Identifier | Description | Extensions |
+|------------|-------------|------------|
+| `io.github.jaemk.sirene.mermaid` | Mermaid diagram | `mmd`, `mermaid` |
+| `io.github.jaemk.sirene.dot` | Graphviz DOT graph | `dot`, `gv` |
+| `io.github.jaemk.sirene.plantuml` | PlantUML diagram | `puml`, `plantuml`, `pu`, `iuml` |
+
+`CFBundleDocumentTypes` lists each with role `Editor` and handler rank `Default`, and Markdown
+(`net.daringfireball.markdown`, WYSIWY-20) with rank `Alternate`, so Finder offers the app for
+those files and opens them through GUISHE-1. `xtask::DOCUMENT_TYPES` holds the table.
 
 ## MACOSP-4 Icon
 

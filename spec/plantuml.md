@@ -1,6 +1,6 @@
 # PlantUML
 
-Status: research; sequence diagrams are specified in `plantuml-sequence-diagrams.md` (PSEQ)
+Status: done; sequence diagrams are specified in `plantuml-sequence-diagrams.md` (PSEQ)
 activity diagrams in `plantuml-activity-diagrams.md` (PACT), class diagrams in
 `plantuml-class-diagrams.md` (PCLS), state diagrams in `plantuml-state-diagrams.md` (PSTA), and
 use case, component, and deployment diagrams in `plantuml-description-diagrams.md` (PDSC), and
@@ -62,16 +62,17 @@ by PSEQ.
 
 `!include`, `!includeurl`, `!includesub`, `!include_many`, `!include_once`, and `!import` read
 other files or the network and are not followed: each is an error naming it. `!define`,
-`!function`, variables, and conditionals are research: they may be worth a small evaluator,
-since real files use them. `skinparam` is a warning, except `actorStyle` in use case diagrams;
-mapping colors and fonts to the theme is research. `!theme` is a warning.
+`!function`, variables, conditionals, and the other preprocessor lines are a warning naming the
+directive (`` `!define` is not supported; ignoring the line ``) and are skipped. `skinparam` is a
+warning, except `actorStyle` in use case diagrams, and `!theme` is a warning. Tests:
+`common_preprocessor_lines` in `crates/sirene-core/src/plantuml/lines.rs`.
 
 ## PUML-5 Open questions
 
 - Resolved: the reference is the current language reference guide and plantuml.com, and the
   fixtures are written for sirene rather than copied from PlantUML's examples (PSEQ).
-- Whether the non-UML kinds (mindmap, WBS, Gantt, JSON, YAML, Salt) share Mermaid's chart work
-  (MCHART).
-- How far the preprocessor has to go before typical files render.
+- Resolved: the non-UML kinds draw on the Mermaid models (PUML-2); Salt is not drawn.
+- Open: whether a small evaluator for `!define`, variables, and conditionals is worth it, since
+  real files use them. Mapping `skinparam` colors and fonts to the theme is open too.
 
-The outcome is one `pending` spec per kind, starting with sequence and activity.
+Each kind has its own spec, listed above.

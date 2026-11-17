@@ -18,7 +18,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Display List | done | [display-list.md](display-list.md) |
 | GUI Shell | done | [gui-shell.md](gui-shell.md) |
 | WYSIWYG Editing | done | [wysiwyg-editing.md](wysiwyg-editing.md) |
-| macOS Packaging | research | [macos-packaging.md](macos-packaging.md) |
+| macOS Packaging | done | [macos-packaging.md](macos-packaging.md) |
 | Flowchart Model | done | [flowchart-model.md](flowchart-model.md) |
 | Markdown | done | [markdown.md](markdown.md) |
 | Agent Skill | done | [agent-skill.md](agent-skill.md) |
@@ -31,7 +31,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | Mermaid Charts | done | [mermaid-charts.md](mermaid-charts.md) |
 | Graphviz DOT | done | [graphviz-dot.md](graphviz-dot.md) |
 | D2 | research | [d2.md](d2.md) |
-| PlantUML | research | [plantuml.md](plantuml.md) |
+| PlantUML | done | [plantuml.md](plantuml.md) |
 | Mermaid Git Graphs | done | [mermaid-git-graphs.md](mermaid-git-graphs.md) |
 | Mermaid Timelines | done | [mermaid-timelines.md](mermaid-timelines.md) |
 | Mermaid Pie Charts | done | [mermaid-pie-charts.md](mermaid-pie-charts.md) |

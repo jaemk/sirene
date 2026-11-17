@@ -29,6 +29,23 @@ pub const APP: &str = "Sirene";
 pub const BUNDLE_ID: &str = "io.github.jaemk.sirene";
 /// The type identifier declared for Mermaid files.
 pub const MERMAID_UTI: &str = "io.github.jaemk.sirene.mermaid";
+/// The file types the app declares and opens (MACOSP-3): type identifier, description, and
+/// file name extensions (LANGS-1).
+pub const DOCUMENT_TYPES: [(&str, &str, &[&str]); 3] = [
+    (MERMAID_UTI, "Mermaid diagram", &["mmd", "mermaid"]),
+    (
+        "io.github.jaemk.sirene.dot",
+        "Graphviz DOT graph",
+        &["dot", "gv"],
+    ),
+    (
+        "io.github.jaemk.sirene.plantuml",
+        "PlantUML diagram",
+        &["puml", "plantuml", "pu", "iuml"],
+    ),
+];
+/// Markdown, which the app opens as an alternate editor (MARKDO-1).
+pub const MARKDOWN_UTI: &str = "net.daringfireball.markdown";
 /// The workspace version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The app icon's source.
@@ -155,28 +172,34 @@ fn run_command(args: impl IntoIterator<Item = OsString>, out: &mut impl Write) -
 
 /// The bundle's `Info.plist` (MACOSP-2, MACOSP-3).
 pub fn info_plist() -> Value {
-    let mut uti = Dictionary::new();
-    uti.insert("UTTypeIdentifier".into(), MERMAID_UTI.into());
-    uti.insert("UTTypeDescription".into(), "Mermaid diagram".into());
-    uti.insert(
-        "UTTypeConformsTo".into(),
-        Value::Array(vec!["public.plain-text".into()]),
-    );
-    let mut tags = Dictionary::new();
-    tags.insert(
-        "public.filename-extension".into(),
-        Value::Array(vec!["mmd".into(), "mermaid".into()]),
-    );
-    uti.insert("UTTypeTagSpecification".into(), tags.into());
-
-    let mut doc = Dictionary::new();
-    doc.insert("CFBundleTypeName".into(), "Mermaid diagram".into());
-    doc.insert("CFBundleTypeRole".into(), "Editor".into());
-    doc.insert("LSHandlerRank".into(), "Default".into());
-    doc.insert(
-        "LSItemContentTypes".into(),
-        Value::Array(vec![MERMAID_UTI.into()]),
-    );
+    let document = |id: &str, name: &str, rank: &str| {
+        let mut doc = Dictionary::new();
+        doc.insert("CFBundleTypeName".into(), name.into());
+        doc.insert("CFBundleTypeRole".into(), "Editor".into());
+        doc.insert("LSHandlerRank".into(), rank.into());
+        doc.insert("LSItemContentTypes".into(), Value::Array(vec![id.into()]));
+        Value::from(doc)
+    };
+    let mut utis = Vec::new();
+    let mut docs = Vec::new();
+    for (id, name, extensions) in DOCUMENT_TYPES {
+        let mut uti = Dictionary::new();
+        uti.insert("UTTypeIdentifier".into(), id.into());
+        uti.insert("UTTypeDescription".into(), name.into());
+        uti.insert(
+            "UTTypeConformsTo".into(),
+            Value::Array(vec!["public.plain-text".into()]),
+        );
+        let mut tags = Dictionary::new();
+        tags.insert(
+            "public.filename-extension".into(),
+            Value::Array(extensions.iter().map(|&e| e.into()).collect()),
+        );
+        uti.insert("UTTypeTagSpecification".into(), tags.into());
+        utis.push(uti.into());
+        docs.push(document(id, name, "Default"));
+    }
+    docs.push(document(MARKDOWN_UTI, "Markdown document", "Alternate"));
 
     let mut d = Dictionary::new();
     for (key, value) in [
@@ -198,14 +221,8 @@ pub fn info_plist() -> Value {
         d.insert(key.into(), value.into());
     }
     d.insert("NSHighResolutionCapable".into(), true.into());
-    d.insert(
-        "CFBundleDocumentTypes".into(),
-        Value::Array(vec![doc.into()]),
-    );
-    d.insert(
-        "UTImportedTypeDeclarations".into(),
-        Value::Array(vec![uti.into()]),
-    );
+    d.insert("CFBundleDocumentTypes".into(), Value::Array(docs));
+    d.insert("UTImportedTypeDeclarations".into(), Value::Array(utis));
     d.into()
 }
 
