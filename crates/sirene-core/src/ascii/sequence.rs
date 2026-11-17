@@ -188,7 +188,10 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
             .map(|g| g.title.as_deref().map_or(0, |t| width(t) + 4) as f32)
             .collect(),
     };
+    let phase = crate::profile::Phase::start("ascii.sequence.layout");
     let l = layout::layout(seq, &sizes, &SPACING);
+    drop(phase);
+    let phase = crate::profile::Phase::start("ascii.sequence.lifelines");
     let header_h = c(l.header_h);
     let cols: Vec<i32> = l.x.iter().map(|&x| c(x)).collect();
     // A cell to spare: notes are placed by lifeline cell, which can differ from the layout's
@@ -229,47 +232,71 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
             v.push((c(b.y0), c(b.y1)));
         }
     }
-    // How many bars cover each row, as running differences.
-    let mut depth = vec![0i32; rows + 1];
+    // Each lifeline's column, rows, and how many bars cover it from a row on, as sorted
+    // (row, change) pairs. Drawn row by row, as the canvas is laid out.
+    struct Life {
+        col: i32,
+        y0: i32,
+        y1: i32,
+        changes: Vec<(i32, i32)>,
+        at: usize,
+        covered: i32,
+    }
+    let mut lives: Vec<Life> = Vec::new();
     for (p, &x) in l.x.iter().enumerate() {
         if seq.participants[p].kind == ParticipantKind::Hidden {
             continue;
         }
-        let col = c(x);
         let y0 = c(l.head_y[p]) + header_h - 1;
         let y1 = c(l.life_end[p]);
-        depth.fill(0);
+        let mut changes = Vec::new();
         for &(b0, b1) in &bars_of[p] {
             // A bar ending on the lifeline's last row leaves that row light.
             let b1 = if b1 == y1 { b1 - 1 } else { b1 };
             let (b0, b1) = (b0.max(0), b1.min(rows as i32 - 1));
             if b0 <= b1 {
-                depth[b0 as usize] += 1;
-                depth[b1 as usize + 1] -= 1;
+                changes.push((b0, 1));
+                changes.push((b1 + 1, -1));
             }
         }
-        let mut covered = 0;
-        let mut at = 0usize;
-        for y in y0..=y1 {
-            // Advance the running count to row `y`.
-            while let Some(r) = row(y)
-                && at <= r
-            {
-                covered += depth[at];
-                at += 1;
+        changes.sort_unstable();
+        lives.push(Life {
+            col: c(x),
+            y0,
+            y1,
+            changes,
+            at: 0,
+            covered: 0,
+        });
+    }
+    let top = lives.iter().map(|life| life.y0).min().unwrap_or(0);
+    let bottom = lives.iter().map(|life| life.y1).max().unwrap_or(-1);
+    for y in top..=bottom {
+        let delay = row(y).is_some_and(|r| delayed[r]);
+        for life in &mut lives {
+            if y < life.y0 || y > life.y1 {
+                continue;
             }
-            let active = row(y).is_some() && covered > 0;
-            let line = if row(y).is_some_and(|r| delayed[r]) {
+            while let Some(&(at, change)) = life.changes.get(life.at)
+                && at <= y
+            {
+                life.covered += change;
+                life.at += 1;
+            }
+            let active = row(y).is_some() && life.covered > 0;
+            let line = if delay {
                 Line::Dotted
             } else if active {
                 Line::Heavy
             } else {
                 Line::Light
             };
-            let bits = if y > y0 { UP } else { 0 } | if y < y1 { DOWN } else { 0 };
-            canvas.add(col, y, bits, line);
+            let bits = if y > life.y0 { UP } else { 0 } | if y < life.y1 { DOWN } else { 0 };
+            canvas.add(life.col, y, bits, line);
         }
     }
+    drop(phase);
+    let phase = crate::profile::Phase::start("ascii.sequence.events");
 
     // Frames, inner ones last so their tabs show.
     for f in l.frames.iter().rev() {
@@ -393,7 +420,10 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         }
     }
 
+    drop(phase);
+    let phase = crate::profile::Phase::start("ascii.sequence.text");
     let body = canvas.render(options.charset);
+    drop(phase);
     match seq
         .title
         .as_deref()
