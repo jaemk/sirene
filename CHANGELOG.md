@@ -21,6 +21,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The editor names UTF-16 files and the first invalid UTF-8 byte when it cannot open a file,
   as the CLI does.
+- The editor's file poll checks the file's metadata and reads it only when that moved.
 
 ### Fixed
 

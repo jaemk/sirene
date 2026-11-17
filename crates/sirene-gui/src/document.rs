@@ -99,6 +99,54 @@ pub struct Document {
     pub write_error: Option<Error>,
     /// The file changed on disk while the document had unsaved edits.
     pub disk_changed: bool,
+    /// The file's metadata when it was last read, for `poll` to skip reading an unchanged file.
+    stamp: Option<Stamp>,
+}
+
+/// A file's size, modification time, and identity, taken just before reading it, and when.
+#[derive(Debug, Clone, PartialEq)]
+struct Stamp {
+    len: u64,
+    modified: std::time::SystemTime,
+    /// Device, inode, and change time, so a replaced file or a permission change is noticed.
+    #[cfg(unix)]
+    identity: (u64, u64, i64, i64),
+    taken: std::time::SystemTime,
+}
+
+/// How long after a file's modification time its stamp is trusted: within this, a change of the
+/// same size may not have moved the time, so `poll` reads the file anyway (WYSIWY-5).
+const RACY: std::time::Duration = std::time::Duration::from_secs(2);
+
+impl Stamp {
+    fn of(path: &Path) -> Option<Stamp> {
+        let meta = std::fs::metadata(path).ok()?;
+        Some(Stamp {
+            len: meta.len(),
+            modified: meta.modified().ok()?,
+            #[cfg(unix)]
+            identity: {
+                use std::os::unix::fs::MetadataExt;
+                (meta.dev(), meta.ino(), meta.ctime(), meta.ctime_nsec())
+            },
+            taken: std::time::SystemTime::now(),
+        })
+    }
+
+    /// Whether `now` describes the same file contents as this stamp, and this stamp was taken
+    /// long enough after the file's modification time to tell.
+    fn holds(&self, now: &Stamp) -> bool {
+        #[cfg(unix)]
+        let same = self.identity == now.identity;
+        #[cfg(not(unix))]
+        let same = true;
+        same && self.len == now.len
+            && self.modified == now.modified
+            && self
+                .modified
+                .checked_add(RACY)
+                .is_some_and(|settled| settled <= self.taken)
+    }
 }
 
 impl Document {
@@ -139,6 +187,7 @@ impl Document {
             read_error: None,
             write_error: None,
             disk_changed: false,
+            stamp: None,
         }
     }
 
@@ -259,9 +308,12 @@ impl Document {
     }
 
     fn read(path: &Path) -> Self {
+        // Taken first, so a change during the read moves the stamp the next poll sees.
+        let stamp = Stamp::of(path);
         let (text, error) = Self::read_text(path);
         Self {
             read_error: error,
+            stamp,
             ..Self::from_source(Some(path.to_owned()), text)
         }
     }
@@ -312,15 +364,24 @@ impl Document {
         let Some(path) = &self.path else {
             return Disk::Unchanged;
         };
-        // Compare the text before parsing it: this runs every 500ms.
+        // This runs every 500ms: skip reading a file whose metadata has not moved, and compare
+        // the text before parsing it.
+        let stamp = Stamp::of(path);
+        if let (Some(old), Some(new)) = (&self.stamp, &stamp)
+            && old.holds(new)
+        {
+            return Disk::Unchanged;
+        }
         let (text, error) = Self::read_text(path);
         if text == self.saved
             && error.as_ref().map(Error::report) == self.read_error.as_ref().map(Error::report)
         {
+            self.stamp = stamp;
             return Disk::Unchanged;
         }
         let next = Self {
             read_error: error,
+            stamp: stamp.clone(),
             ..Self::from_source(Some(path.clone()), text)
         };
         if !self.is_edited() {
@@ -335,6 +396,8 @@ impl Document {
             self.replace(next);
             return Disk::Reloaded;
         }
+        // The stamp stays, so each poll reads again and takes the disk text once the edits are
+        // undone.
         if self.disk_changed {
             return Disk::Unchanged;
         }
@@ -891,6 +954,40 @@ mod tests {
             "{}",
             d.status()
         );
+    }
+
+    #[test]
+    fn polls_skip_reading_a_file_whose_metadata_held() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.mmd");
+        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(60);
+        let write = |text: &str, modified| {
+            let f = std::fs::File::create(&path).unwrap();
+            std::io::Write::write_all(&mut &f, text.as_bytes()).unwrap();
+            f.set_modified(modified).unwrap();
+        };
+        write("flowchart LR\nA --> B\n", old);
+        let mut d = Document::open(&path);
+        assert_eq!(d.chart.nodes.len(), 2);
+
+        // Same size and time: not read, so the change is not seen.
+        write("flowchart LR\nA --> C\n", old);
+        #[cfg(unix)]
+        {
+            // Rewriting moved the change time; put the stamp back to match it.
+            d.stamp = Stamp::of(&path);
+        }
+        assert_eq!(d.poll(), Disk::Unchanged);
+        assert_eq!(d.source, "flowchart LR\nA --> B\n");
+
+        // A new modification time is read.
+        write("flowchart LR\nA --> C\n", std::time::SystemTime::now());
+        assert_eq!(d.poll(), Disk::Reloaded);
+        assert_eq!(d.source, "flowchart LR\nA --> C\n");
+
+        // Within `RACY` of the modification time, the file is read on every poll.
+        let racy = Stamp::of(&path).unwrap();
+        assert!(!racy.holds(&racy));
     }
 
     #[test]

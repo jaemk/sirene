@@ -45,6 +45,10 @@ Reload replaces the edits with the file's text. Reload on an edited document fir
 ("Discard your changes to NAME?", Reload or Cancel), and Save after the file changed on disk
 first checks the current file and asks before overwriting changes or a file that could not be read (Overwrite or Cancel); Cancel changes nothing. The check also applies before the next poll and when Save As selects an alias of the current file. A file that could not be read may instead be saved to a different path. A confirmed save checks again that the file has not changed while the prompt was open.
 
+A poll reads the file only when its metadata moved since the last read: size, modification time,
+and on Unix device, inode, and change time. A file modified within 2 seconds of the last read is
+read on every poll, since a same-size write in that window may leave the time unchanged.
+
 ## WYSIWY-6 Closing with unsaved edits
 
 CloseWindow, and Quit for each window, ask whether to save an edited document: Save writes it (as
