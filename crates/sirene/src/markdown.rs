@@ -35,9 +35,14 @@ pub fn report(
 
 /// Checks `path`'s diagrams, printing their diagnostics: a Markdown file's diagram blocks, every
 /// diagram under a directory, or one diagram (stdin for `-`). Returns whether all were read
-/// and had no errors.
-pub fn check(path: &Path) -> bool {
-    if path.as_os_str() == "-" {
+/// and had no errors. With `as_markdown`, a file or stdin is read as Markdown whatever its name
+/// (CLI-15).
+pub fn check(path: &Path, as_markdown: bool) -> bool {
+    let stdin = path.as_os_str() == "-";
+    if as_markdown && !path.is_dir() {
+        return check_markdown(path);
+    }
+    if stdin {
         return check_source(None);
     }
     if path.is_dir() {
@@ -63,27 +68,31 @@ pub fn check(path: &Path) -> bool {
         return failed == 0 && scanned.errors.is_empty();
     }
     if markdown::is_markdown(path) {
-        let name = path.display().to_string();
-        let src = match crate::read_text(path) {
-            Ok(src) => src,
-            Err(e) => {
-                diagnostic!("error: {}", e.report());
-                return false;
-            }
-        };
-        let blocks = markdown::mermaid_blocks(&src);
-        log::debug!("{name}: {} diagram block(s)", blocks.len());
-        if blocks.is_empty() {
-            diagnostic!("{name}: no diagram blocks");
-        }
-        let mut ok = true;
-        for block in &blocks {
-            let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
-            ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
-        }
-        return ok;
+        return check_markdown(path);
     }
     check_source(Some(path))
+}
+
+/// Checks a Markdown file's diagram blocks, or stdin's for `-`.
+fn check_markdown(path: &Path) -> bool {
+    let (name, src) = match crate::read(Some(path.to_path_buf())) {
+        Ok(read) => read,
+        Err(e) => {
+            diagnostic!("error: {}", e.report());
+            return false;
+        }
+    };
+    let blocks = markdown::mermaid_blocks(&src);
+    log::debug!("{name}: {} diagram block(s)", blocks.len());
+    if blocks.is_empty() {
+        diagnostic!("{name}: no diagram blocks");
+    }
+    let mut ok = true;
+    for block in &blocks {
+        let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
+        ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
+    }
+    ok
 }
 
 /// Checks one diagram file, or stdin for `None`.
@@ -268,12 +277,11 @@ pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
     out
 }
 
-/// Prints each diagram block of Markdown file `md` as text, a blank line between them, and
-/// their diagnostics. Reports output completion separately from input diagnostics.
+/// Prints each diagram block of Markdown file `md` (stdin for `-`) as text, a blank line between
+/// them, and their diagnostics. Reports output completion separately from input diagnostics.
 pub fn print_ascii(md: &Path, charset: Charset, width: Option<usize>) -> crate::Done {
-    let name = md.display().to_string();
-    let src = match crate::read_text(md) {
-        Ok(src) => src,
+    let (name, src) = match crate::read(Some(md.to_path_buf())) {
+        Ok(read) => read,
         Err(e) => {
             diagnostic!("error: {}", e.report());
             return crate::Done {

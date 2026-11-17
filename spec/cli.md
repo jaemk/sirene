@@ -179,3 +179,11 @@ and other sources are detected (LANGS-1, DOT-5). Tests: `forced_languages` in
 terminal columns (`ascii::columns`) also prints `error: NAME: the drawing is W columns wide, over
 --width N` to stderr and exits 1. For a Markdown file each block is checked, named `FILE block
 K`. Test: `ascii_width` in `crates/sirene/tests/cli.rs`.
+
+## CLI-15 `--markdown`
+
+`sirene ascii --markdown` and `sirene check --markdown` read stdin (`-` or no FILE for `ascii`)
+and files as Markdown (CLI-12) whatever their names; diagnostics name stdin `<stdin>`.
+Directories are scanned as without it. `ascii --markdown --watch` on stdin fails with
+`error: --watch needs a FILE or directory, not stdin`. Test: `markdown_stdin` in
+`crates/sirene/tests/cli.rs`.

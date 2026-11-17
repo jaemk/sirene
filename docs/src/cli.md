@@ -64,6 +64,13 @@ e.g. to keep drawings in a README within 80 columns:
 $ sirene ascii --width 80 README.md
 ```
 
+`--markdown` reads stdin, or a file of any name, as Markdown; `sirene check --markdown` does the
+same:
+
+```
+$ git show HEAD:README.md | sirene check --markdown -
+```
+
 ## `sirene svg`
 
 Prints a standalone SVG document. `--theme light|dark` picks the colors (default `light`), and

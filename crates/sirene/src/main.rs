@@ -92,11 +92,17 @@ enum Command {
         /// for stdin.
         #[arg(required = true)]
         files: Vec<PathBuf>,
+        /// Read stdin and files as Markdown, whatever their names.
+        #[arg(long)]
+        markdown: bool,
     },
     /// Print a diagram, or each diagram block of a Markdown file, as text.
     Ascii {
         /// Diagram or Markdown file to read; stdin when omitted or `-`.
         file: Option<PathBuf>,
+        /// Read stdin or FILE as Markdown, whatever its name.
+        #[arg(long)]
+        markdown: bool,
         /// Characters to draw with.
         #[arg(long, value_enum, default_value_t = CharsetArg::Unicode)]
         charset: CharsetArg,
@@ -310,10 +316,13 @@ fn run(cli: Cli) -> ExitCode {
     match cli.command {
         None => gui(cli.files),
         Some(Command::Update { check, yes, to }) => update::run(update::Args { check, yes, to }),
-        Some(Command::Check { files }) => {
+        Some(Command::Check { files, markdown }) => {
             log::info!("checking {} input(s)", files.len());
             // Every file is checked, whatever the ones before it had.
-            let failed = files.iter().filter(|f| !markdown::check(f)).count();
+            let failed = files
+                .iter()
+                .filter(|f| !markdown::check(f, markdown))
+                .count();
             if failed == 0 {
                 ExitCode::SUCCESS
             } else {
@@ -322,6 +331,7 @@ fn run(cli: Cli) -> ExitCode {
         }
         Some(Command::Ascii {
             file,
+            markdown,
             charset,
             width,
             watch,
@@ -330,7 +340,17 @@ fn run(cli: Cli) -> ExitCode {
                 CharsetArg::Unicode => Charset::Unicode,
                 CharsetArg::Ascii => Charset::Ascii,
             };
-            if let Some(md) = markdown_file(&file) {
+            let stdin = PathBuf::from("-");
+            let md = if markdown {
+                Some(file.as_ref().unwrap_or(&stdin)).filter(|f| !f.is_dir())
+            } else {
+                markdown_file(&file)
+            };
+            if let Some(md) = md {
+                if watch && md.as_os_str() == "-" {
+                    diagnostic!("error: --watch needs a FILE or directory, not stdin");
+                    return ExitCode::FAILURE;
+                }
                 return markdown_blocks(md, watch, || markdown::print_ascii(md, charset, width));
             }
             let wide = std::cell::Cell::new(false);

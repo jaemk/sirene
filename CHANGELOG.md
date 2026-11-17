@@ -22,6 +22,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The editor edits Mermaid sequence diagrams on the drawing: select, rename, add, and delete
   participants and messages, with undo. `sequence::edit` holds the source edits, and the scene
   owns participants as nodes and messages as edges.
+- `sirene ascii --markdown` and `sirene check --markdown` read stdin, or files of any name, as
+  Markdown.
 
 ### Changed
 

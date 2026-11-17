@@ -1277,6 +1277,49 @@ fn ascii_width() {
 }
 
 #[test]
+fn markdown_stdin() {
+    let md = "# Doc\n\n```mermaid\nflowchart LR\n  A\n```\n\n```dot\ndigraph { b -> }\n```\n";
+    let out = sirene()
+        .args(["ascii", "--markdown", "--charset", "ascii"])
+        .write_stdin(md)
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        "+---+\n| A |\n+---+\n\n.---.\n( b )\n'---'\n"
+    );
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.starts_with("<stdin>:9:"), "{stderr}");
+
+    // `check` reads `-` and a file not named `.md` as Markdown.
+    let out = sirene()
+        .args(["check", "--markdown", "-"])
+        .write_stdin(md)
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.starts_with("<stdin>:9:"), "{stderr}");
+    let tmp = tempfile::tempdir().unwrap();
+    let notes = tmp.path().join("notes.txt");
+    std::fs::write(&notes, "```mermaid\nflowchart LR\n  A\n```\n").unwrap();
+    sirene()
+        .args(["check", "--markdown"])
+        .arg(&notes)
+        .assert()
+        .success()
+        .stderr("");
+    sirene()
+        .args(["ascii", "--markdown", "--watch"])
+        .assert()
+        .failure()
+        .stderr("error: --watch needs a FILE or directory, not stdin\n");
+}
+
+#[test]
 fn markdown_ascii() {
     let tmp = tempfile::tempdir().unwrap();
     let md = tmp.path().join("doc.md");
