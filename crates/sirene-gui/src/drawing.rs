@@ -81,7 +81,7 @@ impl Viewer {
 
     /// The item drawn at window position `p`.
     pub fn item_at(&mut self, p: Point<Pixels>, window: &Window) -> Option<Item> {
-        let sequence = self.doc.sequence().is_some();
+        let sequence = self.doc.scene_edits();
         if self.doc.other.is_some() && !sequence {
             return None;
         }
@@ -108,7 +108,7 @@ impl Viewer {
 
     /// The scene owner of `item`, while it exists.
     pub fn owner(&self, item: &Item) -> Option<Owner> {
-        if self.doc.sequence().is_some() {
+        if self.doc.scene_edits() {
             return self.sequence_owner(item);
         }
         let chart = &self.doc.chart;
@@ -125,7 +125,7 @@ impl Viewer {
     /// The scene owners of those `items` that exist, in order, looking nodes up by id once
     /// rather than per item.
     pub fn owners(&self, items: &[Item]) -> Vec<Owner> {
-        if self.doc.sequence().is_some() {
+        if self.doc.scene_edits() {
             return items
                 .iter()
                 .filter_map(|i| self.sequence_owner(i))
@@ -175,7 +175,7 @@ impl Viewer {
         self.selection = items;
         if let [item] = self.selection.as_slice() {
             let chart = &self.doc.chart;
-            let range = if self.doc.sequence().is_some() {
+            let range = if self.doc.scene_edits() {
                 self.sequence_range(item)
             } else {
                 match item {
@@ -194,7 +194,7 @@ impl Viewer {
 
     /// Drops selected items that no longer exist, and a label field whose item is gone.
     pub(crate) fn prune(&mut self) {
-        if self.doc.sequence().is_some() {
+        if self.doc.scene_edits() {
             let mut selection = std::mem::take(&mut self.selection);
             selection.retain(|i| self.sequence_owner(i).is_some());
             self.selection = selection;
@@ -299,7 +299,7 @@ impl Viewer {
                 }
                 // Double-clicking empty space adds a node there, in the subgraph under the
                 // pointer if any (WYSIWY-15).
-                None if self.doc.sequence().is_some() => self.add_participant(None, window, cx),
+                None if self.doc.scene_edits() => self.add_participant(None, window, cx),
                 None if let Some(g) = self.doc.graph() => {
                     self.graph_add(g, Link::None, window, cx);
                 }
@@ -380,7 +380,7 @@ impl Viewer {
         let moved = e.position - start;
         let far = f32::from(moved.x).hypot(f32::from(moved.y)) > DRAG;
         // On a sequence diagram: a message to the participant released on, or to a new one.
-        if far && self.doc.sequence().is_some() {
+        if far && self.doc.scene_edits() {
             match self.item_at(e.position, window) {
                 Some(Item::Node(to)) => self.add_message(&from, &to, window, cx),
                 None if self.viewport.get().contains(&e.position) => {
@@ -461,7 +461,7 @@ impl Viewer {
         if self.label.is_some() {
             return;
         }
-        if self.doc.sequence().is_some() {
+        if self.doc.scene_edits() {
             self.sequence_delete(window, cx);
             return;
         }
@@ -526,7 +526,7 @@ impl Viewer {
     ) {
         // Shapes, links into a new node, and subgraphs do not apply: a participant, with a
         // message from the linked one.
-        if self.doc.sequence().is_some() {
+        if self.doc.scene_edits() {
             let from = match link {
                 Link::From(from) => Some(from),
                 Link::None | Link::To(_) => None,
@@ -724,9 +724,13 @@ impl Viewer {
     /// Moves the one selected item's statement (WYSIWY-16); a moved edge stays selected.
     fn move_item(&mut self, later: bool, window: &mut Window, cx: &mut Context<Self>) {
         let src = &self.doc.source;
+        let action = if later { "move later" } else { "move earlier" };
+        if self.doc.mindmap().is_some() {
+            self.refused(action, self.doc.read_only(), cx);
+            return;
+        }
         // A sequence diagram's participant swaps with its neighbor (WYSIWY-21).
         if self.doc.sequence().is_some() {
-            let action = if later { "move later" } else { "move earlier" };
             if let [Item::Node(id)] = self.selection.as_slice() {
                 match sirene_core::sequence::edit::move_participant(src, id, later) {
                     Some(edit) => self.record(edit, window, cx),
@@ -966,7 +970,7 @@ impl Viewer {
 
     /// Opens the label field over `item` (WYSIWY-10).
     pub fn edit_label(&mut self, item: Item, window: &mut Window, cx: &mut Context<Self>) {
-        let text = if self.doc.sequence().is_some() {
+        let text = if self.doc.scene_edits() {
             self.sequence_label(&item)
         } else if let Some(g) = self.doc.graph() {
             self.graph_label(g, &item)
@@ -1043,7 +1047,7 @@ impl Viewer {
             {
                 self.record(edit, window, cx);
             }
-        } else if self.doc.sequence().is_some() {
+        } else if self.doc.scene_edits() {
             if let Some(edit) = self.sequence_rename(&label.item, &text) {
                 self.record(edit, window, cx);
             }

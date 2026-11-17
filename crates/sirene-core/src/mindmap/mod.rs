@@ -1,5 +1,6 @@
 //! Mermaid mindmaps (MMIND-*): a tree of ideas drawn out from a root.
 
+pub mod edit;
 pub(crate) mod lower;
 pub(crate) mod parser;
 

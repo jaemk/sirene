@@ -837,6 +837,42 @@ fn sequence_arrows_and_order(cx: &mut TestAppContext) {
     assert_eq!(source(&viewer, cx), out);
 }
 
+/// WYSIWY-26: mindmap nodes are selected by index, renamed, added, and deleted.
+#[gpui::test]
+fn mindmaps(cx: &mut TestAppContext) {
+    let src = "mindmap\n  root((Root))\n    A\n    B[Bee]\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Double-click renames, keeping the shape.
+    let b = center(&viewer, cx, &node("2"));
+    double_click(cx, b);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("Bee"));
+    cx.simulate_input("Bea (2)");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "mindmap\n  root((Root))\n    A\n    B[\"Bea (2)\"]\n"
+    );
+    // Add Node with A selected adds a child of A, selected with its label open.
+    viewer.update(cx, |v, cx| v.select(vec![node("1")], cx));
+    cx.dispatch_action(AddNode);
+    assert_eq!(selection(&viewer, cx), [node("2")]);
+    cx.simulate_input("kid");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "mindmap\n  root((Root))\n    A\n      kid\n    B[\"Bea (2)\"]\n"
+    );
+    // Deleting A takes its child.
+    viewer.update(cx, |v, cx| v.select(vec![node("1")], cx));
+    cx.dispatch_action(Delete);
+    assert_eq!(
+        source(&viewer, cx),
+        "mindmap\n  root((Root))\n    B[\"Bea (2)\"]\n"
+    );
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert!(source(&viewer, cx).contains("      kid\n"));
+}
+
 #[gpui::test]
 fn states_move_into_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";

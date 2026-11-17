@@ -74,7 +74,10 @@ fn snapshots() {
             for theme in [Theme::LIGHT, Theme::DARK] {
                 let s = lowered.diagram.scene(&Approx, &theme).unwrap();
                 assert!(!s.elements.is_empty(), "{name}");
-                assert!(s.elements.iter().all(|e| e.owner == Owner::Diagram));
+                // Nodes own their boxes and text (WYSIWY-26); the rest is the diagram's.
+                assert!(
+                    (s.elements.iter()).all(|e| matches!(e.owner, Owner::Diagram | Owner::Node(_)))
+                );
             }
         }
     }
@@ -295,8 +298,16 @@ fn drawing() {
     for (_, p) in &t {
         assert!(p.x > 0.0 && p.x < s.width && p.y > 0.0 && p.y < s.height);
     }
-    // The diagram is read-only, so it owns every element.
-    assert!(s.elements.iter().all(|e| e.owner == Owner::Diagram));
+    // Node `i` owns its box and text, and the diagram the edges (WYSIWY-26).
+    let nodes = 7;
+    for i in 0..nodes {
+        assert!(s.elements.iter().any(|e| e.owner == Owner::Node(i)), "{i}");
+    }
+    assert!((s.elements.iter()).all(|e| match e.owner {
+        Owner::Diagram => true,
+        Owner::Node(i) => i < nodes,
+        _ => false,
+    }));
     // Edges, in node order from node 1, with their position among the elements.
     let edges: Vec<(usize, f32, u32)> = s
         .elements

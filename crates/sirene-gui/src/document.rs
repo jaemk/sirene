@@ -6,10 +6,14 @@ use std::path::{Path, PathBuf};
 use sirene_core::diagram::{self, Diagram, Kind, Lang};
 use sirene_core::flowchart::Flowchart;
 use sirene_core::markdown::{Block, append_block, is_markdown, mermaid_blocks};
+use sirene_core::mindmap::Mindmap;
 use sirene_core::scene::{Scene, TextMetrics, Theme};
 use sirene_core::sequence::Sequence;
 use sirene_core::theme::ThemeConfig;
 use sirene_core::{Error, Result, Severity};
+
+/// Why a mindmap refuses the other drawing edits (WYSIWY-26).
+pub const MINDMAP_EDITS: &str = "mindmaps take only adding, renaming, and deleting nodes";
 
 /// Why a sequence diagram refuses the other drawing edits (WYSIWY-21).
 pub const SEQUENCE_EDITS: &str = "sequence diagrams take only adding, renaming, moving, and deleting participants and messages, and setting message arrows";
@@ -244,7 +248,7 @@ impl Document {
             Kind::Timeline => Some("drawing edits are not supported for timelines yet"),
             Kind::Pie => Some("drawing edits are not supported for pie charts yet"),
             Kind::Gantt => Some("drawing edits are not supported for gantt charts yet"),
-            Kind::Mindmap => Some("drawing edits are not supported for mindmaps yet"),
+            Kind::Mindmap => Some(MINDMAP_EDITS),
             Kind::Journey => Some("drawing edits are not supported for user journeys yet"),
             Kind::Quadrant => Some("drawing edits are not supported for quadrant charts yet"),
             Kind::XyChart => Some("drawing edits are not supported for XY charts yet"),
@@ -291,6 +295,25 @@ impl Document {
         }
     }
 
+    /// The Mermaid mindmap the document holds, which takes its own drawing edits: adding,
+    /// renaming, and deleting nodes (WYSIWY-26).
+    pub fn mindmap(&self) -> Option<&Mindmap> {
+        match &self.other {
+            Some(Diagram::Mindmap(m))
+                if Kind::of_lang(&self.source, self.lang()) == Kind::Mindmap =>
+            {
+                Some(m)
+            }
+            _ => None,
+        }
+    }
+
+    /// Whether the document holds a diagram drawn from `other` that takes its own drawing
+    /// edits: a sequence diagram (WYSIWY-21) or a mindmap (WYSIWY-26).
+    pub fn scene_edits(&self) -> bool {
+        self.sequence().is_some() || self.mindmap().is_some()
+    }
+
     /// The kind of graph the document holds when it is drawn from `chart` and takes its own
     /// drawing edits: adding, renaming, connecting, and deleting nodes and edges (WYSIWY-22,
     /// WYSIWY-23, WYSIWY-24, WYSIWY-25).
@@ -320,7 +343,7 @@ impl Document {
     /// Whether drawing edits go through a diagram's own edit module rather than
     /// `flowchart::edit` (WYSIWY-21 to WYSIWY-24).
     pub fn own_edits(&self) -> bool {
-        self.sequence().is_some() || self.graph().is_some()
+        self.scene_edits() || self.graph().is_some()
     }
 
     /// The drawing of whichever diagram the document holds.

@@ -311,9 +311,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     let mindmap = Document::from_source(None, "mindmap\n  root\n    a\n".to_owned());
     assert_eq!(
         mindmap.read_only(),
-        Some("drawing edits are not supported for mindmaps yet")
+        Some("mindmaps take only adding, renaming, and deleting nodes")
     );
     assert!(mindmap.chart.nodes.is_empty() && mindmap.other.is_some());
+    assert!(mindmap.own_edits() && mindmap.mindmap().is_some());
     let journey = Document::from_source(None, "journey\n  a: 5: Me\n".to_owned());
     assert_eq!(
         journey.read_only(),

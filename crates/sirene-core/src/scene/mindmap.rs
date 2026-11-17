@@ -260,8 +260,8 @@ pub fn mindmap(mindmap: &Mindmap, metrics: &impl TextMetrics, theme: &Theme) -> 
             },
         });
     }
-    // Edges behind the nodes, each as a curve leaving its parent's side, in node order. Every
-    // element is owned by the diagram, which is read-only (LANGS-2).
+    // Edges behind the nodes, each as a curve leaving its parent's side, in node order. Edges
+    // are owned by the diagram, and node `i` by `Owner::Node(i)` (WYSIWY-26).
     let owner = Owner::Diagram;
     for (i, n) in nodes.iter().enumerate() {
         let Some(parent) = n.parent else { continue };
@@ -298,6 +298,7 @@ pub fn mindmap(mindmap: &Mindmap, metrics: &impl TextMetrics, theme: &Theme) -> 
         );
     }
     for (i, n) in nodes.iter().enumerate() {
+        let owner = Owner::Node(i);
         let b = boxes[i];
         let color = fill(theme, n.section);
         p.path(owner, outline(n.shape, b), Some(color), None);

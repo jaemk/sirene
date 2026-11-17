@@ -72,13 +72,14 @@ pub(crate) fn build(
     let Some(viewer) = viewer.upgrade() else {
         return menu;
     };
-    let (nodes, edges, chart, src, subgraph, focus, read_only, adds, graph) = {
+    let (nodes, edges, chart, src, subgraph, focus, read_only, adds, graph, is_sequence) = {
         let v = viewer.read(cx);
         // A diagram with its own edits: its Add Node item, unlinked and linked.
         let adds = match v.doc.graph() {
             _ if v.doc.sequence().is_some() => {
                 Some(("Add Participant", "Add Participant With Message"))
             }
+            _ if v.doc.mindmap().is_some() => Some(("Add Node", "Add Child Node")),
             Some(Graph::State) => Some(("Add State", "Add State With Transition")),
             Some(Graph::Class) => Some(("Add Class", "Add Class With Relation")),
             Some(Graph::Er) => Some(("Add Entity", "Add Entity With Relationship")),
@@ -97,6 +98,7 @@ pub(crate) fn build(
             v.doc.read_only(),
             adds,
             v.doc.graph(),
+            v.doc.sequence().is_some(),
         )
     };
     let mut menu = menu.action_context(focus);
@@ -126,7 +128,7 @@ pub(crate) fn build(
         }
         // A sequence diagram's messages: their arrow; its one selected participant: its place
         // (WYSIWY-21).
-        if graph.is_none() {
+        if is_sequence {
             if !edges.is_empty() {
                 let current = match edges.as_slice() {
                     [n] => sequence::edit::message_arrow(&src, *n),

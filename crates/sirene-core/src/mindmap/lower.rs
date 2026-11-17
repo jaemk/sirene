@@ -8,7 +8,14 @@ use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
+    let (map, diagnostics, _) = lower_ranges(root);
+    (map, diagnostics)
+}
+
+/// [`lower`], with the statement of each node kept, by index.
+pub(crate) fn lower_ranges(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>, Vec<SyntaxNode>) {
     let src = root.to_string();
+    let mut statements = Vec::new();
     let mut map = Mindmap::default();
     let mut diagnostics = Vec::new();
     // The last node and its ancestors, as (indentation, index) with indentation rising: the
@@ -75,6 +82,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
                     map.nodes[p].children.push(i);
                 }
                 map.nodes.push(node);
+                statements.push(stmt.clone());
                 open.truncate(under);
                 open.push((level, i));
                 last = Some(i);
@@ -111,7 +119,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
             _ => {}
         }
     }
-    (map, diagnostics)
+    (map, diagnostics, statements)
 }
 
 /// A node line's id, shape, and label.

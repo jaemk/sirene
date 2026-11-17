@@ -117,11 +117,14 @@ impl Viewer {
             cx.propagate();
             return;
         }
-        let items = match self.doc.sequence() {
-            Some(seq) => (seq.participants.iter().map(|p| Item::Node(p.id.clone())))
+        let items = match (self.doc.sequence(), self.doc.mindmap()) {
+            (Some(seq), _) => (seq.participants.iter().map(|p| Item::Node(p.id.clone())))
                 .chain((0..seq.messages().count()).map(Item::Edge))
                 .collect(),
-            None => {
+            (_, Some(map)) => (0..map.nodes.len())
+                .map(|i| Item::Node(i.to_string()))
+                .collect(),
+            (None, None) => {
                 let chart = &self.doc.chart;
                 (chart.nodes.iter().map(|n| Item::Node(n.id.clone())))
                     .chain((0..chart.edges.len()).map(Item::Edge))

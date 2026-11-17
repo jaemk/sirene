@@ -445,3 +445,26 @@ A node's id is its name, without quotes.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/context_menu.rs`,
 `crates/sirene-core/src/requirement/edit.rs`.
+
+## WYSIWY-26 Mindmaps
+
+A Mermaid mindmap takes drawing edits through `sirene_core::mindmap::edit`; nodes are selected
+by their index in the lowered mindmap (as `Item::Node("0")`, `"1"`, ...), the root first.
+Edges are not selectable.
+
+- Clicking selects a node and its line in the source pane.
+- Double-click or Rename edits a node's label: the text inside its shape, written as a quoted
+  string, or for a node without a shape its text, written alone when it reads back as written
+  and as `["..."]` otherwise. `#`, `<`, and `"` are written as entity codes, and line breaks as
+  `<br>`. An empty label is refused.
+- Add Node, a double-click on empty space, or a drag from a node to empty space adds a node
+  `New idea` as the last child of the dragged node, the one selected node, or the root (or the
+  root of an empty mindmap), selected with its label open. It goes after the parent's subtree,
+  indented as the parent's first child is.
+- Delete removes the selected nodes, each with its subtree and the `::icon` and `:::` lines
+  after it.
+- Each is one undoable drawing change (WYSIWY-13). The other edits stay refused, with the reason
+  `mindmaps take only adding, renaming, and deleting nodes`. The right-click menu holds Add Node
+  (Add Child Node with one node selected), Rename, Delete, Select All, and Fit Window.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/mindmap/edit.rs`.
