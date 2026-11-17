@@ -1,5 +1,8 @@
 //! Drawing edits on a Mermaid sequence diagram (WYSIWY-21). Participants are `Item::Node` by
-//! id and messages `Item::Edge` by their place among the diagram's messages.
+//! id and messages `Item::Edge` by their place among the diagram's messages. Mindmaps
+//! (WYSIWY-26) and timelines (WYSIWY-27), also drawn from `Document::other`, take the same
+//! paths: mindmap nodes and timeline periods are `Item::Node` by index, and timeline events
+//! `Item::Edge` by their place among every period's events.
 
 use std::ops::Range;
 
@@ -8,10 +11,15 @@ use sirene_core::flowchart::edit::TextEdit;
 use sirene_core::mindmap;
 use sirene_core::scene::Owner;
 use sirene_core::sequence::edit;
+use sirene_core::timeline::{self, Text};
 
 use crate::SetMessageArrow;
 use crate::drawing::{Item, NEW_NODE};
 use crate::viewer::Viewer;
+
+/// The label of a new timeline period, and of a new event (WYSIWY-27).
+const NEW_PERIOD: &str = "New period";
+const NEW_EVENT: &str = "New event";
 
 impl Viewer {
     /// Sets the arrow of the selected messages (WYSIWY-21).
@@ -45,8 +53,32 @@ impl Viewer {
         }
     }
 
-    /// The item scene owner `owner` draws, on a sequence diagram or a mindmap.
+    /// The periods and the events of the timeline, by index (WYSIWY-27).
+    fn timeline_parts(&self) -> Option<(Vec<&Text>, Vec<&Text>)> {
+        let t = self.doc.timeline()?;
+        let periods = t.periods().map(|(_, p)| &p.label).collect();
+        let events = t.periods().flat_map(|(_, p)| &p.events).collect();
+        Some((periods, events))
+    }
+
+    /// The timeline period `item` names, by index.
+    fn timeline_period(&self, item: &Item) -> Option<usize> {
+        let (periods, _) = self.timeline_parts()?;
+        match item {
+            Item::Node(id) => id.parse().ok().filter(|&i| i < periods.len()),
+            Item::Edge(_) => None,
+        }
+    }
+
+    /// The item scene owner `owner` draws, on a sequence diagram, a mindmap, or a timeline.
     pub(crate) fn sequence_item(&self, owner: Owner) -> Option<Item> {
+        if let Some((periods, events)) = self.timeline_parts() {
+            return match owner {
+                Owner::Node(i) if i < periods.len() => Some(Item::Node(i.to_string())),
+                Owner::Edge(n) if n < events.len() => Some(Item::Edge(n)),
+                _ => None,
+            };
+        }
         if let Some(map) = self.doc.mindmap() {
             return match owner {
                 Owner::Node(i) if i < map.nodes.len() => Some(Item::Node(i.to_string())),
@@ -63,6 +95,12 @@ impl Viewer {
 
     /// The scene owner of `item`, while it exists, on a sequence diagram.
     pub(crate) fn sequence_owner(&self, item: &Item) -> Option<Owner> {
+        if let Some((_, events)) = self.timeline_parts() {
+            return match item {
+                Item::Node(_) => self.timeline_period(item).map(Owner::Node),
+                Item::Edge(n) => (*n < events.len()).then_some(Owner::Edge(*n)),
+            };
+        }
         if self.doc.mindmap().is_some() {
             return self.mindmap_node(item).map(Owner::Node);
         }
@@ -80,6 +118,12 @@ impl Viewer {
     /// The source of `item`, on a sequence diagram.
     pub(crate) fn sequence_range(&self, item: &Item) -> Option<Range<usize>> {
         let src = &self.doc.source;
+        if self.doc.timeline().is_some() {
+            return match item {
+                Item::Node(_) => timeline::edit::period_range(src, self.timeline_period(item)?),
+                Item::Edge(n) => timeline::edit::event_range(src, *n),
+            };
+        }
         if self.doc.mindmap().is_some() {
             return mindmap::edit::node_range(src, self.mindmap_node(item)?);
         }
@@ -91,6 +135,13 @@ impl Viewer {
 
     /// The text the label field starts with for `item`, on a sequence diagram.
     pub(crate) fn sequence_label(&self, item: &Item) -> Option<String> {
+        if let Some((periods, events)) = self.timeline_parts() {
+            let lines = match item {
+                Item::Node(_) => periods[self.timeline_period(item)?],
+                Item::Edge(n) => *events.get(*n)?,
+            };
+            return Some(lines.join("\n"));
+        }
         if let Some(map) = self.doc.mindmap() {
             return Some(map.nodes[self.mindmap_node(item)?].label.text.clone());
         }
@@ -105,6 +156,14 @@ impl Viewer {
     /// The edit giving `item` the label `text`, on a sequence diagram.
     pub(crate) fn sequence_rename(&self, item: &Item, text: &str) -> Option<TextEdit> {
         let src = &self.doc.source;
+        if self.doc.timeline().is_some() {
+            return match item {
+                Item::Node(_) => {
+                    timeline::edit::set_period_label(src, self.timeline_period(item)?, text)
+                }
+                Item::Edge(n) => timeline::edit::set_event_text(src, *n, text),
+            };
+        }
         if self.doc.mindmap().is_some() {
             return mindmap::edit::set_label(src, self.mindmap_node(item)?, text);
         }
@@ -123,6 +182,30 @@ impl Viewer {
         cx: &mut Context<Self>,
     ) {
         let src = self.doc.source.clone();
+        // On a timeline: an event of `from` or the one selected period, or a period at the end.
+        if self.doc.timeline().is_some() {
+            let selected = match self.selection.as_slice() {
+                [item] => self.timeline_period(item),
+                _ => None,
+            };
+            let period = from
+                .and_then(|f| self.timeline_period(&Item::Node(f)))
+                .or(selected);
+            let added = match period {
+                Some(i) => {
+                    timeline::edit::add_event(&src, i, NEW_EVENT).map(|(n, e)| (Item::Edge(n), e))
+                }
+                None => timeline::edit::add_period(&src, None, NEW_PERIOD)
+                    .map(|(i, e)| (Item::Node(i.to_string()), e)),
+            };
+            let Some((item, e)) = added else {
+                return;
+            };
+            self.record(e, window, cx);
+            self.select(vec![item.clone()], cx);
+            self.edit_label(item, window, cx);
+            return;
+        }
         // On a mindmap: a child of `from`, of the one selected node, or of the root.
         if let Some(map) = self.doc.mindmap() {
             let selected = match self.selection.as_slice() {
@@ -182,6 +265,18 @@ impl Viewer {
 
     /// Deletes the selected participants and messages.
     pub(crate) fn sequence_delete(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.doc.timeline().is_some() {
+            let periods: Vec<usize> = (self.selection.iter())
+                .filter_map(|i| self.timeline_period(i))
+                .collect();
+            let events = self.selected_edges();
+            let e = timeline::edit::delete(&self.doc.source, &periods, &events);
+            self.select(Vec::new(), cx);
+            if let Some(e) = e {
+                self.record(e, window, cx);
+            }
+            return;
+        }
         if self.doc.mindmap().is_some() {
             let nodes: Vec<usize> = (self.selection.iter())
                 .filter_map(|i| self.mindmap_node(i))

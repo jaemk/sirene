@@ -873,6 +873,45 @@ fn mindmaps(cx: &mut TestAppContext) {
     assert!(source(&viewer, cx).contains("      kid\n"));
 }
 
+/// WYSIWY-27: timeline periods and events are selected by index, renamed, added, and deleted.
+#[gpui::test]
+fn timelines(cx: &mut TestAppContext) {
+    let src = "timeline\n    2002 : LinkedIn\n    2004 : Facebook\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Double-click renames an event.
+    let e = center(&viewer, cx, &Item::Edge(1));
+    double_click(cx, e);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("Facebook"));
+    cx.simulate_input("Flickr");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "timeline\n    2002 : LinkedIn\n    2004 : Flickr\n"
+    );
+    // Add Node with a period selected adds an event to it; with none, a period at the end.
+    viewer.update(cx, |v, cx| v.select(vec![node("0")], cx));
+    cx.dispatch_action(AddNode);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(1)]);
+    cx.simulate_input("Yahoo");
+    keys(cx, "enter");
+    viewer.update(cx, |v, cx| v.select(Vec::new(), cx));
+    cx.dispatch_action(AddNode);
+    assert_eq!(selection(&viewer, cx), [node("2")]);
+    cx.simulate_input("2006");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "timeline\n    2002 : LinkedIn : Yahoo\n    2004 : Flickr\n    2006\n"
+    );
+    // Deleting a period takes its events; deleting an event leaves its period.
+    viewer.update(cx, |v, cx| v.select(vec![node("1"), Item::Edge(0)], cx));
+    cx.dispatch_action(Delete);
+    assert_eq!(
+        source(&viewer, cx),
+        "timeline\n    2002 : Yahoo\n    2006\n"
+    );
+}
+
 #[gpui::test]
 fn states_move_into_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";

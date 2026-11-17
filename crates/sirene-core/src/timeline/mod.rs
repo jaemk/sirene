@@ -1,5 +1,6 @@
 //! Mermaid timelines (TIMELI-*): time periods with their events, grouped in sections.
 
+pub mod edit;
 mod lower;
 mod parser;
 

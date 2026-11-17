@@ -74,7 +74,13 @@ fn snapshots() {
             for theme in [Theme::LIGHT, Theme::DARK] {
                 let s = lowered.diagram.scene(&Approx, &theme).unwrap();
                 assert!(!s.elements.is_empty(), "{name}");
-                assert!(s.elements.iter().all(|e| e.owner == Owner::Diagram));
+                // Periods and events own their boxes and text (WYSIWY-27).
+                assert!(
+                    (s.elements.iter()).all(|e| matches!(
+                        e.owner,
+                        Owner::Diagram | Owner::Node(_) | Owner::Edge(_)
+                    ))
+                );
             }
         }
     }

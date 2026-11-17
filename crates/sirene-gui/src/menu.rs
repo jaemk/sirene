@@ -80,6 +80,7 @@ pub(crate) fn build(
                 Some(("Add Participant", "Add Participant With Message"))
             }
             _ if v.doc.mindmap().is_some() => Some(("Add Node", "Add Child Node")),
+            _ if v.doc.timeline().is_some() => Some(("Add Period", "Add Event")),
             Some(Graph::State) => Some(("Add State", "Add State With Transition")),
             Some(Graph::Class) => Some(("Add Class", "Add Class With Relation")),
             Some(Graph::Er) => Some(("Add Entity", "Add Entity With Relationship")),

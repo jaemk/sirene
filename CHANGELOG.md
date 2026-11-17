@@ -41,6 +41,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The right-click menu on sequence messages holds an Arrow submenu; Move Earlier and Move Later
   reorder participants.
 - Mindmaps take drawing edits: adding, renaming, and deleting nodes, through `mindmap::edit`.
+- Timelines take drawing edits: adding, renaming, and deleting periods and events, through
+  `timeline::edit`.
 - `sirene ascii --markdown` and `sirene check --markdown` read stdin, or files of any name, as
   Markdown.
 - `sirene check --json` prints the diagnostics to stdout as one JSON array.

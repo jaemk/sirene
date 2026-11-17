@@ -32,6 +32,9 @@ struct Painter<'a, M> {
     metrics: &'a M,
     theme: &'a Theme,
     elements: Vec<Element>,
+    /// The owner of what is drawn next: period `i` is `Owner::Node(i)`, the `n`th event in
+    /// order `Owner::Edge(n)`, and the rest the diagram (WYSIWY-27).
+    owner: Owner,
 }
 
 impl<M: TextMetrics> Painter<'_, M> {
@@ -75,7 +78,7 @@ impl<M: TextMetrics> Painter<'_, M> {
 
     fn path(&mut self, segments: Vec<Segment>, fill: Option<Color>, stroke: Option<Stroke>) {
         self.elements.push(Element {
-            owner: Owner::Diagram,
+            owner: self.owner,
             primitive: Primitive::Path {
                 segments,
                 fill,
@@ -86,7 +89,7 @@ impl<M: TextMetrics> Painter<'_, M> {
 
     fn text(&mut self, text: &str, center: Pt, size: f32, color: Color) {
         self.elements.push(Element {
-            owner: Owner::Diagram,
+            owner: self.owner,
             primitive: Primitive::Text {
                 text: text.to_owned(),
                 center,
@@ -170,8 +173,18 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
         metrics,
         theme,
         elements: Vec::new(),
+        owner: Owner::Diagram,
     };
     let lh = theme.line_height;
+    // The index of each period's first event, in event order.
+    let first_event: Vec<usize> = timeline
+        .periods()
+        .scan(0, |n, (_, period)| {
+            let first = *n;
+            *n += period.events.len();
+            Some(first)
+        })
+        .collect();
     let title = timeline
         .title
         .as_deref()
@@ -296,18 +309,21 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 w: col_w[i],
                 h: period_h,
             };
+            p.owner = Owner::Node(i);
             p.boxed(b, &label.lines, fill, None);
             let mut y = events_y;
-            for e in events {
+            for (j, e) in events.iter().enumerate() {
                 let b = BoxF {
                     x: col_x[i],
                     y,
                     w: col_w[i],
                     h: e.h,
                 };
+                p.owner = Owner::Edge(first_event[i] + j);
                 p.boxed(b, &e.lines, event_fill, event_stroke(*k));
                 y += e.h + GAP;
             }
+            p.owner = Owner::Diagram;
             bottom = bottom.max(y - GAP);
         }
         width = right + 2.0 * HEAD + MARGIN;
@@ -381,18 +397,21 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 w: period_w,
                 h: row_h[i],
             };
+            p.owner = Owner::Node(i);
             p.boxed(b, &label.lines, fill, None);
             let mut x = events_x;
-            for e in events {
+            for (j, e) in events.iter().enumerate() {
                 let b = BoxF {
                     x,
                     y: row_y[i] + (row_h[i] - e.h) / 2.0,
                     w: e.w,
                     h: e.h,
                 };
+                p.owner = Owner::Edge(first_event[i] + j);
                 p.boxed(b, &e.lines, event_fill, event_stroke(*k));
                 x += e.w + GAP;
             }
+            p.owner = Owner::Diagram;
             right = right.max(x - GAP);
         }
         width = right + MARGIN;
@@ -469,6 +488,7 @@ mod tests {
             metrics: &Wider,
             theme: &Theme::LIGHT,
             elements: Vec::new(),
+            owner: Owner::Diagram,
         };
         let block = p.block(&vec!["abcdefghij".into()], MIN_W);
         assert!(block.w >= 200.0 + 2.0 * PAD);

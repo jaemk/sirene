@@ -285,9 +285,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     let timeline = Document::from_source(None, "timeline\n  2002 : A\n".to_owned());
     assert_eq!(
         timeline.read_only(),
-        Some("drawing edits are not supported for timelines yet")
+        Some("timelines take only adding, renaming, and deleting time periods and events")
     );
     assert!(timeline.chart.nodes.is_empty() && timeline.other.is_some());
+    assert!(timeline.own_edits() && timeline.timeline().is_some());
     let seq = Document::from_source(None, "sequenceDiagram\n  A->>B: hi\n".to_owned());
     assert_eq!(
         seq.read_only(),

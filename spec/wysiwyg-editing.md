@@ -468,3 +468,25 @@ Edges are not selectable.
   (Add Child Node with one node selected), Rename, Delete, Select All, and Fit Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/mindmap/edit.rs`.
+
+## WYSIWY-27 Timelines
+
+A Mermaid timeline takes drawing edits through `sirene_core::timeline::edit`; time periods are
+selected as nodes by their place among the periods (`Item::Node("0")`, `"1"`, ...), and events
+as edges by their place among every period's events, in order.
+
+- Clicking selects a period (its line in the source pane) or an event (its text).
+- Double-click or Rename edits a period's label or an event's text, with line breaks written as
+  `<br>`. Timelines have no escapes, so text that would not read back as written (empty, a `:`
+  before whitespace or at the end of a line, or a period starting with a keyword) is refused.
+- Add Node with one period selected, or a drag from a period to empty space, adds an event
+  `New event` at the end of its events; otherwise Add Node, or a double-click on empty space,
+  adds a period `New period` at the end. The new item is selected with its label open.
+- Delete removes the selected periods, each with its `: EVENT` lines, and the selected events
+  (a `: EVENT` line holding only that event goes whole).
+- Each is one undoable drawing change (WYSIWY-13). The other edits stay refused, with the reason
+  `timelines take only adding, renaming, and deleting time periods and events`. The right-click
+  menu holds Add Period (Add Event with one period selected), Rename, Delete, Select All, and
+  Fit Window.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/timeline/edit.rs`.

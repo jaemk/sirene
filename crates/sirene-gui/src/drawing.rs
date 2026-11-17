@@ -725,7 +725,7 @@ impl Viewer {
     fn move_item(&mut self, later: bool, window: &mut Window, cx: &mut Context<Self>) {
         let src = &self.doc.source;
         let action = if later { "move later" } else { "move earlier" };
-        if self.doc.mindmap().is_some() {
+        if self.doc.mindmap().is_some() || self.doc.timeline().is_some() {
             self.refused(action, self.doc.read_only(), cx);
             return;
         }
