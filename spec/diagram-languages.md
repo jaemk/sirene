@@ -15,7 +15,9 @@ is detected from its first statement: `@startuml` (or another `@start...`) is Pl
 `digraph`, or `strict` followed by an optional ID and `{` is DOT; anything else is Mermaid. D2 has
 no header, so it needs its extension or `--lang d2`. Every command takes `--lang
 mermaid|dot|d2|plantuml` to override detection. Within Mermaid, the header keyword picks the
-diagram type (FLOWCH-4).
+diagram type (FLOWCH-4). The library reports the type a source was read as in
+`diagram::Lowered::kind`, with `Kind::lang` and a message name (`Kind::name`, e.g. `sequence
+diagram`); `-v` logs it as `read as a NAME`.
 
 In Markdown (MARKDO-1), a block's info string picks the language: `mermaid`; `dot` or
 `graphviz`; `d2`; `plantuml` or `puml`, in any case, also as `{.mermaid}` or `{mermaid}`.

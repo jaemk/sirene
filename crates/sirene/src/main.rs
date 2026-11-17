@@ -68,7 +68,9 @@ fn lower_file(path: Option<&Path>, src: &str) -> Lowered {
         src.len(),
         lang(path.and_then(Lang::of_path))
     );
-    diagram::lower_as(src, lang(path.and_then(Lang::of_path)))
+    let lowered = diagram::lower_as(src, lang(path.and_then(Lang::of_path)));
+    log::debug!("read as a {}", lowered.kind.name());
+    lowered
 }
 
 // Diagnostics are a presentation boundary. A failed stderr write is remembered so the

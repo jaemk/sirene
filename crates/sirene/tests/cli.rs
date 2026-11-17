@@ -246,6 +246,7 @@ fn verbose_reports_each_step() {
             "read <stdin>: 21 bytes",
             "sirene_core::flowchart: parsed 21 bytes, 2 lines",
             "lowered 2 nodes, 1 edges",
+            "sirene: read as a flowchart",
             "sirene_core::layout: laid out 2 nodes",
             "rendered ",
             "writing <stdout>",

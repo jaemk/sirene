@@ -14,6 +14,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `source::read` reads a diagram file as UTF-8 of at most 64 MiB, as the CLI and editor do.
 - `sirene-core` builds and renders on `wasm32-unknown-unknown`, checked in CI by rendering the
   examples under Node.
+- `diagram::Lowered::kind` is the type the source was read as, with `Kind::lang`,
+  `Kind::name`, and `Kind::ALL`. `-v` logs it (`read as a sequence diagram`).
 
 ### Changed
 

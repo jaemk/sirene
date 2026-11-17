@@ -34,8 +34,9 @@ use crate::xychart::{self, XyChart};
 use crate::{class, dot, er, plantuml, requirement, state, usecase, zenuml};
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Kind {
+    #[default]
     Flowchart,
     Sequence,
     State,
@@ -115,6 +116,97 @@ impl Lang {
 }
 
 impl Kind {
+    /// Every type, in declaration order.
+    pub const ALL: &[Kind] = &[
+        Kind::Flowchart,
+        Kind::Sequence,
+        Kind::State,
+        Kind::Class,
+        Kind::Er,
+        Kind::Git,
+        Kind::Timeline,
+        Kind::Pie,
+        Kind::Gantt,
+        Kind::Mindmap,
+        Kind::Journey,
+        Kind::Quadrant,
+        Kind::XyChart,
+        Kind::Requirement,
+        Kind::Kanban,
+        Kind::Packet,
+        Kind::Radar,
+        Kind::Sankey,
+        Kind::Treemap,
+        Kind::Block,
+        Kind::Architecture,
+        Kind::C4,
+        Kind::ZenUml,
+        Kind::Info,
+        Kind::Ishikawa,
+        Kind::Venn,
+        Kind::Wardley,
+        Kind::TreeView,
+        Kind::UseCase,
+        Kind::Railroad,
+        Kind::Swimlane,
+        Kind::Cynefin,
+        Kind::EventModel,
+        Kind::Agentflow,
+        Kind::Dot,
+        Kind::PlantUml,
+    ];
+
+    /// The language this type is written in.
+    pub fn lang(self) -> Lang {
+        match self {
+            Kind::Dot => Lang::Dot,
+            Kind::PlantUml => Lang::PlantUml,
+            _ => Lang::Mermaid,
+        }
+    }
+
+    /// The type's name in messages, e.g. `sequence diagram` or `DOT graph`.
+    pub fn name(self) -> &'static str {
+        match self {
+            Kind::Flowchart => "flowchart",
+            Kind::Sequence => "sequence diagram",
+            Kind::State => "state diagram",
+            Kind::Class => "class diagram",
+            Kind::Er => "ER diagram",
+            Kind::Git => "git graph",
+            Kind::Timeline => "timeline",
+            Kind::Pie => "pie chart",
+            Kind::Gantt => "gantt chart",
+            Kind::Mindmap => "mindmap",
+            Kind::Journey => "user journey",
+            Kind::Quadrant => "quadrant chart",
+            Kind::XyChart => "XY chart",
+            Kind::Requirement => "requirement diagram",
+            Kind::Kanban => "kanban board",
+            Kind::Packet => "packet diagram",
+            Kind::Radar => "radar chart",
+            Kind::Sankey => "sankey diagram",
+            Kind::Treemap => "treemap",
+            Kind::Block => "block diagram",
+            Kind::Architecture => "architecture diagram",
+            Kind::C4 => "C4 diagram",
+            Kind::ZenUml => "ZenUML diagram",
+            Kind::Info => "info diagram",
+            Kind::Ishikawa => "ishikawa diagram",
+            Kind::Venn => "venn diagram",
+            Kind::Wardley => "Wardley map",
+            Kind::TreeView => "tree view",
+            Kind::UseCase => "use case diagram",
+            Kind::Railroad => "railroad diagram",
+            Kind::Swimlane => "swimlane diagram",
+            Kind::Cynefin => "Cynefin diagram",
+            Kind::EventModel => "event modeling diagram",
+            Kind::Agentflow => "agentflow diagram",
+            Kind::Dot => "DOT graph",
+            Kind::PlantUml => "PlantUML diagram",
+        }
+    }
+
     /// The type of the diagram `src` starts with: DOT when it starts with a DOT graph header,
     /// otherwise the Mermaid type its header names, and a flowchart when it names none.
     pub fn of(src: &str) -> Kind {
@@ -347,6 +439,8 @@ pub struct Lowered {
     pub diagnostics: Vec<Diagnostic>,
     /// The diagram's own `theme` and `themeVariables` (MTHEME-1).
     pub theme: ThemeConfig,
+    /// The type the source was read as (LANGS-1); [`Kind::lang`] is its language.
+    pub kind: Kind,
 }
 
 impl Lowered {
@@ -461,6 +555,7 @@ fn lower_as_with_limit(src: &str, lang: Option<Lang>, limit: usize) -> Lowered {
         lowered.diagnostics.extend(lowered.theme.diagnostics());
         lowered
     };
+    lowered.kind = kind;
     cap(&mut lowered.diagnostics);
     lowered
 }
@@ -496,6 +591,7 @@ fn lower_dot(src: &str) -> Lowered {
         diagram: Diagram::Graph(l.flowchart),
         diagnostics: l.diagnostics,
         theme,
+        kind: Kind::Dot,
     }
 }
 
@@ -806,6 +902,53 @@ mod tests {
         assert_eq!(Kind::of("stateDiagramX\n"), Kind::Flowchart);
         assert_eq!(Kind::of(""), Kind::Flowchart);
         assert_eq!(Kind::of("---\nunclosed\n"), Kind::Flowchart);
+    }
+
+    /// `Lowered::kind` is the type the source was read as, with its language and name.
+    #[test]
+    fn lowered_kinds() {
+        for (src, lang, kind, name) in [
+            ("flowchart\nA\n", None, Kind::Flowchart, "flowchart"),
+            (
+                "sequenceDiagram\nA->>B: x\n",
+                None,
+                Kind::Sequence,
+                "sequence diagram",
+            ),
+            (
+                "swimlane-beta LR\n",
+                None,
+                Kind::Swimlane,
+                "swimlane diagram",
+            ),
+            ("digraph { a -> b }\n", None, Kind::Dot, "DOT graph"),
+            (
+                "@startuml\nA -> B\n@enduml\n",
+                None,
+                Kind::PlantUml,
+                "PlantUML diagram",
+            ),
+            ("pie\n\"a\" : 1\n", Some(Lang::Dot), Kind::Dot, "DOT graph"),
+            (
+                "graph { a }\n",
+                Some(Lang::Mermaid),
+                Kind::Flowchart,
+                "flowchart",
+            ),
+        ] {
+            let lowered = lower_as(src, lang);
+            assert_eq!(lowered.kind, kind, "{src}");
+            assert_eq!(kind.name(), name);
+            assert_eq!(kind.lang(), lang.unwrap_or(kind.lang()));
+        }
+        assert_eq!(Kind::Dot.lang(), Lang::Dot);
+        assert_eq!(Kind::PlantUml.lang(), Lang::PlantUml);
+        assert_eq!(Kind::Gantt.lang(), Lang::Mermaid);
+        // A source over the limit is not read as anything but the default.
+        assert_eq!(lower_as_with_limit("pie\n", None, 1).kind, Kind::Flowchart);
+        // Every name is distinct.
+        let names: std::collections::HashSet<_> = Kind::ALL.iter().map(|k| k.name()).collect();
+        assert_eq!(names.len(), Kind::ALL.len());
     }
 
     #[test]

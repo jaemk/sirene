@@ -202,6 +202,7 @@ $ sirene -v svg diagram.mmd -o diagram.svg
 [     0.2ms] DEBUG sirene: read diagram.mmd: 23 bytes
 [     0.4ms] DEBUG sirene_core::flowchart: parsed 23 bytes, 2 lines; 0 syntax diagnostics
 [     0.5ms] DEBUG sirene_core::flowchart: lowered 2 nodes, 1 edges, 0 subgraphs, 0 class definitions; 0 diagnostics
+[     0.5ms] DEBUG sirene: read as a flowchart
 [     0.5ms] DEBUG sirene: parsed and lowered in 357.7µs
 [     0.7ms] DEBUG sirene_core::layout: laid out 2 nodes, 0 clusters, 1 edges (1 routed) in 34x114 cells, 147.4µs
 [     0.8ms] DEBUG sirene_core::scene::paint: drew a 65x145 scene of 6 elements
