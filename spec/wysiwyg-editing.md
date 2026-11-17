@@ -346,3 +346,27 @@ has the id `CONTAINER:[*]start` or `CONTAINER:[*]end`, with an empty container a
   transitions`. The right-click menu holds Add State, Rename, Delete, Select All, and Fit Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/state/edit.rs`.
+
+## WYSIWY-23 Class diagrams
+
+A Mermaid class diagram takes drawing edits through `sirene_core::class::edit`; classes and
+relations are selected as the flowchart's nodes and edges are. A note on its own is a node with
+an id starting `note:`.
+
+- Double-click or Rename edits a class's label (the `["..."]` of its first declaration, with
+  later ones removed; a bare declaration gains `class`, and a class with none gets a new
+  `class ID["..."]` at the end; a label equal to the id, or empty, drops them), a lone note's
+  text, or a relation's label. The field leaves out the class's annotation. `#` and `"` are
+  written as entity codes, and line breaks as `<br>`.
+- Dragging from a class to another adds an association `FROM --> TO` at the end, selected with
+  its label open; one at a note is refused. An id that is not plain is written in backticks.
+  Dragging to empty space adds a class too. Add Node, or a double-click on empty space, adds a
+  class `C1`, `C2`, ... labeled `New class`, with a relation to it from the one selected class.
+- Delete removes the selected relations and notes, and the selected classes with every
+  statement that names them (declarations, members, annotations, relations, notes, and clicks;
+  their ids are dropped from `style` and `cssClass` lists).
+- Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
+  the reason `class diagrams take only adding, renaming, connecting, and deleting classes and
+  relations`. The right-click menu holds Add Class, Rename, Delete, Select All, and Fit Window.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/class/edit.rs`.

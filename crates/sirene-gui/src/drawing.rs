@@ -298,6 +298,7 @@ impl Viewer {
                 // pointer if any (WYSIWY-15).
                 None if self.doc.sequence().is_some() => self.add_participant(None, window, cx),
                 None if self.doc.is_state() => self.add_state(Link::None, window, cx),
+                None if self.doc.is_class() => self.add_class(Link::None, window, cx),
                 None => {
                     let scope = self.subgraph_at(e.position, window);
                     self.add_linked(Shape::Rect, Link::None, scope, window, cx);
@@ -392,6 +393,15 @@ impl Viewer {
                 }
                 _ => {}
             }
+        } else if far && self.doc.is_class() {
+            // A relation to the class released on, or to a new class.
+            match self.item_at(e.position, window) {
+                Some(Item::Node(to)) => self.add_relation(&from, &to, window, cx),
+                None if self.viewport.get().contains(&e.position) => {
+                    self.add_class(Link::From(from), window, cx);
+                }
+                _ => {}
+            }
         } else if far {
             match self.item_at(e.position, window) {
                 Some(Item::Node(to)) => {
@@ -444,6 +454,10 @@ impl Viewer {
         }
         if self.doc.is_state() {
             self.state_delete(window, cx);
+            return;
+        }
+        if self.doc.is_class() {
+            self.class_delete(window, cx);
             return;
         }
         if let Some(why) = self.doc.read_only() {
@@ -515,6 +529,12 @@ impl Viewer {
         // one.
         if self.doc.is_state() {
             self.add_state(link, window, cx);
+            return;
+        }
+        // Shapes and namespaces do not apply: a class, with a relation to or from the linked
+        // one.
+        if self.doc.is_class() {
+            self.add_class(link, window, cx);
             return;
         }
         if let Some(why) = self.doc.read_only() {
@@ -934,6 +954,8 @@ impl Viewer {
     pub fn edit_label(&mut self, item: Item, window: &mut Window, cx: &mut Context<Self>) {
         let text = if self.doc.sequence().is_some() {
             self.sequence_label(&item)
+        } else if self.doc.is_class() {
+            self.class_label(&item)
         } else {
             if let Some(why) = self.doc.read_only()
                 && !self.doc.is_state()
@@ -1002,6 +1024,10 @@ impl Viewer {
             }
         } else if self.doc.is_state() {
             if let Some(edit) = self.state_rename(&label.item, &text) {
+                self.record(edit, window, cx);
+            }
+        } else if self.doc.is_class() {
+            if let Some(edit) = self.class_rename(&label.item, &text) {
                 self.record(edit, window, cx);
             }
         } else {

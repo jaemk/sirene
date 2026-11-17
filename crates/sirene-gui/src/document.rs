@@ -19,6 +19,10 @@ pub const SEQUENCE_EDITS: &str =
 pub const STATE_EDITS: &str =
     "state diagrams take only adding, renaming, connecting, and deleting states and transitions";
 
+/// Why a class diagram refuses the other drawing edits (WYSIWY-23).
+pub const CLASS_EDITS: &str =
+    "class diagrams take only adding, renaming, connecting, and deleting classes and relations";
+
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
 
@@ -217,7 +221,7 @@ impl Document {
             Kind::Sequence => Some(SEQUENCE_EDITS),
             // Edited through `state` instead (WYSIWY-22).
             Kind::State => Some(STATE_EDITS),
-            Kind::Class => Some("drawing edits are not supported for class diagrams yet"),
+            Kind::Class => Some(CLASS_EDITS),
             Kind::Er => Some("drawing edits are not supported for ER diagrams yet"),
             Kind::Git => Some("drawing edits are not supported for git graphs yet"),
             Kind::Timeline => Some("drawing edits are not supported for timelines yet"),
@@ -279,10 +283,17 @@ impl Document {
         self.other.is_none() && Kind::of_lang(&self.source, self.lang()) == Kind::State
     }
 
+    /// Whether the document holds a Mermaid class diagram, which is drawn from `chart` and takes
+    /// its own drawing edits: adding, renaming, connecting, and deleting classes and relations
+    /// (WYSIWY-23).
+    pub fn is_class(&self) -> bool {
+        self.other.is_none() && Kind::of_lang(&self.source, self.lang()) == Kind::Class
+    }
+
     /// Whether drawing edits go through a diagram's own edit module rather than
-    /// `flowchart::edit` (WYSIWY-21, WYSIWY-22).
+    /// `flowchart::edit` (WYSIWY-21, WYSIWY-22, WYSIWY-23).
     pub fn own_edits(&self) -> bool {
-        self.sequence().is_some() || self.is_state()
+        self.sequence().is_some() || self.is_state() || self.is_class()
     }
 
     /// The drawing of whichever diagram the document holds.

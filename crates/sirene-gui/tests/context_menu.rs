@@ -88,6 +88,25 @@ fn state_diagram_menu(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn class_diagram_menu(cx: &mut TestAppContext) {
+    let src = "classDiagram\n    A <|-- B\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Flowchart edits stay refused (WYSIWY-23).
+    select(&viewer, cx, vec![node("A")]);
+    cx.dispatch_action(SetShape {
+        shape: Shape::Diamond,
+    });
+    assert_eq!(source(&viewer, cx), src);
+    // The first item adds a class with a relation from the one right-clicked.
+    let b = center(&viewer, cx, &node("B"));
+    first_item(cx, b);
+    assert_eq!(
+        source(&viewer, cx),
+        "classDiagram\n    A <|-- B\n    class C1[\"New class\"]\n    B --> C1\n"
+    );
+}
+
+#[gpui::test]
 fn shapes_and_links_for_the_selected_nodes(cx: &mut TestAppContext) {
     let (viewer, cx) = open_src(cx, SRC);
     select(&viewer, cx, vec![node("A"), node("C")]);

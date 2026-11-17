@@ -69,8 +69,18 @@ pub(crate) fn build(
     let Some(viewer) = viewer.upgrade() else {
         return menu;
     };
-    let (nodes, edges, chart, src, subgraph, focus, read_only, sequence, state) = {
+    let (nodes, edges, chart, src, subgraph, focus, read_only, adds) = {
         let v = viewer.read(cx);
+        // A diagram with its own edits: its Add Node item, unlinked and linked.
+        let adds = if v.doc.sequence().is_some() {
+            Some(("Add Participant", "Add Participant With Message"))
+        } else if v.doc.is_state() {
+            Some(("Add State", "Add State With Transition"))
+        } else if v.doc.is_class() {
+            Some(("Add Class", "Add Class With Relation"))
+        } else {
+            None
+        };
         (
             v.selected_nodes(),
             v.selected_edges(),
@@ -79,21 +89,15 @@ pub(crate) fn build(
             v.menu_subgraph.clone(),
             v.drawing_focus.clone(),
             v.doc.read_only(),
-            v.doc.sequence().is_some(),
-            v.doc.is_state(),
+            adds,
         )
     };
     let mut menu = menu.action_context(focus);
     // A sequence diagram: participants and messages (WYSIWY-21). A state diagram: states and
-    // transitions (WYSIWY-22).
-    if sequence || state {
+    // transitions (WYSIWY-22). A class diagram: classes and relations (WYSIWY-23).
+    if let Some((add, add_linked)) = adds {
         let linked = nodes.len() == 1 && edges.is_empty();
-        let label = match (state, linked) {
-            (false, true) => "Add Participant With Message",
-            (false, false) => "Add Participant",
-            (true, true) => "Add State With Transition",
-            (true, false) => "Add State",
-        };
+        let label = if linked { add_linked } else { add };
         menu = menu.menu(label, Box::new(AddNode));
         if nodes.len() + edges.len() == 1 {
             menu = menu.menu("Rename", Box::new(Rename));

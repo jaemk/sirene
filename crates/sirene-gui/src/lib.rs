@@ -12,6 +12,7 @@
 #![doc = include_str!("../README.md")]
 // The window's behavior: GUISHE-* in spec/gui-shell.md, WYSIWY-* in spec/wysiwyg-editing.md.
 
+pub mod class;
 pub mod document;
 pub mod drawing;
 pub mod export;

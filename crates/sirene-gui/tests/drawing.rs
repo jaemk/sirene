@@ -557,6 +557,72 @@ fn state_diagrams(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn class_diagrams(cx: &mut TestAppContext) {
+    let src = "classDiagram\n    <<interface>> A\n    A <|-- B : is\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Renaming a class (its field leaves out the annotation) and a relation (WYSIWY-23).
+    let a = center(&viewer, cx, &node("A"));
+    double_click(cx, a);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("A"));
+    cx.simulate_input("Shape #1");
+    keys(cx, "enter");
+    let r = center(&viewer, cx, &Item::Edge(0));
+    double_click(cx, r);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("is"));
+    cx.simulate_input("extends");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "classDiagram\n    <<interface>> A\n    A <|-- B : extends\n    class A[\"Shape #35;1\"]\n"
+    );
+
+    // Dragging between classes adds a relation, with its label open.
+    let (a, b) = (
+        center(&viewer, cx, &node("A")),
+        center(&viewer, cx, &node("B")),
+    );
+    drag(cx, b, a);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(1)]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some(""));
+    cx.simulate_input("uses");
+    keys(cx, "enter");
+    assert!(
+        source(&viewer, cx).ends_with("    B --> A : uses\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+
+    // Adding a class from the selected one adds a relation to it.
+    let b = center(&viewer, cx, &node("B"));
+    click(cx, b, Modifiers::none());
+    cx.dispatch_action(AddNode);
+    cx.run_until_parked();
+    assert_eq!(selection(&viewer, cx), [node("C1")]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("New class"));
+    cx.simulate_input("Circle");
+    keys(cx, "enter");
+    assert!(
+        source(&viewer, cx).ends_with("    class C1[\"Circle\"]\n    B --> C1\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+
+    // Deleting a class takes its relations; undo brings them back.
+    let before = source(&viewer, cx);
+    let b = center(&viewer, cx, &node("B"));
+    click(cx, b, Modifiers::none());
+    cx.dispatch_action(Delete);
+    cx.run_until_parked();
+    assert_eq!(
+        source(&viewer, cx),
+        "classDiagram\n    <<interface>> A\n    class A[\"Shape #35;1\"]\n    class C1[\"Circle\"]\n"
+    );
+    assert!(selection(&viewer, cx).is_empty());
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), before);
+}
+
+#[gpui::test]
 fn state_transitions_inside_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    state W {\n        [*] --> a\n    }\n    a --> b\n";
     let (viewer, cx) = open_src(cx, src);
