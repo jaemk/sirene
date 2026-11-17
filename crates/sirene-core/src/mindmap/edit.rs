@@ -57,14 +57,22 @@ fn text_source(text: &str) -> String {
         .replace('\n', "<br>")
 }
 
-/// A node for `text`: the text alone when it reads back as written, otherwise quoted in `[...]`.
-fn node_source(text: &str) -> String {
+/// Nodes for `text`, to try in order: the text alone when it may read back as written, then
+/// quoted in `[...]`.
+fn node_sources(text: &str) -> Vec<String> {
     let s = text_source(text);
     let bare = !s.contains(['(', ')', '[', ']', '{', '}'])
         && !s.contains("@{")
         && !s.starts_with(':')
         && !s.contains("<br>");
-    if bare { s } else { format!("[\"{s}\"]") }
+    let quoted = format!("[\"{s}\"]");
+    if bare { vec![s, quoted] } else { vec![quoted] }
+}
+
+/// Whether node `i` of `src` reads as `want`, with `count` nodes in all.
+fn reads(src: &str, i: usize, want: &str, count: usize) -> bool {
+    let (map, _, _) = lower::lower_ranges(&super::parse(src).syntax());
+    map.nodes.len() == count && map.nodes.get(i).is_some_and(|n| n.label.text == want)
 }
 
 /// The label of node `i`.
@@ -91,18 +99,21 @@ pub fn add_node(src: &str, parent: Option<usize>, text: &str) -> Option<(usize, 
         text
     };
     let nl = newline(src);
-    let line = node_source(text);
+    let want = normalize(text);
+    let count = doc.map.nodes.len() + 1;
     let Some(p) = parent else {
         if !doc.map.nodes.is_empty() {
             return None;
         }
         let at = src.len();
         let lead = if src.ends_with('\n') { "" } else { nl };
-        let edit = TextEdit {
-            range: at..at,
-            text: format!("{lead}  {line}{nl}"),
-        };
-        return Some((0, edit));
+        return node_sources(text).into_iter().find_map(|line| {
+            let edit = TextEdit {
+                range: at..at,
+                text: format!("{lead}  {line}{nl}"),
+            };
+            reads(&edit.apply(src), 0, &want, count).then_some((0, edit))
+        });
     };
     let node = doc.map.nodes.get(p)?;
     let start = usize::from(doc.statements[p].text_range().start());
@@ -116,16 +127,19 @@ pub fn add_node(src: &str, parent: Option<usize>, text: &str) -> Option<(usize, 
     };
     let at = doc.subtree_end(p);
     let lead = if src[..at].ends_with('\n') { "" } else { nl };
-    let edit = TextEdit {
-        range: at..at,
-        text: format!("{lead}{inner}{line}{nl}"),
-    };
     let i = p + doc.map.descendants(p).len() + 1;
-    // The new node must lower under `p`, with every other node kept.
-    let (after, _, _) = lower::lower_ranges(&super::parse(&edit.apply(src)).syntax());
-    let kept = after.nodes.len() == doc.map.nodes.len() + 1
-        && after.nodes.get(i).and_then(|n| n.parent) == Some(p);
-    kept.then_some((i, edit))
+    node_sources(text).into_iter().find_map(|line| {
+        let edit = TextEdit {
+            range: at..at,
+            text: format!("{lead}{inner}{line}{nl}"),
+        };
+        // The new node must lower under `p` as written, with every other node kept.
+        let out = edit.apply(src);
+        let (after, _, _) = lower::lower_ranges(&super::parse(&out).syntax());
+        let kept =
+            after.nodes.get(i).and_then(|n| n.parent) == Some(p) && reads(&out, i, &want, count);
+        kept.then_some((i, edit))
+    })
 }
 
 /// Shows node `i` as `text`, keeping its shape and id. `None` when there is no such node, the
@@ -136,25 +150,28 @@ pub fn set_label(src: &str, i: usize, text: &str) -> Option<TextEdit> {
     }
     let doc = Doc::new(src);
     let stmt = doc.statements.get(i)?;
-    let shape = stmt.children().find(|n| n.kind() == SHAPE);
-    let edit = match shape {
+    let want = normalize(text);
+    if doc.map.nodes[i].label.text == want {
+        return None;
+    }
+    let (range, sources) = match stmt.children().find(|n| n.kind() == SHAPE) {
         Some(shape) => {
             let content = [MD_STRING, STRING, TEXT]
                 .into_iter()
                 .find_map(|k| token(&shape, k))?;
-            TextEdit {
-                range: span(content.text_range()),
-                text: format!("\"{}\"", text_source(text)),
-            }
+            let quoted = format!("\"{}\"", text_source(text));
+            (span(content.text_range()), vec![quoted])
         }
-        None => TextEdit {
-            range: span(token(stmt, IDENT)?.text_range()),
-            text: node_source(text),
-        },
+        None => (span(token(stmt, IDENT)?.text_range()), node_sources(text)),
     };
-    let out = edit.apply(src);
-    let changed = label(&out, i).is_some_and(|l| l != doc.map.nodes[i].label.text);
-    changed.then_some(edit)
+    let count = doc.map.nodes.len();
+    sources.into_iter().find_map(|text| {
+        let edit = TextEdit {
+            range: range.clone(),
+            text,
+        };
+        reads(&edit.apply(src), i, &want, count).then_some(edit)
+    })
 }
 
 /// Removes nodes `nodes`, each with its subtree. `None` when nothing is removed.
@@ -231,6 +248,20 @@ mod tests {
         assert!(set_label(SRC, 3, " ").is_none());
         assert!(set_label(SRC, 9, "x").is_none());
         assert_eq!(label(SRC, 1).as_deref(), Some("Square"));
+    }
+
+    #[test]
+    fn quotes_text_read_otherwise() {
+        for text in ["%% x", "::icon(y)", ":::c"] {
+            let out = set_label(SRC, 3, text).unwrap().apply(SRC);
+            assert_eq!(labels(&out)[3], text, "{out}");
+            let (i, e) = add_node("mindmap\n", None, text).unwrap();
+            assert_eq!(labels(&e.apply("mindmap\n"))[i], text);
+            let (i, e) = add_node(SRC, Some(3), text).unwrap();
+            let out = e.apply(SRC);
+            assert_eq!(labels(&out)[i], text, "{out}");
+            assert_eq!(map(&out).nodes[i].parent, Some(3));
+        }
     }
 
     #[test]

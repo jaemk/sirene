@@ -241,27 +241,46 @@ pub fn delete(src: &str, periods: &[usize], events: &[usize]) -> Option<TextEdit
         .filter(|&&i| i < doc.groups.len())
         .map(|&i| (doc.group_span(src, i), String::new()))
         .collect();
-    for &n in events {
-        let Some((i, k)) = doc.event(n) else { continue };
-        let token = &doc.groups[i].events[k];
-        let stmt = token.parent()?;
-        let mine = self::events(&stmt);
-        // A `: EVENT` line holding only this event goes whole.
-        if stmt.kind() == EVENTS_STMT && mine.len() == 1 {
-            edits.push((statement_span(src, stmt.text_range()), String::new()));
+    let gone: Vec<SyntaxToken> = (events.iter())
+        .filter_map(|&n| doc.event(n))
+        .map(|(i, k)| doc.groups[i].events[k].clone())
+        .collect();
+    let mut stmts: Vec<SyntaxNode> = gone.iter().filter_map(SyntaxToken::parent).collect();
+    stmts.sort_by_key(|s| s.text_range().start());
+    stmts.dedup();
+    for stmt in stmts {
+        // Each event as written, from its `:` to its end.
+        let pieces: Vec<(Range<usize>, bool)> = (self::events(&stmt).iter())
+            .filter_map(|t| {
+                let colon = (stmt.children_with_tokens())
+                    .filter_map(|e| e.into_token())
+                    .filter(|c| c.kind() == COLON && c.text_range().end() <= t.text_range().start())
+                    .last()?;
+                let range =
+                    usize::from(colon.text_range().start())..usize::from(t.text_range().end());
+                Some((range, !gone.contains(t)))
+            })
+            .collect();
+        let (Some(first), Some(last)) = (pieces.first(), pieces.last()) else {
             continue;
-        }
-        // From the space before its `:` to its end.
-        let colon = (stmt.children_with_tokens())
-            .filter_map(|e| e.into_token())
-            .filter(|t| t.kind() == COLON && t.text_range().end() <= token.text_range().start())
-            .last()?;
-        let start = usize::from(colon.text_range().start());
-        let start = src[..start].trim_end_matches([' ', '\t']).len();
-        let start = start.max(line_start(src, start));
-        edits.push((start..usize::from(token.text_range().end()), String::new()));
+        };
+        let kept: Vec<&str> = (pieces.iter())
+            .filter(|(_, keep)| *keep)
+            .map(|(r, _)| &src[r.clone()])
+            .collect();
+        let edit = if !kept.is_empty() {
+            (first.0.start..last.0.end, kept.join(" "))
+        } else if stmt.kind() == EVENTS_STMT {
+            // A `: EVENT` line left with no events goes whole.
+            (statement_span(src, stmt.text_range()), String::new())
+        } else {
+            // From the space before the first `:`.
+            let start = src[..first.0.start].trim_end_matches([' ', '\t']).len();
+            let start = start.max(line_start(src, first.0.start));
+            (start..last.0.end, String::new())
+        };
+        edits.push(edit);
     }
-    edits.sort_by_key(|(r, _)| r.start);
     combine(src, edits)
 }
 
@@ -344,5 +363,14 @@ mod tests {
         assert!(out.contains("    2002\n"), "{out}");
         assert_eq!(labels(&out)[0].1.len(), 0);
         assert!(delete(SRC, &[7], &[9]).is_none());
+        let src = "timeline\n    2004 : Facebook\n         : Flickr : Yahoo\n";
+        let out = delete(src, &[], &[1]).unwrap().apply(src);
+        assert_eq!(out, "timeline\n    2004 : Facebook\n         : Yahoo\n");
+        let out = delete(src, &[], &[2, 0, 1]).unwrap().apply(src);
+        assert_eq!(out, "timeline\n    2004\n");
+        let out = delete(src, &[], &[1, 2]).unwrap().apply(src);
+        assert_eq!(out, "timeline\n    2004 : Facebook\n");
+        let out = delete(src, &[0], &[1]).unwrap().apply(src);
+        assert_eq!(out, "timeline\n");
     }
 }
