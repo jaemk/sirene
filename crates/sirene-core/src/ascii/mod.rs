@@ -335,6 +335,19 @@ impl Measure for Cells {
     }
 }
 
+/// The columns a drawing takes in a terminal: its widest line, measured as it was drawn.
+///
+/// ```
+/// assert_eq!(sirene_core::ascii::columns("ab\n┌─┐\n名前\n"), 4);
+/// ```
+pub fn columns(drawing: &str) -> usize {
+    drawing
+        .lines()
+        .map(|l| width(l).max(0) as usize)
+        .max()
+        .unwrap_or(0)
+}
+
 /// The columns `Canvas::text` gives `s`: each character's own width, so emoji sequences that
 /// a string width would join measure as drawn.
 fn width(s: &str) -> i32 {

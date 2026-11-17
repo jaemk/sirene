@@ -21,7 +21,8 @@ each of its diagram blocks (MARKDO-1), a blank line between them, with diagnosti
 in the Markdown file; one with none prints `NAME: no diagram blocks` to stderr and nothing to
 stdout. Tests: `markdown_ascii` in `crates/sirene/tests/cli.rs`.
 
-`--charset unicode|ascii` picks the character set; the default is `unicode`.
+`--charset unicode|ascii` picks the character set; the default is `unicode`. `--width N` fails
+a drawing wider than N columns (CLI-14).
 
 ## CLI-3 Diagnostics
 
@@ -171,3 +172,10 @@ filename backslashes as percent escapes, keeping directory separators, so a file
 as that language. Without it, a file's extension or a block's info string picks the language,
 and other sources are detected (LANGS-1, DOT-5). Tests: `forced_languages` in
 `crates/sirene/tests/cli.rs`.
+
+## CLI-14 `ascii --width`
+
+`sirene ascii --width N` prints the drawing as usual, and when its widest line takes more than N
+terminal columns (`ascii::columns`) also prints `error: NAME: the drawing is W columns wide, over
+--width N` to stderr and exits 1. For a Markdown file each block is checked, named `FILE block
+K`. Test: `ascii_width` in `crates/sirene/tests/cli.rs`.

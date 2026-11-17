@@ -57,6 +57,13 @@ $ printf 'flowchart TD\n  A --> B\n' | sirene ascii --charset ascii
 +---+
 ```
 
+`--width N` exits 1 with an error when a drawing is wider than N columns, still printing it,
+e.g. to keep drawings in a README within 80 columns:
+
+```
+$ sirene ascii --width 80 README.md
+```
+
 ## `sirene svg`
 
 Prints a standalone SVG document. `--theme light|dark` picks the colors (default `light`), and

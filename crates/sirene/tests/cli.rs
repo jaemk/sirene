@@ -1239,6 +1239,44 @@ fn markdown_links_encode_filename_delimiters() {
 /// `ascii` on a Markdown file prints each diagram block, a blank line between them, with
 /// diagnostics at Markdown positions.
 #[test]
+fn ascii_width() {
+    // "+---+" is 5 columns.
+    let src = "flowchart LR\n  A\n";
+    sirene()
+        .args(["ascii", "--charset", "ascii", "--width", "5"])
+        .write_stdin(src)
+        .assert()
+        .success()
+        .stdout("+---+\n| A |\n+---+\n")
+        .stderr("");
+    sirene()
+        .args(["ascii", "--charset", "ascii", "--width", "4"])
+        .write_stdin(src)
+        .assert()
+        .code(1)
+        .stdout("+---+\n| A |\n+---+\n")
+        .stderr("error: <stdin>: the drawing is 5 columns wide, over --width 4\n");
+
+    let tmp = tempfile::tempdir().unwrap();
+    let md = tmp.path().join("doc.md");
+    std::fs::write(
+        &md,
+        "```mermaid\nflowchart LR\n  A\n```\n\n```mermaid\nflowchart LR\n  Long\n```\n",
+    )
+    .unwrap();
+    sirene()
+        .args(["ascii", "--charset", "ascii", "--width", "5"])
+        .arg(&md)
+        .assert()
+        .code(1)
+        .stdout("+---+\n| A |\n+---+\n\n+------+\n| Long |\n+------+\n")
+        .stderr(format!(
+            "error: {} block 2: the drawing is 8 columns wide, over --width 5\n",
+            md.display()
+        ));
+}
+
+#[test]
 fn markdown_ascii() {
     let tmp = tempfile::tempdir().unwrap();
     let md = tmp.path().join("doc.md");

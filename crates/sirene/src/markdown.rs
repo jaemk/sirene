@@ -270,7 +270,7 @@ pub fn with_links(src: &str, blocks: &[(Block, Option<String>)]) -> String {
 
 /// Prints each diagram block of Markdown file `md` as text, a blank line between them, and
 /// their diagnostics. Reports output completion separately from input diagnostics.
-pub fn print_ascii(md: &Path, charset: Charset) -> crate::Done {
+pub fn print_ascii(md: &Path, charset: Charset, width: Option<usize>) -> crate::Done {
     let name = md.display().to_string();
     let src = match crate::read_text(md) {
         Ok(src) => src,
@@ -296,7 +296,11 @@ pub fn print_ascii(md: &Path, charset: Charset) -> crate::Done {
             out.push('\n');
         }
         match lowered.ascii(&Options { charset }) {
-            Ok(drawing) => out.push_str(&drawing),
+            Ok(drawing) => {
+                let block_name = format!("{name} block {}", i + 1);
+                ok &= !crate::too_wide(&block_name, &drawing, width);
+                out.push_str(&drawing);
+            }
             Err(e) => {
                 diagnostic!(
                     "error: {}",

@@ -100,6 +100,9 @@ enum Command {
         /// Characters to draw with.
         #[arg(long, value_enum, default_value_t = CharsetArg::Unicode)]
         charset: CharsetArg,
+        /// Fail when a drawing is wider than N columns. It is still printed.
+        #[arg(long, value_name = "N")]
+        width: Option<usize>,
         /// Print again each time FILE changes, until interrupted.
         #[arg(short, long)]
         watch: bool,
@@ -320,6 +323,7 @@ fn run(cli: Cli) -> ExitCode {
         Some(Command::Ascii {
             file,
             charset,
+            width,
             watch,
         }) => {
             let charset = match charset {
@@ -327,11 +331,24 @@ fn run(cli: Cli) -> ExitCode {
                 CharsetArg::Ascii => Charset::Ascii,
             };
             if let Some(md) = markdown_file(&file) {
-                return markdown_blocks(md, watch, || markdown::print_ascii(md, charset));
+                return markdown_blocks(md, watch, || markdown::print_ascii(md, charset, width));
             }
-            convert(file, None, None, watch, |l| {
-                l.ascii(&Options { charset }).map(String::into_bytes)
-            })
+            let wide = std::cell::Cell::new(false);
+            let name = file
+                .as_deref()
+                .filter(|f| f.as_os_str() != "-")
+                .map_or_else(|| "<stdin>".to_owned(), |f| f.display().to_string());
+            let code = convert(file, None, None, watch, |l| {
+                let drawing = l.ascii(&Options { charset })?;
+                if too_wide(&name, &drawing, width) {
+                    wide.set(true);
+                }
+                Ok(drawing.into_bytes())
+            });
+            if wide.get() && code == ExitCode::SUCCESS {
+                return ExitCode::FAILURE;
+            }
+            code
         }
         Some(Command::Svg {
             file,
@@ -399,6 +416,19 @@ fn run(cli: Cli) -> ExitCode {
             convert(file, output, Some("png"), watch, render)
         }
     }
+}
+
+/// Whether `drawing` is wider than `width` columns, reporting it when so (CLI-14).
+fn too_wide(name: &str, drawing: &str, width: Option<usize>) -> bool {
+    let Some(limit) = width else {
+        return false;
+    };
+    let columns = sirene_core::ascii::columns(drawing);
+    if columns <= limit {
+        return false;
+    }
+    diagnostic!("error: {name}: the drawing is {columns} columns wide, over --width {limit}");
+    true
 }
 
 /// `output` with `-` read as stdout (`None`), as `-` is stdin for FILE; an error for a directory

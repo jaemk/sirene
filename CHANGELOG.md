@@ -16,6 +16,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   examples under Node.
 - `diagram::Lowered::kind` is the type the source was read as, with `Kind::lang`,
   `Kind::name`, and `Kind::ALL`. `-v` logs it (`read as a sequence diagram`).
+- `sirene ascii --width N` exits 1 when a drawing is wider than N columns, still printing it.
+  `ascii::columns` measures a drawing's width.
 
 ### Changed
 
