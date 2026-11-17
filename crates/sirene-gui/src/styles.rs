@@ -66,6 +66,97 @@ fn class_value(chart: &Flowchart, name: &str, property: &str) -> Option<String> 
         .map(|s| s.value.clone())
 }
 
+/// The colors class `name` gives, in `COLORS` order; all `None` without a name.
+fn class_colors(chart: &Flowchart, name: Option<&str>) -> Vec<Option<Hsla>> {
+    COLORS
+        .iter()
+        .map(|(_, property)| {
+            name.and_then(|n| class_value(chart, n, property))
+                .and_then(|v| parse_color(&v))
+                .map(paint::color)
+        })
+        .collect()
+}
+
+/// One class row of the panel.
+struct ClassRow {
+    name: String,
+    /// Every selected node has the class.
+    on: bool,
+    fill: Option<Hsla>,
+    stroke: Option<Hsla>,
+}
+
+/// What the panel shows, read from the chart without keeping it.
+struct Shown {
+    classes: Vec<ClassRow>,
+    /// The edited class's line width and whether it is dashed.
+    class_line: Option<(Option<String>, bool)>,
+    /// The first selected edge's line width and whether it is dashed.
+    edge_line: Option<(Option<String>, bool)>,
+    edge_sync: EdgeSync,
+    dark: bool,
+}
+
+impl Shown {
+    fn of(
+        chart: &Flowchart,
+        nodes: &[String],
+        edges: &[usize],
+        editing: Option<&str>,
+        dark: bool,
+    ) -> Self {
+        let mut seen = std::collections::HashSet::new();
+        // The selected nodes, the first with each id, or `None` when one is gone.
+        let picked: Option<Vec<_>> = {
+            let mut by_id = std::collections::HashMap::new();
+            for n in &chart.nodes {
+                by_id.entry(n.id.as_str()).or_insert(n);
+            }
+            nodes
+                .iter()
+                .map(|id| by_id.get(id.as_str()).copied())
+                .collect()
+        };
+        let swatch = |name: &str, property| {
+            class_value(chart, name, property)
+                .and_then(|v| parse_color(&v))
+                .map(paint::color)
+        };
+        let classes = (chart.classes.iter())
+            .filter(|c| seen.insert(c.name.as_str()))
+            .map(|c| ClassRow {
+                name: c.name.clone(),
+                on: !nodes.is_empty()
+                    && picked
+                        .as_ref()
+                        .is_some_and(|p| p.iter().all(|n| n.classes.contains(&c.name))),
+                fill: swatch(&c.name, "fill"),
+                stroke: swatch(&c.name, "stroke"),
+            })
+            .collect();
+        let class_line = editing.map(|name| {
+            (
+                class_value(chart, name, "stroke-width"),
+                class_value(chart, name, "stroke-dasharray").is_some(),
+            )
+        });
+        let edge_line = edges.first().map(|&first| {
+            (
+                edge_value(chart, first, "stroke-width"),
+                edge_value(chart, first, "stroke-dasharray").is_some(),
+            )
+        });
+        Shown {
+            classes,
+            class_line,
+            edge_line,
+            edge_sync: StylePanel::edge_state(chart, edges),
+            dark,
+        }
+    }
+}
+
 /// The value edge `i` gives `property` in its `linkStyle`.
 fn edge_value(chart: &Flowchart, i: usize, property: &str) -> Option<String> {
     chart
@@ -155,7 +246,7 @@ impl StylePanel {
         cx.notify();
     }
 
-    /// What the edge pickers show for `edges` of `chart`: the first edge's colors.
+    /// What the edge pickers show for `edges` of `chart`: the edge ids and the first edge's colors.
     fn edge_state(chart: &Flowchart, edges: &[usize]) -> EdgeSync {
         let colors = EDGE_COLORS
             .iter()
@@ -232,8 +323,8 @@ impl StylePanel {
         let Some(viewer) = self.viewer.upgrade() else {
             return;
         };
-        let chart = viewer.read(cx).doc.chart.clone();
-        self.edit_in(name, &chart, window, cx);
+        let colors = class_colors(&viewer.read(cx).doc.chart, name.as_deref());
+        self.edit_with(name, colors, window, cx);
     }
 
     /// Edits class `name` of `chart`; for the viewer, which cannot be read while it updates.
@@ -244,15 +335,21 @@ impl StylePanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let colors = class_colors(chart, name.as_deref());
+        self.edit_with(name, colors, window, cx);
+    }
+
+    /// Edits class `name`, filling the pickers with `colors`, in `COLORS` order.
+    fn edit_with(
+        &mut self,
+        name: Option<String>,
+        colors: Vec<Option<Hsla>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.editing = name;
         self.syncing = true;
-        for (picker, (_, property)) in self.pickers.clone().iter().zip(COLORS) {
-            let color = self
-                .editing
-                .as_deref()
-                .and_then(|n| class_value(chart, n, property))
-                .and_then(|v| parse_color(&v))
-                .map(paint::color);
+        for (picker, color) in self.pickers.clone().iter().zip(colors) {
             picker.update(cx, |p, cx| match color {
                 Some(c) => p.set_value(c, window, cx),
                 None => p.clear_value(window, cx),
@@ -319,51 +416,34 @@ impl Render for StylePanel {
         let Some(viewer) = self.viewer.upgrade() else {
             return div();
         };
-        let (chart, nodes, edges, dark) = {
+        // Read what the panel shows while the chart is borrowed, rather than cloning it.
+        let shown = {
             let v = viewer.read(cx);
-            (
-                v.doc.chart.clone(),
-                v.selected_nodes(),
-                v.selected_edges(),
+            Shown::of(
+                &v.doc.chart,
+                &v.selected_nodes(),
+                &v.selected_edges(),
+                self.editing.as_deref(),
                 v.dark,
             )
         };
         // The pickers can't be set while rendering; refill them right after.
-        if Self::edge_state(&chart, &edges) != self.edge_sync {
+        if shown.edge_sync != self.edge_sync {
             cx.defer_in(window, |this, window, cx| this.sync_edges(window, cx));
         }
-        let rule = paint::color(if dark {
+        let rule = paint::color(if shown.dark {
             sirene_core::scene::Theme::DARK.cluster_stroke
         } else {
             sirene_core::scene::Theme::LIGHT.cluster_stroke
         });
-        let mut seen = std::collections::HashSet::new();
-        let names: Vec<String> = (chart.classes.iter())
-            .filter(|c| seen.insert(c.name.as_str()))
-            .map(|c| c.name.clone())
-            .collect();
-        // The selected nodes, the first with each id, or `None` when one is gone.
-        let picked: Option<Vec<_>> = {
-            let mut by_id = std::collections::HashMap::new();
-            for n in &chart.nodes {
-                by_id.entry(n.id.as_str()).or_insert(n);
-            }
-            nodes
-                .iter()
-                .map(|id| by_id.get(id.as_str()).copied())
-                .collect()
-        };
-        let rows = names.iter().enumerate().map(|(i, name)| {
-            let on = !nodes.is_empty()
-                && picked
-                    .as_ref()
-                    .is_some_and(|p| p.iter().all(|n| n.classes.iter().any(|c| c == name)));
-            let swatch = |property| {
-                class_value(&chart, name, property)
-                    .and_then(|v| parse_color(&v))
-                    .map(paint::color)
-            };
-            let (fill, stroke) = (swatch("fill"), swatch("stroke"));
+        let rows = shown.classes.iter().enumerate().map(|(i, row)| {
+            let ClassRow {
+                name,
+                on,
+                fill,
+                stroke,
+            } = row;
+            let (on, fill, stroke) = (*on, *fill, *stroke);
             let editing = self.editing.as_deref() == Some(name.as_str());
             let (toggle_name, edit_name) = (name.clone(), name.clone());
             div()
@@ -427,9 +507,7 @@ impl Render for StylePanel {
                         .on_click(cx.listener(|this, _, window, cx| this.new_class(window, cx))),
                 ),
             );
-        if let Some(name) = self.editing.clone() {
-            let width = class_value(&chart, &name, "stroke-width");
-            let dashed = class_value(&chart, &name, "stroke-dasharray").is_some();
+        if let (Some(name), Some((width, dashed))) = (self.editing.clone(), shown.class_line) {
             let colors = COLORS
                 .iter()
                 .zip(&self.pickers)
@@ -495,9 +573,7 @@ impl Render for StylePanel {
                         .child(div().flex().flex_row().gap_1().children(dashes)),
                 );
         }
-        if let Some(&first) = edges.first() {
-            let width = edge_value(&chart, first, "stroke-width");
-            let dashed = edge_value(&chart, first, "stroke-dasharray").is_some();
+        if let Some((width, dashed)) = shown.edge_line {
             let colors = EDGE_COLORS
                 .iter()
                 .zip(&self.edge_pickers)
@@ -539,10 +615,11 @@ impl Render for StylePanel {
                         })),
                 )
             });
-            let title = if edges.len() == 1 {
+            let count = shown.edge_sync.0.len();
+            let title = if count == 1 {
                 "Edge".to_owned()
             } else {
-                format!("{} Edges", edges.len())
+                format!("{count} Edges")
             };
             panel = panel
                 .child(div().h(px(1.0)).bg(rule))
