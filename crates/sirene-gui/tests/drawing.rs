@@ -480,6 +480,84 @@ fn sequence_diagrams(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn state_diagrams(cx: &mut TestAppContext) {
+    let src = "stateDiagram-v2\n    [*] --> A\n    A --> B : go\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Renaming a state and a transition (WYSIWY-22).
+    let a = center(&viewer, cx, &node("A"));
+    double_click(cx, a);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("A"));
+    cx.simulate_input("Idle #1");
+    keys(cx, "enter");
+    let t = center(&viewer, cx, &Item::Edge(1));
+    double_click(cx, t);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("go"));
+    cx.simulate_input("start");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "stateDiagram-v2\n    [*] --> A\n    A --> B : start\n    A : Idle #35;1\n"
+    );
+    // Start states have no label.
+    let start = center(&viewer, cx, &node(":[*]start"));
+    double_click(cx, start);
+    assert_eq!(field(&viewer, cx), None);
+
+    // Dragging between states adds a transition, with its label open.
+    let (a, b) = (
+        center(&viewer, cx, &node("A")),
+        center(&viewer, cx, &node("B")),
+    );
+    drag(cx, b, a);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(2)]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some(""));
+    cx.simulate_input("back");
+    keys(cx, "enter");
+    assert!(
+        source(&viewer, cx).ends_with("    B --> A : back\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+    // Into the start state is refused.
+    let (b, start) = (
+        center(&viewer, cx, &node("B")),
+        center(&viewer, cx, &node(":[*]start")),
+    );
+    let before = source(&viewer, cx);
+    drag(cx, b, start);
+    assert_eq!(source(&viewer, cx), before);
+
+    // Adding a state from the selected one adds a transition to it.
+    let b = center(&viewer, cx, &node("B"));
+    click(cx, b, Modifiers::none());
+    cx.dispatch_action(AddNode);
+    cx.run_until_parked();
+    assert_eq!(selection(&viewer, cx), [node("S1")]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("New state"));
+    cx.simulate_input("Done");
+    keys(cx, "enter");
+    assert!(
+        source(&viewer, cx).ends_with("    state \"Done\" as S1\n    B --> S1\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+
+    // Deleting a state takes its transitions; undo brings them back.
+    let before = source(&viewer, cx);
+    let b = center(&viewer, cx, &node("B"));
+    click(cx, b, Modifiers::none());
+    cx.dispatch_action(Delete);
+    cx.run_until_parked();
+    assert_eq!(
+        source(&viewer, cx),
+        "stateDiagram-v2\n    [*] --> A\n    A : Idle #35;1\n    state \"Done\" as S1\n"
+    );
+    assert!(selection(&viewer, cx).is_empty());
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), before);
+}
+
+#[gpui::test]
 fn read_only_scene_nodes_ignore_graph_selection(cx: &mut TestAppContext) {
     use sirene_core::scene::{Owner, Pt};
     for source in [

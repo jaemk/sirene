@@ -150,10 +150,10 @@ fn refused_actions_say_why(cx: &mut TestAppContext) {
 
 /// A diagram type without an edit module draws read-only; edits say why (LANGS-5).
 #[gpui::test]
-fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
-    let src = "stateDiagram-v2\n    [*] --> A\n    A --> B\n";
+fn class_diagrams_are_read_only(cx: &mut TestAppContext) {
+    let src = "classDiagram\n    A <|-- B\n";
     let (viewer, cx) = open_src(cx, src);
-    let why = "drawing edits are not supported for state diagrams yet";
+    let why = "drawing edits are not supported for class diagrams yet";
     viewer.read_with(cx, |v, _| {
         assert_eq!(v.doc.read_only(), Some(why));
         assert!(v.doc.problems.is_empty());
@@ -174,15 +174,19 @@ fn state_diagrams_are_read_only(cx: &mut TestAppContext) {
     assert_eq!(status(&viewer, cx), format!("Can't delete: {why}"));
     viewer.read_with(cx, |v, _| assert_eq!(v.selection, [node("A")]));
     assert_eq!(source(&viewer, cx), src);
-    // Flowcharts stay editable; class and ER diagrams are read-only too.
+    // Flowcharts stay editable; state diagrams take their own edits (WYSIWY-22); ER diagrams are
+    // read-only too.
     let flow = Document::from_source(None, "flowchart\n  A\n".to_owned());
     assert_eq!(flow.read_only(), None);
-    let class = Document::from_source(None, "classDiagram\n  A <|-- B\n".to_owned());
+    let state = Document::from_source(None, "stateDiagram-v2\n  A --> B\n".to_owned());
     assert_eq!(
-        class.read_only(),
-        Some("drawing edits are not supported for class diagrams yet")
+        state.read_only(),
+        Some(
+            "state diagrams take only adding, renaming, connecting, and deleting states and transitions"
+        )
     );
-    assert_eq!(class.chart.edges.len(), 1);
+    assert!(state.is_state() && state.own_edits());
+    assert_eq!(state.chart.edges.len(), 1);
     let er = Document::from_source(None, "erDiagram\n  A ||--o{ B : has\n".to_owned());
     assert_eq!(
         er.read_only(),

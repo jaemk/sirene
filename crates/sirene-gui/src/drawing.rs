@@ -40,7 +40,7 @@ pub(crate) enum Drag {
 }
 
 /// How a new node is linked to an existing one.
-enum Link {
+pub(crate) enum Link {
     None,
     From(String),
     To(String),
@@ -297,6 +297,7 @@ impl Viewer {
                 // Double-clicking empty space adds a node there, in the subgraph under the
                 // pointer if any (WYSIWY-15).
                 None if self.doc.sequence().is_some() => self.add_participant(None, window, cx),
+                None if self.doc.is_state() => self.add_state(Link::None, window, cx),
                 None => {
                     let scope = self.subgraph_at(e.position, window);
                     self.add_linked(Shape::Rect, Link::None, scope, window, cx);
@@ -320,7 +321,7 @@ impl Viewer {
                 }
                 self.drag = match item {
                     // A read-only drawing pans from anywhere.
-                    _ if self.doc.read_only().is_some() && self.doc.sequence().is_none() => {
+                    _ if self.doc.read_only().is_some() && !self.doc.own_edits() => {
                         Some(Drag::Pan { last: e.position })
                     }
                     Item::Node(from) => Some(Drag::Connect {
@@ -382,6 +383,15 @@ impl Viewer {
                 }
                 _ => {}
             }
+        } else if far && self.doc.is_state() {
+            // A transition to the state released on, or to a new state.
+            match self.item_at(e.position, window) {
+                Some(Item::Node(to)) => self.add_transition(&from, &to, window, cx),
+                None if self.viewport.get().contains(&e.position) => {
+                    self.add_state(Link::From(from), window, cx);
+                }
+                _ => {}
+            }
         } else if far {
             match self.item_at(e.position, window) {
                 Some(Item::Node(to)) => {
@@ -430,6 +440,10 @@ impl Viewer {
         }
         if self.doc.sequence().is_some() {
             self.sequence_delete(window, cx);
+            return;
+        }
+        if self.doc.is_state() {
+            self.state_delete(window, cx);
             return;
         }
         if let Some(why) = self.doc.read_only() {
@@ -495,6 +509,12 @@ impl Viewer {
                 Link::None | Link::To(_) => None,
             };
             self.add_participant(from, window, cx);
+            return;
+        }
+        // Shapes and subgraphs do not apply: a state, with a transition to or from the linked
+        // one.
+        if self.doc.is_state() {
+            self.add_state(link, window, cx);
             return;
         }
         if let Some(why) = self.doc.read_only() {
@@ -593,7 +613,7 @@ impl Viewer {
     }
 
     /// Says in the status bar why `action` changed nothing (WYSIWY-19).
-    fn refused(&mut self, action: &str, reason: Option<&str>, cx: &mut Context<Self>) {
+    pub(crate) fn refused(&mut self, action: &str, reason: Option<&str>, cx: &mut Context<Self>) {
         if let Some(reason) = reason {
             self.notice = Some(refusal::notice(action, reason));
             cx.notify();
@@ -915,8 +935,17 @@ impl Viewer {
         let text = if self.doc.sequence().is_some() {
             self.sequence_label(&item)
         } else {
-            if let Some(why) = self.doc.read_only() {
+            if let Some(why) = self.doc.read_only()
+                && !self.doc.is_state()
+            {
                 self.refused("rename", Some(why), cx);
+                return;
+            }
+            // A state diagram's start and end states have no label.
+            if self.doc.is_state()
+                && let Item::Node(id) = &item
+                && id.contains(":[*]")
+            {
                 return;
             }
             let chart = &self.doc.chart;
@@ -969,6 +998,10 @@ impl Viewer {
         let src = &self.doc.source;
         if self.doc.sequence().is_some() {
             if let Some(edit) = self.sequence_rename(&label.item, &text) {
+                self.record(edit, window, cx);
+            }
+        } else if self.doc.is_state() {
+            if let Some(edit) = self.state_rename(&label.item, &text) {
                 self.record(edit, window, cx);
             }
         } else {

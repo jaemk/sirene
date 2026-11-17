@@ -22,6 +22,7 @@ pub mod refusal;
 pub mod sequence;
 pub mod settings;
 pub mod shape_bar;
+pub mod state;
 pub mod styles;
 pub mod viewer;
 

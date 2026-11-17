@@ -1,5 +1,6 @@
 //! Mermaid state diagrams (MSTATE-*), lowered to the flowchart model.
 
+pub mod edit;
 mod lower;
 mod parser;
 

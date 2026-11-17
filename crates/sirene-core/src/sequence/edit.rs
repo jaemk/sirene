@@ -277,7 +277,7 @@ pub fn delete(src: &str, participants: &[&str], messages: &[usize]) -> Option<Te
 
 /// The bytes that removing the statement at `r` takes: its whole line when it is alone on it,
 /// otherwise the statement and a `;` after it.
-fn statement_span(src: &str, r: TextRange) -> Range<usize> {
+pub(crate) fn statement_span(src: &str, r: TextRange) -> Range<usize> {
     let (start, end) = (usize::from(r.start()), usize::from(r.end()));
     let line = line_start(src, start);
     let rest = &src[end..];
@@ -308,17 +308,17 @@ fn statement_span(src: &str, r: TextRange) -> Range<usize> {
 }
 
 /// Leading whitespace of the line containing byte `at`.
-fn indent(src: &str, at: usize) -> &str {
+pub(crate) fn indent(src: &str, at: usize) -> &str {
     let line = &src[line_start(src, at)..];
     &line[..line.len() - line.trim_start_matches([' ', '\t']).len()]
 }
 
 /// The start of the line containing byte `at`.
-fn line_start(src: &str, at: usize) -> usize {
+pub(crate) fn line_start(src: &str, at: usize) -> usize {
     src[..at].rfind('\n').map_or(0, |i| i + 1)
 }
 
-fn span(r: TextRange) -> Range<usize> {
+pub(crate) fn span(r: TextRange) -> Range<usize> {
     usize::from(r.start())..usize::from(r.end())
 }
 

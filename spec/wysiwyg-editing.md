@@ -321,3 +321,28 @@ messages, as lowering counts them).
   Participant, Rename, Delete, Select All, and Fit Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/sequence/edit.rs`.
+
+## WYSIWY-22 State diagrams
+
+A Mermaid state diagram takes drawing edits through `sirene_core::state::edit`; states and
+transitions are selected as the flowchart's nodes and edges are. A start or end state (`[*]`)
+has the id `CONTAINER:[*]start` or `CONTAINER:[*]end`, with an empty container at the top level.
+
+- Double-click or Rename edits a state's label (the quoted label of `state "..." as ID`, or the
+  text of its first description, with later descriptions removed; or a new `ID : TEXT` at the
+  end; a label equal to the id, or empty, drops them) or a transition's label. `#` and `"` are
+  written as entity codes, and line breaks as `<br>`. Start and end states have no label.
+- Dragging from a state to another adds a transition `FROM --> TO` at the end, selected with its
+  label open; one at a composite's start or end state goes inside the composite. A transition
+  into a start state, out of an end state, between different composites' start and end states,
+  or at a concurrent region's start or end is refused. Dragging to empty space adds a state too.
+  Add Node, or a double-click on empty space, adds a state `S1`, `S2`, ... labeled `New state`,
+  with a transition to it from the one selected state.
+- Delete removes the selected transitions, and the selected states with every statement that
+  names them (their ids are dropped from `class` and `style` lists); a start or end state takes
+  its transitions.
+- Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
+  the reason `state diagrams take only adding, renaming, connecting, and deleting states and
+  transitions`. The right-click menu holds Add State, Rename, Delete, Select All, and Fit Window.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/state/edit.rs`.

@@ -15,6 +15,10 @@ use sirene_core::{Error, Result, Severity};
 pub const SEQUENCE_EDITS: &str =
     "sequence diagrams take only adding, renaming, and deleting participants and messages";
 
+/// Why a state diagram refuses the other drawing edits (WYSIWY-22).
+pub const STATE_EDITS: &str =
+    "state diagrams take only adding, renaming, connecting, and deleting states and transitions";
+
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
 
@@ -211,7 +215,8 @@ impl Document {
             Kind::Flowchart => None,
             // Edited through `sequence` instead (WYSIWY-21).
             Kind::Sequence => Some(SEQUENCE_EDITS),
-            Kind::State => Some("drawing edits are not supported for state diagrams yet"),
+            // Edited through `state` instead (WYSIWY-22).
+            Kind::State => Some(STATE_EDITS),
             Kind::Class => Some("drawing edits are not supported for class diagrams yet"),
             Kind::Er => Some("drawing edits are not supported for ER diagrams yet"),
             Kind::Git => Some("drawing edits are not supported for git graphs yet"),
@@ -265,6 +270,19 @@ impl Document {
             }
             _ => None,
         }
+    }
+
+    /// Whether the document holds a Mermaid state diagram, which is drawn from `chart` and takes
+    /// its own drawing edits: adding, renaming, connecting, and deleting states and transitions
+    /// (WYSIWY-22).
+    pub fn is_state(&self) -> bool {
+        self.other.is_none() && Kind::of_lang(&self.source, self.lang()) == Kind::State
+    }
+
+    /// Whether drawing edits go through a diagram's own edit module rather than
+    /// `flowchart::edit` (WYSIWY-21, WYSIWY-22).
+    pub fn own_edits(&self) -> bool {
+        self.sequence().is_some() || self.is_state()
     }
 
     /// The drawing of whichever diagram the document holds.

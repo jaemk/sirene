@@ -69,7 +69,7 @@ pub(crate) fn build(
     let Some(viewer) = viewer.upgrade() else {
         return menu;
     };
-    let (nodes, edges, chart, src, subgraph, focus, read_only, sequence) = {
+    let (nodes, edges, chart, src, subgraph, focus, read_only, sequence, state) = {
         let v = viewer.read(cx);
         (
             v.selected_nodes(),
@@ -80,15 +80,19 @@ pub(crate) fn build(
             v.drawing_focus.clone(),
             v.doc.read_only(),
             v.doc.sequence().is_some(),
+            v.doc.is_state(),
         )
     };
     let mut menu = menu.action_context(focus);
-    // A sequence diagram: participants and messages (WYSIWY-21).
-    if sequence {
-        let label = if nodes.len() == 1 && edges.is_empty() {
-            "Add Participant With Message"
-        } else {
-            "Add Participant"
+    // A sequence diagram: participants and messages (WYSIWY-21). A state diagram: states and
+    // transitions (WYSIWY-22).
+    if sequence || state {
+        let linked = nodes.len() == 1 && edges.is_empty();
+        let label = match (state, linked) {
+            (false, true) => "Add Participant With Message",
+            (false, false) => "Add Participant",
+            (true, true) => "Add State With Transition",
+            (true, false) => "Add State",
         };
         menu = menu.menu(label, Box::new(AddNode));
         if nodes.len() + edges.len() == 1 {

@@ -69,6 +69,25 @@ fn sequence_diagram_menu(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn state_diagram_menu(cx: &mut TestAppContext) {
+    let src = "stateDiagram-v2\n    A --> B\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Flowchart edits stay refused (WYSIWY-22).
+    select(&viewer, cx, vec![node("A")]);
+    cx.dispatch_action(SetShape {
+        shape: Shape::Diamond,
+    });
+    assert_eq!(source(&viewer, cx), src);
+    // The first item adds a state with a transition from the one right-clicked.
+    let b = center(&viewer, cx, &node("B"));
+    first_item(cx, b);
+    assert_eq!(
+        source(&viewer, cx),
+        "stateDiagram-v2\n    A --> B\n    state \"New state\" as S1\n    B --> S1\n"
+    );
+}
+
+#[gpui::test]
 fn shapes_and_links_for_the_selected_nodes(cx: &mut TestAppContext) {
     let (viewer, cx) = open_src(cx, SRC);
     select(&viewer, cx, vec![node("A"), node("C")]);
