@@ -5,13 +5,13 @@
 //! (`[*]`) has the id `CONTAINER:[*]start` or `CONTAINER:[*]end`, with an empty container for the
 //! diagram itself.
 
-use std::collections::HashSet;
-use std::ops::Range;
-
+use crate::edits::{
+    append, combine, fresh_id, indent, label_source, line_start, newline, normalize, quoted, span,
+    statement_span, token,
+};
 use crate::flowchart::Flowchart;
 use crate::flowchart::edit::TextEdit;
-use crate::sequence::edit::{indent, line_start, span, statement_span};
-use crate::syntax::SyntaxKind::{self, *};
+use crate::syntax::SyntaxKind::*;
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
 /// Why [`add_transition`] refused a transition.
@@ -32,7 +32,7 @@ impl<'a> Doc<'a> {
             src,
             root: parse.syntax(),
             chart: parse.lower().flowchart,
-            newline: if src.contains("\r\n") { "\r\n" } else { "\n" },
+            newline: newline(src),
         }
     }
 
@@ -61,23 +61,7 @@ impl<'a> Doc<'a> {
 
     /// Adds `line` at the end of the diagram, indented as its last statement.
     fn append(&self, line: &str) -> TextEdit {
-        let src = self.src;
-        let indent = self
-            .root
-            .children()
-            .last()
-            .map(|s| indent(src, usize::from(s.text_range().start())).to_owned())
-            .filter(|i| !i.is_empty())
-            .unwrap_or_else(|| "    ".to_owned());
-        let sep = if src.is_empty() || src.ends_with('\n') {
-            ""
-        } else {
-            self.newline
-        };
-        TextEdit {
-            range: src.len()..src.len(),
-            text: format!("{sep}{indent}{line}{}", self.newline),
-        }
+        append(self.src, self.root.children().last().as_ref(), line)
     }
 
     /// Adds `line` as the last statement of composite state `id`.
@@ -115,14 +99,12 @@ impl<'a> Doc<'a> {
 
     /// A state id not yet in use: `S1`, `S2`, ...
     fn fresh_id(&self) -> String {
-        let used: HashSet<&str> = (self.chart.nodes.iter().map(|n| n.id.as_str()))
-            .chain(self.chart.subgraphs.iter().map(|s| s.id.as_str()))
-            .collect();
-        // One of the first `used.len() + 1` is free.
-        (1..=used.len() + 1)
-            .map(|n| format!("S{n}"))
-            .find(|id| !used.contains(id.as_str()))
-            .unwrap_or_default()
+        let chart = &self.chart;
+        let nodes = chart.nodes.iter().map(|n| n.id.as_str());
+        fresh_id(
+            "S",
+            nodes.chain(chart.subgraphs.iter().map(|s| s.id.as_str())),
+        )
     }
 }
 
@@ -179,52 +161,6 @@ fn ids(stmt: &SyntaxNode) -> Vec<SyntaxToken> {
         out.push(t);
     }
     out
-}
-
-fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
-    node.children_with_tokens()
-        .filter_map(|e| e.into_token())
-        .find(|t| t.kind() == kind)
-}
-
-/// Label text as the editor gives it: control characters as spaces and each line trimmed.
-fn normalize(text: &str) -> String {
-    let text: String = text
-        .chars()
-        .map(|c| if c.is_control() && c != '\n' { ' ' } else { c })
-        .collect();
-    text.trim()
-        .lines()
-        .map(str::trim)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// Description text (after `:`) for `text`: lines joined with `<br>`, `#` as an entity code.
-fn description_source(text: &str) -> String {
-    normalize(text).replace('#', "#35;").replace('\n', "<br>")
-}
-
-/// A quoted state label (`state "..." as id`) for `text`.
-fn quoted(text: &str) -> String {
-    format!("\"{}\"", description_source(text).replace('"', "#quot;"))
-}
-
-/// Applies `edits`, which must not overlap, and returns the change as one edit.
-fn combine(src: &str, mut edits: Vec<(Range<usize>, String)>) -> Option<TextEdit> {
-    edits.sort_by_key(|(r, _)| r.start);
-    let mut out = String::with_capacity(src.len());
-    let mut at = 0;
-    for (r, text) in edits {
-        if r.start < at {
-            continue;
-        }
-        out.push_str(&src[at..r.start]);
-        out.push_str(&text);
-        at = r.end;
-    }
-    out.push_str(&src[at..]);
-    TextEdit::between(src, &out)
 }
 
 /// Adds a state shown as `label` (just its id when `label` is empty). Returns its id and the
@@ -291,7 +227,7 @@ pub fn set_state_label(src: &str, id: &str, label: &str) -> Option<TextEdit> {
         if plain {
             return None;
         }
-        return Some(doc.append(&format!("{id} : {}", description_source(&text))));
+        return Some(doc.append(&format!("{id} : {}", label_source(&text))));
     }
     let mut edits = Vec::new();
     for (k, s) in carriers.iter().enumerate() {
@@ -318,7 +254,7 @@ pub fn set_state_label(src: &str, id: &str, label: &str) -> Option<TextEdit> {
                 let end = usize::from(s.text_range().end());
                 if keep {
                     let start = usize::from(colon.text_range().end());
-                    edits.push((start..end, format!(" {}", description_source(&text))));
+                    edits.push((start..end, format!(" {}", label_source(&text))));
                 } else {
                     let start = src[..usize::from(colon.text_range().start())]
                         .trim_end()
@@ -336,7 +272,7 @@ pub fn set_state_label(src: &str, id: &str, label: &str) -> Option<TextEdit> {
 pub fn set_transition_label(src: &str, edge: usize, label: &str) -> Option<TextEdit> {
     let doc = Doc::new(src);
     let stmt = doc.transition(edge)?;
-    let text = description_source(label);
+    let text = label_source(label);
     let end = usize::from(stmt.text_range().end());
     let edit = match token(&stmt, COLON) {
         Some(colon) if text.is_empty() => {

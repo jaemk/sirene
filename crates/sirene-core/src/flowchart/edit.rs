@@ -7,6 +7,7 @@ use rowan::TextRange;
 
 use super::model::{Arrow, Direction, Edge, Flowchart, Node, Shape, Stroke, Subgraph};
 use super::text;
+use crate::edits::{indent, line_start, normalize, span, token};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -81,20 +82,6 @@ pub fn label_source(text: &str, markdown: bool) -> String {
     } else {
         format!("\"{body}\"")
     }
-}
-
-/// The label text that parsing `label_source(text, _)` gives back: control characters as
-/// spaces, and each line trimmed.
-fn normalize(text: &str) -> String {
-    let text: String = text
-        .chars()
-        .map(|c| if c.is_control() && c != '\n' { ' ' } else { c })
-        .collect();
-    text.trim()
-        .lines()
-        .map(str::trim)
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 /// Sets the label of node `id`. `None` when there is no such node, its label comes from
@@ -1282,7 +1269,6 @@ impl<'a> Doc<'a> {
     /// The edit appending `line` as a statement at the end of the document.
     fn append(&self, line: &str) -> TextEdit {
         let src = self.src;
-        let indent = self.top_indent();
         let sep = if src.is_empty() || src.ends_with('\n') {
             ""
         } else {
@@ -1290,7 +1276,7 @@ impl<'a> Doc<'a> {
         };
         TextEdit {
             range: src.len()..src.len(),
-            text: format!("{sep}{indent}{line}{}", self.newline),
+            text: format!("{sep}{}{line}{}", self.top_indent(), self.newline),
         }
     }
 
@@ -1572,30 +1558,10 @@ fn stroke_text(e: &Edge) -> String {
     format!("{}{line}{}", head(e.start, '<'), head(e.end, '>'))
 }
 
-/// Leading whitespace of the line containing byte `at`.
-fn indent(src: &str, at: usize) -> &str {
-    let start = src[..at].rfind('\n').map_or(0, |i| i + 1);
-    let line = &src[start..];
-    &line[..line.len() - line.trim_start_matches([' ', '\t']).len()]
-}
-
-/// The start of the line containing byte `at`.
-fn line_start(src: &str, at: usize) -> usize {
-    src[..at].rfind('\n').map_or(0, |i| i + 1)
-}
-
-fn span(r: TextRange) -> Range<usize> {
-    usize::from(r.start())..usize::from(r.end())
-}
-
 fn child(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxNode> {
     node.children().find(|n| n.kind() == kind)
 }
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
     node.children_with_tokens().filter_map(|e| e.into_token())
-}
-
-fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
-    tokens(node).find(|t| t.kind() == kind)
 }

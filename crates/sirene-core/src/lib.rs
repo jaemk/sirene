@@ -20,6 +20,7 @@ pub mod cynefin;
 pub mod diagnostic;
 pub mod diagram;
 pub mod dot;
+mod edits;
 pub mod er;
 pub mod error;
 pub mod eventmodel;

@@ -4,15 +4,14 @@
 //! their index among its edges, as [`flowchart::edit`](crate::flowchart::edit) names them. A note
 //! on its own is a node too, with an id starting `note:`.
 
-use std::collections::HashSet;
-use std::ops::Range;
-
 use super::parser::id_len;
+use crate::edits::{
+    append, combine, fresh_id, label_source, normalize, quoted, span, statement_span, token,
+};
 use crate::flowchart::Flowchart;
 use crate::flowchart::edit::TextEdit;
-use crate::sequence::edit::{indent, span, statement_span};
-use crate::syntax::SyntaxKind::{self, *};
-use crate::syntax::{SyntaxNode, SyntaxToken};
+use crate::syntax::SyntaxKind::*;
+use crate::syntax::SyntaxNode;
 
 /// Why [`add_relation`] refused a relation.
 pub const RELATION_REFUSED: &str = "a relation joins two classes, not notes";
@@ -22,7 +21,6 @@ struct Doc<'a> {
     src: &'a str,
     root: SyntaxNode,
     chart: Flowchart,
-    newline: &'static str,
 }
 
 impl<'a> Doc<'a> {
@@ -32,7 +30,6 @@ impl<'a> Doc<'a> {
             src,
             root: parse.syntax(),
             chart: parse.lower().flowchart,
-            newline: if src.contains("\r\n") { "\r\n" } else { "\n" },
         }
     }
 
@@ -74,35 +71,17 @@ impl<'a> Doc<'a> {
 
     /// Adds `line` at the end of the diagram, indented as its last statement.
     fn append(&self, line: &str) -> TextEdit {
-        let src = self.src;
-        let indent = self
-            .root
-            .children()
-            .last()
-            .map(|s| indent(src, usize::from(s.text_range().start())).to_owned())
-            .filter(|i| !i.is_empty())
-            .unwrap_or_else(|| "    ".to_owned());
-        let sep = if src.is_empty() || src.ends_with('\n') {
-            ""
-        } else {
-            self.newline
-        };
-        TextEdit {
-            range: src.len()..src.len(),
-            text: format!("{sep}{indent}{line}{}", self.newline),
-        }
+        append(self.src, self.root.children().last().as_ref(), line)
     }
 
     /// A class id not yet in use: `C1`, `C2`, ...
     fn fresh_id(&self) -> String {
-        let used: HashSet<&str> = (self.chart.nodes.iter().map(|n| n.id.as_str()))
-            .chain(self.chart.subgraphs.iter().map(|s| s.id.as_str()))
-            .collect();
-        // One of the first `used.len() + 1` is free.
-        (1..=used.len() + 1)
-            .map(|n| format!("C{n}"))
-            .find(|id| !used.contains(id.as_str()))
-            .unwrap_or_default()
+        let chart = &self.chart;
+        let nodes = chart.nodes.iter().map(|n| n.id.as_str());
+        fresh_id(
+            "C",
+            nodes.chain(chart.subgraphs.iter().map(|s| s.id.as_str())),
+        )
     }
 
     /// Whether `id` is a class rather than a note.
@@ -125,12 +104,6 @@ fn source_id(id: &str) -> String {
     } else {
         format!("`{id}`")
     }
-}
-
-fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {
-    node.children_with_tokens()
-        .filter_map(|e| e.into_token())
-        .find(|t| t.kind() == kind)
 }
 
 /// The class a `CLASS_REF` names.
@@ -160,46 +133,6 @@ fn ids(stmt: &SyntaxNode) -> Vec<String> {
             .filter_map(|r| ref_id(&r))
             .collect(),
     }
-}
-
-/// Label text as the editor gives it: control characters as spaces and each line trimmed.
-fn normalize(text: &str) -> String {
-    let text: String = text
-        .chars()
-        .map(|c| if c.is_control() && c != '\n' { ' ' } else { c })
-        .collect();
-    text.trim()
-        .lines()
-        .map(str::trim)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// Label source for `text`: lines joined with `<br>`, `#` as an entity code.
-fn label_source(text: &str) -> String {
-    normalize(text).replace('#', "#35;").replace('\n', "<br>")
-}
-
-/// A quoted label for `text`.
-fn quoted(text: &str) -> String {
-    format!("\"{}\"", label_source(text).replace('"', "#quot;"))
-}
-
-/// Applies `edits`, which must not overlap, and returns the change as one edit.
-fn combine(src: &str, mut edits: Vec<(Range<usize>, String)>) -> Option<TextEdit> {
-    edits.sort_by_key(|(r, _)| r.start);
-    let mut out = String::with_capacity(src.len());
-    let mut at = 0;
-    for (r, text) in edits {
-        if r.start < at {
-            continue;
-        }
-        out.push_str(&src[at..r.start]);
-        out.push_str(&text);
-        at = r.end;
-    }
-    out.push_str(&src[at..]);
-    TextEdit::between(src, &out)
 }
 
 /// The label of class or note `id` as the editor shows it: without a class's annotation.

@@ -7,6 +7,9 @@ use std::ops::Range;
 
 use rowan::TextRange;
 
+use crate::edits::{
+    append, combine, fresh_id, indent, line_start, newline, span, statement_span, token,
+};
 use crate::flowchart::edit::TextEdit;
 use crate::syntax::SyntaxKind::*;
 use crate::syntax::{SyntaxNode, SyntaxToken};
@@ -31,7 +34,7 @@ impl<'a> Doc<'a> {
             src,
             root,
             messages,
-            newline: if src.contains("\r\n") { "\r\n" } else { "\n" },
+            newline: newline(src),
         }
     }
 
@@ -46,41 +49,15 @@ impl<'a> Doc<'a> {
         self.root.children().find(|s| s.text_range() == range)
     }
 
-    /// The indent of the last statement, or four spaces.
-    fn indent(&self) -> String {
-        self.statements()
-            .last()
-            .map(|s| indent(self.src, usize::from(s.text_range().start())).to_owned())
-            .filter(|i| !i.is_empty())
-            .unwrap_or_else(|| "    ".to_owned())
-    }
-
     /// Adds `line` at the end, indented as the statements are.
     fn append(&self, line: &str) -> TextEdit {
-        let src = self.src;
-        let sep = if src.is_empty() || src.ends_with('\n') {
-            ""
-        } else {
-            self.newline
-        };
-        TextEdit {
-            range: src.len()..src.len(),
-            text: format!("{sep}{}{line}{}", self.indent(), self.newline),
-        }
+        append(self.src, self.statements().last().as_ref(), line)
     }
 
     /// A participant id not yet in use: `P1`, `P2`, ...
     fn fresh_id(&self) -> String {
-        let used: std::collections::HashSet<String> = self
-            .statements()
-            .flat_map(|s| names(&s))
-            .map(|t| t.text().trim().to_owned())
-            .collect();
-        // One of the first `used.len() + 1` is free.
-        (1..=used.len() + 1)
-            .map(|n| format!("P{n}"))
-            .find(|id| !used.contains(id))
-            .unwrap_or_default()
+        let names: Vec<SyntaxToken> = self.statements().flat_map(|s| names(&s)).collect();
+        fresh_id("P", names.iter().map(|t| t.text().trim()))
     }
 }
 
@@ -90,12 +67,6 @@ fn names(stmt: &SyntaxNode) -> Vec<SyntaxToken> {
         .filter_map(|e| e.into_token())
         .filter(|t| t.kind() == IDENT)
         .collect()
-}
-
-fn token(node: &SyntaxNode, kind: crate::syntax::SyntaxKind) -> Option<SyntaxToken> {
-    node.children_with_tokens()
-        .filter_map(|e| e.into_token())
-        .find(|t| t.kind() == kind)
 }
 
 /// Source text for a participant alias or message text: lines joined with `<br>`, and the
@@ -261,65 +232,11 @@ pub fn delete(src: &str, participants: &[&str], messages: &[usize]) -> Option<Te
     }
     doomed.sort_by_key(|r| r.start());
     doomed.dedup();
-    let mut out = String::with_capacity(src.len());
-    let mut at = 0;
-    for r in doomed {
-        let range = statement_span(src, r);
-        if range.start < at {
-            continue;
-        }
-        out.push_str(&src[at..range.start]);
-        at = range.end;
-    }
-    out.push_str(&src[at..]);
-    TextEdit::between(src, &out)
-}
-
-/// The bytes that removing the statement at `r` takes: its whole line when it is alone on it,
-/// otherwise the statement and a `;` after it.
-pub(crate) fn statement_span(src: &str, r: TextRange) -> Range<usize> {
-    let (start, end) = (usize::from(r.start()), usize::from(r.end()));
-    let line = line_start(src, start);
-    let rest = &src[end..];
-    let after = rest.trim_start_matches([' ', '\t']);
-    let alone_before = src[line..start].trim().is_empty();
-    if alone_before && (after.is_empty() || after.starts_with('\n') || after.starts_with("\r\n")) {
-        let eol = end + (rest.len() - after.len());
-        let eol = if after.starts_with("\r\n") {
-            eol + 2
-        } else if after.starts_with('\n') {
-            eol + 1
-        } else {
-            eol
-        };
-        return line..eol;
-    }
-    if let Some(next) = after.strip_prefix(';') {
-        // Up to the next statement on the line.
-        let next = next.trim_start_matches([' ', '\t']);
-        return start..src.len() - next.len();
-    }
-    // The last of several on a line: take the `;` before it.
-    let before = src[..start].trim_end_matches([' ', '\t']);
-    match before.strip_suffix(';') {
-        Some(kept) if !alone_before => kept.len()..end,
-        _ => start..end,
-    }
-}
-
-/// Leading whitespace of the line containing byte `at`.
-pub(crate) fn indent(src: &str, at: usize) -> &str {
-    let line = &src[line_start(src, at)..];
-    &line[..line.len() - line.trim_start_matches([' ', '\t']).len()]
-}
-
-/// The start of the line containing byte `at`.
-pub(crate) fn line_start(src: &str, at: usize) -> usize {
-    src[..at].rfind('\n').map_or(0, |i| i + 1)
-}
-
-pub(crate) fn span(r: TextRange) -> Range<usize> {
-    usize::from(r.start())..usize::from(r.end())
+    let edits = doomed
+        .into_iter()
+        .map(|r| (statement_span(src, r), String::new()))
+        .collect();
+    combine(src, edits)
 }
 
 #[cfg(test)]
