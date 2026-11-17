@@ -13,9 +13,6 @@ use sirene_core::{Error, Result, Severity};
 /// The text of a new document (WYSIWY-7).
 pub const STARTER: &str = "flowchart TD\n    A --> B\n";
 
-/// The largest file opened, in bytes.
-const MAX_FILE: u64 = 64 << 20;
-
 /// A diagnostic located by byte range and by 1-based line and column.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Problem {
@@ -269,32 +266,12 @@ impl Document {
         }
     }
 
-    /// The file's text, or an empty text and the read error. A file over `MAX_FILE` bytes is not
-    /// read.
+    /// The file's text, or an empty text and the read error. A file over
+    /// `source::MAX_INPUT` bytes is not read.
     fn read_text(path: &Path) -> (String, Option<Error>) {
-        use std::io::Read;
-
-        let read = std::fs::File::open(path).and_then(|file| {
-            let mut bytes = Vec::new();
-            file.take(MAX_FILE + 1).read_to_end(&mut bytes)?;
-            if bytes.len() as u64 > MAX_FILE {
-                return Err(std::io::Error::other(format!(
-                    "the file is over {} MiB",
-                    MAX_FILE >> 20
-                )));
-            }
-            String::from_utf8(bytes)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
-        });
-        match read {
+        match sirene_core::source::read(path) {
             Ok(text) => (text, None),
-            Err(e) => (
-                String::new(),
-                Some(Error::with_source(
-                    format!("cannot read {}", path.display()),
-                    e,
-                )),
-            ),
+            Err(e) => (String::new(), Some(e)),
         }
     }
 
@@ -793,16 +770,17 @@ mod tests {
         std::fs::write(&invalid, [0xff]).unwrap();
         let doc_utf8 = Document::open(&invalid);
         let error = doc_utf8.read_error.as_ref().unwrap();
-        let io = error
-            .source()
-            .unwrap()
-            .downcast_ref::<std::io::Error>()
-            .unwrap();
+        let encoding = error.source().unwrap().downcast_ref::<Error>().unwrap();
         assert!(
-            io.get_ref()
+            encoding
+                .source()
                 .unwrap()
-                .downcast_ref::<std::string::FromUtf8Error>()
-                .is_some()
+                .is::<std::string::FromUtf8Error>()
+        );
+        assert!(
+            doc_utf8.status().contains("offset 0"),
+            "{}",
+            doc_utf8.status()
         );
         doc.path = Some(dir.path().join("missing-dir/output.mmd"));
         let error = doc.save().unwrap_err();
@@ -905,11 +883,11 @@ mod tests {
 
         // A huge file is refused, not read.
         let big = std::fs::File::create(&path).unwrap();
-        big.set_len(MAX_FILE + 1).unwrap();
+        big.set_len(sirene_core::source::MAX_INPUT + 1).unwrap();
         let d = Document::open(&path);
         assert!(d.source.is_empty());
         assert!(
-            d.status().ends_with("the file is over 64 MiB"),
+            d.status().ends_with("the text is over 64 MiB"),
             "{}",
             d.status()
         );

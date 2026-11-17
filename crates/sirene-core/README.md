@@ -12,9 +12,14 @@ use sirene_core::scene::Theme;
 # fn main() -> sirene_core::Result<()> {
 
 let path = Path::new("login.mmd");
-let src = "flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n";
-// `std::fs::read_to_string(path)?` for a real file. The extension picks DOT (`.dot`, `.gv`) or
-// PlantUML (`.puml`, ...); otherwise the source's header picks the diagram type.
+# let dir = std::env::temp_dir().join(format!("sirene-readme-{}", std::process::id()));
+# std::fs::create_dir_all(&dir).unwrap();
+# let path = &dir.join(path);
+# std::fs::write(path, "flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n").unwrap();
+// UTF-8 of at most 64 MiB, with errors naming the file.
+let src = &sirene_core::source::read(path)?;
+// The extension picks DOT (`.dot`, `.gv`) or PlantUML (`.puml`, ...); otherwise the source's
+// header picks the diagram type.
 let lowered = diagram::lower_as(src, Lang::of_path(path));
 for d in &lowered.diagnostics {
     let (line, col) = d.line_col(src);
@@ -39,6 +44,7 @@ for block in sirene_core::markdown::mermaid_blocks(md) {
     let lowered = diagram::lower_as(&block.code, Some(block.lang));
     assert!(lowered.svg(&Theme::DARK)?.contains("<svg"));
 }
+# std::fs::remove_dir_all(&dir).unwrap();
 # Ok(())
 # }
 ```

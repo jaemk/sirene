@@ -11,7 +11,7 @@
 )]
 
 use std::collections::HashMap;
-use std::io::{IsTerminal, Read, Write};
+use std::io::{IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, Instant, SystemTime};
@@ -21,7 +21,7 @@ use sirene_core::ascii::{Charset, Options};
 use sirene_core::diagram::{self, Lang, Lowered};
 use sirene_core::scene::Theme;
 use sirene_core::scene::png;
-use sirene_core::{Error, Result};
+use sirene_core::{Error, Result, source};
 
 /// Mermaid, PlantUML, and Graphviz DOT diagram editor and viewer.
 ///
@@ -514,43 +514,16 @@ fn read(file: Option<PathBuf>) -> Result<(String, String)> {
         }
         None => {
             log::debug!("reading <stdin>");
-            let src = read_capped(std::io::stdin().lock())
-                .map_err(|e| e.context("cannot read <stdin>"))?;
-            utf8(src)
+            source::read_text(std::io::stdin().lock())
                 .map(|src| ("<stdin>".to_owned(), src))
                 .map_err(|e| e.context("cannot read <stdin>"))
         }
     }
 }
 
-/// The largest source read, in bytes.
-const MAX_INPUT: u64 = 64 << 20;
-
-/// Reads at most `MAX_INPUT` bytes from `r`, or an error past that.
-fn read_capped(r: impl Read) -> Result<Vec<u8>> {
-    let mut bytes = Vec::new();
-    r.take(MAX_INPUT + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|e| Error::with_source("cannot read input bytes", e))?;
-    if bytes.len() as u64 > MAX_INPUT {
-        return Err(Error::new(format!(
-            "the text is over {} MiB",
-            MAX_INPUT >> 20
-        )));
-    }
-    Ok(bytes)
-}
-
 /// Reads the file at `path` as UTF-8 text, with an error naming it.
 pub(crate) fn read_text(path: &Path) -> Result<String> {
-    std::fs::File::open(path)
-        .map_err(|e| Error::with_source(format!("cannot read {}", path.display()), e))
-        .and_then(|file| {
-            read_capped(file).map_err(|e| e.context(format!("cannot read {}", path.display())))
-        })
-        .and_then(|bytes| {
-            utf8(bytes).map_err(|e| e.context(format!("cannot read {}", path.display())))
-        })
+    source::read(path)
 }
 
 /// Missing output files are expected; other metadata failures are not permission to replace them.
@@ -598,20 +571,6 @@ pub(crate) fn write_file(path: &Path, bytes: &[u8], follow: bool) -> std::io::Re
     tmp.write_all(bytes)?;
     tmp.as_file().sync_all()?;
     tmp.persist(&path).map(|_| ()).map_err(|e| e.error)
-}
-
-/// `bytes` as UTF-8, or an error naming UTF-16 (by its byte order mark) or the first bad byte.
-fn utf8(bytes: Vec<u8>) -> Result<String> {
-    if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) {
-        return Err("the text is UTF-16; sirene reads UTF-8".into());
-    }
-    String::from_utf8(bytes).map_err(|e| {
-        let at = e.utf8_error().valid_up_to();
-        Error::with_source(
-            format!("the text is not UTF-8 (an invalid byte at offset {at})"),
-            e,
-        )
-    })
 }
 
 /// How often `--watch` looks for changes.
@@ -1155,52 +1114,6 @@ mod tests {
         assert_eq!(parse(&["ascii", "--verbose", "--verbose"]).verbose, 2);
     }
 
-    /// ERRORH-1: original I/O and UTF-8 errors survive through file context.
-    #[test]
-    fn read_errors_retain_their_causes() {
-        use std::error::Error as _;
-
-        let dir = tempfile::tempdir().unwrap();
-        let missing = dir.path().join("missing.mmd");
-        let error = read_text(&missing).unwrap_err();
-        let io = error
-            .source()
-            .unwrap()
-            .downcast_ref::<std::io::Error>()
-            .unwrap();
-        assert_eq!(io.kind(), std::io::ErrorKind::NotFound);
-        assert!(error.report().contains(&missing.display().to_string()));
-
-        let path = dir.path().join("bad.mmd");
-        std::fs::write(&path, b"a\xff").unwrap();
-        let error = read_text(&path).unwrap_err();
-        assert!(error.report().contains("offset 1"));
-        let encoding = error.source().unwrap().downcast_ref::<Error>().unwrap();
-        assert!(
-            encoding
-                .source()
-                .unwrap()
-                .is::<std::string::FromUtf8Error>()
-        );
-
-        struct FailedRead;
-        impl Read for FailedRead {
-            fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
-                Err(std::io::ErrorKind::PermissionDenied.into())
-            }
-        }
-        let error = read_capped(FailedRead).unwrap_err();
-        assert_eq!(
-            error
-                .source()
-                .unwrap()
-                .downcast_ref::<std::io::Error>()
-                .unwrap()
-                .kind(),
-            std::io::ErrorKind::PermissionDenied
-        );
-    }
-
     /// ERRORH-4: a readable sibling does not erase descendant or directory-entry failures.
     #[test]
     fn scan_retains_directory_and_entry_errors() {
@@ -1517,18 +1430,6 @@ mod tests {
             ]
         );
         assert_eq!(scan(&dir.join("missing"), dir, "png").errors.len(), 1);
-    }
-
-    #[test]
-    fn reads_are_capped() {
-        let big = std::io::repeat(b'a').take(MAX_INPUT + 1);
-        assert!(
-            read_capped(big)
-                .unwrap_err()
-                .report()
-                .contains("over 64 MiB")
-        );
-        assert_eq!(read_capped(&b"ab"[..]).unwrap(), b"ab");
     }
 
     #[cfg(unix)]

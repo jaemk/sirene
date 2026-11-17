@@ -45,6 +45,7 @@ pub mod requirement;
 pub mod sankey;
 pub mod scene;
 pub mod sequence;
+pub mod source;
 pub mod state;
 pub mod syntax;
 pub mod theme;
