@@ -206,6 +206,13 @@ pub fn add_member(src: &str, id: &str, text: &str) -> Option<TextEdit> {
         .filter(|s| s.kind() == CLASS_DECL && ids(s).first().is_some_and(|i| i == id))
         .filter_map(|s| token(&s, R_BRACE).map(|close| (s, close)))
         .last();
+    // An edit counts only when the class gains exactly that member (a line such as `%%` reads
+    // as a comment instead).
+    let count = members(src, id).len();
+    let adds = |e: &TextEdit| {
+        let after = members(&e.apply(src), id);
+        after.len() == count + 1 && after.contains(&text)
+    };
     // In a body, `}` would close it and `<<` start an annotation.
     let fits = !text.contains('}') && !text.starts_with("<<");
     if let Some((decl, close)) = body.filter(|_| fits) {
@@ -219,13 +226,16 @@ pub fn add_member(src: &str, id: &str, text: &str) -> Option<TextEdit> {
                 Some(m) => indent(src, usize::from(m.text_range().start())).to_owned(),
                 None => format!("{}    ", indent(src, close)),
             };
-            return Some(TextEdit {
+            let edit = TextEdit {
                 range: at..at,
                 text: format!("{indent}{text}{}", newline(src)),
-            });
+            };
+            if adds(&edit) {
+                return Some(edit);
+            }
         }
     }
-    Some(doc.append(&format!("{} : {text}", source_id(id))))
+    Some(doc.append(&format!("{} : {text}", source_id(id)))).filter(adds)
 }
 
 /// Removes member `n` (in the order [`members`] gives) of class `id`. `None` when there is no
@@ -660,6 +670,9 @@ mod tests {
             apply(empty, add_member(empty, "A", "+x")),
             "classDiagram\n    class A {\n        +x\n    }\n"
         );
+        // `%%` starts a comment in a body; as `A : %%` it is a member.
+        let out = apply(empty, add_member(empty, "A", "%%"));
+        assert_eq!(members(&out, "A"), ["%%"], "{out}");
         assert!(add_member(SRC, "Duck", "  ").is_none());
         assert!(add_member(SRC, "Nope", "+x").is_none());
 
