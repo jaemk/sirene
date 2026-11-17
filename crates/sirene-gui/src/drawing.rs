@@ -50,6 +50,8 @@ pub(crate) enum Link {
 pub struct LabelEdit {
     pub item: Item,
     pub input: Entity<InputState>,
+    /// The field adds a member to class `item` instead of renaming it (WYSIWY-23).
+    pub member: bool,
     _subscription: Subscription,
 }
 
@@ -955,6 +957,19 @@ impl Viewer {
         let Some(text) = text else {
             return;
         };
+        self.open_field(item, &text, false, window, cx);
+    }
+
+    /// Opens the label field over `item` with `text` selected; when `member`, it adds a member
+    /// to class `item` instead of renaming it (WYSIWY-23).
+    pub(crate) fn open_field(
+        &mut self,
+        item: Item,
+        text: &str,
+        member: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let text = text.replace('\n', "<br>");
         let input = cx.new(|cx| InputState::new(window, cx).default_value(text));
         // The field takes focus after the event that opened it, which may focus the drawing.
@@ -979,6 +994,7 @@ impl Viewer {
         self.label = Some(LabelEdit {
             item,
             input,
+            member,
             _subscription: subscription,
         });
         cx.notify();
@@ -991,7 +1007,13 @@ impl Viewer {
         };
         let text = label.input.read(cx).value().replace("<br>", "\n");
         let src = &self.doc.source;
-        if self.doc.sequence().is_some() {
+        if label.member {
+            if let Item::Node(id) = &label.item
+                && let Some(edit) = sirene_core::class::edit::add_member(src, id, &text)
+            {
+                self.record(edit, window, cx);
+            }
+        } else if self.doc.sequence().is_some() {
             if let Some(edit) = self.sequence_rename(&label.item, &text) {
                 self.record(edit, window, cx);
             }

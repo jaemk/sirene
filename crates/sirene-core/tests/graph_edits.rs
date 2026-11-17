@@ -17,11 +17,12 @@ enum Kind {
 }
 
 /// What an edit is checked against: the node (or participant) ids, the number of edges (or
-/// messages), and the diagnostics.
+/// messages), the diagnostics, and the source.
 struct Summary {
     ids: Vec<String>,
     edges: usize,
     diagnostics: Vec<String>,
+    src: String,
 }
 
 impl Summary {
@@ -30,11 +31,12 @@ impl Summary {
     }
 }
 
-fn summary(l: Lowered) -> Summary {
+fn summary(l: Lowered, src: &str) -> Summary {
     Summary {
         ids: l.flowchart.nodes.into_iter().map(|n| n.id).collect(),
         edges: l.flowchart.edges.len(),
         diagnostics: l.diagnostics.into_iter().map(|d| d.message).collect(),
+        src: src.to_owned(),
     }
 }
 
@@ -47,12 +49,13 @@ impl Kind {
                     ids: s.participants.iter().map(|p| p.id.clone()).collect(),
                     edges: s.messages().count(),
                     diagnostics: diagnostics.into_iter().map(|d| d.message).collect(),
+                    src: src.to_owned(),
                 }
             }
-            Kind::State => summary(state::parse(src).lower()),
-            Kind::Class => summary(class::parse(src).lower()),
-            Kind::Er => summary(er::parse(src).lower()),
-            Kind::Requirement => summary(requirement::parse(src).lower()),
+            Kind::State => summary(state::parse(src).lower(), src),
+            Kind::Class => summary(class::parse(src).lower(), src),
+            Kind::Er => summary(er::parse(src).lower(), src),
+            Kind::Requirement => summary(requirement::parse(src).lower(), src),
         }
     }
 
@@ -139,6 +142,8 @@ enum Op {
     DeleteNode(usize),
     DeleteEdge(usize),
     SetEdge(usize, usize),
+    AddMember(usize, String),
+    RemoveMember(usize, usize),
 }
 
 const IDS: [&str; 5] = ["A", "B", "Cc", "d_1", "E"];
@@ -156,6 +161,8 @@ fn op() -> impl Strategy<Value = Op> {
         any::<usize>().prop_map(Op::DeleteNode),
         any::<usize>().prop_map(Op::DeleteEdge),
         (any::<usize>(), any::<usize>()).prop_map(|(i, n)| Op::SetEdge(i, n)),
+        (any::<usize>(), label()).prop_map(|(i, l)| Op::AddMember(i, l)),
+        (any::<usize>(), any::<usize>()).prop_map(|(i, n)| Op::RemoveMember(i, n)),
     ]
 }
 
@@ -261,6 +268,32 @@ fn step(kind: Kind, src: &str, op: &Op) -> Result<String, TestCaseError> {
         Op::SetEdge(i, k) => match edge(*i) {
             Some(i) => (kind.set_edge(src, i, *k), same),
             None => (None, same),
+        },
+        Op::AddMember(i, text) => match pick(*i) {
+            Some(id) if matches!(kind, Kind::Class) => {
+                let m = class::edit::members(src, &id).len();
+                (
+                    class::edit::add_member(src, &id, text),
+                    Box::new(move |s: &Summary| {
+                        s.ids.len() == n && class::edit::members(&s.src, &id).len() == m + 1
+                    }),
+                )
+            }
+            _ => (None, same),
+        },
+        Op::RemoveMember(i, k) => match pick(*i) {
+            Some(id) if matches!(kind, Kind::Class) => {
+                let m = class::edit::members(src, &id).len();
+                (
+                    (m > 0)
+                        .then(|| class::edit::remove_member(src, &id, k % m))
+                        .flatten(),
+                    Box::new(move |s: &Summary| {
+                        s.ids.len() == n && class::edit::members(&s.src, &id).len() + 1 == m
+                    }),
+                )
+            }
+            _ => (None, same),
         },
     };
     let Some(edit) = edit else {

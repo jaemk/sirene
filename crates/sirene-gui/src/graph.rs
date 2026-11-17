@@ -10,7 +10,9 @@ use sirene_core::{class, er, requirement, state};
 use crate::document::Graph;
 use crate::drawing::{Item, Link};
 use crate::viewer::Viewer;
-use crate::{SetCardinality, SetIdentifying, SetRelationKind, SetRelationshipType};
+use crate::{
+    AddMember, RemoveMember, SetCardinality, SetIdentifying, SetRelationKind, SetRelationshipType,
+};
 
 /// Label of states made by AddNode.
 pub const NEW_STATE: &str = "New state";
@@ -18,6 +20,9 @@ pub const NEW_STATE: &str = "New state";
 pub const NEW_CLASS: &str = "New class";
 /// Label of entities made by AddNode.
 pub const NEW_ENTITY: &str = "New entity";
+/// The text AddMember opens with, for an attribute and a method.
+pub const NEW_ATTRIBUTE: &str = "+attribute";
+pub const NEW_METHOD: &str = "+method()";
 /// Name of requirements made by AddNode.
 pub const NEW_REQUIREMENT: &str = "New requirement";
 
@@ -221,6 +226,47 @@ impl Viewer {
         self.graph_edges(window, cx, |src, i| {
             er::edit::set_identifying(src, i, identifying)
         });
+    }
+
+    /// The one selected class of a class diagram (not a note).
+    fn selected_class(&self) -> Option<String> {
+        if self.doc.graph() != Some(Graph::Class) || !self.selected_edges().is_empty() {
+            return None;
+        }
+        match self.selected_nodes().as_slice() {
+            [id] if !id.starts_with("note:") => Some(id.clone()),
+            _ => None,
+        }
+    }
+
+    /// Opens the label field over the selected class to add an attribute or a method
+    /// (WYSIWY-23).
+    pub(crate) fn add_member(
+        &mut self,
+        a: &AddMember,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(id) = self.selected_class() else {
+            return;
+        };
+        let text = if a.method { NEW_METHOD } else { NEW_ATTRIBUTE };
+        self.open_field(Item::Node(id), text, true, window, cx);
+    }
+
+    /// Removes a member of the selected class (WYSIWY-23).
+    pub(crate) fn remove_member(
+        &mut self,
+        a: &RemoveMember,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(id) = self.selected_class() else {
+            return;
+        };
+        if let Some(e) = class::edit::remove_member(&self.doc.source, &id, a.n) {
+            self.record(e, window, cx);
+        }
     }
 
     /// Sets the kind of the selected relations of a class diagram (WYSIWY-23).

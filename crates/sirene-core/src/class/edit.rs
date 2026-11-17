@@ -6,12 +6,13 @@
 
 use super::parser::id_len;
 use crate::edits::{
-    append, combine, fresh_id, label_source, normalize, quoted, span, statement_span, token,
+    append, combine, fresh_id, indent, label_source, line_start, newline, normalize, quoted, span,
+    statement_span, token,
 };
 use crate::flowchart::Flowchart;
 use crate::flowchart::edit::TextEdit;
 use crate::syntax::SyntaxKind::*;
-use crate::syntax::SyntaxNode;
+use crate::syntax::{SyntaxNode, SyntaxToken};
 
 /// Why [`add_relation`] refused a relation.
 pub const RELATION_REFUSED: &str = "a relation joins two classes, not notes";
@@ -165,6 +166,95 @@ pub fn add_class(src: &str, label: &str) -> (String, TextEdit) {
         format!("class {id}[{}]", quoted(&text))
     };
     (id, doc.append(&line))
+}
+
+/// The member tokens of class `id`, in the order its box shows them.
+fn member_tokens(doc: &Doc, id: &str) -> Vec<SyntaxToken> {
+    doc.statements()
+        .filter(|s| {
+            matches!(s.kind(), CLASS_DECL | MEMBER_STMT) && ids(s).first().is_some_and(|i| i == id)
+        })
+        .flat_map(|s| {
+            s.children_with_tokens()
+                .filter_map(|e| e.into_token())
+                .filter(|t| t.kind() == MEMBER)
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// The members of class `id` as written, in the order its box shows them.
+pub fn members(src: &str, id: &str) -> Vec<String> {
+    let doc = Doc::new(src);
+    member_tokens(&doc, id)
+        .iter()
+        .map(|t| t.text().trim().to_owned())
+        .collect()
+}
+
+/// Adds member `text` (an attribute, or a method with `(...)`) to class `id`: on a new line
+/// before the `}` of its last body when that is on its own line, otherwise as `ID : text` at the
+/// end. `None` for an empty member or one that is not a class.
+pub fn add_member(src: &str, id: &str, text: &str) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let text = normalize(text).replace('\n', " ");
+    if text.is_empty() || !doc.is_class(id) {
+        return None;
+    }
+    let body = doc
+        .statements()
+        .filter(|s| s.kind() == CLASS_DECL && ids(s).first().is_some_and(|i| i == id))
+        .filter_map(|s| token(&s, R_BRACE).map(|close| (s, close)))
+        .last();
+    // In a body, `}` would close it and `<<` start an annotation.
+    let fits = !text.contains('}') && !text.starts_with("<<");
+    if let Some((decl, close)) = body.filter(|_| fits) {
+        let close = usize::from(close.text_range().start());
+        let at = line_start(src, close);
+        if src[at..close].trim().is_empty() {
+            let indent = match member_tokens(&doc, id)
+                .iter()
+                .find(|t| t.parent().as_ref() == Some(&decl))
+            {
+                Some(m) => indent(src, usize::from(m.text_range().start())).to_owned(),
+                None => format!("{}    ", indent(src, close)),
+            };
+            return Some(TextEdit {
+                range: at..at,
+                text: format!("{indent}{text}{}", newline(src)),
+            });
+        }
+    }
+    Some(doc.append(&format!("{} : {text}", source_id(id))))
+}
+
+/// Removes member `n` (in the order [`members`] gives) of class `id`. `None` when there is no
+/// such member.
+pub fn remove_member(src: &str, id: &str, n: usize) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let member = member_tokens(&doc, id).into_iter().nth(n)?;
+    let parent = member.parent()?;
+    if parent.kind() != MEMBER_STMT {
+        return Some(TextEdit {
+            range: statement_span(src, member.text_range()),
+            text: String::new(),
+        });
+    }
+    // Removing the only statement naming the class would remove the class.
+    let elsewhere = doc
+        .statements()
+        .any(|s| s != parent && ids(&s).iter().any(|i| i == id));
+    Some(if elsewhere {
+        TextEdit {
+            range: statement_span(src, parent.text_range()),
+            text: String::new(),
+        }
+    } else {
+        TextEdit {
+            range: span(parent.text_range()),
+            text: format!("class {}", source_id(id)),
+        }
+    })
 }
 
 /// Adds an association (`-->`) from class `from` to class `to`, at the end of the diagram. One
@@ -546,6 +636,51 @@ mod tests {
         );
         assert!(set_relation_label(bare, 0, "").is_none());
         assert!(set_relation_label(bare, 9, "x").is_none());
+    }
+
+    #[test]
+    fn members_of_classes() {
+        assert_eq!(members(SRC, "Duck"), ["+swim()"]);
+        // Into the body, at its members' indent.
+        let out = apply(SRC, add_member(SRC, "Duck", "+int age"));
+        assert!(
+            out.contains("class Duck {\n        +swim()\n        +int age\n    }\n"),
+            "{out}"
+        );
+        assert_eq!(members(&out, "Duck"), ["+swim()", "+int age"]);
+        assert_eq!(chart(&out).node("Duck").unwrap().sections.len(), 2);
+        // A class without a body gets `ID : member`; so does a member with `}`.
+        let out = apply(SRC, add_member(SRC, "Fish", "+fin()"));
+        assert!(out.ends_with("    Fish : +fin()\n"), "{out}");
+        let out = apply(SRC, add_member(SRC, "Duck", "+map() Map{}"));
+        assert!(out.ends_with("    Duck : +map() Map{}\n"), "{out}");
+        // An empty body.
+        let empty = "classDiagram\n    class A {\n    }\n";
+        assert_eq!(
+            apply(empty, add_member(empty, "A", "+x")),
+            "classDiagram\n    class A {\n        +x\n    }\n"
+        );
+        assert!(add_member(SRC, "Duck", "  ").is_none());
+        assert!(add_member(SRC, "Nope", "+x").is_none());
+
+        // Removing one in a body, and one in a member statement.
+        let two = "classDiagram\n    class A {\n        +x\n    }\n    A : +y()\n";
+        assert_eq!(members(two, "A"), ["+x", "+y()"]);
+        assert_eq!(
+            apply(two, remove_member(two, "A", 0)),
+            "classDiagram\n    class A {\n    }\n    A : +y()\n"
+        );
+        assert_eq!(
+            apply(two, remove_member(two, "A", 1)),
+            "classDiagram\n    class A {\n        +x\n    }\n"
+        );
+        assert!(remove_member(two, "A", 2).is_none());
+        // A class named only by its member keeps a declaration.
+        let only = "classDiagram\n    A : +x\n";
+        assert_eq!(
+            apply(only, remove_member(only, "A", 0)),
+            "classDiagram\n    class A\n"
+        );
     }
 
     #[test]

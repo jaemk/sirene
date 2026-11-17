@@ -11,10 +11,10 @@ use crate::drawing::Item;
 use crate::refusal;
 use crate::viewer::Viewer;
 use crate::{
-    AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, Group, KeepTogether,
-    LongerEdge, MoveEarlier, MoveLater, MoveTo, Rename, ReverseEdge, SelectAll, SetArrows,
-    SetCardinality, SetDirection, SetIdentifying, SetRelationKind, SetRelationshipType, SetShape,
-    SetStroke, ShorterEdge, Ungroup,
+    AddMember, AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, Group,
+    KeepTogether, LongerEdge, MoveEarlier, MoveLater, MoveTo, RemoveMember, Rename, ReverseEdge,
+    SelectAll, SetArrows, SetCardinality, SetDirection, SetIdentifying, SetRelationKind,
+    SetRelationshipType, SetShape, SetStroke, ShorterEdge, Ungroup,
 };
 
 /// The directions in Direction, with their names.
@@ -124,6 +124,14 @@ pub(crate) fn build(
                 _ => {}
             }
         }
+        // A class diagram's one selected class: its members (WYSIWY-23).
+        if graph == Some(Graph::Class)
+            && edges.is_empty()
+            && let [id] = nodes.as_slice()
+            && !id.starts_with("note:")
+        {
+            menu = member_items(menu, &class::edit::members(&src, id), window, cx);
+        }
         if !nodes.is_empty() || !edges.is_empty() {
             menu = menu.menu("Delete", Box::new(Delete));
         }
@@ -221,6 +229,27 @@ fn cardinality_items(
                 identifying: !identifying,
             }),
         )
+}
+
+/// Add Attribute, Add Method, and a Remove Member submenu of `members` when there are any.
+fn member_items(
+    menu: PopupMenu,
+    members: &[String],
+    window: &mut Window,
+    cx: &mut Context<PopupMenu>,
+) -> PopupMenu {
+    let menu = menu
+        .menu("Add Attribute", Box::new(AddMember { method: false }))
+        .menu("Add Method", Box::new(AddMember { method: true }));
+    if members.is_empty() {
+        return menu;
+    }
+    let members = members.to_vec();
+    menu.submenu("Remove Member", window, cx, move |m, _, _| {
+        members.iter().enumerate().fold(m, |m, (n, text)| {
+            m.menu(text.clone(), Box::new(RemoveMember { n }))
+        })
+    })
 }
 
 /// A submenu `title` of `choices` (`(name, value)`) for the selected edges, with `current`

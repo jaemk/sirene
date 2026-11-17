@@ -366,13 +366,20 @@ an id starting `note:`.
   Aggregation, Dependency, Realization, Link, Dashed Link), which rewrites the relation's
   symbol with the marker on the side it had (the right when it had none), e.g. `<|--` becomes
   `*--` and `-->` becomes `..|>`. A relation with markers at both ends has none checked.
+- The right-click menu on one selected class holds Add Attribute and Add Method, which open the
+  label field over the class with `+attribute` or `+method()`; Enter adds the text as a member
+  (on a new line before the `}` of the class's last body when that is on its own line,
+  otherwise as `ID : member` at the end), and Escape adds nothing. Remove Member lists the
+  class's members and removes the one picked (a class named only by that `ID : member` keeps a
+  `class ID`).
 - Delete removes the selected relations and notes, and the selected classes with every
   statement that names them (declarations, members, annotations, relations, notes, and clicks;
   their ids are dropped from `style` and `cssClass` lists).
 - Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
   the reason `class diagrams take only adding, renaming, connecting, and deleting classes and
   relations, and setting relation kinds`. The right-click menu holds Add Class, Rename, Kind (on
-  relations), Delete, Select All, and Fit Window.
+  relations), Add Attribute, Add Method, and Remove Member (on one class), Delete, Select All,
+  and Fit Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/context_menu.rs`,
 `crates/sirene-core/src/class/edit.rs`.

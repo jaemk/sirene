@@ -11,7 +11,10 @@ use sirene_core::flowchart::Arrow;
 use sirene_gui::document::Document;
 use sirene_gui::drawing::Item;
 use sirene_gui::viewer::Viewer;
-use sirene_gui::{AddNode, Delete, Deselect, SetCardinality, SetIdentifying, SetRelationshipType};
+use sirene_gui::{
+    AddMember, AddNode, Delete, Deselect, RemoveMember, SetCardinality, SetIdentifying,
+    SetRelationshipType,
+};
 
 const SRC: &str = "flowchart TD\n    A[Alpha] --> B[Beta]\n";
 
@@ -690,6 +693,38 @@ fn er_diagrams(cx: &mut TestAppContext) {
     assert!(!source(&viewer, cx).contains("E1"));
     keys(cx, &format!("{SECONDARY}-z"));
     assert_eq!(source(&viewer, cx), before);
+}
+
+#[gpui::test]
+fn class_members(cx: &mut TestAppContext) {
+    let src = "classDiagram\n    class Duck {\n        +swim()\n    }\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Add Method opens the field over the class, and Enter adds the member (WYSIWY-23).
+    viewer.update(cx, |v, cx| v.select(vec![node("Duck")], cx));
+    cx.dispatch_action(AddMember { method: true });
+    cx.run_until_parked();
+    assert_eq!(field(&viewer, cx).as_deref(), Some("+method()"));
+    cx.simulate_input("+quack()");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "classDiagram\n    class Duck {\n        +swim()\n        +quack()\n    }\n"
+    );
+    // Escape adds nothing.
+    viewer.update(cx, |v, cx| v.select(vec![node("Duck")], cx));
+    cx.dispatch_action(AddMember { method: false });
+    cx.run_until_parked();
+    assert_eq!(field(&viewer, cx).as_deref(), Some("+attribute"));
+    keys(cx, "escape");
+    viewer.update(cx, |v, cx| v.select(vec![node("Duck")], cx));
+    cx.dispatch_action(RemoveMember { n: 0 });
+    assert_eq!(
+        source(&viewer, cx),
+        "classDiagram\n    class Duck {\n        +quack()\n    }\n"
+    );
+    keys(cx, &format!("{SECONDARY}-z"));
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), src);
 }
 
 #[gpui::test]

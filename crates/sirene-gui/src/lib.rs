@@ -229,6 +229,21 @@ pub struct SetIdentifying {
     pub identifying: bool,
 }
 
+/// Add an attribute, or a method, to the one selected class of a class diagram, through the
+/// label field (WYSIWY-23).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct AddMember {
+    pub method: bool,
+}
+
+/// Remove member `n` of the one selected class of a class diagram (WYSIWY-23).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct RemoveMember {
+    pub n: usize,
+}
+
 /// Set the kind (`Inheritance`, `Composition`, ...) of the selected relations of a class diagram
 /// (WYSIWY-23).
 #[derive(Clone, PartialEq, Debug, gpui::Action)]

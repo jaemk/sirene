@@ -999,6 +999,8 @@ impl Render for Viewer {
             .on_action(cx.listener(Self::set_identifying))
             .on_action(cx.listener(Self::set_relationship_type))
             .on_action(cx.listener(Self::set_relation_kind))
+            .on_action(cx.listener(Self::add_member))
+            .on_action(cx.listener(Self::remove_member))
             .on_action(cx.listener(Self::longer_edge))
             .on_action(cx.listener(Self::shorter_edge))
             .on_action(cx.listener(Self::reverse_edge))
