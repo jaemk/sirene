@@ -9,6 +9,10 @@ use crate::drawing::Item;
 /// Why Move To makes no edit for a node not already in the target.
 pub const MOVE_TO: &str = "it would move other nodes too";
 
+/// Why Move Earlier or Move Later makes no edit for a sequence diagram's participant.
+pub const MOVE_PARTICIPANT: &str =
+    "it is first or last, or the swap would change a box, a create, or the messages";
+
 /// Why Group makes no edit for nodes `ids`.
 pub fn group(src: &str, ids: &[&str]) -> Option<&'static str> {
     if ids.is_empty() {

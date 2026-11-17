@@ -4,7 +4,7 @@ use gpui::component::menu::PopupMenu;
 use gpui::{Context, WeakEntity, Window, px};
 use sirene_core::flowchart::edit::Line;
 use sirene_core::flowchart::{Arrow, Direction, Flowchart, Node, Shape, Stroke};
-use sirene_core::{class, er, requirement};
+use sirene_core::{class, er, requirement, sequence};
 
 use crate::document::Graph;
 use crate::drawing::Item;
@@ -13,8 +13,8 @@ use crate::viewer::Viewer;
 use crate::{
     AddMember, AddNode, AddNodeBefore, ConnectFrom, ConnectTo, Delete, FitWindow, Group,
     KeepTogether, LongerEdge, MoveEarlier, MoveLater, MoveTo, RemoveMember, Rename, ReverseEdge,
-    SelectAll, SetArrows, SetCardinality, SetDirection, SetIdentifying, SetRelationKind,
-    SetRelationshipType, SetShape, SetStroke, ShorterEdge, Ungroup,
+    SelectAll, SetArrows, SetCardinality, SetDirection, SetIdentifying, SetMessageArrow,
+    SetRelationKind, SetRelationshipType, SetShape, SetStroke, ShorterEdge, Ungroup,
 };
 
 /// The directions in Direction, with their names.
@@ -122,6 +122,43 @@ pub(crate) fn build(
                     menu = kind_items(menu, g, &edges, &src, window, cx)
                 }
                 _ => {}
+            }
+        }
+        // A sequence diagram's messages: their arrow; its one selected participant: its place
+        // (WYSIWY-21).
+        if graph.is_none() {
+            if !edges.is_empty() {
+                let current = match edges.as_slice() {
+                    [n] => sequence::edit::message_arrow(&src, *n),
+                    _ => None,
+                };
+                menu = choice_items(
+                    menu,
+                    "Arrow",
+                    sequence::edit::ARROWS.to_vec(),
+                    current,
+                    |arrow| Box::new(SetMessageArrow { arrow }),
+                    window,
+                    cx,
+                );
+            }
+            if let [id] = nodes.as_slice()
+                && edges.is_empty()
+            {
+                for (title, later, action) in [
+                    (
+                        "Move Earlier",
+                        false,
+                        Box::new(MoveEarlier) as Box<dyn gpui::Action>,
+                    ),
+                    ("Move Later", true, Box::new(MoveLater)),
+                ] {
+                    let why = sequence::edit::move_participant(&src, id, later)
+                        .is_none()
+                        .then_some(refusal::MOVE_PARTICIPANT);
+                    menu =
+                        menu.menu_with_disabled(refusal::label(title, why), action, why.is_some());
+                }
             }
         }
         // A class diagram's one selected class: its members (WYSIWY-23).

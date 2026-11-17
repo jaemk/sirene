@@ -292,7 +292,7 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     assert_eq!(
         seq.read_only(),
         Some(
-            "sequence diagrams take only adding, renaming, and deleting participants and messages"
+            "sequence diagrams take only adding, renaming, moving, and deleting participants and messages, and setting message arrows"
         )
     );
     assert!(seq.chart.nodes.is_empty() && seq.sequence().is_some());

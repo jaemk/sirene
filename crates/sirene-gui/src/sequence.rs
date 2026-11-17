@@ -8,10 +8,33 @@ use sirene_core::flowchart::edit::TextEdit;
 use sirene_core::scene::Owner;
 use sirene_core::sequence::edit;
 
+use crate::SetMessageArrow;
 use crate::drawing::{Item, NEW_NODE};
 use crate::viewer::Viewer;
 
 impl Viewer {
+    /// Sets the arrow of the selected messages (WYSIWY-21).
+    pub(crate) fn set_message_arrow(
+        &mut self,
+        a: &SetMessageArrow,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.doc.sequence().is_none() {
+            return;
+        }
+        let src = self.doc.source.clone();
+        let mut out = src.clone();
+        for n in self.selected_edges() {
+            if let Some(e) = edit::set_message_arrow(&out, n, &a.arrow) {
+                out = e.apply(&out);
+            }
+        }
+        if let Some(e) = TextEdit::between(&src, &out) {
+            self.record(e, window, cx);
+        }
+    }
+
     /// The item scene owner `owner` draws, on a sequence diagram.
     pub(crate) fn sequence_item(&self, owner: Owner) -> Option<Item> {
         let seq = self.doc.sequence()?;

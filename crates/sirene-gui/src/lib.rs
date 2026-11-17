@@ -229,6 +229,13 @@ pub struct SetIdentifying {
     pub identifying: bool,
 }
 
+/// Set the arrow (`->>`, `-->`, ...) of the selected messages of a sequence diagram (WYSIWY-21).
+#[derive(Clone, PartialEq, Debug, gpui::Action)]
+#[action(namespace = sirene, no_json)]
+pub struct SetMessageArrow {
+    pub arrow: String,
+}
+
 /// Add an attribute, or a method, to the one selected class of a class diagram, through the
 /// label field (WYSIWY-23).
 #[derive(Clone, PartialEq, Debug, gpui::Action)]

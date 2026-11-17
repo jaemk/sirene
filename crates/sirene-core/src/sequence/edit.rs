@@ -239,6 +239,84 @@ pub fn delete(src: &str, participants: &[&str], messages: &[usize]) -> Option<Te
     combine(src, edits)
 }
 
+/// The message arrows, for menus: `(title, arrow)`.
+pub const ARROWS: &[(&str, &str)] = &[
+    ("Solid Arrow", "->>"),
+    ("Dotted Arrow", "-->>"),
+    ("Solid Line", "->"),
+    ("Dotted Line", "-->"),
+    ("Solid Cross", "-x"),
+    ("Dotted Cross", "--x"),
+    ("Solid Async", "-)"),
+    ("Dotted Async", "--)"),
+    ("Solid Both Ways", "<<->>"),
+    ("Dotted Both Ways", "<<-->>"),
+];
+
+/// The arrow of message `n`, as written.
+pub fn message_arrow(src: &str, n: usize) -> Option<String> {
+    let doc = Doc::new(src);
+    Some(token(&doc.message(n)?, ARROW)?.text().to_owned())
+}
+
+/// Sets the arrow of message `n` to `arrow`, one of [`ARROWS`]. `None` when there is no such
+/// message or arrow, or nothing changes.
+pub fn set_message_arrow(src: &str, n: usize, arrow: &str) -> Option<TextEdit> {
+    if !ARROWS.iter().any(|&(_, a)| a == arrow) {
+        return None;
+    }
+    let doc = Doc::new(src);
+    let t = token(&doc.message(n)?, ARROW)?;
+    (t.text() != arrow).then(|| TextEdit {
+        range: span(t.text_range()),
+        text: arrow.to_owned(),
+    })
+}
+
+/// Swaps participant `id` with the one before it (or, with `later`, after it): the later one's
+/// declaration moves, or a new `participant` declaration goes, before the earlier one's first
+/// mention. `None` when there is no such neighbor, or the swap would change anything else (a
+/// `box`, `create`, the messages, or the diagnostics).
+pub fn move_participant(src: &str, id: &str, later: bool) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    let (seq, diagnostics) = super::parse(src).lower();
+    let order: Vec<&str> = seq.participants.iter().map(|p| p.id.as_str()).collect();
+    let i = order.iter().position(|p| *p == id)?;
+    let j = if later { i + 1 } else { i.checked_sub(1)? };
+    let (a, b) = (order[i.min(j)], *order.get(i.max(j))?);
+    let first = |p: &str| {
+        doc.statements()
+            .find(|s| names(s).iter().any(|t| t.text().trim() == p))
+    };
+    let (fa, fb) = (first(a)?, first(b)?);
+    let start = usize::from(fa.text_range().start());
+    let at = line_start(src, start);
+    let mut edits = Vec::new();
+    let declared = fb != fa
+        && fb.kind() == PARTICIPANT_STMT
+        && names(&fb).first().is_some_and(|t| t.text().trim() == b)
+        && !fb.text().to_string().contains('\n');
+    let line = if declared {
+        edits.push((statement_span(src, fb.text_range()), String::new()));
+        fb.text().to_string().trim().to_owned()
+    } else {
+        format!("participant {b}")
+    };
+    edits.push((at..at, format!("{}{line}{}", indent(src, at), doc.newline)));
+    let edit = combine(src, edits)?;
+    let (after, problems) = super::parse(&edit.apply(src)).lower();
+    let mut swapped = order.clone();
+    swapped.swap(i, j);
+    let same = after.participants.len() == seq.participants.len()
+        && after.participants.iter().zip(&swapped).all(|(p, id)| {
+            let old = &seq.participants[order.iter().position(|o| o == id).unwrap_or(0)];
+            p.id == *id && p.label == old.label && p.kind == old.kind && p.group == old.group
+        })
+        && after.messages().count() == seq.messages().count()
+        && problems.len() <= diagnostics.len();
+    same.then_some(edit)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252,6 +330,55 @@ mod tests {
     }
 
     const SRC: &str = "sequenceDiagram\n    participant A as Alice\n    A->>B: hi\n    note over B: n\n    B-->>A: back; A->>A: self\n";
+
+    #[test]
+    fn sets_message_arrows() {
+        assert_eq!(message_arrow(SRC, 1).as_deref(), Some("-->>"));
+        let out = apply(SRC, set_message_arrow(SRC, 1, "--x"));
+        assert!(out.contains("B--xA: back; A->>A: self"), "{out}");
+        let out = apply(SRC, set_message_arrow(SRC, 2, "<<->>"));
+        assert!(out.contains("A<<->>A: self"), "{out}");
+        assert!(seq(&out).messages().nth(2).unwrap().arrow.both);
+        assert!(set_message_arrow(SRC, 1, "-->>").is_none());
+        assert!(set_message_arrow(SRC, 1, "~>").is_none());
+        assert!(set_message_arrow(SRC, 9, "->").is_none());
+    }
+
+    #[test]
+    fn moves_participants() {
+        let order = |src: &str| -> Vec<String> {
+            seq(src).participants.into_iter().map(|p| p.id).collect()
+        };
+        // B has no declaration: one goes before A's.
+        let out = apply(SRC, move_participant(SRC, "B", false));
+        assert!(
+            out.starts_with("sequenceDiagram\n    participant B\n    participant A as Alice\n"),
+            "{out}"
+        );
+        assert_eq!(order(&out), ["B", "A"]);
+        assert_eq!(
+            move_participant(SRC, "A", true),
+            move_participant(SRC, "B", false)
+        );
+        // A declaration moves.
+        let decl = "sequenceDiagram\n    participant A\n    participant B as Bob\n    A->>B: hi\n";
+        assert_eq!(
+            apply(decl, move_participant(decl, "B", false)),
+            "sequenceDiagram\n    participant B as Bob\n    participant A\n    A->>B: hi\n"
+        );
+        // Both first named by one message.
+        let msg = "sequenceDiagram\n    A->>B: hi\n";
+        assert_eq!(
+            apply(msg, move_participant(msg, "B", false)),
+            "sequenceDiagram\n    participant B\n    A->>B: hi\n"
+        );
+        assert!(move_participant(SRC, "A", false).is_none());
+        assert!(move_participant(SRC, "B", true).is_none());
+        // Out of a box would change it.
+        let boxed =
+            "sequenceDiagram\n    box Team\n    participant A\n    end\n    participant B\n";
+        assert!(move_participant(boxed, "B", false).is_none());
+    }
 
     #[test]
     fn adds_participants_and_messages() {

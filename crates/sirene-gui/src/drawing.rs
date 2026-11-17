@@ -724,6 +724,17 @@ impl Viewer {
     /// Moves the one selected item's statement (WYSIWY-16); a moved edge stays selected.
     fn move_item(&mut self, later: bool, window: &mut Window, cx: &mut Context<Self>) {
         let src = &self.doc.source;
+        // A sequence diagram's participant swaps with its neighbor (WYSIWY-21).
+        if self.doc.sequence().is_some() {
+            let action = if later { "move later" } else { "move earlier" };
+            if let [Item::Node(id)] = self.selection.as_slice() {
+                match sirene_core::sequence::edit::move_participant(src, id, later) {
+                    Some(edit) => self.record(edit, window, cx),
+                    None => self.refused(action, Some(refusal::MOVE_PARTICIPANT), cx),
+                }
+            }
+            return;
+        }
         let (edit, edge) = match self.selection.as_slice() {
             [Item::Node(id)] => (edit::move_node(src, id, later), None),
             [Item::Edge(i)] => (

@@ -315,10 +315,16 @@ messages, as lowering counts them).
   space, adds a participant `P1`, `P2`, ..., with a message to it from the one selected node.
 - Delete removes the selected messages, and the selected participants with every statement that
   mentions them.
+- Arrow sets the arrow of the selected messages (`->>`, `-->>`, `->`, `-->`, `-x`, `--x`, `-)`,
+  `--)`, `<<->>`, `<<-->>`), the current one checked.
+- Move Earlier and Move Later swap the one selected participant with its neighbor: the later
+  one's one-line declaration, or a new `participant ID`, goes before the earlier one's first
+  mention. A swap that would change a `box`, a `create`, or the messages is refused.
 - Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits (shapes, subgraphs,
-  layout hints, styles, moves) stay refused, with the reason `sequence diagrams take only
-  adding, renaming, and deleting participants and messages`. The right-click menu holds Add
-  Participant, Rename, Delete, Select All, and Fit Window.
+  layout hints, styles) stay refused, with the reason `sequence diagrams take only adding,
+  renaming, moving, and deleting participants and messages, and setting message arrows`. The
+  right-click menu holds Add Participant, Rename, Arrow, Move Earlier, Move Later, Delete,
+  Select All, and Fit Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/sequence/edit.rs`.
 

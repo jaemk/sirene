@@ -12,8 +12,7 @@ use sirene_core::theme::ThemeConfig;
 use sirene_core::{Error, Result, Severity};
 
 /// Why a sequence diagram refuses the other drawing edits (WYSIWY-21).
-pub const SEQUENCE_EDITS: &str =
-    "sequence diagrams take only adding, renaming, and deleting participants and messages";
+pub const SEQUENCE_EDITS: &str = "sequence diagrams take only adding, renaming, moving, and deleting participants and messages, and setting message arrows";
 
 /// Why a state diagram refuses the other drawing edits (WYSIWY-22).
 pub const STATE_EDITS: &str =

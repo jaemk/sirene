@@ -12,8 +12,8 @@ use sirene_gui::document::Document;
 use sirene_gui::drawing::Item;
 use sirene_gui::viewer::Viewer;
 use sirene_gui::{
-    AddMember, AddNode, Delete, Deselect, RemoveMember, SetCardinality, SetIdentifying,
-    SetRelationshipType,
+    AddMember, AddNode, Delete, Deselect, MoveEarlier, MoveLater, RemoveMember, SetCardinality,
+    SetIdentifying, SetMessageArrow, SetRelationshipType,
 };
 
 const SRC: &str = "flowchart TD\n    A[Alpha] --> B[Beta]\n";
@@ -797,6 +797,44 @@ fn state_transitions_inside_composites(cx: &mut TestAppContext) {
         source(&viewer, cx),
         "stateDiagram-v2\n    state W {\n        [*] --> a\n        [*] --> a : again\n    }\n    a --> b\n"
     );
+}
+
+#[gpui::test]
+fn sequence_arrows_and_order(cx: &mut TestAppContext) {
+    let src = "sequenceDiagram\n    A->>B: hi\n    B-->>A: back\n";
+    let (viewer, cx) = open_src(cx, src);
+    // The selected messages take the arrow, as one change (WYSIWY-21).
+    viewer.update(cx, |v, cx| v.select(vec![Item::Edge(0), Item::Edge(1)], cx));
+    cx.dispatch_action(SetMessageArrow { arrow: "-x".into() });
+    assert_eq!(
+        source(&viewer, cx),
+        "sequenceDiagram\n    A-xB: hi\n    B-xA: back\n"
+    );
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), src);
+    // B swaps with A; then Move Later puts it back, and A first is refused Move Earlier.
+    viewer.update(cx, |v, cx| v.select(vec![node("B")], cx));
+    cx.dispatch_action(MoveEarlier);
+    assert_eq!(
+        source(&viewer, cx),
+        "sequenceDiagram\n    participant B\n    A->>B: hi\n    B-->>A: back\n"
+    );
+    cx.dispatch_action(MoveLater);
+    let out = source(&viewer, cx);
+    assert_eq!(
+        sirene_core::sequence::parse(&out)
+            .lower()
+            .0
+            .participants
+            .iter()
+            .map(|p| p.id.as_str())
+            .collect::<Vec<_>>(),
+        ["A", "B"],
+        "{out}"
+    );
+    viewer.update(cx, |v, cx| v.select(vec![node("A")], cx));
+    cx.dispatch_action(MoveEarlier);
+    assert_eq!(source(&viewer, cx), out);
 }
 
 #[gpui::test]

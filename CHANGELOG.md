@@ -38,6 +38,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   composition, aggregation, dependency, realization, link, dashed link).
 - The right-click menu on a class holds Add Attribute, Add Method, and Remove Member.
 - Dragging a state onto another composite state moves it inside.
+- The right-click menu on sequence messages holds an Arrow submenu; Move Earlier and Move Later
+  reorder participants.
 - `sirene ascii --markdown` and `sirene check --markdown` read stdin, or files of any name, as
   Markdown.
 - `sirene check --json` prints the diagnostics to stdout as one JSON array.
