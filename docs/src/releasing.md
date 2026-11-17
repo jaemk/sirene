@@ -14,7 +14,11 @@ so older installations can still update.
 
 ## Release steps
 
-`main` carries the next `-dev` version between releases. To release `X.Y.Z`:
+`main` carries the next `-dev` version between releases. CI's `semver` job compares
+`sirene-core`'s API with its latest crates.io release; a change that breaks it also bumps the
+`-dev` version to the next minor (`0.5.1-dev` to `0.6.0-dev`), so the release is numbered for it.
+
+To release `X.Y.Z`:
 
 1. Set `version` in the root `Cargo.toml`, and the matching `[workspace.dependencies]` pins, to
    `X.Y.Z`.

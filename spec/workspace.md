@@ -129,3 +129,11 @@ read through `diagram::lower` is read at the Unix epoch (`gantt::Parse::lower_at
 date). CI's `wasm` job builds `wasm-smoke` for the target and runs it under Node with
 `scripts/wasm-smoke.mjs`; it renders each file in `examples/` and a gantt chart as ASCII, SVG,
 and PNG, and a panic fails the job.
+
+## WORKSP-12 API compatibility
+
+CI's `semver` job runs `cargo semver-checks` on `sirene-core` with all features, against its
+latest crates.io release, on pull requests and pushes to `main`. A change that breaks the API
+bumps the workspace `-dev` version to the next minor (`0.5.1-dev` to `0.6.0-dev`; a major once
+past 1.0) in the same change, which the check accepts. `sirene-gui` and `sirene` are not checked:
+the editor's API serves the binary only.
