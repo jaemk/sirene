@@ -229,10 +229,17 @@ pub fn set_state_label(src: &str, id: &str, label: &str) -> Option<TextEdit> {
         }
         return Some(doc.append(&format!("{id} : {}", label_source(&text))));
     }
+    // Removing every description of a state named nowhere else would remove the state.
+    let elsewhere = doc
+        .statements()
+        .any(|s| !carriers.contains(&s) && ids(&s).iter().any(|t| t.text() == id));
     let mut edits = Vec::new();
     for (k, s) in carriers.iter().enumerate() {
         let keep = k == 0 && !plain;
         match (s.kind(), token(s, STRING)) {
+            (DESCRIPTION_STMT, _) if k == 0 && plain && !elsewhere => {
+                edits.push((span(s.text_range()), format!("state {id}")));
+            }
             (DESCRIPTION_STMT, _) if !keep => {
                 edits.push((statement_span(src, s.text_range()), String::new()));
             }
@@ -444,6 +451,12 @@ mod tests {
         assert_eq!(
             apply(two, set_state_label(two, "A", "")),
             "stateDiagram-v2\n    A --> B\n"
+        );
+        // A state named only by its description keeps a declaration.
+        let only = "stateDiagram-v2\n    A : one\n    A : two\n";
+        assert_eq!(
+            apply(only, set_state_label(only, "A", "")),
+            "stateDiagram-v2\n    state A\n"
         );
         // `state "..." as id`, and `state id : text`.
         let alias = "stateDiagram-v2\n    state \"Old\" as A\n    state B : desc\n";

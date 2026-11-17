@@ -3,7 +3,7 @@
 //! Requirements and elements are named by their name (a quoted one without its quotes), which is
 //! their node id in the lowered chart, and relationships by their index among its edges.
 
-use super::parser::RELATIONS;
+use super::parser::{KINDS, RELATIONS};
 use crate::edits::{append, combine, indent, newline, normalize, span, statement_span, token};
 use crate::flowchart::Flowchart;
 use crate::flowchart::edit::TextEdit;
@@ -95,25 +95,42 @@ fn names(stmt: &SyntaxNode) -> Vec<SyntaxToken> {
     }
 }
 
-/// `name` as source: as written when it is a plain word, otherwise quoted.
+/// `name` as source: as written when it is a plain word that is not a keyword (which would start
+/// another statement), otherwise quoted.
 fn source_name(name: &str) -> String {
-    if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+    let lower = name.to_ascii_lowercase();
+    let keyword = KINDS.contains(&lower.as_str())
+        || [
+            "direction",
+            "classdef",
+            "class",
+            "style",
+            "acctitle",
+            "accdescr",
+        ]
+        .contains(&lower.as_str());
+    if !keyword && !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
         name.to_owned()
     } else {
-        format!("\"{}\"", name.replace('"', "'"))
+        format!("\"{name}\"")
     }
 }
 
-/// A name for `text`: on one line, trimmed.
+/// A name for `text`: on one line, trimmed, with `"` and `` ` `` as `'` (a quoted name cannot
+/// hold `"`, and one opening with `` ` `` is Markdown).
 fn name_of(text: &str) -> String {
-    normalize(text).replace('\n', " ")
+    normalize(text).replace('\n', " ").replace(['"', '`'], "'")
 }
 
-/// Adds a requirement named `name` (made unique with a number), with no fields. Returns its
-/// name and the edit.
+/// Adds a requirement named `name` (made unique with a number; `Requirement` when empty), with
+/// no fields. Returns its name and the edit.
 pub fn add_requirement(src: &str, name: &str) -> (String, TextEdit) {
     let doc = Doc::new(src);
-    let name = doc.unused(&name_of(name));
+    let name = match name_of(name) {
+        n if n.is_empty() => "Requirement".to_owned(),
+        n => n,
+    };
+    let name = doc.unused(&name);
     let last = doc.root.children().last();
     // `}` goes under `requirement`, at the indent `append` gives the line.
     let under = last
@@ -265,6 +282,16 @@ mod tests {
         assert_eq!(diagnostics(&out), 0, "{out}");
         let (name, _) = add_requirement(&out, "New requirement");
         assert_eq!(name, "New requirement 2");
+        // An empty name is `Requirement`, which is quoted because it is a keyword; `"` and `` `
+        // `` become `'`.
+        let (name, e) = add_requirement("requirementDiagram\n", "");
+        assert_eq!(name, "Requirement");
+        let out = e.apply("requirementDiagram\n");
+        assert!(out.contains("requirement \"Requirement\" {"), "{out}");
+        let out = apply(&out, add_relationship(&out, "Requirement", "Requirement"));
+        assert_eq!(diagnostics(&out), 0, "{out}");
+        let (name, _) = add_requirement(SRC, "`a\"");
+        assert_eq!(name, "'a'");
         let (name, e) = add_requirement("requirementDiagram\n", "r");
         assert_eq!(name, "r");
         assert_eq!(

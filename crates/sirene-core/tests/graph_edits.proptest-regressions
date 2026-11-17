@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 11cda0746b173ae7b5cb0f527ca2208cfc3271fdbef05b5b40ea7fe45593f3d8 # shrinks to src = "requirementDiagram\n", ops = [Add("\"")]
+cc bc881d8e337b850605799ea7a68f9df452cbd07de470b580fe7769648b34aaad # shrinks to src = "requirementDiagram\n", ops = [Add(""), Add("")]
+cc 0e88401fff9c6dfc2a55a41abe60682453239d50a476a226a0d250c868582961 # shrinks to src = "requirementDiagram\n", ops = [Add("`")]
+cc 8a4ac73376671ee053bc7c0a44f5c05af0ec7f99b287a00fd82e7841d819f364 # shrinks to src = "stateDiagram-v2\n    A --> A\n", ops = [Connect(0, 0), DeleteEdge(0), RenameNode(0, "\""), DeleteEdge(0), RenameNode(0, "")]
