@@ -407,7 +407,6 @@ fn subgraphs_and_missing_items(cx: &mut TestAppContext) {
     assert!(selection(&viewer, cx).is_empty());
 }
 
-/// ERRORH-1: scene owners from non-graph diagrams never index the flowchart model.
 #[gpui::test]
 fn sequence_diagrams(cx: &mut TestAppContext) {
     let src = "sequenceDiagram\n    participant A as Alice\n    A->>B: hi\n";
@@ -576,6 +575,7 @@ fn state_transitions_inside_composites(cx: &mut TestAppContext) {
     );
 }
 
+/// ERRORH-1: scene owners from non-graph diagrams never index the flowchart model.
 #[gpui::test]
 fn read_only_scene_nodes_ignore_graph_selection(cx: &mut TestAppContext) {
     use sirene_core::scene::{Owner, Pt};
