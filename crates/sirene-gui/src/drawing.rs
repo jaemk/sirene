@@ -11,6 +11,7 @@ use sirene_core::flowchart::edit::{self, Line, TextEdit};
 use sirene_core::flowchart::{self, Flowchart, Shape};
 use sirene_core::scene::{Owner, Pt};
 
+use crate::document::Graph;
 use crate::paint::Placement;
 use crate::refusal;
 use crate::viewer::{Viewer, place};
@@ -388,11 +389,29 @@ impl Viewer {
                 _ => {}
             }
         } else if far && let Some(g) = self.doc.graph() {
-            // An edge to the node released on, or to a new node.
+            // An edge to the node released on, or to a new node. A state released on another
+            // composite state moves into it (WYSIWY-22).
             match self.item_at(e.position, window) {
                 Some(Item::Node(to)) => self.graph_connect(g, &from, &to, window, cx),
                 None if self.viewport.get().contains(&e.position) => {
-                    self.graph_add(g, Link::From(from), window, cx);
+                    let scope = (g == Graph::State)
+                        .then(|| self.subgraph_at(e.position, window))
+                        .flatten()
+                        .filter(|s| Some(s) != self.parent_of(&from).as_ref());
+                    match scope {
+                        Some(target) => {
+                            let src = &self.doc.source;
+                            match sirene_core::state::edit::move_into(src, &from, &target) {
+                                Some(edit) => self.record(edit, window, cx),
+                                None => self.refused(
+                                    "move",
+                                    Some(sirene_core::state::edit::MOVE_REFUSED),
+                                    cx,
+                                ),
+                            }
+                        }
+                        None => self.graph_add(g, Link::From(from), window, cx),
+                    }
                 }
                 _ => {}
             }

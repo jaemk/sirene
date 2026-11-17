@@ -799,6 +799,27 @@ fn state_transitions_inside_composites(cx: &mut TestAppContext) {
     );
 }
 
+#[gpui::test]
+fn states_move_into_composites(cx: &mut TestAppContext) {
+    let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Released on empty space in W, `a` moves into it with its statements (WYSIWY-22).
+    let (lo, hi) = cx
+        .update(|window, cx| viewer.update(cx, |v, _| v.subgraph_bounds("W", window)))
+        .expect("W is drawn");
+    let inside = gpui::point(lo.x + gpui::px(6.0), hi.y - gpui::px(6.0));
+    let at = cx.update(|window, cx| viewer.update(cx, |v, _| v.subgraph_at(inside, window)));
+    assert_eq!(at.as_deref(), Some("W"));
+    let a = center(&viewer, cx, &node("a"));
+    drag(cx, a, inside);
+    assert_eq!(
+        source(&viewer, cx),
+        "stateDiagram-v2\n    state W {\n        b\n        a : desc\n        a --> b\n    }\n"
+    );
+    keys(cx, &format!("{SECONDARY}-z"));
+    assert_eq!(source(&viewer, cx), src);
+}
+
 /// ERRORH-1: scene owners from non-graph diagrams never index the flowchart model.
 #[gpui::test]
 fn read_only_scene_nodes_ignore_graph_selection(cx: &mut TestAppContext) {

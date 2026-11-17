@@ -338,9 +338,15 @@ has the id `CONTAINER:[*]start` or `CONTAINER:[*]end`, with an empty container a
   or at a concurrent region's start or end is refused. Dragging to empty space adds a state too.
   Add Node, or a double-click on empty space, adds a state `S1`, `S2`, ... labeled `New state`,
   with a transition to it from the one selected state.
+- Dragging a state to empty space in another composite state moves it in: the one-line
+  statements naming it (declarations, descriptions, notes, and transitions) outside that
+  composite move to its end. A move that would also move another state, change a start or end
+  state, or that meets a statement over several lines, is refused with the reason `moving the
+  state with its transitions would move other states or change the transitions`.
 - Delete removes the selected transitions, and the selected states with every statement that
   names them (their ids are dropped from `class` and `style` lists); a start or end state takes
-  its transitions.
+  its transitions. Clearing the label of a state named only by its descriptions leaves
+  `state ID`.
 - Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
   the reason `state diagrams take only adding, renaming, connecting, and deleting states and
   transitions`. The right-click menu holds Add State, Rename, Delete, Select All, and Fit Window.

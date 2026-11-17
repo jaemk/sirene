@@ -17,6 +17,10 @@ use crate::syntax::{SyntaxNode, SyntaxToken};
 /// Why [`add_transition`] refused a transition.
 pub const TRANSITION_REFUSED: &str = "a transition cannot go into a start state, out of an end state, or between the start and end states of different composite states";
 
+/// Why [`move_into`] refused a move.
+pub const MOVE_REFUSED: &str =
+    "moving the state with its transitions would move other states or change the transitions";
+
 /// A parsed source and the chart it lowers to.
 struct Doc<'a> {
     src: &'a str,
@@ -64,8 +68,8 @@ impl<'a> Doc<'a> {
         append(self.src, self.root.children().last().as_ref(), line)
     }
 
-    /// Adds `line` as the last statement of composite state `id`.
-    fn append_in(&self, id: &str, line: &str) -> Option<TextEdit> {
+    /// Adds `lines` as the last statements of composite state `id`.
+    fn append_in(&self, id: &str, lines: &[String]) -> Option<TextEdit> {
         let composite = self
             .root
             .descendants()
@@ -83,6 +87,7 @@ impl<'a> Doc<'a> {
             .map(|at| indent(src, at).to_owned())
             .unwrap_or_else(|| format!("{}    ", indent(src, open)));
         let nl = self.newline;
+        let line = lines.join(&format!("{nl}{inner}"));
         Some(if src[line_start(src, at)..at].trim().is_empty() {
             let start = line_start(src, at);
             TextEdit {
@@ -196,8 +201,73 @@ pub fn add_transition(src: &str, from: &str, to: &str) -> Option<TextEdit> {
         None | Some("") => Some(doc.append(&line)),
         // A region's id has its composite's id and the region's number.
         Some(c) if c.contains(':') => None,
-        Some(c) => doc.append_in(c, &line),
+        Some(c) => doc.append_in(c, &[line]),
     }
+}
+
+/// The composite states whose members include `id`.
+fn containers(chart: &Flowchart, id: &str) -> Vec<String> {
+    chart
+        .subgraphs
+        .iter()
+        .filter(|s| s.members.iter().any(|m| m == id))
+        .map(|s| s.id.clone())
+        .collect()
+}
+
+/// Moves state `id` into composite state `target`: the one-line statements naming it (its
+/// declarations, descriptions, notes, and transitions) move to the end of the composite. `None`
+/// when `id` is not a simple state or `target` not a composite, when it is already only there,
+/// or when the move would change where any other state is, or the transitions.
+pub fn move_into(src: &str, id: &str, target: &str) -> Option<TextEdit> {
+    let doc = Doc::new(src);
+    if !matches!(End::of(id), End::State(_))
+        || doc.chart.node(id).is_none()
+        || doc.chart.subgraph(id).is_some()
+        || doc.chart.subgraph(target).is_none()
+        || containers(&doc.chart, id) == [target]
+    {
+        return None;
+    }
+    let inside = |s: &SyntaxNode| {
+        s.ancestors()
+            .any(|c| c.kind() == COMPOSITE && token(&c, IDENT).is_some_and(|t| t.text() == target))
+    };
+    let mut lines = Vec::new();
+    let mut edits = Vec::new();
+    for s in doc.statements().filter(|s| {
+        matches!(
+            s.kind(),
+            STATE_STMT | DESCRIPTION_STMT | TRANSITION_STMT | NOTE_STMT
+        ) && ids(s).iter().any(|t| t.text() == id)
+    }) {
+        if inside(&s) {
+            continue;
+        }
+        let text = s.text().to_string();
+        if text.contains('\n') {
+            return None;
+        }
+        edits.push((statement_span(src, s.text_range()), String::new()));
+        lines.push(text.trim().to_owned());
+    }
+    if lines.is_empty() {
+        lines.push(id.to_owned());
+    }
+    let add = doc.append_in(target, &lines)?;
+    edits.push((add.range, add.text));
+    let edit = combine(src, edits)?;
+    let after = super::parse(&edit.apply(src)).lower().flowchart;
+    let same = doc.chart.nodes.iter().all(|n| {
+        n.id == id
+            || after.node(&n.id).is_some()
+                && containers(&after, &n.id) == containers(&doc.chart, &n.id)
+    });
+    let ok = same
+        && after.nodes.len() == doc.chart.nodes.len()
+        && after.edges.len() == doc.chart.edges.len()
+        && containers(&after, id) == [target];
+    ok.then_some(edit)
 }
 
 /// Shows state `id` as `label`: the quoted label of `state "..." as id` or the text of its first
@@ -432,6 +502,35 @@ mod tests {
             "stateDiagram-v2\n    state W { a \n        [*] --> a\n    }\n"
         );
         assert_eq!(chart(&out).edges.len(), 1, "{out}");
+    }
+
+    #[test]
+    fn moves_into_composites() {
+        let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";
+        let out = apply(src, move_into(src, "a", "W"));
+        assert_eq!(
+            out,
+            "stateDiagram-v2\n    state W {\n        b\n        a : desc\n        a --> b\n    }\n"
+        );
+        let c = chart(&out);
+        assert_eq!(containers(&c, "a"), ["W"]);
+        assert_eq!(c.edges.len(), 1);
+        // A state only mentioned elsewhere in another composite moves out of it.
+        let two = "stateDiagram-v2\n    state V {\n        a\n    }\n    state W {\n    }\n";
+        let out = apply(two, move_into(two, "a", "W"));
+        assert_eq!(
+            out,
+            "stateDiagram-v2\n    state V {\n    }\n    state W {\n        a\n    }\n"
+        );
+        // Moving `a --> b` would take `b` along.
+        let along = "stateDiagram-v2\n    a --> b\n    state W {\n        c\n    }\n";
+        assert!(move_into(along, "a", "W").is_none());
+        // `[*] --> a` would change the start state.
+        let star = "stateDiagram-v2\n    [*] --> a\n    state W {\n        c\n    }\n";
+        assert!(move_into(star, "a", "W").is_none());
+        assert!(move_into(src, "W", "W").is_none());
+        assert!(move_into(src, "b", "W").is_none());
+        assert!(move_into(src, "a", "nope").is_none());
     }
 
     #[test]
