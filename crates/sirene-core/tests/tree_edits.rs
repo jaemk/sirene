@@ -7,7 +7,11 @@ use sirene_core::{mindmap, timeline};
 
 /// Text as the editors read it back: trimmed lines, trimmed as a whole.
 fn normalize(text: &str) -> String {
-    text.trim().lines().map(str::trim).collect::<Vec<_>>().join("\n")
+    text.trim()
+        .lines()
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Plain text that every editor can write: letters, digits, and inner spaces.
@@ -52,7 +56,10 @@ fn op() -> impl Strategy<Value = Op> {
 /// A mindmap's nodes as (label, depth), depth first.
 fn tree(src: &str) -> Vec<(String, usize)> {
     let map = mindmap::parse(src).lower().0;
-    map.nodes.iter().map(|n| (n.label.text.clone(), n.depth)).collect()
+    map.nodes
+        .iter()
+        .map(|n| (n.label.text.clone(), n.depth))
+        .collect()
 }
 
 /// A mindmap: a root and nodes of mixed shapes, each at most one deeper than the one before,
