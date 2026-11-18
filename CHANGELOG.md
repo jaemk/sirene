@@ -56,6 +56,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fields after them, through `packet::edit`.
 - DOT graphs take drawing edits: adding, renaming, connecting, and deleting nodes and edges,
   through `dot::edit`.
+- PlantUML use case, component, and deployment diagrams take drawing edits: adding, renaming,
+  connecting, and deleting elements and links, through `plantuml::edit`.
 - `sirene ascii --markdown` and `sirene check --markdown` read stdin, or files of any name, as
   Markdown.
 - `sirene check --json` prints the diagnostics to stdout as one JSON array.

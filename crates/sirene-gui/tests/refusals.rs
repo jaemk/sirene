@@ -236,6 +236,15 @@ fn use_case_diagrams_are_read_only(cx: &mut TestAppContext) {
         Some("drawing edits are not supported for use case diagrams yet")
     );
     assert_eq!(uc.chart.edges.len(), 1);
+    // PlantUML use case diagrams take edits (WYSIWY-30); its other kinds don't yet.
+    let puml = Document::from_source(None, "@startuml\nactor A\n(B)\nA --> B\n@enduml\n".into());
+    assert_eq!(puml.graph(), Some(sirene_gui::document::Graph::PlantUml));
+    let seq = Document::from_source(None, "@startuml\nA -> B\n@enduml\n".to_owned());
+    assert_eq!(seq.graph(), None);
+    assert_eq!(
+        seq.read_only(),
+        Some("drawing edits are not supported for PlantUML yet")
+    );
     let sl = Document::from_source(None, "swimlane-beta\nsubgraph L\n  a\nend\n".to_owned());
     assert_eq!(
         sl.read_only(),

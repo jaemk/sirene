@@ -8,7 +8,7 @@ use gpui::{
     TestAppContext, VisualTestContext, point, px,
 };
 use sirene_core::flowchart::Arrow;
-use sirene_gui::document::Document;
+use sirene_gui::document::{Document, Graph, PLANTUML_EDITS};
 use sirene_gui::drawing::Item;
 use sirene_gui::viewer::Viewer;
 use sirene_gui::{
@@ -1140,6 +1140,66 @@ fn dot_graphs(cx: &mut TestAppContext) {
     assert_eq!(
         source(&viewer, cx),
         "digraph {\n    a [label=\"Start\"]\n    n1 [label=\"End\"]\n}\n"
+    );
+}
+
+/// WYSIWY-30: PlantUML use case diagram elements and links are renamed, added, connected, and
+/// deleted.
+#[gpui::test]
+fn plantuml_diagrams(cx: &mut TestAppContext) {
+    let src = "@startuml\nactor User\n(Login) as L\n(Help) as H\nUser --> L\n@enduml\n";
+    let (viewer, cx) = open_src(cx, src);
+    viewer.read_with(cx, |v, _| {
+        assert_eq!(v.doc.graph(), Some(Graph::PlantUml));
+        assert_eq!(v.doc.read_only(), Some(PLANTUML_EDITS));
+    });
+    let l = center(&viewer, cx, &node("L"));
+    double_click(cx, l);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("Login"));
+    cx.simulate_input("Sign in");
+    keys(cx, "enter");
+    let e = center(&viewer, cx, &Item::Edge(0));
+    double_click(cx, e);
+    assert_eq!(field(&viewer, cx).as_deref(), Some(""));
+    cx.simulate_input("uses");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "@startuml\nactor User\nusecase \"Sign in\" as L\n(Help) as H\nUser --> L : uses\n\
+         @enduml\n"
+    );
+    // Dragging between elements adds a link.
+    let (user, h) = (
+        center(&viewer, cx, &node("User")),
+        center(&viewer, cx, &node("H")),
+    );
+    drag(cx, user, h);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(1)]);
+    keys(cx, "escape");
+    // Adding an element from the selected one links to it.
+    let user = center(&viewer, cx, &node("User"));
+    click(cx, user, Modifiers::none());
+    cx.dispatch_action(AddNode);
+    cx.run_until_parked();
+    assert_eq!(selection(&viewer, cx), [node("n1")]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("New element"));
+    cx.simulate_input("Logout");
+    keys(cx, "enter");
+    assert!(
+        source(&viewer, cx)
+            .ends_with("User --> H\nusecase \"Logout\" as n1\nUser --> n1\n@enduml\n"),
+        "{}",
+        source(&viewer, cx)
+    );
+    // Deleting an element takes its links.
+    let l = center(&viewer, cx, &node("L"));
+    click(cx, l, Modifiers::none());
+    cx.dispatch_action(Delete);
+    cx.run_until_parked();
+    assert_eq!(
+        source(&viewer, cx),
+        "@startuml\nactor User\n(Help) as H\nUser --> H\nusecase \"Logout\" as n1\n\
+         User --> n1\n@enduml\n"
     );
 }
 

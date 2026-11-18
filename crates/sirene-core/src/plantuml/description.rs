@@ -54,7 +54,7 @@ pub(crate) const ELEMENTS: &[(&str, Shape)] = &[
 /// An element's name at the start of `s` (PDSC-3): `:x:` (an actor), `(x)` (a use case),
 /// `[x]` (a component), `() x` (an interface), `"x"`, or `x`, each with an optional `as alias`.
 /// Returns the shape its brackets give, the id, the label, and the rest of the line.
-fn element(s: &str) -> Option<(Option<Shape>, String, String, &str)> {
+pub(crate) fn element(s: &str) -> Option<(Option<Shape>, String, String, &str)> {
     let s = s.trim_start();
     if let Some(r) = s.strip_prefix("()") {
         let (id, label, rest) = name(r)?;

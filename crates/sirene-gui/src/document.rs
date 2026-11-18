@@ -12,7 +12,7 @@ use sirene_core::scene::{Scene, TextMetrics, Theme};
 use sirene_core::sequence::Sequence;
 use sirene_core::theme::ThemeConfig;
 use sirene_core::timeline::Timeline;
-use sirene_core::{Error, Result, Severity};
+use sirene_core::{Error, Result, Severity, plantuml};
 
 /// Why a mindmap refuses the other drawing edits (WYSIWY-26).
 pub const MINDMAP_EDITS: &str = "mindmaps take only adding, renaming, and deleting nodes";
@@ -41,6 +41,11 @@ pub const REQUIREMENT_EDITS: &str = "requirement diagrams take only adding, rena
 pub const DOT_EDITS: &str =
     "DOT graphs take only adding, renaming, connecting, and deleting nodes and edges";
 
+/// Why a PlantUML use case, component, or deployment diagram refuses the other drawing edits
+/// (WYSIWY-30).
+pub const PLANTUML_EDITS: &str =
+    "PlantUML diagrams take only adding, renaming, connecting, and deleting elements and links";
+
 /// A diagram drawn from `Document::chart` that takes its own drawing edits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Graph {
@@ -54,6 +59,8 @@ pub enum Graph {
     Requirement,
     /// A Graphviz DOT graph (WYSIWY-29).
     Dot,
+    /// A PlantUML use case, component, or deployment diagram (WYSIWY-30).
+    PlantUml,
 }
 
 /// The text of a new document (WYSIWY-7).
@@ -295,6 +302,7 @@ impl Document {
             Kind::Agentflow => Some("drawing edits are not supported for agentflow diagrams yet"),
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Dot => Some(DOT_EDITS),
+            Kind::PlantUml if plantuml::edit::editable(&self.source) => Some(PLANTUML_EDITS),
             Kind::PlantUml => Some("drawing edits are not supported for PlantUML yet"),
             Kind::Requirement => Some(REQUIREMENT_EDITS),
         }
@@ -369,6 +377,7 @@ impl Document {
             Kind::Er => Some(Graph::Er),
             Kind::Requirement => Some(Graph::Requirement),
             Kind::Dot => Some(Graph::Dot),
+            Kind::PlantUml if plantuml::edit::editable(&self.source) => Some(Graph::PlantUml),
             _ => None,
         }
     }

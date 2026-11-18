@@ -8,6 +8,7 @@ mod class;
 mod data;
 mod description;
 mod detect;
+pub mod edit;
 mod embedded;
 mod files;
 mod gantt;

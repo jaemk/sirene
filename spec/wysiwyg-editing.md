@@ -563,3 +563,29 @@ back.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/refusals.rs`,
 `crates/sirene-core/src/dot/edit.rs`.
+
+## WYSIWY-30 PlantUML use case, component, and deployment diagrams
+
+A PlantUML use case, component, or deployment diagram (PDSC) takes drawing edits through
+`sirene_core::plantuml::edit`; its elements and links are selected as the flowchart's nodes
+and edges are. An element is named by its id, a link by its index in the lowered graph. Each edit
+is checked by lowering the result, and refused when it would not read back with the same
+elements and links, adds an error, or reads as another PlantUML kind (a lone `actor` reads as
+a sequence diagram).
+
+- Double-click or Rename on an element rewrites the name in its last declaration as
+  `"text" as ID` (a short form such as `(Use)` gains its keyword), or adds `KEYWORD "text" as ID`
+  before `@enduml` when it has none. A label with `"` is refused; a line break is written `\n`.
+- Double-click or Rename on a link sets the text after ` : `, or removes it when empty.
+- Dragging from an element to another adds `FROM --> TO` before `@enduml`, selected. Add Node,
+  or a double-click on empty space, adds `usecase "New element" as nK` (`rectangle` in a
+  diagram with no use cases) with the first free `nK`, with a link to it from the one selected
+  element.
+- Delete removes the selected links, and the selected elements with every line naming them. An
+  element named only on a removed line stays, declared in its place.
+- Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
+  the reason `PlantUML diagrams take only adding, renaming, connecting, and deleting elements and
+  links`. The other PlantUML kinds stay read-only (LANGS-5).
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/refusals.rs`,
+`crates/sirene-core/src/plantuml/edit.rs`.

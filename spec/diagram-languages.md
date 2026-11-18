@@ -92,7 +92,7 @@ as `flowchart::edit` does; a language without one has a read-only drawing, and t
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
 PlantUML yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
-Sequence diagrams take their own edits (WYSIWY-21), as do state diagrams (WYSIWY-22), class diagrams (WYSIWY-23), ER diagrams (WYSIWY-24), requirement diagrams (WYSIWY-25), mindmaps (WYSIWY-26), timelines (WYSIWY-27), pie charts, quadrant charts, user journeys, gantt charts, kanban boards, and packet diagrams (WYSIWY-28), and DOT graphs (WYSIWY-29). PlantUML, use case diagrams, git graphs,
+Sequence diagrams take their own edits (WYSIWY-21), as do state diagrams (WYSIWY-22), class diagrams (WYSIWY-23), ER diagrams (WYSIWY-24), requirement diagrams (WYSIWY-25), mindmaps (WYSIWY-26), timelines (WYSIWY-27), pie charts, quadrant charts, user journeys, gantt charts, kanban boards, and packet diagrams (WYSIWY-28), DOT graphs (WYSIWY-29), and PlantUML use case, component, and deployment diagrams (WYSIWY-30). The other PlantUML kinds, use case diagrams, git graphs,
 XY and radar charts, sankey, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, event modeling, and agentflow diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
 disabled Add Node, Select All, and Fit Window, a press on a node pans instead of connecting, and
 every edit action says `Can't ...: drawing edits are not supported for PlantUML yet` (or

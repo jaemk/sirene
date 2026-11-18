@@ -1,11 +1,12 @@
 //! Drawing edits on a diagram drawn from `Document::chart` that has its own edit module: a
 //! Mermaid state (WYSIWY-22), class (WYSIWY-23), ER (WYSIWY-24), or requirement (WYSIWY-25)
-//! diagram, or a DOT graph (WYSIWY-29). Its nodes and edges are selected as the flowchart's are;
+//! diagram, a DOT graph (WYSIWY-29), or a PlantUML use case, component, or deployment diagram
+//! (WYSIWY-30). Its nodes and edges are selected as the flowchart's are;
 //! their source edits come from `sirene_core::{state, class, er, requirement, dot}::edit`.
 
 use gpui::{Context, Window};
 use sirene_core::flowchart::edit::TextEdit;
-use sirene_core::{class, dot, er, requirement, state};
+use sirene_core::{class, dot, er, plantuml, requirement, state};
 
 use crate::document::Graph;
 use crate::drawing::{Item, Link};
@@ -27,6 +28,8 @@ pub const NEW_METHOD: &str = "+method()";
 pub const NEW_REQUIREMENT: &str = "New requirement";
 /// Label of DOT nodes made by AddNode.
 pub const NEW_DOT_NODE: &str = "New node";
+/// Label of PlantUML elements made by AddNode.
+pub const NEW_ELEMENT: &str = "New element";
 
 /// Why connecting two nodes failed: one of them is gone.
 const NO_NODE: &str = "a relationship joins two nodes of the diagram";
@@ -41,6 +44,7 @@ impl Graph {
             Graph::Er => er::edit::add_entity(src, NEW_ENTITY),
             Graph::Requirement => requirement::edit::add_requirement(src, NEW_REQUIREMENT),
             Graph::Dot => return dot::edit::add_node(src, NEW_DOT_NODE),
+            Graph::PlantUml => return plantuml::edit::add_node(src, NEW_ELEMENT),
         })
     }
 
@@ -56,6 +60,7 @@ impl Graph {
             Graph::Er => er::edit::add_relationship(src, from, to).ok_or(NO_NODE),
             Graph::Requirement => requirement::edit::add_relationship(src, from, to).ok_or(NO_NODE),
             Graph::Dot => dot::edit::add_edge(src, from, to).ok_or(NO_NODE),
+            Graph::PlantUml => plantuml::edit::add_edge(src, from, to).ok_or(NO_NODE),
         }
     }
 
@@ -160,6 +165,8 @@ impl Viewer {
             (Graph::Requirement, Item::Edge(_)) => None,
             (Graph::Dot, Item::Node(id)) => dot::edit::set_node_label(src, id, text),
             (Graph::Dot, Item::Edge(i)) => dot::edit::set_edge_label(src, *i, text),
+            (Graph::PlantUml, Item::Node(id)) => plantuml::edit::set_node_label(src, id, text),
+            (Graph::PlantUml, Item::Edge(i)) => plantuml::edit::set_edge_label(src, *i, text),
         }
     }
 
@@ -180,6 +187,7 @@ impl Viewer {
             Graph::Er => er::edit::delete(src, &nodes, &edges),
             Graph::Requirement => requirement::edit::delete(src, &nodes, &edges),
             Graph::Dot => dot::edit::delete(src, &nodes, &edges),
+            Graph::PlantUml => plantuml::edit::delete(src, &nodes, &edges),
         };
         self.select(Vec::new(), cx);
         if let Some(e) = e {

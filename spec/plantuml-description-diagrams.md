@@ -78,3 +78,7 @@ Notes follow PCLS-8: `note left|right|top|bottom of X : text` or a block to `end
 A line that is not a description statement, a declaration with no name, a `}` with no open
 container, an unclosed container or `[` description are errors. Unknown words after a name,
 link styles that are not drawn, and settings that are not drawn are warnings, as in PACT-9.
+
+## PDSC-8 Drawing edits
+
+Elements and links take drawing edits through `sirene_core::plantuml::edit` (WYSIWY-30).
