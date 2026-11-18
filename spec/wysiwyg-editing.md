@@ -515,6 +515,10 @@ a node by its index in the lowered model (`Item::Node("0")`, `"1"`, ...) and dra
   each its box and text. Labels are written as mindmap labels are (WYSIWY-26). A new item is a
   card: after a card, first in a selected column, or last in the last column; in an empty board,
   a column. Deleting a column deletes its cards.
+- packet diagrams (`packet::edit`): fields, each its boxes, labels, and bit numbers. A label is
+  quoted with `"` and `\` escaped; a line break is refused. A new field takes 8 bits, written
+  as the field before it is (`START-END` or `+8`). Fields written with bit numbers after an
+  added or deleted field are renumbered so they still follow on.
 
 For every list:
 
@@ -531,4 +535,5 @@ For every list:
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/pie/edit.rs`,
 `crates/sirene-core/src/quadrant/edit.rs`, `crates/sirene-core/src/journey/edit.rs`,
-`crates/sirene-core/src/gantt/edit.rs`, `crates/sirene-core/src/kanban/edit.rs`.
+`crates/sirene-core/src/gantt/edit.rs`, `crates/sirene-core/src/kanban/edit.rs`,
+`crates/sirene-core/src/packet/edit.rs`.

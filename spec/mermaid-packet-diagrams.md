@@ -41,8 +41,9 @@ limit applies to parsed diagrams; callers constructing `Packet` directly control
 Each row is `bits_per_row` bits of at least 32 pixels wide and 32 pixels high, 5 pixels apart.
 Bit cells widen when a glyph would not fit, and rows grow to fit wrapped labels. Each field's
 part in a row is a box in the node colors across its bits, with its label wrapped inside. With `show_bits`, the
-first and last bit numbers sit over their bits above the box. The title is centered above. Every
-element is owned by the diagram. Tests: `drawing`.
+first and last bit numbers sit over their bits above the box. The title is centered above. A
+field's boxes, labels, and bit numbers are owned by `Owner::Node` of its index (WYSIWY-28); the
+title by the diagram. Tests: `drawing`.
 
 ## MPKT-4 ASCII
 
@@ -56,4 +57,5 @@ Tests: `snapshots`, `ascii_charset_snapshots`, and the renderer's unit tests.
 ## MPKT-5 Not drawn
 
 Theme variables and the other `config.packet` keys (`bitWidth`, `rowHeight`, paddings) are
-ignored. Drawing edits are read-only (LANGS-5).
+ignored. Drawing edits are adding, renaming, and deleting fields
+(WYSIWY-28).

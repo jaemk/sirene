@@ -22,6 +22,8 @@ pub enum Items {
     Gantt,
     /// Kanban board columns and cards.
     Kanban,
+    /// Packet diagram fields.
+    Packet,
 }
 
 /// Runs `$e` with `$m` naming the edit module of `$items`.
@@ -48,6 +50,10 @@ macro_rules! with_module {
                 use crate::kanban::edit as $m;
                 $e
             }
+            Items::Packet => {
+                use crate::packet::edit as $m;
+                $e
+            }
         }
     };
 }
@@ -61,6 +67,7 @@ impl Items {
             Kind::Journey => Some(Items::Journey),
             Kind::Gantt => Some(Items::Gantt),
             Kind::Kanban => Some(Items::Kanban),
+            Kind::Packet => Some(Items::Packet),
             _ => None,
         }
     }
@@ -72,6 +79,7 @@ impl Items {
             Items::Quadrant => "New point",
             Items::Journey | Items::Gantt => "New task",
             Items::Kanban => "New card",
+            Items::Packet => "New field",
         }
     }
 
@@ -82,6 +90,7 @@ impl Items {
             Items::Quadrant => ("Add Point", "Add Point After"),
             Items::Journey | Items::Gantt => ("Add Task", "Add Task After"),
             Items::Kanban => ("Add Card", "Add Card After"),
+            Items::Packet => ("Add Field", "Add Field After"),
         }
     }
 
@@ -95,6 +104,7 @@ impl Items {
             Items::Kanban => {
                 "kanban boards take only adding, renaming, and deleting cards and columns"
             }
+            Items::Packet => "packet diagrams take only adding, renaming, and deleting fields",
         }
     }
 

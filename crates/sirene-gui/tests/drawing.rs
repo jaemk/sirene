@@ -1061,6 +1061,36 @@ fn kanban_boards(cx: &mut TestAppContext) {
     );
 }
 
+/// WYSIWY-28: packet fields are selected by index, renamed, added, and deleted, renumbering the
+/// fields after them.
+#[gpui::test]
+fn packet_diagrams(cx: &mut TestAppContext) {
+    let src = "packet\n  0-15: \"Source\"\n  16-31: \"Dest\"\n";
+    let (viewer, cx) = open_src(cx, src);
+    let dest = center(&viewer, cx, &node("1"));
+    click(cx, dest, Modifiers::default());
+    assert_eq!(selected_source(&viewer, cx), "16-31: \"Dest\"");
+    double_click(cx, dest);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("Dest"));
+    cx.simulate_input("Port");
+    keys(cx, "enter");
+    viewer.update(cx, |v, cx| v.select(vec![node("0")], cx));
+    cx.dispatch_action(AddNode);
+    assert_eq!(selection(&viewer, cx), [node("1")]);
+    cx.simulate_input("Len");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "packet\n  0-15: \"Source\"\n  16-23: \"Len\"\n  24-39: \"Port\"\n"
+    );
+    viewer.update(cx, |v, cx| v.select(vec![node("0")], cx));
+    cx.dispatch_action(Delete);
+    assert_eq!(
+        source(&viewer, cx),
+        "packet\n  0-7: \"Len\"\n  8-23: \"Port\"\n"
+    );
+}
+
 #[gpui::test]
 fn states_move_into_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";

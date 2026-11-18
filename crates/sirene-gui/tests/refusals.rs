@@ -348,9 +348,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     let packet = Document::from_source(None, "packet\n  0-7: \"a\"\n".to_owned());
     assert_eq!(
         packet.read_only(),
-        Some("drawing edits are not supported for packet diagrams yet")
+        Some("packet diagrams take only adding, renaming, and deleting fields")
     );
     assert!(packet.chart.nodes.is_empty() && packet.other.is_some());
+    assert!(packet.items().is_some());
     let radar = Document::from_source(None, "radar-beta\n  axis a, b, c\n".to_owned());
     assert_eq!(
         radar.read_only(),

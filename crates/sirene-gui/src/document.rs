@@ -256,12 +256,16 @@ impl Document {
             Kind::Class => Some(CLASS_EDITS),
             Kind::Er => Some(ER_EDITS),
             // Answered above.
-            Kind::Pie | Kind::Quadrant | Kind::Journey | Kind::Gantt | Kind::Kanban => None,
+            Kind::Pie
+            | Kind::Quadrant
+            | Kind::Journey
+            | Kind::Gantt
+            | Kind::Kanban
+            | Kind::Packet => None,
             Kind::Git => Some("drawing edits are not supported for git graphs yet"),
             Kind::Timeline => Some(TIMELINE_EDITS),
             Kind::Mindmap => Some(MINDMAP_EDITS),
             Kind::XyChart => Some("drawing edits are not supported for XY charts yet"),
-            Kind::Packet => Some("drawing edits are not supported for packet diagrams yet"),
             Kind::Radar => Some("drawing edits are not supported for radar charts yet"),
             Kind::Sankey => Some("drawing edits are not supported for sankey diagrams yet"),
             Kind::Treemap => Some("drawing edits are not supported for treemaps yet"),

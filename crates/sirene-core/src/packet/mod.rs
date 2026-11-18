@@ -1,5 +1,6 @@
 //! Mermaid packet diagrams (MPKT-*): bit fields laid out in rows.
 
+pub mod edit;
 mod lower;
 mod parser;
 

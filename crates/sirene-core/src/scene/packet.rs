@@ -118,13 +118,12 @@ pub fn packet(packet: &Packet, metrics: &impl TextMetrics, theme: &Theme) -> Sce
     let left = (width - row_w) / 2.0;
     let height = top + heights.iter().map(|h| numbers_h + h + ROW_GAP).sum::<f32>() + MARGIN;
 
-    let owner = Owner::Diagram;
     let mut p = Painter {
         theme,
         metrics,
         elements: Vec::new(),
     };
-    let text = |p: &mut Painter, s: &str, center: Pt, size: f32, color: Color| {
+    let text = |p: &mut Painter, owner: Owner, s: &str, center: Pt, size: f32, color: Color| {
         p.elements.push(Element {
             owner,
             primitive: Primitive::Text {
@@ -138,7 +137,7 @@ pub fn packet(packet: &Packet, metrics: &impl TextMetrics, theme: &Theme) -> Sce
     };
     if let Some(t) = title {
         let at = Pt::new(width / 2.0, MARGIN + lh / 2.0);
-        text(&mut p, t, at, title_size, theme.text);
+        text(&mut p, Owner::Diagram, t, at, title_size, theme.text);
     }
     let stroke = Some(Stroke {
         width: 1.0,
@@ -149,6 +148,9 @@ pub fn packet(packet: &Packet, metrics: &impl TextMetrics, theme: &Theme) -> Sce
     for ((row, lines), &row_height) in rows.iter().zip(&wrapped).zip(&heights) {
         let y = row_top + numbers_h;
         for (b, lines) in row.iter().zip(lines) {
+            // A field's blocks are owned by `Owner::Node` of its index (WYSIWY-28).
+            let field = (packet.fields).partition_point(|f| f.end < b.start);
+            let owner = Owner::Node(field);
             let (a, z) = (packet.column(b.start), packet.column(b.end));
             let (lo, hi) = (a.min(z), a.max(z));
             let bx = BoxF {
@@ -165,6 +167,7 @@ pub fn packet(packet: &Packet, metrics: &impl TextMetrics, theme: &Theme) -> Sce
                 let over = |bit: u32| left + (packet.column(bit) as f32 + 0.5) * bit_w;
                 text(
                     &mut p,
+                    owner,
                     &b.start.to_string(),
                     Pt::new(over(b.start), ny),
                     small,
@@ -173,6 +176,7 @@ pub fn packet(packet: &Packet, metrics: &impl TextMetrics, theme: &Theme) -> Sce
                 if b.end != b.start {
                     text(
                         &mut p,
+                        owner,
                         &b.end.to_string(),
                         Pt::new(over(b.end), ny),
                         small,

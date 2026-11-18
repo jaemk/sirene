@@ -15,7 +15,18 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Packet, Vec<Diagnostic>) {
     lower_with_limit(root, LABEL_BYTES_LIMIT)
 }
 
+/// Lowers `root`, with the statement of each field in order.
+pub(crate) fn lower_statements(root: &SyntaxNode) -> (Packet, Vec<Diagnostic>, Vec<SyntaxNode>) {
+    lower_all(root, LABEL_BYTES_LIMIT)
+}
+
 fn lower_with_limit(root: &SyntaxNode, limit: usize) -> (Packet, Vec<Diagnostic>) {
+    let (p, diagnostics, _) = lower_all(root, limit);
+    (p, diagnostics)
+}
+
+fn lower_all(root: &SyntaxNode, limit: usize) -> (Packet, Vec<Diagnostic>, Vec<SyntaxNode>) {
+    let mut statements = Vec::new();
     let mut p = Packet::default();
     let mut diagnostics = Vec::new();
     let mut title = None;
@@ -127,6 +138,7 @@ fn lower_with_limit(root: &SyntaxNode, limit: usize) -> (Packet, Vec<Diagnostic>
                 };
                 label_bytes = total;
                 p.fields.push(Field { start, end, label });
+                statements.push(stmt.clone());
                 next = end + 1;
             }
             ACC_TITLE_STMT => p.acc_title = text_of(&stmt, ACC_TEXT),
@@ -135,7 +147,7 @@ fn lower_with_limit(root: &SyntaxNode, limit: usize) -> (Packet, Vec<Diagnostic>
         }
     }
     p.title = title;
-    (p, diagnostics)
+    (p, diagnostics, statements)
 }
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {

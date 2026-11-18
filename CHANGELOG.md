@@ -52,6 +52,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Gantt charts take drawing edits: adding, renaming, and deleting tasks, through `gantt::edit`.
 - Kanban boards take drawing edits: adding, renaming, and deleting columns and cards, through
   `kanban::edit`.
+- Packet diagrams take drawing edits: adding, renaming, and deleting fields, renumbering the
+  fields after them, through `packet::edit`.
 - `sirene ascii --markdown` and `sirene check --markdown` read stdin, or files of any name, as
   Markdown.
 - `sirene check --json` prints the diagnostics to stdout as one JSON array.
