@@ -241,7 +241,7 @@ jobs:
       # it: the GUI crate does not build for musl.
       - name: verify the crates
         if: ${{ !contains(matrix.target, 'musl') }}
-        run: cargo package --workspace --exclude xtask --locked --target ${{ matrix.target }}
+        run: cargo package --workspace --exclude xtask --exclude wasm-smoke --locked --target ${{ matrix.target }}
       - name: package
         run: |
           dist="sirene-${VERSION}-${{ matrix.target }}"
