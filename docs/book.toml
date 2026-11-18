@@ -18,7 +18,8 @@ edit-url-template = "https://github.com/jaemk/sirene/edit/main/docs/{path}"
 # Docs are served under /guide/ on the Pages site; the landing page owns the root.
 site-url = "/sirene/guide/"
 additional-css = ["assets/custom.css"]
-additional-js = ["assets/custom.js"]
+# sirene-wasm.js first: custom.js draws edited samples with it.
+additional-js = ["assets/sirene-wasm.js", "assets/custom.js"]
 
 [output.html.fold]
 enable = true

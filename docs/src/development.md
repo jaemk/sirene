@@ -49,8 +49,18 @@ block with that build and adds the drawing and `sirene ascii` text below it. A b
 reports an error for fails the build; ```` ```mermaid no-render ```` leaves a block as source only.
 Untagged blocks are not drawn.
 
+The pages redraw a sample as it is edited, and the [playground](playground.md) draws as you type,
+with `sirene-wasm` (`wasm/`), `sirene-core` built for WebAssembly. Without the module they show
+that it is not built. To build it into the preview:
+
+```
+cargo build --profile wasm -p sirene-wasm --target wasm32-unknown-unknown
+mkdir -p docs/src/wasm
+cp target/wasm32-unknown-unknown/wasm/sirene_wasm.wasm docs/src/wasm/sirene.wasm
+```
+
 `.github/workflows/pages.yml` builds both on pull requests and publishes them on each push to
-`main` that changes `docs/`, `examples/`, or `crates/`.
+`main` that changes `docs/`, `examples/`, `crates/`, or `wasm/`.
 
 ## Packaging
 

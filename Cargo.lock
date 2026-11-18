@@ -7170,6 +7170,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sirene-wasm"
+version = "0.6.1-dev"
+dependencies = [
+ "sirene-core",
+]
+
+[[package]]
 name = "skrifa"
 version = "0.40.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8370,13 +8377,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3b1f9c3798725016c6ee5f2f57869ec0831e8bbc0ab0310a86e787e97f41389e"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "wasm-smoke"
-version = "0.6.1-dev"
-dependencies = [
- "sirene-core",
 ]
 
 [[package]]

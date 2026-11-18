@@ -1,7 +1,8 @@
 name: docs
 
-# Pages source is GitHub Actions. Builds sirene, renders the landing page's diagram, and builds
-# the mdBook, whose samples.py preprocessor draws every diagram block with that build. Deploys on
+# Pages source is GitHub Actions. Builds sirene and sirene-wasm, renders the landing page's
+# diagram, and builds the mdBook, whose samples.py preprocessor draws every diagram block with
+# that build; the pages redraw edited samples in the browser with sirene-wasm. Deploys on
 # pushes to main; a pull request only builds, so a doc example sirene rejects fails the check.
 on:
   push:
@@ -10,6 +11,7 @@ on:
       - 'docs/**'
       - 'examples/**'
       - 'crates/**'
+      - 'wasm/**'
       - 'Cargo.lock'
       - '.github/workflows/pages.yml'
   pull_request:
@@ -17,6 +19,7 @@ on:
       - 'docs/**'
       - 'examples/**'
       - 'crates/**'
+      - 'wasm/**'
       - 'Cargo.lock'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -42,6 +45,13 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       - name: Build sirene
         run: cargo build --locked --release -p sirene --no-default-features
+      # The docs pages load it to redraw a sample as it is edited, and on the playground page.
+      - name: Build sirene-wasm
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build --locked --profile wasm -p sirene-wasm --target wasm32-unknown-unknown
+          mkdir -p docs/src/wasm
+          cp target/wasm32-unknown-unknown/wasm/sirene_wasm.wasm docs/src/wasm/sirene.wasm
       - name: Render the landing diagram
         run: |
           sirene=target/release/sirene

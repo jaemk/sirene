@@ -6,6 +6,7 @@
 
 - [Install](install.md)
 - [Quickstart](quickstart.md)
+- [Playground](playground.md)
 
 # Using sirene
 

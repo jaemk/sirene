@@ -119,6 +119,47 @@ html.navy,
   white-space: pre;
 }
 
+/* The editor that replaces a sample's code block, and the playground's (custom.js). */
+.sirene-edit,
+.sirene-lang { margin-left: auto; }
+.sirene-lang {
+  padding: 2px 6px;
+  border: 1px solid #1d3557;
+  border-radius: 7px;
+  background: #0d1d33;
+  color: #dbeafe;
+  font: 500 12px var(--mono-font);
+}
+textarea.sirene-source {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--quote-border);
+  border-radius: 10px;
+  background: var(--code-bg, #0b1b31);
+  color: var(--fg);
+  font: 14px/1.45 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-ligatures: none;
+  tab-size: 4;
+  resize: vertical;
+}
+textarea.sirene-source:focus { outline: none; border-color: var(--cyan); }
+.content pre.sirene-status {
+  margin: 0;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 1px solid #1d3557;
+  border-radius: 0;
+  background: #0d1d33;
+  color: #8ba3c4;
+  font: 12px/1.4 var(--mono-font);
+  white-space: pre-wrap;
+}
+.content pre.sirene-status[hidden] { display: none; }
+.content pre.sirene-status.is-error { color: #fca5a5; }
+
 .navy .chapter li.chapter-item a { border-radius: 7px; padding-left: 8px; }
 .navy .chapter li.chapter-item a:hover { background: var(--theme-hover); }
 .navy .chapter li.chapter-item a.active {

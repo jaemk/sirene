@@ -1,0 +1,27 @@
+[package]
+name = "sirene-wasm"
+description = "sirene-core rendering for JavaScript on wasm32-unknown-unknown (WORKSP-11)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+# A cdylib for wasm32-unknown-unknown (the docs site and scripts/wasm-test.mjs load it); the rlib
+# lets `cargo test` run its tests on the host.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+png = ["sirene-core/png"]
+
+[dependencies]
+sirene-core.workspace = true
+
+# The workspace lints, except that `unsafe_code` is denied rather than forbidden: each export to
+# JavaScript is `#[unsafe(no_mangle)]` and allows it on that item alone (WORKSP-3).
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }

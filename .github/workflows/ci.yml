@@ -42,7 +42,8 @@ jobs:
           tool: cargo-llvm-cov
       - run: bash scripts/ci.sh
 
-  # sirene-core on wasm32-unknown-unknown: build, then render the examples under Node (WORKSP-11).
+  # sirene-wasm on wasm32-unknown-unknown: build, then render the examples under Node through the
+  # docs site's loader (WORKSP-11).
   wasm:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
@@ -51,8 +52,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-      - run: cargo build -p wasm-smoke --target wasm32-unknown-unknown --locked
-      - run: node scripts/wasm-smoke.mjs
+      - run: cargo build -p sirene-wasm --features png --target wasm32-unknown-unknown --locked
+      - run: node scripts/wasm-test.mjs
 
   # sirene-core's API against its latest crates.io release (WORKSP-12). A breaking change
   # needs the workspace version bumped to the next minor `-dev` in the same change.

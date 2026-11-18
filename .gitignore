@@ -7,5 +7,6 @@
 *.snap.new
 # Built and rendered by .github/workflows/pages.yml.
 /docs/book
+/docs/src/wasm
 /docs/landing/hero.svg
 /docs/landing/hero.txt

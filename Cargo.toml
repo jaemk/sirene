@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "xtask", "wasm-smoke"]
+members = ["crates/*", "xtask", "wasm"]
 
 [workspace.package]
 version = "0.6.1-dev"
@@ -17,6 +17,14 @@ unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+# `sirene-wasm` as the docs site loads it (pages.yml): small over fast.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
 
 [workspace.dependencies]
 sirene-core = { path = "crates/sirene-core", version = "0.6.1-dev" }

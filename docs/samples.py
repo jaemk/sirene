@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """mdBook preprocessor: draws each `mermaid`, `plantuml`, `puml`, `dot`, or `graphviz` code block
 with sirene and adds the drawing and the `sirene ascii` text below it, as on the landing page.
+The page redraws them in the browser when the block is edited (assets/custom.js).
 
 The sirene binary is $SIRENE, else target/release/sirene or target/debug/sirene in the
 repository, else `sirene` on the PATH. A block sirene reports an error for fails the build; warnings
@@ -60,7 +61,7 @@ def sample(binary, lang, source, where):
     # One line, so Markdown keeps the whole block as raw HTML (a blank line would end it).
     text = html.escape(ascii_text, quote=False).replace("\n", "&#10;")
     return (
-        '<div class="sirene-sample">'
+        f'<div class="sirene-sample" data-lang="{lang}">'
         '<div class="sirene-sample-bar" role="tablist" aria-label="Output">'
         '<button class="sirene-view is-active" type="button" role="tab" aria-selected="true" '
         'data-view="drawing">drawing</button>'

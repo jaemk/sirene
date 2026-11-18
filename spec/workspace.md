@@ -14,7 +14,8 @@ The repository root is a virtual Cargo workspace. The three published crates liv
 - `sirene`: the `sirene` binary (CLI entrypoint and GUI launcher).
 
 Two more members are not published: `xtask/` holds packaging and release-signing tasks, and
-`wasm-smoke/` renders the examples on WebAssembly (WORKSP-11).
+`wasm/` (`sirene-wasm`) exports `sirene-core` rendering to JavaScript on WebAssembly
+(WORKSP-11).
 
 ## WORKSP-2
 
@@ -24,7 +25,9 @@ inherited by members.
 
 ## WORKSP-3
 
-`unsafe_code` is forbidden workspace-wide. Clippy warnings fail CI.
+`unsafe_code` is forbidden workspace-wide, except in `sirene-wasm`, which denies it and allows it
+on each `#[unsafe(no_mangle)]` export alone; the exports' bodies are safe code. Clippy warnings
+fail CI.
 
 ## WORKSP-4
 
@@ -126,9 +129,26 @@ Markdown image links stay in the CLI.
 `sirene-core`, with or without `png`, builds for `wasm32-unknown-unknown` and renders there.
 That target has no clock: phase timings and layout timing logs are skipped, and a gantt chart
 read through `diagram::lower` is read at the Unix epoch (`gantt::Parse::lower_at` takes the
-date). CI's `wasm` job builds `wasm-smoke` for the target and runs it under Node with
-`scripts/wasm-smoke.mjs`; it renders each file in `examples/` and a gantt chart as ASCII, SVG,
-and PNG, and a panic fails the job.
+date).
+
+`sirene-wasm` builds `sirene-core` for the target as a module with no imports. JavaScript writes
+UTF-8 source into its memory (`input(len)` returns where), calls `render(format, lang, theme)`
+(SVG, ASCII, or PNG with feature `png`; detected, Mermaid, DOT, or PlantUML; light or dark),
+and reads the drawing or an error message, and the diagnostics as a JSON array with 1-based
+line and column (`output_ptr`/`output_len`, `diagnostics_ptr`/`diagnostics_len`). A panic traps;
+`docs/assets/sirene-wasm.js`, the loader, then starts a new instance for the next call. The
+`wasm` cargo profile builds it small for the docs site.
+
+CI's `wasm` job builds `sirene-wasm` with `png` for the target and runs `scripts/wasm-test.mjs`
+under Node: through the loader, it renders each file in `examples/` and a gantt chart as SVG,
+ASCII, and PNG, requires no error diagnostics, and checks a diagnostic's line. Any failure fails
+the job.
+
+The docs site (`.github/workflows/pages.yml`) serves the module as `wasm/sirene.wasm`.
+`docs/assets/custom.js` fetches it on first use: an `edit` button on each sample `samples.py`
+draws swaps the code block for an editor and redraws the drawing and `sirene ascii` text as it
+changes, showing the first diagnostics; the playground page does the same for Mermaid,
+PlantUML, or DOT, keeping the language and source in the URL fragment (`#lang:base64url`).
 
 ## WORKSP-12 API compatibility
 
