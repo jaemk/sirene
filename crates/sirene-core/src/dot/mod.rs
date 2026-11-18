@@ -1,5 +1,6 @@
 //! Graphviz DOT (DOT-*), lowered to the graph model.
 
+pub mod edit;
 pub(crate) mod lower;
 mod parser;
 mod x11;

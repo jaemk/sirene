@@ -1,11 +1,11 @@
 //! Drawing edits on a diagram drawn from `Document::chart` that has its own edit module: a
 //! Mermaid state (WYSIWY-22), class (WYSIWY-23), ER (WYSIWY-24), or requirement (WYSIWY-25)
-//! diagram. Its nodes and edges are selected as the flowchart's are; their source edits come from
-//! `sirene_core::{state, class, er, requirement}::edit`.
+//! diagram, or a DOT graph (WYSIWY-29). Its nodes and edges are selected as the flowchart's are;
+//! their source edits come from `sirene_core::{state, class, er, requirement, dot}::edit`.
 
 use gpui::{Context, Window};
 use sirene_core::flowchart::edit::TextEdit;
-use sirene_core::{class, er, requirement, state};
+use sirene_core::{class, dot, er, requirement, state};
 
 use crate::document::Graph;
 use crate::drawing::{Item, Link};
@@ -25,19 +25,23 @@ pub const NEW_ATTRIBUTE: &str = "+attribute";
 pub const NEW_METHOD: &str = "+method()";
 /// Name of requirements made by AddNode.
 pub const NEW_REQUIREMENT: &str = "New requirement";
+/// Label of DOT nodes made by AddNode.
+pub const NEW_DOT_NODE: &str = "New node";
 
 /// Why connecting two nodes failed: one of them is gone.
 const NO_NODE: &str = "a relationship joins two nodes of the diagram";
 
 impl Graph {
-    /// A new node labeled for this kind: its id and the edit.
-    fn add_node(self, src: &str) -> (String, TextEdit) {
-        match self {
+    /// A new node labeled for this kind: its id and the edit. `None` for a DOT source with no
+    /// graph to add it to.
+    fn add_node(self, src: &str) -> Option<(String, TextEdit)> {
+        Some(match self {
             Graph::State => state::edit::add_state(src, NEW_STATE),
             Graph::Class => class::edit::add_class(src, NEW_CLASS),
             Graph::Er => er::edit::add_entity(src, NEW_ENTITY),
             Graph::Requirement => requirement::edit::add_requirement(src, NEW_REQUIREMENT),
-        }
+            Graph::Dot => return dot::edit::add_node(src, NEW_DOT_NODE),
+        })
     }
 
     /// An edge from `from` to `to`, or why there is none.
@@ -51,6 +55,7 @@ impl Graph {
             }
             Graph::Er => er::edit::add_relationship(src, from, to).ok_or(NO_NODE),
             Graph::Requirement => requirement::edit::add_relationship(src, from, to).ok_or(NO_NODE),
+            Graph::Dot => dot::edit::add_edge(src, from, to).ok_or(NO_NODE),
         }
     }
 
@@ -71,7 +76,9 @@ impl Viewer {
         cx: &mut Context<Self>,
     ) {
         let src = self.doc.source.clone();
-        let (id, add) = graph.add_node(&src);
+        let Some((id, add)) = graph.add_node(&src) else {
+            return;
+        };
         let mut out = add.apply(&src);
         let linked = match &link {
             Link::None => None,
@@ -151,6 +158,8 @@ impl Viewer {
             (Graph::Er, Item::Edge(i)) => er::edit::set_relationship_label(src, *i, text),
             (Graph::Requirement, Item::Node(id)) => requirement::edit::rename(src, id, text),
             (Graph::Requirement, Item::Edge(_)) => None,
+            (Graph::Dot, Item::Node(id)) => dot::edit::set_node_label(src, id, text),
+            (Graph::Dot, Item::Edge(i)) => dot::edit::set_edge_label(src, *i, text),
         }
     }
 
@@ -170,6 +179,7 @@ impl Viewer {
             Graph::Class => class::edit::delete(src, &nodes, &edges),
             Graph::Er => er::edit::delete(src, &nodes, &edges),
             Graph::Requirement => requirement::edit::delete(src, &nodes, &edges),
+            Graph::Dot => dot::edit::delete(src, &nodes, &edges),
         };
         self.select(Vec::new(), cx);
         if let Some(e) = e {

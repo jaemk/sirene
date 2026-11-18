@@ -90,12 +90,12 @@ Every language opens in the editor with the source pane, the live drawing, selec
 export, and copy. Drawing edits (WYSIWY) need a per-language edit module that writes source text,
 as `flowchart::edit` does; a language without one has a read-only drawing, and the edit items
 are disabled with the reason (WYSIWY-19), e.g. `Add Node (drawing edits are not supported for
-DOT yet)`. Edit modules come after a language renders, in the order of LANGS-7.
+PlantUML yet)`. Edit modules come after a language renders, in the order of LANGS-7.
 
-Sequence diagrams take their own edits (WYSIWY-21), as do state diagrams (WYSIWY-22), class diagrams (WYSIWY-23), ER diagrams (WYSIWY-24), requirement diagrams (WYSIWY-25), mindmaps (WYSIWY-26), timelines (WYSIWY-27), pie charts, quadrant charts, user journeys, gantt charts, kanban boards, and packet diagrams (WYSIWY-28). DOT and PlantUML, use case diagrams, git graphs,
+Sequence diagrams take their own edits (WYSIWY-21), as do state diagrams (WYSIWY-22), class diagrams (WYSIWY-23), ER diagrams (WYSIWY-24), requirement diagrams (WYSIWY-25), mindmaps (WYSIWY-26), timelines (WYSIWY-27), pie charts, quadrant charts, user journeys, gantt charts, kanban boards, and packet diagrams (WYSIWY-28), and DOT graphs (WYSIWY-29). PlantUML, use case diagrams, git graphs,
 XY and radar charts, sankey, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, event modeling, and agentflow diagrams, and treemaps are read-only this way: `Document::read_only` gives the reason, the drawing's menu holds only the
 disabled Add Node, Select All, and Fit Window, a press on a node pans instead of connecting, and
-every edit action says `Can't ...: drawing edits are not supported for DOT yet` (or PlantUML,
+every edit action says `Can't ...: drawing edits are not supported for PlantUML yet` (or
 use case diagrams, git graphs, XY charts,
 radar charts, sankey diagrams, treemaps, block diagrams, architecture diagrams, C4 diagrams, ZenUML diagrams, ishikawa diagrams, venn diagrams, Wardley maps, tree views, or railroad diagrams; an info diagram says it has
 nothing to edit).
@@ -103,7 +103,7 @@ A git graph, XY, or radar chart,
 sankey, block, architecture, C4, ZenUML, info, ishikawa, or venn diagram, Wardley map, tree view,
 railroad diagram, or treemap is drawn from `Document::other` and has nothing to select; a
 sequence diagram, mindmap, timeline, pie chart, quadrant chart, user journey, gantt chart, kanban board, or packet diagram is drawn from it too, with its elements owned so
-they can be selected (`Document::scene_edits`). Tests: `dot_graphs_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
+they can be selected (`Document::scene_edits`). Tests: `use_case_diagrams_are_read_only` in `crates/sirene-gui/tests/refusals.rs`.
 
 ## LANGS-6 Unsupported syntax
 

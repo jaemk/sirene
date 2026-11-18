@@ -37,6 +37,10 @@ pub const ER_EDITS: &str = "ER diagrams take only adding, renaming, connecting, 
 /// Why a requirement diagram refuses the other drawing edits (WYSIWY-25).
 pub const REQUIREMENT_EDITS: &str = "requirement diagrams take only adding, renaming, connecting, and deleting requirements and relationships, and setting relationship types";
 
+/// Why a DOT graph refuses the other drawing edits (WYSIWY-29).
+pub const DOT_EDITS: &str =
+    "DOT graphs take only adding, renaming, connecting, and deleting nodes and edges";
+
 /// A diagram drawn from `Document::chart` that takes its own drawing edits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Graph {
@@ -48,6 +52,8 @@ pub enum Graph {
     Er,
     /// A Mermaid requirement diagram (WYSIWY-25).
     Requirement,
+    /// A Graphviz DOT graph (WYSIWY-29).
+    Dot,
 }
 
 /// The text of a new document (WYSIWY-7).
@@ -288,7 +294,7 @@ impl Document {
             }
             Kind::Agentflow => Some("drawing edits are not supported for agentflow diagrams yet"),
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
-            Kind::Dot => Some("drawing edits are not supported for DOT yet"),
+            Kind::Dot => Some(DOT_EDITS),
             Kind::PlantUml => Some("drawing edits are not supported for PlantUML yet"),
             Kind::Requirement => Some(REQUIREMENT_EDITS),
         }
@@ -362,6 +368,7 @@ impl Document {
             Kind::Class => Some(Graph::Class),
             Kind::Er => Some(Graph::Er),
             Kind::Requirement => Some(Graph::Requirement),
+            Kind::Dot => Some(Graph::Dot),
             _ => None,
         }
     }

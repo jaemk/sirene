@@ -261,6 +261,11 @@ fn unquote(s: &str) -> String {
     out
 }
 
+/// The text of a `DOT_ID`: a name, numeral, or the unquoted string.
+pub(crate) fn id_text(id: &SyntaxNode) -> String {
+    value(id).text
+}
+
 fn value(id: &SyntaxNode) -> Value {
     let mut text = String::new();
     let mut html = false;

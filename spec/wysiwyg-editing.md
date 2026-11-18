@@ -537,3 +537,29 @@ Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/pie/edit.rs
 `crates/sirene-core/src/quadrant/edit.rs`, `crates/sirene-core/src/journey/edit.rs`,
 `crates/sirene-core/src/gantt/edit.rs`, `crates/sirene-core/src/kanban/edit.rs`,
 `crates/sirene-core/src/packet/edit.rs`.
+
+## WYSIWY-29 DOT graphs
+
+A Graphviz DOT graph takes drawing edits through `sirene_core::dot::edit`; its nodes and edges
+are selected as the flowchart's are. A node is named by its DOT id, an edge by its index in the
+lowered graph. Each edit is checked by lowering the result, and refused when it would not read
+back.
+
+- Double-click or Rename on a node sets its `label`: the last `label` among its node
+  statements is rewritten, else one is added to its last node statement, else `ID [label=...]`
+  is added at the end of the graph. Labels are quoted, with `\` and `"` escaped and a line
+  break written `\n`.
+- Double-click or Rename on an edge sets the `label` of its statement; an edge whose statement
+  makes several edges (`a -> b -> c`, `a -> {b c}`) is refused.
+- Dragging from a node to another adds `FROM -> TO` (`--` in a `graph`) at the end of the
+  graph, selected. Add Node, or a double-click on empty space, adds `nK [label="New node"]` with
+  the first free `nK`, with an edge to it from the one selected node.
+- Delete removes the selected edges, and the selected nodes with their node statements and
+  edges. An edge statement keeps the edges it still makes, each run of them written as its own
+  statement with the statement's attributes, and a node left on no edge and named nowhere else
+  as a bare statement. Removing an edge to or from a subgraph is refused.
+- Each is one undoable drawing change (WYSIWY-13). The flowchart-only edits stay refused, with
+  the reason `DOT graphs take only adding, renaming, connecting, and deleting nodes and edges`.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-gui/tests/refusals.rs`,
+`crates/sirene-core/src/dot/edit.rs`.

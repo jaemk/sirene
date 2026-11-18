@@ -125,4 +125,4 @@ as Mermaid even when they start like a DOT graph. A source forced to DOT without
 a syntax error, not a flowchart. The editor reads a file by its extension or block name the same
 way (`Lang::of_path`, `Lang::of_info`, `diagram::lower_as`). Tests: `forced_languages` in
 `diagram.rs` and in `crates/sirene/tests/cli.rs`, and `refusals.rs` in `sirene-gui`. Drawing
-edits (LANGS-5) come later.
+edits are adding, renaming, connecting, and deleting nodes and edges (WYSIWY-29).

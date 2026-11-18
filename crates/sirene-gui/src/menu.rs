@@ -88,6 +88,7 @@ pub(crate) fn build(
             Some(Graph::Requirement) => {
                 Some(("Add Requirement", "Add Requirement With Relationship"))
             }
+            Some(Graph::Dot) => Some(("Add Node", "Add Node With Edge")),
             None => None,
         };
         (

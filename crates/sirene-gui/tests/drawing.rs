@@ -1091,6 +1091,58 @@ fn packet_diagrams(cx: &mut TestAppContext) {
     );
 }
 
+/// WYSIWY-29: DOT nodes and edges are renamed, added, connected, and deleted.
+#[gpui::test]
+fn dot_graphs(cx: &mut TestAppContext) {
+    let src = "digraph {\n    a -> b\n}\n";
+    let (viewer, cx) = open_src(cx, src);
+    let a = center(&viewer, cx, &node("a"));
+    double_click(cx, a);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("a"));
+    cx.simulate_input("Start");
+    keys(cx, "enter");
+    let e = center(&viewer, cx, &Item::Edge(0));
+    double_click(cx, e);
+    assert_eq!(field(&viewer, cx).as_deref(), Some(""));
+    cx.simulate_input("go");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "digraph {\n    a -> b [label=\"go\"]\n    a [label=\"Start\"]\n}\n"
+    );
+    // Dragging between nodes adds an edge.
+    let (a, b) = (
+        center(&viewer, cx, &node("a")),
+        center(&viewer, cx, &node("b")),
+    );
+    drag(cx, b, a);
+    assert_eq!(selection(&viewer, cx), [Item::Edge(1)]);
+    keys(cx, "escape");
+    // Adding a node from the selected one adds an edge to it.
+    let b = center(&viewer, cx, &node("b"));
+    click(cx, b, Modifiers::none());
+    cx.dispatch_action(AddNode);
+    cx.run_until_parked();
+    assert_eq!(selection(&viewer, cx), [node("n1")]);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("New node"));
+    cx.simulate_input("End");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "digraph {\n    a -> b [label=\"go\"]\n    a [label=\"Start\"]\n    b -> a\n    \
+         n1 [label=\"End\"]\n    b -> n1\n}\n"
+    );
+    // Deleting a node takes its edges.
+    let b = center(&viewer, cx, &node("b"));
+    click(cx, b, Modifiers::none());
+    cx.dispatch_action(Delete);
+    cx.run_until_parked();
+    assert_eq!(
+        source(&viewer, cx),
+        "digraph {\n    a [label=\"Start\"]\n    n1 [label=\"End\"]\n}\n"
+    );
+}
+
 #[gpui::test]
 fn states_move_into_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";

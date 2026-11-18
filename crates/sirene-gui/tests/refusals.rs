@@ -150,21 +150,21 @@ fn refused_actions_say_why(cx: &mut TestAppContext) {
 
 /// A diagram type without an edit module draws read-only; edits say why (LANGS-5).
 #[gpui::test]
-fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
-    let src = "digraph {\n    A -> B\n}\n";
+fn use_case_diagrams_are_read_only(cx: &mut TestAppContext) {
+    let src = "usecase-beta\n  actor A\n  A --> B\n";
     let (viewer, cx) = open_src(cx, src);
-    let why = "drawing edits are not supported for DOT yet";
-    viewer.read_with(cx, |v, _| {
+    let why = "drawing edits are not supported for use case diagrams yet";
+    let a = viewer.read_with(cx, |v, _| {
         assert_eq!(v.doc.read_only(), Some(why));
         assert!(v.doc.problems.is_empty());
-        assert!(v.doc.chart.node("A").is_some());
+        node(&v.doc.chart.nodes[0].id)
     });
-    // A click focuses the drawing and selects A.
-    let a = viewer
-        .update_in(cx, |v, window, _| v.item_center(&node("A"), window))
-        .expect("A is drawn");
-    cx.simulate_click(a, gpui::Modifiers::default());
-    viewer.read_with(cx, |v, _| assert_eq!(v.selection, [node("A")]));
+    // A click focuses the drawing and selects the node.
+    let at = viewer
+        .update_in(cx, |v, window, _| v.item_center(&a, window))
+        .expect("the node is drawn");
+    cx.simulate_click(at, gpui::Modifiers::default());
+    viewer.read_with(cx, |v, _| assert_eq!(v.selection, std::slice::from_ref(&a)));
     cx.dispatch_action(AddNode);
     assert_eq!(status(&viewer, cx), format!("Can't add a node: {why}"));
     cx.dispatch_action(Rename);
@@ -172,10 +172,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     viewer.read_with(cx, |v, _| assert!(v.label.is_none()));
     cx.dispatch_action(Delete);
     assert_eq!(status(&viewer, cx), format!("Can't delete: {why}"));
-    viewer.read_with(cx, |v, _| assert_eq!(v.selection, [node("A")]));
+    viewer.read_with(cx, |v, _| assert_eq!(v.selection, std::slice::from_ref(&a)));
     assert_eq!(source(&viewer, cx), src);
-    // Flowcharts stay editable; state, class, ER, and requirement diagrams take their own edits
-    // (WYSIWY-22 to WYSIWY-25).
+    // Flowcharts stay editable; state, class, ER, and requirement diagrams and DOT graphs take
+    // their own edits (WYSIWY-22 to WYSIWY-25, WYSIWY-29).
     let flow = Document::from_source(None, "flowchart\n  A\n".to_owned());
     assert_eq!(flow.read_only(), None);
     let state = Document::from_source(None, "stateDiagram-v2\n  A --> B\n".to_owned());
@@ -212,10 +212,9 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     assert!(req.own_edits());
     assert_eq!(req.chart.edges.len(), 1);
     let dot = Document::from_source(None, "digraph { a -> b }\n".to_owned());
-    assert_eq!(
-        dot.read_only(),
-        Some("drawing edits are not supported for DOT yet")
-    );
+    assert_eq!(dot.read_only(), Some(sirene_gui::document::DOT_EDITS));
+    assert_eq!(dot.graph(), Some(sirene_gui::document::Graph::Dot));
+    assert!(dot.own_edits());
     assert_eq!(dot.chart.edges.len(), 1);
     // The extension or the Markdown block's name picks the language (DOT-5).
     let gv = Document::from_source(Some("a.gv".into()), "flowchart LR\n".to_owned());
