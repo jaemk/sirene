@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-17
+
 ### Added
 
 - `diagram::Lowered::ascii`, `svg`, `png` (feature `png`), and `scene` render a diagram from

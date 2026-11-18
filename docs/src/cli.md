@@ -175,7 +175,7 @@ build stays a GUI build. Before anything is replaced it is checked against the r
 
 ```
 $ sirene update --check
-update available: 0.5.0 -> 0.5.1 (target x86_64-unknown-linux-gnu)
+update available: 0.6.0 -> 0.6.1 (target x86_64-unknown-linux-gnu)
 ```
 
 It never downgrades. A sirene installed by Homebrew or `cargo install` is refused with the
@@ -221,7 +221,7 @@ stderr:
 
 ```
 $ sirene -v svg diagram.mmd -o diagram.svg
-[     0.0ms] DEBUG sirene: sirene 0.5.0 (linux, x86_64): ...
+[     0.0ms] DEBUG sirene: sirene 0.6.0 (linux, x86_64): ...
 [     0.1ms] DEBUG sirene: rendering 1 file(s)
 [     0.1ms] DEBUG sirene: reading diagram.mmd
 [     0.2ms] DEBUG sirene: read diagram.mmd: 23 bytes
