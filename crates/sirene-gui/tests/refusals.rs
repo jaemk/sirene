@@ -320,8 +320,9 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     let journey = Document::from_source(None, "journey\n  a: 5: Me\n".to_owned());
     assert_eq!(
         journey.read_only(),
-        Some("drawing edits are not supported for user journeys yet")
+        Some("user journeys take only adding, renaming, and deleting tasks")
     );
+    assert!(journey.items().is_some());
     assert!(journey.chart.nodes.is_empty() && journey.other.is_some());
     let quadrant = Document::from_source(None, "quadrantChart\n  a: [0.5, 0.5]\n".to_owned());
     assert_eq!(

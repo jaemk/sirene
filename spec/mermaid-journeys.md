@@ -34,7 +34,8 @@ their names wrapped, under a box per named section spanning its tasks; section `
 `k`th branch color, and its tasks a light tint of it. Each task shows a dot per actor along its
 top edge. Below each task a dashed line runs to a face, placed lower for a lower score (30 pixels
 per point); it smiles above 3, frowns below 3, and is level at 3. An arrow runs under the faces
-across every task. The title is centered above. Every element is owned by the diagram. Tests:
+across every task. The title is centered above. A task's box, name, and actor dots are owned by
+`Owner::Node` of its place among every section's tasks (WYSIWY-28); the rest by the diagram. Tests:
 `drawing`.
 
 ## MJOUR-4 ASCII
@@ -46,4 +47,4 @@ actors. The title is centered above. Tests: `snapshots`, `ascii_charset_snapshot
 ## MJOUR-5 Not drawn
 
 Frontmatter `config` for `journey` (box sizes, colors, `actorColours`) and theme variables are
-ignored. Drawing edits are read-only (LANGS-5).
+ignored. Drawing edits are adding, renaming, and deleting tasks (WYSIWY-28).

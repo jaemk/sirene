@@ -1,5 +1,6 @@
 //! Mermaid user journeys (MJOUR-*): tasks in sections, each scored and done by actors.
 
+pub mod edit;
 mod lower;
 mod parser;
 

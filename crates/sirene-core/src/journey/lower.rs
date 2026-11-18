@@ -7,6 +7,13 @@ use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Journey, Vec<Diagnostic>) {
+    let (j, diagnostics, _) = lower_statements(root);
+    (j, diagnostics)
+}
+
+/// Lowers `root`, with the statement of each task in order.
+pub(crate) fn lower_statements(root: &SyntaxNode) -> (Journey, Vec<Diagnostic>, Vec<SyntaxNode>) {
+    let mut statements = Vec::new();
     let mut j = Journey::default();
     let mut diagnostics = Vec::new();
     let mut title = None;
@@ -40,6 +47,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Journey, Vec<Diagnostic>) {
                     }
                     let last = j.sections.len() - 1;
                     j.sections[last].tasks.push(task);
+                    statements.push(stmt.clone());
                 }
             }
             ACC_TITLE_STMT => j.acc_title = text_of(&stmt, ACC_TEXT),
@@ -48,7 +56,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Journey, Vec<Diagnostic>) {
         }
     }
     j.title = title;
-    (j, diagnostics)
+    (j, diagnostics, statements)
 }
 
 /// A task from its name and `score: actor, actor` data.

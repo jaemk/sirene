@@ -974,6 +974,35 @@ fn quadrant_charts(cx: &mut TestAppContext) {
     );
 }
 
+/// WYSIWY-28: user journey tasks are selected by index, renamed, added, and deleted.
+#[gpui::test]
+fn user_journeys(cx: &mut TestAppContext) {
+    let src = "journey\n  section A\n    Make tea: 5: Me\n    Rest: 2: Me\n";
+    let (viewer, cx) = open_src(cx, src);
+    let rest = center(&viewer, cx, &node("1"));
+    click(cx, rest, Modifiers::default());
+    assert_eq!(selected_source(&viewer, cx), "Rest: 2: Me");
+    double_click(cx, rest);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("Rest"));
+    cx.simulate_input("Nap");
+    keys(cx, "enter");
+    viewer.update(cx, |v, cx| v.select(vec![node("0")], cx));
+    cx.dispatch_action(AddNode);
+    assert_eq!(selection(&viewer, cx), [node("1")]);
+    cx.simulate_input("Read");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "journey\n  section A\n    Make tea: 5: Me\n    Read: 5: Me\n    Nap: 2: Me\n"
+    );
+    viewer.update(cx, |v, cx| v.select(vec![node("0")], cx));
+    cx.dispatch_action(Delete);
+    assert_eq!(
+        source(&viewer, cx),
+        "journey\n  section A\n    Read: 5: Me\n    Nap: 2: Me\n"
+    );
+}
+
 #[gpui::test]
 fn states_move_into_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";

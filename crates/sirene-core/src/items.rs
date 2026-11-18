@@ -16,6 +16,8 @@ pub enum Items {
     Pie,
     /// Quadrant chart points.
     Quadrant,
+    /// User journey tasks.
+    Journey,
 }
 
 /// Runs `$e` with `$m` naming the edit module of `$items`.
@@ -30,6 +32,10 @@ macro_rules! with_module {
                 use crate::quadrant::edit as $m;
                 $e
             }
+            Items::Journey => {
+                use crate::journey::edit as $m;
+                $e
+            }
         }
     };
 }
@@ -40,6 +46,7 @@ impl Items {
         match kind {
             Kind::Pie => Some(Items::Pie),
             Kind::Quadrant => Some(Items::Quadrant),
+            Kind::Journey => Some(Items::Journey),
             _ => None,
         }
     }
@@ -49,6 +56,7 @@ impl Items {
         match self {
             Items::Pie => "New slice",
             Items::Quadrant => "New point",
+            Items::Journey => "New task",
         }
     }
 
@@ -57,6 +65,7 @@ impl Items {
         match self {
             Items::Pie => ("Add Slice", "Add Slice After"),
             Items::Quadrant => ("Add Point", "Add Point After"),
+            Items::Journey => ("Add Task", "Add Task After"),
         }
     }
 
@@ -65,6 +74,7 @@ impl Items {
         match self {
             Items::Pie => "pie charts take only adding, renaming, and deleting slices",
             Items::Quadrant => "quadrant charts take only adding, renaming, and deleting points",
+            Items::Journey => "user journeys take only adding, renaming, and deleting tasks",
         }
     }
 

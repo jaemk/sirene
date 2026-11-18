@@ -504,6 +504,9 @@ a node by its index in the lowered model (`Item::Node("0")`, `"1"`, ...) and dra
 - quadrant charts (`quadrant::edit`): points, each its circle and name. A name is written as
   is, or quoted when that does not read back (e.g. it holds `: `); a line break is refused. A
   new point is `NAME: [0.5, 0.5]`.
+- user journeys (`journey::edit`): tasks, by their place among every section's tasks, each its
+  box, text, and actor dots. A name with a line break, `#`, `:`, or `;` is refused. A new task
+  takes the score and actors of the task it follows, or a score of 3 at the end.
 
 For every list:
 
@@ -519,4 +522,4 @@ For every list:
   Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/pie/edit.rs`,
-`crates/sirene-core/src/quadrant/edit.rs`.
+`crates/sirene-core/src/quadrant/edit.rs`, `crates/sirene-core/src/journey/edit.rs`.

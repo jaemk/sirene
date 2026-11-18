@@ -198,6 +198,8 @@ pub fn journey(journey: &Journey, metrics: &impl TextMetrics, theme: &Theme) -> 
             w: TASK_W,
             h: task_h,
         };
+        // Task `i`'s box, text, and actor dots are owned by `Owner::Node(i)` (WYSIWY-28).
+        let owner = Owner::Node(i);
         p.path(
             owner,
             shapes::rounded(bx, 4.0),
