@@ -33,6 +33,17 @@ struct Raw {
 }
 
 pub(crate) fn lower(root: &SyntaxNode, now: Time) -> (Gantt, Vec<Diagnostic>) {
+    let (g, diagnostics, _) = lower_statements(root, now);
+    (g, diagnostics)
+}
+
+/// Lowers `root`, with the statement of each task in order.
+pub(crate) fn lower_statements(
+    root: &SyntaxNode,
+    now: Time,
+) -> (Gantt, Vec<Diagnostic>, Vec<SyntaxNode>) {
+    let mut statements = Vec::new();
+    let mut task_stmts = Vec::new();
     let mut g = Gantt {
         now,
         ..Gantt::default()
@@ -76,6 +87,7 @@ pub(crate) fn lower(root: &SyntaxNode, now: Time) -> (Gantt, Vec<Diagnostic>) {
                 let previous = raws.len().checked_sub(1);
                 if let Some(raw) = task(&stmt, g.sections.len() - 1, previous, &mut diagnostics) {
                     raws.push(raw);
+                    task_stmts.push(stmt.clone());
                 }
             }
             ACC_TITLE_STMT => g.acc_title = text_of(&stmt, ACC_TEXT),
@@ -85,8 +97,9 @@ pub(crate) fn lower(root: &SyntaxNode, now: Time) -> (Gantt, Vec<Diagnostic>) {
     }
     g.title = title;
     let dated = date_tasks(&g, &raws, &mut diagnostics);
-    for (raw, dates) in raws.into_iter().zip(dated) {
+    for ((raw, dates), stmt) in raws.into_iter().zip(dated).zip(task_stmts) {
         if let Some((start, end, drawn_end)) = dates {
+            statements.push(stmt);
             g.sections[raw.section].tasks.push(Task {
                 name: raw.name,
                 id: raw.id,
@@ -97,7 +110,7 @@ pub(crate) fn lower(root: &SyntaxNode, now: Time) -> (Gantt, Vec<Diagnostic>) {
             });
         }
     }
-    (g, diagnostics)
+    (g, diagnostics, statements)
 }
 
 fn unquote(s: &str) -> String {

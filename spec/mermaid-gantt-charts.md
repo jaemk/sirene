@@ -87,7 +87,9 @@ diamond at the middle of its span. A `vert` task takes no row: a line across the
 start, with its name at the top. Excluded days are grey columns behind the bars, a vertical grid
 line marks each tick with its label below the chart (and above it with `topAxis`), and today is a
 red line unless `todayMarker off`, or drawn with the `stroke`, `stroke-width`, and `opacity` of
-its style. The title is centered above. Every element is owned by the diagram. Tests: `drawing`.
+its style. The title is centered above. A task's bar or milestone, name, and `vert` line are owned by
+`Owner::Node` of its place among every section's tasks (WYSIWY-28); the rest by the diagram. Tests:
+`drawing`.
 
 ## MGANTT-6 ASCII
 
@@ -101,4 +103,4 @@ with `topAxis` it is repeated above. Tests: `snapshots`, `ascii_charset_snapshot
 
 ## MGANTT-7 Editor
 
-Drawing edits are read-only (LANGS-5). Theme variables (`taskBkgColor`, ...) are ignored.
+Drawing edits are adding, renaming, and deleting tasks (WYSIWY-28). Theme variables (`taskBkgColor`, ...) are ignored.

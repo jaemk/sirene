@@ -507,6 +507,10 @@ a node by its index in the lowered model (`Item::Node("0")`, `"1"`, ...) and dra
 - user journeys (`journey::edit`): tasks, by their place among every section's tasks, each its
   box, text, and actor dots. A name with a line break, `#`, `:`, or `;` is refused. A new task
   takes the score and actors of the task it follows, or a score of 3 at the end.
+- gantt charts (`gantt::edit`): tasks, by their place among every section's tasks, each its bar
+  or milestone, name, and `vert` line. A name with a line break, `:`, `#`, or `;` is refused.
+  A new task is `NAME : 1d`, after the task before it (today's date when the chart has none).
+  Deleting a task another one is `after` is refused, since that one would no longer be drawn.
 
 For every list:
 
@@ -522,4 +526,5 @@ For every list:
   Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/pie/edit.rs`,
-`crates/sirene-core/src/quadrant/edit.rs`, `crates/sirene-core/src/journey/edit.rs`.
+`crates/sirene-core/src/quadrant/edit.rs`, `crates/sirene-core/src/journey/edit.rs`,
+`crates/sirene-core/src/gantt/edit.rs`.

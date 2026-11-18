@@ -18,6 +18,8 @@ pub enum Items {
     Quadrant,
     /// User journey tasks.
     Journey,
+    /// Gantt chart tasks.
+    Gantt,
 }
 
 /// Runs `$e` with `$m` naming the edit module of `$items`.
@@ -36,6 +38,10 @@ macro_rules! with_module {
                 use crate::journey::edit as $m;
                 $e
             }
+            Items::Gantt => {
+                use crate::gantt::edit as $m;
+                $e
+            }
         }
     };
 }
@@ -47,6 +53,7 @@ impl Items {
             Kind::Pie => Some(Items::Pie),
             Kind::Quadrant => Some(Items::Quadrant),
             Kind::Journey => Some(Items::Journey),
+            Kind::Gantt => Some(Items::Gantt),
             _ => None,
         }
     }
@@ -56,7 +63,7 @@ impl Items {
         match self {
             Items::Pie => "New slice",
             Items::Quadrant => "New point",
-            Items::Journey => "New task",
+            Items::Journey | Items::Gantt => "New task",
         }
     }
 
@@ -65,7 +72,7 @@ impl Items {
         match self {
             Items::Pie => ("Add Slice", "Add Slice After"),
             Items::Quadrant => ("Add Point", "Add Point After"),
-            Items::Journey => ("Add Task", "Add Task After"),
+            Items::Journey | Items::Gantt => ("Add Task", "Add Task After"),
         }
     }
 
@@ -75,6 +82,7 @@ impl Items {
             Items::Pie => "pie charts take only adding, renaming, and deleting slices",
             Items::Quadrant => "quadrant charts take only adding, renaming, and deleting points",
             Items::Journey => "user journeys take only adding, renaming, and deleting tasks",
+            Items::Gantt => "gantt charts take only adding, renaming, and deleting tasks",
         }
     }
 

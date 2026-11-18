@@ -27,6 +27,8 @@ struct Painter<'a, M> {
     theme: &'a Theme,
     elements: Vec<Element>,
     right: f32,
+    /// The owner of what is drawn next.
+    owner: Owner,
 }
 
 impl<M: TextMetrics> Painter<'_, M> {
@@ -36,7 +38,7 @@ impl<M: TextMetrics> Painter<'_, M> {
 
     fn path(&mut self, segments: Vec<Segment>, fill: Option<Color>, stroke: Option<Stroke>) {
         self.elements.push(Element {
-            owner: Owner::Diagram,
+            owner: self.owner,
             primitive: Primitive::Path {
                 segments,
                 fill,
@@ -62,7 +64,7 @@ impl<M: TextMetrics> Painter<'_, M> {
         let w = self.width(text, size);
         self.right = self.right.max(x + w);
         self.elements.push(Element {
-            owner: Owner::Diagram,
+            owner: self.owner,
             primitive: Primitive::Text {
                 text: text.to_owned(),
                 center: Pt::new(x + w / 2.0, y),
@@ -161,6 +163,7 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         theme,
         elements: Vec::new(),
         right: 0.0,
+        owner: Owner::Diagram,
     };
     let fs = theme.font_size;
     let small = fs * 0.85;
@@ -180,10 +183,9 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         .fold(MIN_LEFT, f32::max);
     let x0 = MARGIN + left_w;
     let x1 = x0 + CHART_W;
-    let verts: Vec<(&str, Time)> = gantt
-        .tasks()
-        .filter(|t| t.tags.vert)
-        .map(|t| (t.name.as_str(), t.start))
+    let verts: Vec<(usize, &str, Time)> = (gantt.tasks().enumerate())
+        .filter(|(_, t)| t.tags.vert)
+        .map(|(n, t)| (n, t.name.as_str(), t.start))
         .collect();
     let mut y = MARGIN + title_h;
     let top_axis_y = y;
@@ -268,12 +270,21 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
             p.text_at(&label, lx, top_axis_y + LABEL_H / 2.0, small, theme.text);
         }
     }
-    // Bars.
+    // Bars. Task `n`, by its place among every section's tasks, is owned by `Owner::Node(n)`
+    // (WYSIWY-28).
+    let firsts: Vec<usize> = (gantt.sections.iter())
+        .scan(0, |n, s| {
+            let first = *n;
+            *n += s.tasks.len();
+            Some(first)
+        })
+        .collect();
     for (r, row) in rows.iter().enumerate() {
         let section = &gantt.sections[row.section];
         let cy = rows_top + (r as f32 + 0.5) * ROW;
         for &i in &row.tasks {
             let task = &section.tasks[i];
+            p.owner = Owner::Node(firsts[row.section] + i);
             let (fill, line) = task_colors(theme, task.tags);
             let stroke = Stroke {
                 width: 1.5,
@@ -306,13 +317,15 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
             }
         }
     }
+    p.owner = Owner::Diagram;
     // `vert` tasks: a line across the rows with the name above.
     let vert_stroke = Stroke {
         width: 2.0,
         color: theme.edge,
         dash: Some((6.0, 3.0)),
     };
-    for (name, t) in verts {
+    for (n, name, t) in verts {
+        p.owner = Owner::Node(n);
         let vx = x(t);
         p.line(
             Pt::new(vx, vert_y + LABEL_H),
@@ -328,6 +341,7 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
             theme.text,
         );
     }
+    p.owner = Owner::Diagram;
     // Today.
     if let Some(stroke) = today_stroke(&gantt.today_marker)
         && (t0..=t1).contains(&gantt.now)

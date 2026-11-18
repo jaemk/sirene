@@ -1003,6 +1003,35 @@ fn user_journeys(cx: &mut TestAppContext) {
     );
 }
 
+/// WYSIWY-28: gantt chart tasks are selected by index, renamed, added, and deleted.
+#[gpui::test]
+fn gantt_charts(cx: &mut TestAppContext) {
+    let src = "gantt\n    dateFormat YYYY-MM-DD\n    Design : 2014-01-01, 3d\n    Build : 2014-01-04, 3d\n";
+    let (viewer, cx) = open_src(cx, src);
+    let build = center(&viewer, cx, &node("1"));
+    click(cx, build, Modifiers::default());
+    assert_eq!(selected_source(&viewer, cx), "Build : 2014-01-04, 3d");
+    double_click(cx, build);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("Build"));
+    cx.simulate_input("Ship");
+    keys(cx, "enter");
+    viewer.update(cx, |v, cx| v.select(vec![node("1")], cx));
+    cx.dispatch_action(AddNode);
+    assert_eq!(selection(&viewer, cx), [node("2")]);
+    cx.simulate_input("Review");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "gantt\n    dateFormat YYYY-MM-DD\n    Design : 2014-01-01, 3d\n    Ship : 2014-01-04, 3d\n    Review : 1d\n"
+    );
+    viewer.update(cx, |v, cx| v.select(vec![node("0")], cx));
+    cx.dispatch_action(Delete);
+    assert_eq!(
+        source(&viewer, cx),
+        "gantt\n    dateFormat YYYY-MM-DD\n    Ship : 2014-01-04, 3d\n    Review : 1d\n"
+    );
+}
+
 #[gpui::test]
 fn states_move_into_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";

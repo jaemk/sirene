@@ -307,9 +307,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     let gantt = Document::from_source(None, "gantt\n  a : 2014-01-01, 1d\n".to_owned());
     assert_eq!(
         gantt.read_only(),
-        Some("drawing edits are not supported for gantt charts yet")
+        Some("gantt charts take only adding, renaming, and deleting tasks")
     );
     assert!(gantt.chart.nodes.is_empty() && gantt.other.is_some());
+    assert!(gantt.items().is_some());
     let mindmap = Document::from_source(None, "mindmap\n  root\n    a\n".to_owned());
     assert_eq!(
         mindmap.read_only(),

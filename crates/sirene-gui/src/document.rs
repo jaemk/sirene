@@ -256,10 +256,9 @@ impl Document {
             Kind::Class => Some(CLASS_EDITS),
             Kind::Er => Some(ER_EDITS),
             // Answered above.
-            Kind::Pie | Kind::Quadrant | Kind::Journey => None,
+            Kind::Pie | Kind::Quadrant | Kind::Journey | Kind::Gantt => None,
             Kind::Git => Some("drawing edits are not supported for git graphs yet"),
             Kind::Timeline => Some(TIMELINE_EDITS),
-            Kind::Gantt => Some("drawing edits are not supported for gantt charts yet"),
             Kind::Mindmap => Some(MINDMAP_EDITS),
             Kind::XyChart => Some("drawing edits are not supported for XY charts yet"),
             Kind::Kanban => Some("drawing edits are not supported for kanban boards yet"),

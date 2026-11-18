@@ -1,5 +1,6 @@
 //! Mermaid gantt charts (MGANTT-*): tasks on a time axis, grouped in sections.
 
+pub mod edit;
 mod lower;
 mod parser;
 pub mod time;
@@ -271,14 +272,7 @@ impl Parse {
     /// Lowers the tree to a [`Gantt`], read now (UTC). On `wasm32-unknown-unknown`, which has
     /// no clock, it is read at the Unix epoch; use [`Parse::lower_at`] there (WORKSP-11).
     pub fn lower(&self) -> (Gantt, Vec<Diagnostic>) {
-        let now = if cfg!(all(target_family = "wasm", target_os = "unknown")) {
-            0
-        } else {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |d| d.as_millis() as i64)
-        };
-        self.lower_at(now)
+        self.lower_at(now())
     }
 
     /// Lowers the tree to a [`Gantt`] read at `now`, which fills date fields a format lacks and
@@ -296,6 +290,17 @@ impl Parse {
             diagnostics.len()
         );
         (gantt, diagnostics)
+    }
+}
+
+/// The time now (UTC), or the Unix epoch on `wasm32-unknown-unknown`, which has no clock.
+pub(crate) fn now() -> Time {
+    if cfg!(all(target_family = "wasm", target_os = "unknown")) {
+        0
+    } else {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis() as i64)
     }
 }
 

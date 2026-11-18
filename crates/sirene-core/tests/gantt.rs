@@ -75,7 +75,15 @@ fn snapshots() {
             for theme in [Theme::LIGHT, Theme::DARK] {
                 let s = lowered.diagram.scene(&Approx, &theme).unwrap();
                 assert!(!s.elements.is_empty(), "{name}");
-                assert!(s.elements.iter().all(|e| e.owner == Owner::Diagram));
+                // Each task's elements are owned by it (WYSIWY-28).
+                let Diagram::Gantt(g) = &lowered.diagram else {
+                    panic!("{name} is not a gantt chart");
+                };
+                let tasks = g.tasks().count();
+                assert!(s.elements.iter().all(|e| match e.owner {
+                    Owner::Node(i) => i < tasks,
+                    o => o == Owner::Diagram,
+                }));
             }
         }
     }
