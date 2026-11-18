@@ -21,9 +21,6 @@ pub const MINDMAP_EDITS: &str = "mindmaps take only adding, renaming, and deleti
 pub const TIMELINE_EDITS: &str =
     "timelines take only adding, renaming, and deleting time periods and events";
 
-/// Why a pie chart refuses the other drawing edits (WYSIWY-28).
-pub const PIE_EDITS: &str = "pie charts take only adding, renaming, and deleting slices";
-
 /// Why a sequence diagram refuses the other drawing edits (WYSIWY-21).
 pub const SEQUENCE_EDITS: &str = "sequence diagrams take only adding, renaming, moving, and deleting participants and messages, and setting message arrows";
 
@@ -245,7 +242,12 @@ impl Document {
 
     /// Why drawing edits are off for this diagram's type, when they are (LANGS-5).
     pub fn read_only(&self) -> Option<&'static str> {
-        match Kind::of_lang(&self.source, self.lang()) {
+        let kind = Kind::of_lang(&self.source, self.lang());
+        // Lists of items (WYSIWY-28).
+        if let Some(list) = Items::of(kind) {
+            return Some(list.refusal());
+        }
+        match kind {
             Kind::Flowchart => None,
             // Edited through `sequence` instead (WYSIWY-21).
             Kind::Sequence => Some(SEQUENCE_EDITS),
@@ -253,13 +255,13 @@ impl Document {
             Kind::State => Some(STATE_EDITS),
             Kind::Class => Some(CLASS_EDITS),
             Kind::Er => Some(ER_EDITS),
+            // Answered above.
+            Kind::Pie | Kind::Quadrant => None,
             Kind::Git => Some("drawing edits are not supported for git graphs yet"),
             Kind::Timeline => Some(TIMELINE_EDITS),
-            Kind::Pie => Some(PIE_EDITS),
             Kind::Gantt => Some("drawing edits are not supported for gantt charts yet"),
             Kind::Mindmap => Some(MINDMAP_EDITS),
             Kind::Journey => Some("drawing edits are not supported for user journeys yet"),
-            Kind::Quadrant => Some("drawing edits are not supported for quadrant charts yet"),
             Kind::XyChart => Some("drawing edits are not supported for XY charts yet"),
             Kind::Kanban => Some("drawing edits are not supported for kanban boards yet"),
             Kind::Packet => Some("drawing edits are not supported for packet diagrams yet"),

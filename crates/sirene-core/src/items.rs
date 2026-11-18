@@ -7,7 +7,6 @@ use std::ops::Range;
 use crate::diagram::Kind;
 use crate::edits::{combine, indent, newline, span, statement_span};
 use crate::flowchart::edit::TextEdit;
-use crate::pie;
 use crate::syntax::SyntaxNode;
 
 /// A diagram whose drawing edits are a list of items.
@@ -15,6 +14,24 @@ use crate::syntax::SyntaxNode;
 pub enum Items {
     /// Pie chart slices.
     Pie,
+    /// Quadrant chart points.
+    Quadrant,
+}
+
+/// Runs `$e` with `$m` naming the edit module of `$items`.
+macro_rules! with_module {
+    ($items:expr, $m:ident => $e:expr) => {
+        match $items {
+            Items::Pie => {
+                use crate::pie::edit as $m;
+                $e
+            }
+            Items::Quadrant => {
+                use crate::quadrant::edit as $m;
+                $e
+            }
+        }
+    };
 }
 
 impl Items {
@@ -22,6 +39,7 @@ impl Items {
     pub fn of(kind: Kind) -> Option<Items> {
         match kind {
             Kind::Pie => Some(Items::Pie),
+            Kind::Quadrant => Some(Items::Quadrant),
             _ => None,
         }
     }
@@ -30,6 +48,7 @@ impl Items {
     pub fn new_label(self) -> &'static str {
         match self {
             Items::Pie => "New slice",
+            Items::Quadrant => "New point",
         }
     }
 
@@ -37,51 +56,53 @@ impl Items {
     pub fn add_labels(self) -> (&'static str, &'static str) {
         match self {
             Items::Pie => ("Add Slice", "Add Slice After"),
+            Items::Quadrant => ("Add Point", "Add Point After"),
         }
+    }
+
+    /// Why the diagram refuses the other drawing edits.
+    pub fn refusal(self) -> &'static str {
+        match self {
+            Items::Pie => "pie charts take only adding, renaming, and deleting slices",
+            Items::Quadrant => "quadrant charts take only adding, renaming, and deleting points",
+        }
+    }
+
+    /// The labels of the items in `src`, as the label field shows them.
+    pub fn labels(self, src: &str) -> Vec<String> {
+        with_module!(self, m => m::labels(src))
     }
 
     /// The number of items in `src`.
     pub fn count(self, src: &str) -> usize {
-        match self {
-            Items::Pie => pie::edit::labels(src).len(),
-        }
+        self.labels(src).len()
     }
 
-    /// The label of item `i`, as the label field shows it.
+    /// The label of item `i`.
     pub fn label(self, src: &str, i: usize) -> Option<String> {
-        match self {
-            Items::Pie => pie::edit::labels(src).into_iter().nth(i),
-        }
+        self.labels(src).into_iter().nth(i)
     }
 
     /// The source of item `i`.
     pub fn range(self, src: &str, i: usize) -> Option<Range<usize>> {
-        match self {
-            Items::Pie => pie::edit::range(src, i),
-        }
+        with_module!(self, m => m::range(src, i))
     }
 
     /// Shows item `i` as `text`. `None` when there is no such item, `text` can't be written, or
     /// nothing changes.
     pub fn set_label(self, src: &str, i: usize, text: &str) -> Option<TextEdit> {
-        match self {
-            Items::Pie => pie::edit::set_label(src, i, text),
-        }
+        with_module!(self, m => m::set_label(src, i, text))
     }
 
     /// Adds an item shown as `text` after item `after`, or at the end. Returns its index and the
     /// edit; `None` when `text` can't be written or there is no such item.
     pub fn add(self, src: &str, after: Option<usize>, text: &str) -> Option<(usize, TextEdit)> {
-        match self {
-            Items::Pie => pie::edit::add(src, after, text),
-        }
+        with_module!(self, m => m::add(src, after, text))
     }
 
     /// Removes items `items`. `None` when nothing is removed.
     pub fn delete(self, src: &str, items: &[usize]) -> Option<TextEdit> {
-        match self {
-            Items::Pie => pie::edit::delete(src, items),
-        }
+        with_module!(self, m => m::delete(src, items))
     }
 }
 

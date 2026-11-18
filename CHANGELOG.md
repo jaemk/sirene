@@ -45,6 +45,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `timeline::edit`.
 - Pie charts take drawing edits: adding, renaming, and deleting slices, through `pie::edit` and
   `items::Items`.
+- Quadrant charts take drawing edits: adding, renaming, and deleting points, through
+  `quadrant::edit`.
 - `sirene ascii --markdown` and `sirene check --markdown` read stdin, or files of any name, as
   Markdown.
 - `sirene check --json` prints the diagnostics to stdout as one JSON array.

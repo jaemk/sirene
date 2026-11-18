@@ -1,5 +1,6 @@
 //! Mermaid quadrant charts (MQUAD-*): points on two axes split into four quadrants.
 
+pub mod edit;
 mod lower;
 mod parser;
 

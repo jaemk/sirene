@@ -326,9 +326,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     let quadrant = Document::from_source(None, "quadrantChart\n  a: [0.5, 0.5]\n".to_owned());
     assert_eq!(
         quadrant.read_only(),
-        Some("drawing edits are not supported for quadrant charts yet")
+        Some("quadrant charts take only adding, renaming, and deleting points")
     );
     assert!(quadrant.chart.nodes.is_empty() && quadrant.other.is_some());
+    assert!(quadrant.items().is_some());
     let xy = Document::from_source(None, "xychart-beta\n  bar [1, 2]\n".to_owned());
     assert_eq!(
         xy.read_only(),

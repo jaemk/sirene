@@ -62,4 +62,5 @@ tests.
 
 Frontmatter `config` for `quadrantChart` (sizes, paddings, font sizes, `xAxisPosition`,
 `yAxisPosition`) and theme variables are ignored: the x-axis labels are always below and the
-y-axis labels always left, horizontal. Drawing edits are read-only (LANGS-5).
+y-axis labels always left, horizontal. Drawing edits are adding, renaming, and deleting points
+(WYSIWY-28).

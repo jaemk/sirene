@@ -501,6 +501,9 @@ a node by its index in the lowered model (`Item::Node("0")`, `"1"`, ...) and dra
 - pie charts (`pie::edit`): slices, each its wedge, percentage, and legend row. A label is
   quoted with `"`, or `'` when it holds `"`; one with both quotes, a line break, or another
   slice's label is refused. A new slice takes the mean value (at least 1), so that it shows.
+- quadrant charts (`quadrant::edit`): points, each its circle and name. A name is written as
+  is, or quoted when that does not read back (e.g. it holds `: `); a line break is refused. A
+  new point is `NAME: [0.5, 0.5]`.
 
 For every list:
 
@@ -515,4 +518,5 @@ For every list:
   holds Add Slice (Add Slice After with one item selected), Rename, Delete, Select All, and Fit
   Window.
 
-Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/pie/edit.rs`.
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/pie/edit.rs`,
+`crates/sirene-core/src/quadrant/edit.rs`.

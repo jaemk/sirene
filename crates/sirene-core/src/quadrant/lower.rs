@@ -11,6 +11,15 @@ use crate::syntax::{SyntaxNode, SyntaxToken};
 use rowan::TextRange;
 
 pub(crate) fn lower(root: &SyntaxNode) -> (QuadrantChart, Vec<Diagnostic>) {
+    let (q, diagnostics, _) = lower_statements(root);
+    (q, diagnostics)
+}
+
+/// Lowers `root`, with the statement of each point.
+pub(crate) fn lower_statements(
+    root: &SyntaxNode,
+) -> (QuadrantChart, Vec<Diagnostic>, Vec<SyntaxNode>) {
+    let mut statements = Vec::new();
     let mut q = QuadrantChart::default();
     let mut diagnostics = Vec::new();
     let mut title = None;
@@ -114,9 +123,10 @@ pub(crate) fn lower(root: &SyntaxNode) -> (QuadrantChart, Vec<Diagnostic>) {
             apply(&mut p.style, &styles, t.text_range(), &mut diagnostics);
         }
         q.points.push(p);
+        statements.push(stmt);
     }
     q.title = title;
-    (q, diagnostics)
+    (q, diagnostics, statements)
 }
 
 /// Later valid declarations replace only the properties they set.

@@ -250,16 +250,27 @@ pub fn quadrant(chart: &QuadrantChart, metrics: &impl TextMetrics, theme: &Theme
         let c = at(Pt::new(-GAP - w / 2.0, (1.0 - *f as f32) * side));
         text(&mut p, t, c, theme.text, fs);
     }
-    for (pt, &(c, r, _)) in chart.points.iter().zip(&points) {
+    // Point `i` and its name are owned by `Owner::Node(i)` (WYSIWY-28).
+    for (i, (pt, &(c, r, _))) in chart.points.iter().zip(&points).enumerate() {
         let fill = pt.style.color.unwrap_or(theme.node_stroke);
         let stroke = pt.style.stroke_width.map(|width| Stroke {
             width,
             color: pt.style.stroke_color.unwrap_or(fill),
             dash: None,
         });
+        let owner = Owner::Node(i);
         p.path(owner, shapes::ellipse(at(c), r, r), Some(fill), stroke);
         let name_at = at(Pt::new(c.x, c.y + r + NAME_GAP + lh / 2.0));
-        text(&mut p, &pt.name, name_at, theme.text, small);
+        p.elements.push(Element {
+            owner,
+            primitive: Primitive::Text {
+                text: pt.name.clone(),
+                center: name_at,
+                size: small,
+                color: theme.text,
+                style: TextStyle::default(),
+            },
+        });
     }
     Scene {
         width,
