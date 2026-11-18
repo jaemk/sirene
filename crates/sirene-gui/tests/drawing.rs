@@ -1032,6 +1032,35 @@ fn gantt_charts(cx: &mut TestAppContext) {
     );
 }
 
+/// WYSIWY-28: kanban columns and cards are selected by index, renamed, added, and deleted.
+#[gpui::test]
+fn kanban_boards(cx: &mut TestAppContext) {
+    let src = "kanban\n  todo[Todo]\n    a[Write]\n  done[Done]\n    b[Ship]\n";
+    let (viewer, cx) = open_src(cx, src);
+    let ship = center(&viewer, cx, &node("3"));
+    click(cx, ship, Modifiers::default());
+    assert_eq!(selected_source(&viewer, cx), "b[Ship]");
+    double_click(cx, ship);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("Ship"));
+    cx.simulate_input("Release");
+    keys(cx, "enter");
+    viewer.update(cx, |v, cx| v.select(vec![node("2")], cx));
+    cx.dispatch_action(AddNode);
+    assert_eq!(selection(&viewer, cx), [node("3")]);
+    cx.simulate_input("Review");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "kanban\n  todo[Todo]\n    a[Write]\n  done[Done]\n    Review\n    b[\"Release\"]\n"
+    );
+    viewer.update(cx, |v, cx| v.select(vec![node("0")], cx));
+    cx.dispatch_action(Delete);
+    assert_eq!(
+        source(&viewer, cx),
+        "kanban\n  done[Done]\n    Review\n    b[\"Release\"]\n"
+    );
+}
+
 #[gpui::test]
 fn states_move_into_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";

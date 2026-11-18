@@ -20,6 +20,8 @@ pub enum Items {
     Journey,
     /// Gantt chart tasks.
     Gantt,
+    /// Kanban board columns and cards.
+    Kanban,
 }
 
 /// Runs `$e` with `$m` naming the edit module of `$items`.
@@ -42,6 +44,10 @@ macro_rules! with_module {
                 use crate::gantt::edit as $m;
                 $e
             }
+            Items::Kanban => {
+                use crate::kanban::edit as $m;
+                $e
+            }
         }
     };
 }
@@ -54,6 +60,7 @@ impl Items {
             Kind::Quadrant => Some(Items::Quadrant),
             Kind::Journey => Some(Items::Journey),
             Kind::Gantt => Some(Items::Gantt),
+            Kind::Kanban => Some(Items::Kanban),
             _ => None,
         }
     }
@@ -64,6 +71,7 @@ impl Items {
             Items::Pie => "New slice",
             Items::Quadrant => "New point",
             Items::Journey | Items::Gantt => "New task",
+            Items::Kanban => "New card",
         }
     }
 
@@ -73,6 +81,7 @@ impl Items {
             Items::Pie => ("Add Slice", "Add Slice After"),
             Items::Quadrant => ("Add Point", "Add Point After"),
             Items::Journey | Items::Gantt => ("Add Task", "Add Task After"),
+            Items::Kanban => ("Add Card", "Add Card After"),
         }
     }
 
@@ -83,6 +92,9 @@ impl Items {
             Items::Quadrant => "quadrant charts take only adding, renaming, and deleting points",
             Items::Journey => "user journeys take only adding, renaming, and deleting tasks",
             Items::Gantt => "gantt charts take only adding, renaming, and deleting tasks",
+            Items::Kanban => {
+                "kanban boards take only adding, renaming, and deleting cards and columns"
+            }
         }
     }
 

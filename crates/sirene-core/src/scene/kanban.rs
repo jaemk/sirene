@@ -143,13 +143,12 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
         top + col_h + MARGIN
     };
 
-    let owner = Owner::Diagram;
     let mut p = Painter {
         theme,
         metrics,
         elements: Vec::new(),
     };
-    let text = |p: &mut Painter, s: &str, center: Pt, size: f32| {
+    let text = |p: &mut Painter, owner: Owner, s: &str, center: Pt, size: f32| {
         p.elements.push(Element {
             owner,
             primitive: Primitive::Text {
@@ -164,6 +163,7 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
     if let Some(t) = title {
         text(
             &mut p,
+            Owner::Diagram,
             t,
             Pt::new(width / 2.0, MARGIN + lh / 2.0),
             title_size,
@@ -174,7 +174,11 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
         color: theme.node_stroke,
         dash: None,
     });
+    // Every column and card, in order, is owned by `Owner::Node` of its place (WYSIWY-28).
+    let mut n = 0;
     for (i, (lines, column)) in headers.iter().zip(&cards).enumerate() {
+        let owner = Owner::Node(n);
+        n += 1;
         let x = left + i as f32 * (COL_W + COL_GAP);
         let col = BoxF {
             x,
@@ -196,6 +200,8 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
         );
         let mut y = top + header_h;
         for c in column {
+            let owner = Owner::Node(n);
+            n += 1;
             let b = BoxF {
                 x: x + COL_PAD,
                 y,
@@ -233,12 +239,19 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
             let meta_y = b.y + CARD_PAD + th + 4.0 + small_lh / 2.0;
             if let Some(t) = c.ticket.as_deref() {
                 let w = metrics.width(t, small);
-                text(&mut p, t, Pt::new(b.x + CARD_PAD + w / 2.0, meta_y), small);
+                text(
+                    &mut p,
+                    owner,
+                    t,
+                    Pt::new(b.x + CARD_PAD + w / 2.0, meta_y),
+                    small,
+                );
             }
             if let Some(a) = c.assigned.as_deref() {
                 let w = metrics.width(a, small);
                 text(
                     &mut p,
+                    owner,
                     a,
                     Pt::new(b.right() - CARD_PAD - w / 2.0, meta_y),
                     small,

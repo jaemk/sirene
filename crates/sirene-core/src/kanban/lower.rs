@@ -15,6 +15,14 @@ enum Last {
 }
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>) {
+    let (board, diagnostics, _) = lower_statements(root);
+    (board, diagnostics)
+}
+
+/// Lowers `root`, with the statement of each column and card in order: a column, then its
+/// cards.
+pub(crate) fn lower_statements(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>, Vec<SyntaxNode>) {
+    let mut statements = Vec::new();
     let src = root.to_string();
     let mut board = Kanban::default();
     let mut diagnostics = Vec::new();
@@ -58,6 +66,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>) {
                         }
                     }
                     board.columns.push(column);
+                    statements.push(stmt.clone());
                     last = Some(Last::Column(board.columns.len() - 1));
                 } else if level > at {
                     let mut card = Card {
@@ -95,6 +104,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>) {
                     }
                     let c = board.columns.len() - 1;
                     board.columns[c].cards.push(card);
+                    statements.push(stmt.clone());
                     last = Some(Last::Card(c, board.columns[c].cards.len() - 1));
                 } else {
                     diagnostics.push(Diagnostic::new(
@@ -148,7 +158,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>) {
             _ => {}
         }
     }
-    (board, diagnostics)
+    (board, diagnostics, statements)
 }
 
 fn icon_warning(range: rowan::TextRange, name: &str) -> Diagnostic {

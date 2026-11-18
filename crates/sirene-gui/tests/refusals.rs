@@ -341,9 +341,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     let board = Document::from_source(None, "kanban\n  todo\n    a[Card]\n".to_owned());
     assert_eq!(
         board.read_only(),
-        Some("drawing edits are not supported for kanban boards yet")
+        Some("kanban boards take only adding, renaming, and deleting cards and columns")
     );
     assert!(board.chart.nodes.is_empty() && board.other.is_some());
+    assert!(board.items().is_some());
     let packet = Document::from_source(None, "packet\n  0-7: \"a\"\n".to_owned());
     assert_eq!(
         packet.read_only(),

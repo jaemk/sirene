@@ -511,6 +511,10 @@ a node by its index in the lowered model (`Item::Node("0")`, `"1"`, ...) and dra
   or milestone, name, and `vert` line. A name with a line break, `:`, `#`, or `;` is refused.
   A new task is `NAME : 1d`, after the task before it (today's date when the chart has none).
   Deleting a task another one is `after` is refused, since that one would no longer be drawn.
+- kanban boards (`kanban::edit`): every column and card, in order (a column, then its cards),
+  each its box and text. Labels are written as mindmap labels are (WYSIWY-26). A new item is a
+  card: after a card, first in a selected column, or last in the last column; in an empty board,
+  a column. Deleting a column deletes its cards.
 
 For every list:
 
@@ -527,4 +531,4 @@ For every list:
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/pie/edit.rs`,
 `crates/sirene-core/src/quadrant/edit.rs`, `crates/sirene-core/src/journey/edit.rs`,
-`crates/sirene-core/src/gantt/edit.rs`.
+`crates/sirene-core/src/gantt/edit.rs`, `crates/sirene-core/src/kanban/edit.rs`.

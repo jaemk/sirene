@@ -41,7 +41,9 @@ background color with a node-stroke border, its label wrapped and aligned left, 
 ticket at the left and the assignee at the right in a smaller size, each cut short with `...`
 to fit (the ticket to half the width when there is an assignee). A card with a priority has a
 colored stripe down its left edge: red for very high, orange for high, blue for low, light blue
-for very low. The title is centered above. Every element is owned by the diagram. Tests:
+for very low. The title is centered above. Each column's box and header, and each card's box,
+stripe, and text, are owned by `Owner::Node` of its place in order, a column then its cards
+(WYSIWY-28); the title by the diagram. Tests:
 `drawing`.
 
 ## MKAN-4 ASCII
@@ -56,4 +58,5 @@ Tests: `snapshots`, `ascii_charset_snapshots`, and the renderer's unit tests.
 ## MKAN-5 Not drawn
 
 Icons, classes (Mermaid applies them only through CSS), and ticket links (the drawing has no
-links) are kept in the model but not drawn. Drawing edits are read-only (LANGS-5).
+links) are kept in the model but not drawn. Drawing edits are adding, renaming, and
+deleting columns and cards (WYSIWY-28).

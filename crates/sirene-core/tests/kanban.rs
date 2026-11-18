@@ -74,7 +74,15 @@ fn snapshots() {
             for theme in [Theme::LIGHT, Theme::DARK] {
                 let s = lowered.diagram.scene(&Approx, &theme).unwrap();
                 assert!(!s.elements.is_empty(), "{name}");
-                assert!(s.elements.iter().all(|e| e.owner == Owner::Diagram));
+                // Each column's and card's elements are owned by it (WYSIWY-28).
+                let Diagram::Kanban(k) = &lowered.diagram else {
+                    panic!("{name} is not a kanban board");
+                };
+                let items: usize = k.columns.iter().map(|c| 1 + c.cards.len()).sum();
+                assert!(s.elements.iter().all(|e| match e.owner {
+                    Owner::Node(i) => i < items,
+                    o => o == Owner::Diagram,
+                }));
             }
         }
     }

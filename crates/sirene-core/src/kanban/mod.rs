@@ -1,5 +1,6 @@
 //! Mermaid kanban boards (MKAN-*): columns of cards, parsed with the mindmap grammar.
 
+pub mod edit;
 mod lower;
 
 use rowan::GreenNode;

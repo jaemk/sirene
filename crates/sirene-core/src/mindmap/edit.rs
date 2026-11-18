@@ -59,7 +59,7 @@ fn text_source(text: &str) -> String {
 
 /// Nodes for `text`, to try in order: the text alone when it may read back as written, then
 /// quoted in `[...]`.
-fn node_sources(text: &str) -> Vec<String> {
+pub(crate) fn node_sources(text: &str) -> Vec<String> {
     let s = text_source(text);
     let bare = !s.contains(['(', ')', '[', ']', '{', '}'])
         && !s.contains("@{")
@@ -142,6 +142,24 @@ pub fn add_node(src: &str, parent: Option<usize>, text: &str) -> Option<(usize, 
     })
 }
 
+/// Where the label of node statement `stmt` is written, and the sources for `text` to try there
+/// in order: quoted inside a shape, else the bare text, then a quoted `[...]`.
+pub(crate) fn label_sources(
+    stmt: &SyntaxNode,
+    text: &str,
+) -> Option<(std::ops::Range<usize>, Vec<String>)> {
+    Some(match stmt.children().find(|n| n.kind() == SHAPE) {
+        Some(shape) => {
+            let content = [MD_STRING, STRING, TEXT]
+                .into_iter()
+                .find_map(|k| token(&shape, k))?;
+            let quoted = format!("\"{}\"", text_source(text));
+            (span(content.text_range()), vec![quoted])
+        }
+        None => (span(token(stmt, IDENT)?.text_range()), node_sources(text)),
+    })
+}
+
 /// Shows node `i` as `text`, keeping its shape and id. `None` when there is no such node, the
 /// text is empty, or nothing changes.
 pub fn set_label(src: &str, i: usize, text: &str) -> Option<TextEdit> {
@@ -154,16 +172,7 @@ pub fn set_label(src: &str, i: usize, text: &str) -> Option<TextEdit> {
     if doc.map.nodes[i].label.text == want {
         return None;
     }
-    let (range, sources) = match stmt.children().find(|n| n.kind() == SHAPE) {
-        Some(shape) => {
-            let content = [MD_STRING, STRING, TEXT]
-                .into_iter()
-                .find_map(|k| token(&shape, k))?;
-            let quoted = format!("\"{}\"", text_source(text));
-            (span(content.text_range()), vec![quoted])
-        }
-        None => (span(token(stmt, IDENT)?.text_range()), node_sources(text)),
-    };
+    let (range, sources) = label_sources(stmt, text)?;
     let count = doc.map.nodes.len();
     sources.into_iter().find_map(|text| {
         let edit = TextEdit {
