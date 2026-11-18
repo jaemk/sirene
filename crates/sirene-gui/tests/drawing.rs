@@ -912,6 +912,39 @@ fn timelines(cx: &mut TestAppContext) {
     );
 }
 
+/// WYSIWY-28: pie slices are selected by index, renamed, added, and deleted.
+#[gpui::test]
+fn pie_charts(cx: &mut TestAppContext) {
+    let src = "pie\n    \"Dogs\" : 10\n    \"Cats\" : 30\n";
+    let (viewer, cx) = open_src(cx, src);
+    // Double-click on a slice renames it. (The larger slice's wedge covers the middle of its
+    // wedge and legend row together.)
+    let cats = center(&viewer, cx, &node("1"));
+    click(cx, cats, Modifiers::default());
+    assert_eq!(selected_source(&viewer, cx), "\"Cats\" : 30");
+    double_click(cx, cats);
+    assert_eq!(field(&viewer, cx).as_deref(), Some("Cats"));
+    cx.simulate_input("Mice");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "pie\n    \"Dogs\" : 10\n    \"Mice\" : 30\n"
+    );
+    // Add Node with a slice selected adds one after it, selected with its label open.
+    viewer.update(cx, |v, cx| v.select(vec![node("0")], cx));
+    cx.dispatch_action(AddNode);
+    assert_eq!(selection(&viewer, cx), [node("1")]);
+    cx.simulate_input("Fish");
+    keys(cx, "enter");
+    assert_eq!(
+        source(&viewer, cx),
+        "pie\n    \"Dogs\" : 10\n    \"Fish\" : 20\n    \"Mice\" : 30\n"
+    );
+    viewer.update(cx, |v, cx| v.select(vec![node("0"), node("2")], cx));
+    cx.dispatch_action(Delete);
+    assert_eq!(source(&viewer, cx), "pie\n    \"Fish\" : 20\n");
+}
+
 #[gpui::test]
 fn states_move_into_composites(cx: &mut TestAppContext) {
     let src = "stateDiagram-v2\n    a : desc\n    state W {\n        b\n    }\n    a --> b\n";

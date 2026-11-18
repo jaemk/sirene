@@ -57,4 +57,4 @@ Tests: `snapshots`, `ascii_charset_snapshots`.
 
 Icons, class styles (Mermaid applies them only through CSS), Mermaid's `cose-bilkent` layout,
 and frontmatter `config` for `mindmap` (`padding`, `maxNodeWidth`) are not used. Drawing edits are
-read-only (LANGS-5).
+adding, renaming, and deleting nodes (WYSIWY-26).

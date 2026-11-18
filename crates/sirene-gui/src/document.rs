@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use sirene_core::diagram::{self, Diagram, Kind, Lang};
 use sirene_core::flowchart::Flowchart;
+use sirene_core::items::Items;
 use sirene_core::markdown::{Block, append_block, is_markdown, mermaid_blocks};
 use sirene_core::mindmap::Mindmap;
 use sirene_core::scene::{Scene, TextMetrics, Theme};
@@ -19,6 +20,9 @@ pub const MINDMAP_EDITS: &str = "mindmaps take only adding, renaming, and deleti
 /// Why a timeline refuses the other drawing edits (WYSIWY-27).
 pub const TIMELINE_EDITS: &str =
     "timelines take only adding, renaming, and deleting time periods and events";
+
+/// Why a pie chart refuses the other drawing edits (WYSIWY-28).
+pub const PIE_EDITS: &str = "pie charts take only adding, renaming, and deleting slices";
 
 /// Why a sequence diagram refuses the other drawing edits (WYSIWY-21).
 pub const SEQUENCE_EDITS: &str = "sequence diagrams take only adding, renaming, moving, and deleting participants and messages, and setting message arrows";
@@ -251,7 +255,7 @@ impl Document {
             Kind::Er => Some(ER_EDITS),
             Kind::Git => Some("drawing edits are not supported for git graphs yet"),
             Kind::Timeline => Some(TIMELINE_EDITS),
-            Kind::Pie => Some("drawing edits are not supported for pie charts yet"),
+            Kind::Pie => Some(PIE_EDITS),
             Kind::Gantt => Some("drawing edits are not supported for gantt charts yet"),
             Kind::Mindmap => Some(MINDMAP_EDITS),
             Kind::Journey => Some("drawing edits are not supported for user journeys yet"),
@@ -326,11 +330,21 @@ impl Document {
         }
     }
 
+    /// The list of items the document holds, when it is drawn from `other` and its drawing
+    /// edits are adding, renaming, and deleting items (WYSIWY-28).
+    pub fn items(&self) -> Option<Items> {
+        self.other.as_ref()?;
+        Items::of(Kind::of_lang(&self.source, self.lang()))
+    }
+
     /// Whether the document holds a diagram drawn from `other` that takes its own drawing
-    /// edits: a sequence diagram (WYSIWY-21), a mindmap (WYSIWY-26), or a timeline
-    /// (WYSIWY-27).
+    /// edits: a sequence diagram (WYSIWY-21), a mindmap (WYSIWY-26), a timeline (WYSIWY-27), or
+    /// a list of items (WYSIWY-28).
     pub fn scene_edits(&self) -> bool {
-        self.sequence().is_some() || self.mindmap().is_some() || self.timeline().is_some()
+        self.sequence().is_some()
+            || self.mindmap().is_some()
+            || self.timeline().is_some()
+            || self.items().is_some()
     }
 
     /// The kind of graph the document holds when it is drawn from `chart` and takes its own

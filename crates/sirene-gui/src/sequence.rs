@@ -2,12 +2,14 @@
 //! id and messages `Item::Edge` by their place among the diagram's messages. Mindmaps
 //! (WYSIWY-26) and timelines (WYSIWY-27), also drawn from `Document::other`, take the same
 //! paths: mindmap nodes and timeline periods are `Item::Node` by index, and timeline events
-//! `Item::Edge` by their place among every period's events.
+//! `Item::Edge` by their place among every period's events. So do lists of items (WYSIWY-28),
+//! each item an `Item::Node` by index.
 
 use std::ops::Range;
 
 use gpui::{Context, Window};
 use sirene_core::flowchart::edit::TextEdit;
+use sirene_core::items::Items;
 use sirene_core::mindmap;
 use sirene_core::scene::Owner;
 use sirene_core::sequence::edit;
@@ -70,8 +72,28 @@ impl Viewer {
         }
     }
 
-    /// The item scene owner `owner` draws, on a sequence diagram, a mindmap, or a timeline.
+    /// The list and index of the list item `item` names (WYSIWY-28).
+    fn list_item(&self, item: &Item) -> Option<(Items, usize)> {
+        let list = self.doc.items()?;
+        match item {
+            Item::Node(id) => (id.parse().ok())
+                .filter(|&i| i < list.count(&self.doc.source))
+                .map(|i| (list, i)),
+            Item::Edge(_) => None,
+        }
+    }
+
+    /// The item scene owner `owner` draws, on a sequence diagram, a mindmap, a timeline, or a
+    /// list of items.
     pub(crate) fn sequence_item(&self, owner: Owner) -> Option<Item> {
+        if let Some(list) = self.doc.items() {
+            return match owner {
+                Owner::Node(i) if i < list.count(&self.doc.source) => {
+                    Some(Item::Node(i.to_string()))
+                }
+                _ => None,
+            };
+        }
         if let Some((periods, events)) = self.timeline_parts() {
             return match owner {
                 Owner::Node(i) if i < periods.len() => Some(Item::Node(i.to_string())),
@@ -95,6 +117,9 @@ impl Viewer {
 
     /// The scene owner of `item`, while it exists, on a sequence diagram.
     pub(crate) fn sequence_owner(&self, item: &Item) -> Option<Owner> {
+        if self.doc.items().is_some() {
+            return self.list_item(item).map(|(_, i)| Owner::Node(i));
+        }
         if let Some((_, events)) = self.timeline_parts() {
             return match item {
                 Item::Node(_) => self.timeline_period(item).map(Owner::Node),
@@ -118,6 +143,10 @@ impl Viewer {
     /// The source of `item`, on a sequence diagram.
     pub(crate) fn sequence_range(&self, item: &Item) -> Option<Range<usize>> {
         let src = &self.doc.source;
+        if self.doc.items().is_some() {
+            let (list, i) = self.list_item(item)?;
+            return list.range(src, i);
+        }
         if self.doc.timeline().is_some() {
             return match item {
                 Item::Node(_) => timeline::edit::period_range(src, self.timeline_period(item)?),
@@ -135,6 +164,10 @@ impl Viewer {
 
     /// The text the label field starts with for `item`, on a sequence diagram.
     pub(crate) fn sequence_label(&self, item: &Item) -> Option<String> {
+        if self.doc.items().is_some() {
+            let (list, i) = self.list_item(item)?;
+            return list.label(&self.doc.source, i);
+        }
         if let Some((periods, events)) = self.timeline_parts() {
             let lines = match item {
                 Item::Node(_) => periods[self.timeline_period(item)?],
@@ -156,6 +189,10 @@ impl Viewer {
     /// The edit giving `item` the label `text`, on a sequence diagram.
     pub(crate) fn sequence_rename(&self, item: &Item, text: &str) -> Option<TextEdit> {
         let src = &self.doc.source;
+        if self.doc.items().is_some() {
+            let (list, i) = self.list_item(item)?;
+            return list.set_label(src, i, text);
+        }
         if self.doc.timeline().is_some() {
             return match item {
                 Item::Node(_) => {
@@ -182,6 +219,24 @@ impl Viewer {
         cx: &mut Context<Self>,
     ) {
         let src = self.doc.source.clone();
+        // On a list of items: after `from` or the one selected item, or at the end.
+        if let Some(list) = self.doc.items() {
+            let selected = match self.selection.as_slice() {
+                [item] => self.list_item(item),
+                _ => None,
+            };
+            let after = (from.and_then(|f| self.list_item(&Item::Node(f))))
+                .or(selected)
+                .map(|(_, i)| i);
+            let Some((i, e)) = list.add(&src, after, list.new_label()) else {
+                return;
+            };
+            self.record(e, window, cx);
+            let item = Item::Node(i.to_string());
+            self.select(vec![item.clone()], cx);
+            self.edit_label(item, window, cx);
+            return;
+        }
         // On a timeline: an event of `from` or the one selected period, or a period at the end.
         if self.doc.timeline().is_some() {
             let selected = match self.selection.as_slice() {
@@ -265,6 +320,17 @@ impl Viewer {
 
     /// Deletes the selected participants and messages.
     pub(crate) fn sequence_delete(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(list) = self.doc.items() {
+            let items: Vec<usize> = (self.selection.iter())
+                .filter_map(|i| self.list_item(i).map(|(_, i)| i))
+                .collect();
+            let e = list.delete(&self.doc.source, &items);
+            self.select(Vec::new(), cx);
+            if let Some(e) = e {
+                self.record(e, window, cx);
+            }
+            return;
+        }
         if self.doc.timeline().is_some() {
             let periods: Vec<usize> = (self.selection.iter())
                 .filter_map(|i| self.timeline_period(i))

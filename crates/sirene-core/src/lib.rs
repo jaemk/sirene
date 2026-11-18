@@ -29,6 +29,7 @@ pub mod gantt;
 pub mod git;
 pub mod info;
 pub mod ishikawa;
+pub mod items;
 pub mod journey;
 pub mod kanban;
 pub mod layout;

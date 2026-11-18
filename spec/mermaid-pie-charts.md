@@ -43,4 +43,5 @@ blocks (`▏` to `▉`) in Unicode and `#` in ASCII. The title is centered above
 ## MPIE-5 Not drawn
 
 Frontmatter `config` for `pie` (`textPosition`) and theme variables (`pie1` to `pie12`,
-`pieStrokeColor`, and the rest) are ignored. Drawing edits are read-only (LANGS-5).
+`pieStrokeColor`, and the rest) are ignored. Drawing edits are adding, renaming, and deleting
+slices (WYSIWY-28).

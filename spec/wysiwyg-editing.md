@@ -490,3 +490,29 @@ as edges by their place among every period's events, in order.
   Fit Window.
 
 Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/timeline/edit.rs`.
+
+## WYSIWY-28 Lists of items
+
+A diagram that is a list of labeled items takes drawing edits through
+`sirene_core::items::Items`, which calls the diagram's own edit module; each item is selected as
+a node by its index in the lowered model (`Item::Node("0")`, `"1"`, ...) and drawn as
+`Owner::Node(index)`. The lists so far:
+
+- pie charts (`pie::edit`): slices, each its wedge, percentage, and legend row. A label is
+  quoted with `"`, or `'` when it holds `"`; one with both quotes, a line break, or another
+  slice's label is refused. A new slice takes the mean value (at least 1), so that it shows.
+
+For every list:
+
+- Clicking selects an item and its statement in the source pane.
+- Double-click or Rename edits an item's label; text that would not read back as written is
+  refused.
+- Add Node, a double-click on empty space, or a drag from an item to empty space adds an item
+  after the dragged or one selected item, or at the end; it is selected with its label open.
+- Delete removes the selected items.
+- Each is one undoable drawing change (WYSIWY-13). The other edits stay refused, with the reason
+  `pie charts take only adding, renaming, and deleting slices` (and so on). The right-click menu
+  holds Add Slice (Add Slice After with one item selected), Rename, Delete, Select All, and Fit
+  Window.
+
+Tests: `crates/sirene-gui/tests/drawing.rs`, `crates/sirene-core/src/pie/edit.rs`.

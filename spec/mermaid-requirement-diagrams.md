@@ -53,4 +53,4 @@ compartment rows of LANGS-3. Tests: `snapshots`, `ascii_charset_snapshots`.
 
 Mermaid draws `contains` with a circle holding a plus; sirene uses its plain circle marker. Mermaid
 12's `redux-color` theme, `neo` look, and ELK layout are not used, and markdown in names and
-values is shown as written. Drawing edits are read-only (LANGS-5).
+values is shown as written. Drawing edits are described in WYSIWY-25.

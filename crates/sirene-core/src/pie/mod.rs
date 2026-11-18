@@ -1,5 +1,6 @@
 //! Mermaid pie charts (MPIE-*): labeled values drawn as slices of a circle.
 
+pub mod edit;
 mod lower;
 mod parser;
 

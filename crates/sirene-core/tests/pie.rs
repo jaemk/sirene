@@ -74,7 +74,14 @@ fn snapshots() {
             for theme in [Theme::LIGHT, Theme::DARK] {
                 let s = lowered.diagram.scene(&Approx, &theme).unwrap();
                 assert!(!s.elements.is_empty(), "{name}");
-                assert!(s.elements.iter().all(|e| e.owner == Owner::Diagram));
+                // Each slice's elements are owned by it (WYSIWY-28).
+                let Diagram::Pie(pie) = &lowered.diagram else {
+                    panic!("{name} is not a pie chart");
+                };
+                assert!(s.elements.iter().all(|e| match e.owner {
+                    Owner::Node(i) => i < pie.slices.len(),
+                    o => o == Owner::Diagram,
+                }));
             }
         }
     }

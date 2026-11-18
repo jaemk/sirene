@@ -300,9 +300,10 @@ fn dot_graphs_are_read_only(cx: &mut TestAppContext) {
     let pie = Document::from_source(None, "pie\n  \"a\" : 1\n".to_owned());
     assert_eq!(
         pie.read_only(),
-        Some("drawing edits are not supported for pie charts yet")
+        Some("pie charts take only adding, renaming, and deleting slices")
     );
     assert!(pie.chart.nodes.is_empty() && pie.other.is_some());
+    assert!(pie.own_edits() && pie.items().is_some());
     let gantt = Document::from_source(None, "gantt\n  a : 2014-01-01, 1d\n".to_owned());
     assert_eq!(
         gantt.read_only(),

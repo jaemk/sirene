@@ -9,6 +9,13 @@ use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Pie, Vec<Diagnostic>) {
+    let (pie, diagnostics, _) = lower_statements(root);
+    (pie, diagnostics)
+}
+
+/// Lowers `root`, with the statement of each slice.
+pub(crate) fn lower_statements(root: &SyntaxNode) -> (Pie, Vec<Diagnostic>, Vec<SyntaxNode>) {
+    let mut statements = Vec::new();
     let mut pie = Pie::default();
     let mut diagnostics = Vec::new();
     let mut title = None;
@@ -60,6 +67,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Pie, Vec<Diagnostic>) {
                     total += value;
                     labels.insert(label.clone());
                     pie.slices.push(Slice { label, value });
+                    statements.push(stmt.clone());
                 }
             }
             ACC_TITLE_STMT => pie.acc_title = text_of(&stmt, ACC_TEXT),
@@ -68,7 +76,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Pie, Vec<Diagnostic>) {
         }
     }
     pie.title = title;
-    (pie, diagnostics)
+    (pie, diagnostics, statements)
 }
 
 fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {

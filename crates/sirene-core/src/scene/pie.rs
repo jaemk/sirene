@@ -22,9 +22,14 @@ const ROW: f32 = 22.0;
 /// Where a slice's percentage sits, as a fraction of the radius.
 const LABEL_AT: f32 = 0.7;
 
-fn path(segments: Vec<Segment>, fill: Option<Color>, stroke: Option<Stroke>) -> Element {
+fn path(
+    owner: Owner,
+    segments: Vec<Segment>,
+    fill: Option<Color>,
+    stroke: Option<Stroke>,
+) -> Element {
     Element {
-        owner: Owner::Diagram,
+        owner,
         primitive: Primitive::Path {
             segments,
             fill,
@@ -33,9 +38,9 @@ fn path(segments: Vec<Segment>, fill: Option<Color>, stroke: Option<Stroke>) -> 
     }
 }
 
-fn text(text: String, center: Pt, size: f32, color: Color) -> Element {
+fn text(owner: Owner, text: String, center: Pt, size: f32, color: Color) -> Element {
     Element {
-        owner: Owner::Diagram,
+        owner,
         primitive: Primitive::Text {
             text,
             center,
@@ -60,7 +65,8 @@ fn legend_text(pie: &Pie, label: &str, value: f64) -> String {
     }
 }
 
-/// Draws `pie` (MPIE-3).
+/// Draws `pie` (MPIE-3). A slice's wedge, percentage, and legend row are owned by
+/// `Owner::Node(i)`, `i` its index in [`Pie::slices`] (WYSIWY-28).
 pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
     let lh = theme.line_height;
     let fs = theme.font_size;
@@ -72,6 +78,12 @@ pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
     let title_h = if title.is_some() { lh + 16.0 } else { 0.0 };
     let top = MARGIN + title_h;
     let ordered = pie.ordered();
+    let owners: Vec<Owner> = (ordered.iter())
+        .map(|s| {
+            let i = pie.slices.iter().position(|x| std::ptr::eq(x, *s));
+            i.map_or(Owner::Diagram, Owner::Node)
+        })
+        .collect();
     let total = pie.total();
     let legend: Vec<String> = ordered
         .iter()
@@ -120,14 +132,14 @@ pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
                 Segment::Close,
             ]
         };
-        elements.push(path(segments, Some(fill), Some(edge)));
+        elements.push(path(owners[i], segments, Some(fill), Some(edge)));
         let at = if share >= 0.9999 {
             c
         } else {
             on_circle(c, RADIUS * LABEL_AT, start + sweep / 2.0)
         };
         let pct = format!("{}%", percent(s.value, total));
-        elements.push(text(pct, at, fs, ink(fill)));
+        elements.push(text(owners[i], pct, at, fs, ink(fill)));
     }
     let outline = Stroke {
         width: 1.5,
@@ -135,6 +147,7 @@ pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
         dash: None,
     };
     elements.push(path(
+        Owner::Diagram,
         shapes::ellipse(c, RADIUS, RADIUS),
         None,
         Some(outline),
@@ -152,6 +165,7 @@ pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
             h: SWATCH,
         };
         elements.push(path(
+            owners[i],
             shapes::rounded(b, 2.0),
             Some(pie_color(theme, i)),
             None,
@@ -159,14 +173,16 @@ pub fn pie(pie: &Pie, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
         let w = metrics.width(&line, fs);
         let tx = lx + SWATCH + SWATCH_GAP;
         right = right.max(tx + w);
-        elements.push(text(line, Pt::new(tx + w / 2.0, cy), fs, theme.text));
+        let at = Pt::new(tx + w / 2.0, cy);
+        elements.push(text(owners[i], line, at, fs, theme.text));
     }
     let title_size = fs * 1.2;
     let width =
         (right + MARGIN).max(title.map_or(0.0, |t| metrics.width(t, title_size)) + 2.0 * MARGIN);
     if let Some(t) = title {
         let at = Pt::new(width / 2.0, MARGIN + lh / 2.0);
-        elements.insert(0, text(t.to_owned(), at, title_size, theme.text));
+        let title = text(Owner::Diagram, t.to_owned(), at, title_size, theme.text);
+        elements.insert(0, title);
     }
     Scene {
         width,
