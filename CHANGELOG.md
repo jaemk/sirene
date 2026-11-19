@@ -6,12 +6,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-19
+
 ### Added
 
 - The docs site draws diagrams in the browser with `sirene-core` built for WebAssembly: an
   `edit` button on each sample redraws it as its source changes, and a playground page draws
   Mermaid, PlantUML, or DOT as you type, keeping the source in the page's link.
-- `sirene-wasm` (`wasm/`, not published) exports rendering to JavaScript over the module's
+- `sirene-wasm` (`wasm/`, not on crates.io) exports rendering to JavaScript over the module's
   memory, with no imports; `docs/assets/sirene-wasm.js` loads it. It replaces `wasm-smoke`:
   CI renders each file in `examples/` with it under Node through that loader.
 - Each release attaches `sirene-wasm-X.Y.Z.tar.gz` (`sirene.wasm` and `sirene-wasm.js`) for
