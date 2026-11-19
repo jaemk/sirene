@@ -6,6 +6,17 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Each release attaches an `.rpm` (`sudo dnf install` its URL) and an AppImage of the editor build
+  for x86_64 and aarch64 Linux, with a desktop entry, icon, and file types for Mermaid, DOT, and
+  PlantUML files. `cargo xtask linux` writes their shared AppDir.
+
+### Changed
+
+- `sirene update` also refuses to replace a binary in `/usr/bin` (the `.rpm`) or inside an
+  AppImage, and its refusal names the package manager that installed the binary.
+
 ## [0.6.1] - 2026-11-19
 
 ### Added

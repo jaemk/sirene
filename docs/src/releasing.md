@@ -30,8 +30,9 @@ To release `X.Y.Z`:
 `umask 077`, and signs the tarballs before their attestations and `SHA256SUMS` are generated.
 The `wasm` job builds `sirene-wasm-X.Y.Z.tar.gz` ([Web pages](embedding.md)) and attests it,
 and packs the `@jaemk/sirene` npm package.
+The `linux` job packs the gnu binaries as `.rpm` files and AppImages and attests them.
 The `release` job creates the `vX.Y.Z` release with the signed tarballs, app, `sirene-wasm`
-tarball, and checksums.
+tarball, `.rpm` files, AppImages, and checksums.
 After approval in the `release` environment, `publish` publishes `sirene-core`, `sirene-gui`,
 and `sirene` to crates.io, commits the Homebrew formula, the cask, and the next `-dev` version
 to `main`, then publishes `@jaemk/sirene` to npm.
@@ -46,4 +47,5 @@ To retry a failed release, dispatch the release workflow from `main`. If the rel
 exists, `main` must still be at the commit named by its `vX.Y.Z` tag; the workflow refuses to
 rebuild that version from a different commit. Dispatches from other branches skip the release.
 
-See `spec/workspace.md` (WORKSP-8, WORKSP-9) and `spec/macos-packaging.md` for the details.
+See `spec/workspace.md` (WORKSP-8, WORKSP-9), `spec/macos-packaging.md`, and
+`spec/linux-packaging.md` for the details.

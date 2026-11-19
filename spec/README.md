@@ -19,6 +19,7 @@ can be built). Keep each row's status current with `spec.py set`.
 | GUI Shell | done | [gui-shell.md](gui-shell.md) |
 | WYSIWYG Editing | done | [wysiwyg-editing.md](wysiwyg-editing.md) |
 | macOS Packaging | done | [macos-packaging.md](macos-packaging.md) |
+| Linux Packaging | done | [linux-packaging.md](linux-packaging.md) |
 | Flowchart Model | done | [flowchart-model.md](flowchart-model.md) |
 | Markdown | done | [markdown.md](markdown.md) |
 | Agent Skill | done | [agent-skill.md](agent-skill.md) |

@@ -398,3 +398,108 @@ fn command_output_flush_errors_retain_io_causes() {
         assert_eq!(io.kind(), std::io::ErrorKind::BrokenPipe);
     }
 }
+
+#[test]
+fn linux_appdir_layout() {
+    let tmp = tempfile::tempdir().unwrap();
+    let binary = tmp.path().join("sirene-built");
+    fs::write(&binary, b"\x7fELF fake").unwrap();
+    let out = tmp.path().join("out");
+    // A stale tree is replaced.
+    fs::create_dir_all(out.join("AppDir/stale")).unwrap();
+
+    let printed = run(&["linux", "--binary", path(&binary), "--out", path(&out)]).unwrap();
+    let root = out.join("AppDir");
+    assert_eq!(printed, format!("{}\n", root.display()));
+    assert!(!root.join("stale").exists());
+
+    let exe = root.join("usr/bin/sirene");
+    assert_eq!(fs::read(&exe).unwrap(), b"\x7fELF fake");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            fs::metadata(&exe).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
+        assert_eq!(
+            fs::read_link(root.join("AppRun")).unwrap(),
+            Path::new("usr/bin/sirene")
+        );
+        assert_eq!(
+            fs::read_link(root.join(".DirIcon")).unwrap(),
+            Path::new("sirene.png")
+        );
+        assert_eq!(fs::read(root.join("AppRun")).unwrap(), b"\x7fELF fake");
+    }
+    let share = root.join("usr/share");
+    let desktop = fs::read_to_string(share.join("applications/sirene.desktop")).unwrap();
+    assert_eq!(desktop, xtask::linux::desktop_entry());
+    assert_eq!(
+        fs::read_to_string(root.join("sirene.desktop")).unwrap(),
+        desktop
+    );
+    assert_eq!(
+        fs::read_to_string(share.join("mime/packages/sirene.xml")).unwrap(),
+        xtask::linux::mime_package()
+    );
+    assert_eq!(
+        fs::read_to_string(share.join("icons/hicolor/scalable/apps/sirene.svg")).unwrap(),
+        xtask::ICON_SVG
+    );
+    assert_eq!(
+        fs::read(root.join("sirene.png")).unwrap(),
+        xtask::icon_png(256).unwrap()
+    );
+    for size in xtask::linux::ICON_SIZES {
+        let png = share.join(format!("icons/hicolor/{size}x{size}/apps/sirene.png"));
+        assert_eq!(
+            fs::read(&png).unwrap(),
+            xtask::icon_png(size).unwrap(),
+            "{size}"
+        );
+    }
+    for (name, text) in xtask::LICENSES {
+        let p = share.join("licenses/sirene").join(name);
+        assert_eq!(fs::read_to_string(p).unwrap(), text, "{name}");
+    }
+}
+
+#[test]
+fn linux_needs_the_binary() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out");
+    let missing = tmp.path().join("missing");
+    let e = run(&["linux", "--binary", path(&missing), "--out", path(&out)]).unwrap_err();
+    assert!(e.starts_with(path(&missing)), "{e}");
+    assert!(!out.exists());
+}
+
+/// The RPM metadata ships every file of the AppDir's `usr/` tree (LINUXP-4).
+#[test]
+fn rpm_assets_cover_the_appdir() {
+    let tmp = tempfile::tempdir().unwrap();
+    let binary = tmp.path().join("sirene");
+    fs::write(&binary, b"bin").unwrap();
+    let root = xtask::linux::appdir(&binary, tmp.path()).unwrap();
+    let manifest = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../crates/sirene/Cargo.toml"),
+    )
+    .unwrap();
+    let mut files = Vec::new();
+    let mut dirs = vec![root.join("usr")];
+    while let Some(d) = dirs.pop() {
+        for e in fs::read_dir(d).unwrap() {
+            let p = e.unwrap().path();
+            if p.is_dir() {
+                dirs.push(p);
+            } else {
+                files.push(p.strip_prefix(&root).unwrap().to_str().unwrap().to_owned());
+            }
+        }
+    }
+    assert_eq!(files.len(), 12);
+    for f in files {
+        assert!(manifest.contains(&format!("dest = \"/{f}\"")), "{f}");
+    }
+}
