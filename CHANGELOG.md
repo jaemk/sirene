@@ -6,6 +6,13 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-19
+
+### Changed
+
+- Update `heapless` (via gpui, used by `sirene-gui`) to 0.9.4 for RUSTSEC-2026-0574 through
+  RUSTSEC-2026-0582.
+
 ## [0.6.1] - 2026-11-19
 
 ### Added
