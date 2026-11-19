@@ -76,7 +76,8 @@ tagged commit):
    before it. `sign`, in the `signing` environment, builds `xtask` in a step without the key,
    then signs each tarball with `target/release/xtask sign` (UPDATE-5; the key is never in the
    environment of a compile) and gives the signed tarballs a build provenance attestation. `app` builds the
-   universal `Sirene.app` zip and cask (MACOSP-6).
+   universal `Sirene.app` zip and cask (MACOSP-6). `wasm` builds `sirene-wasm-X.Y.Z.tar.gz`
+   (WORKSP-11) and attests it; it is not signed, as nothing updates from it.
 4. `release`: creates the `vX.Y.Z` tag on the released commit and its GitHub release, with the
    changelog section as notes and the tarballs, the zip, the cask, and `SHA256SUMS` (of the
    tarballs and zip) as assets.
@@ -137,7 +138,20 @@ UTF-8 source into its memory (`input(len)` returns where), calls `render(format,
 and reads the drawing or an error message, and the diagnostics as a JSON array with 1-based
 line and column (`output_ptr`/`output_len`, `diagnostics_ptr`/`diagnostics_len`). A panic traps;
 `docs/assets/sirene-wasm.js`, the loader, then starts a new instance for the next call. The
-`wasm` cargo profile builds it small for the docs site.
+`wasm` cargo profile builds it small, without `png`, for the docs site and releases.
+
+The loader is a plain script that sets `globalThis.SireneWasm`. `load` compiles the module from
+its bytes, a fetch `Response`, or a promise of either (a failed fetch is an error naming the URL
+and status). `render(source, {format, lang, theme})` returns `{ok, output, error,
+diagnostics}`. `renderAll(scope, {theme})` replaces each `<pre><code class="language-X">` (X
+one of `mermaid`, `plantuml`, `puml`, `dot`, `graphviz`), `<pre class="mermaid">`, and
+`<div class="mermaid">` under `scope` with an `<img class="sirene-diagram">` of its SVG as a
+`data:` URL, theme `light` by default; a block it cannot draw stays, with the error in
+`data-sirene-error`. It returns `{drawn, failed}`.
+
+Each release attaches `sirene-wasm-X.Y.Z.tar.gz` (WORKSP-8): a `sirene-wasm-X.Y.Z/` directory
+with `sirene.wasm` (the `wasm` profile), `sirene-wasm.js`, `LICENSE-MIT`, `LICENSE-APACHE`, and
+`THIRD-PARTY-NOTICES`. `examples/web/index.html` is a page that draws its blocks with them.
 
 CI's `wasm` job builds `sirene-wasm` with `png` for the target and runs `scripts/wasm-test.mjs`
 under Node: through the loader, it renders each file in `examples/` and a gantt chart as SVG,

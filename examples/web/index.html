@@ -1,0 +1,56 @@
+<!doctype html>
+<!--
+  Draws this page's diagram blocks in the browser with sirene-wasm. Put sirene.wasm and
+  sirene-wasm.js from a release's sirene-wasm-X.Y.Z.tar.gz next to this file and serve the
+  directory over HTTP (browsers do not fetch WebAssembly from file:// pages), e.g.
+
+    python3 -m http.server
+
+  See docs/src/embedding.md.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>sirene in a web page</title>
+  <style>
+    body { max-width: 760px; margin: 2rem auto; padding: 0 16px; font-family: system-ui, sans-serif; }
+    img.sirene-diagram { display: block; max-width: 100%; margin: 1rem auto; }
+  </style>
+</head>
+<body>
+  <h1>sirene in a web page</h1>
+
+  <p>A Markdown renderer's code block:</p>
+  <pre><code class="language-mermaid">flowchart LR
+  A[Start] --&gt; B{Ok?} --&gt;|yes| C[Done]
+  B --&gt;|no| A</code></pre>
+
+  <p>mermaid.js's markup:</p>
+  <pre class="mermaid">sequenceDiagram
+  Alice-&gt;&gt;Bob: Hello
+  Bob--&gt;&gt;Alice: Hi</pre>
+
+  <p>PlantUML and DOT:</p>
+  <pre><code class="language-plantuml">@startuml
+Alice -&gt; Bob: request
+Bob --&gt; Alice: response
+@enduml</code></pre>
+  <pre><code class="language-dot">digraph { rankdir=LR; parse -&gt; layout -&gt; draw }</code></pre>
+
+  <script src="sirene-wasm.js"></script>
+  <script>
+    SireneWasm.load(fetch("sirene.wasm"))
+      .then(function (sirene) {
+        var result = sirene.renderAll(document, { theme: "light" });
+        result.failed.forEach(function (f) {
+          console.warn("sirene could not draw a block:", f.error, f.element);
+        });
+      })
+      .catch(function (e) {
+        document.body.setAttribute("data-sirene-error", e.message);
+        console.error(e);
+      });
+  </script>
+</body>
+</html>

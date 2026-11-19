@@ -1,10 +1,12 @@
 // Loads sirene-wasm (wasm/src/lib.rs) and draws diagrams with it. Shared by the docs site
-// (custom.js) and scripts/wasm-test.mjs, so it is a plain script that sets
+// (custom.js), scripts/wasm-test.mjs, and pages that embed sirene (the release's
+// sirene-wasm-X.Y.Z.tar.gz; see docs/src/embedding.md), so it is a plain script that sets
 // `globalThis.SireneWasm`.
 //
-//   var sirene = await SireneWasm.load(bytesOrResponse);
+//   var sirene = await SireneWasm.load(fetch("sirene.wasm"));
 //   var r = sirene.render(source, { format: "svg", lang: "mermaid", theme: "dark" });
 //   // r.ok, r.output (a string, or a Uint8Array for "png"), r.error, r.diagnostics
+//   sirene.renderAll(); // replaces each diagram block on the page with its drawing
 (function (root) {
   var FORMATS = { svg: 0, ascii: 1, png: 2 };
   var LANGS = { detect: 0, mermaid: 1, dot: 2, graphviz: 2, plantuml: 3, puml: 3 };
@@ -58,12 +60,62 @@
     };
   };
 
+  // The diagram blocks `renderAll` draws: Markdown renderers' `<pre><code class="language-X">`,
+  // and mermaid.js's `<pre class="mermaid">` and `<div class="mermaid">`.
+  var BLOCKS = [
+    "pre > code.language-mermaid",
+    "pre > code.language-plantuml",
+    "pre > code.language-puml",
+    "pre > code.language-dot",
+    "pre > code.language-graphviz",
+    "pre.mermaid",
+    "div.mermaid",
+  ].join(", ");
+
+  // Replaces each diagram block under `scope` (default: the document) with an
+  // `<img class="sirene-diagram">` of its SVG, in `options.theme` (default "light"). A block
+  // sirene cannot draw stays as it is, with the error in its `data-sirene-error` attribute.
+  // Returns { drawn, failed: [{ element, error }] }.
+  Sirene.prototype.renderAll = function (scope, options) {
+    options = options || {};
+    var self = this;
+    var drawn = 0;
+    var failed = [];
+    (scope || document).querySelectorAll(BLOCKS).forEach(function (el) {
+      var isCode = el.tagName === "CODE";
+      var block = isCode ? el.parentNode : el;
+      var lang = isCode ? el.className.match(/language-(\w+)/)[1] : "mermaid";
+      var r;
+      try {
+        r = self.render(el.textContent, { format: "svg", lang: lang, theme: options.theme || "light" });
+      } catch (e) {
+        r = { ok: false, error: e.message };
+      }
+      if (!r.ok) {
+        block.setAttribute("data-sirene-error", r.error);
+        failed.push({ element: block, error: r.error });
+        return;
+      }
+      var img = block.ownerDocument.createElement("img");
+      img.className = "sirene-diagram";
+      img.alt = lang + " diagram";
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(r.output);
+      block.replaceWith(img);
+      drawn++;
+    });
+    return { drawn: drawn, failed: failed };
+  };
+
   root.SireneWasm = {
-    // `source` is the module's bytes (an ArrayBuffer or typed array) or a fetch Response.
+    // `source` is the module's bytes (an ArrayBuffer or typed array), a fetch Response, or a
+    // promise of either.
     load: async function (source) {
-      var bytes = typeof Response !== "undefined" && source instanceof Response
-        ? await source.arrayBuffer()
-        : source;
+      source = await source;
+      var bytes = source;
+      if (typeof Response !== "undefined" && source instanceof Response) {
+        if (!source.ok) throw new Error("sirene: could not fetch " + source.url + ": " + source.status);
+        bytes = await source.arrayBuffer();
+      }
       return new Sirene(await WebAssembly.compile(bytes));
     },
   };

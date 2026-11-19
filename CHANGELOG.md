@@ -14,6 +14,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `sirene-wasm` (`wasm/`, not published) exports rendering to JavaScript over the module's
   memory, with no imports; `docs/assets/sirene-wasm.js` loads it. It replaces `wasm-smoke`:
   CI renders each file in `examples/` with it under Node through that loader.
+- Each release attaches `sirene-wasm-X.Y.Z.tar.gz` (`sirene.wasm` and `sirene-wasm.js`) for
+  drawing diagrams in web pages. The loader's `renderAll` replaces a page's `mermaid`,
+  `plantuml`, and `dot` code blocks, and mermaid.js's `.mermaid` blocks, with their drawings;
+  `examples/web/index.html` is a complete page.
+- Guide pages for the Rust library and for web pages.
 
 ## [0.6.0] - 2026-11-17
 

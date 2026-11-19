@@ -796,18 +796,33 @@ fn the_release_workflow_runs_only_on_main() {
     );
 }
 
-/// The release tarballs carry the licenses and third-party notices.
+/// Every release tarball (the binaries' and sirene-wasm's) carries the licenses and
+/// third-party notices.
 #[test]
-fn the_release_tarball_carries_the_notices() {
+fn the_release_tarballs_carry_the_notices() {
     let workflow = read(&repo_root().join(".github/workflows/release.yml"));
-    let tar = workflow
+    let tars: Vec<&str> = workflow
         .lines()
-        .find(|l| l.trim_start().starts_with("tar -czf"))
-        .expect("a tar line");
-    for name in ["LICENSE-MIT", "LICENSE-APACHE", "THIRD-PARTY-NOTICES"] {
-        assert!(tar.contains(name), "{name} missing from: {tar}");
-        assert!(repo_root().join(name).is_file(), "{name}");
+        .filter(|l| l.trim_start().starts_with("tar -czf"))
+        .collect();
+    assert_eq!(tars.len(), 2, "{tars:?}");
+    for tar in tars {
+        for name in ["LICENSE-MIT", "LICENSE-APACHE", "THIRD-PARTY-NOTICES"] {
+            assert!(tar.contains(name), "{name} missing from: {tar}");
+            assert!(repo_root().join(name).is_file(), "{name}");
+        }
     }
+}
+
+/// The release carries sirene-wasm: the `release` job waits for the `wasm` job and
+/// uploads its tarball with the others, so SHA256SUMS lists it.
+#[test]
+fn the_release_carries_sirene_wasm() {
+    let workflow = read(&repo_root().join(".github/workflows/release.yml"));
+    assert!(workflow.contains("    needs: [decide, sign, app, wasm]\n"));
+    assert!(workflow.contains("          name: wasm\n          path: dist\n"));
+    assert!(workflow.contains("cp docs/assets/sirene-wasm.js "));
+    assert!(repo_root().join("docs/assets/sirene-wasm.js").is_file());
 }
 
 #[test]

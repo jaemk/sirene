@@ -28,7 +28,9 @@ To release `X.Y.Z`:
 `.github/workflows/release.yml` then runs CI and the RustSec audit, builds the binaries and
 `Sirene.app`. The `sign` job builds `xtask` before exposing the secret, decodes the key with
 `umask 077`, and signs the tarballs before their attestations and `SHA256SUMS` are generated.
-The `release` job creates the `vX.Y.Z` release with the signed tarballs, app, and checksums.
+The `wasm` job builds `sirene-wasm-X.Y.Z.tar.gz` ([Web pages](embedding.md)) and attests it.
+The `release` job creates the `vX.Y.Z` release with the signed tarballs, app, `sirene-wasm`
+tarball, and checksums.
 After approval in the `release` environment, `publish` publishes `sirene-core`, `sirene-gui`,
 and `sirene` to crates.io and commits the Homebrew formula, the cask, and the next `-dev` version
 to `main`.

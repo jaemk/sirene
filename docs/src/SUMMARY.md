@@ -15,6 +15,8 @@
 - [Keys](keys.md)
 - [Settings](settings.md)
 - [Agents](agents.md)
+- [Rust library](library.md)
+- [Web pages](embedding.md)
 
 # Flowcharts
 

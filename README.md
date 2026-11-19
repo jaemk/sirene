@@ -89,6 +89,20 @@ A file's language comes from its extension (`.mmd`, `.puml`, `.dot`, ...), its M
 Mermaid's, PlantUML's, and Graphviz's. Each kind's page in the docs lists what is read and what
 is not drawn; `spec/README.md` has the feature status table.
 
+## Library and web pages
+
+`sirene-core` renders without the CLI, from Rust:
+
+```rust
+let lowered = sirene_core::diagram::lower(src);
+let svg = lowered.svg(&sirene_core::scene::Theme::LIGHT)?;
+```
+
+See [Rust library](https://jaemk.github.io/sirene/guide/library.html) and
+[docs.rs](https://docs.rs/sirene-core). In web pages, the release's
+`sirene-wasm-X.Y.Z.tar.gz` draws diagram blocks in the browser; see
+[Web pages](https://jaemk.github.io/sirene/guide/embedding.html) and `examples/web/index.html`.
+
 ## Agents
 
 The repo is a [mind](https://github.com/jaemk/mind) source with one skill, `sirene:render`, that
