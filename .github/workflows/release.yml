@@ -12,7 +12,8 @@ name: release
 # up-to-date formula and cask are not re-committed.
 #
 # The workflow file name and the `release` environment are what the crates.io
-# trusted publishers for sirene-core, sirene-gui, and sirene name.
+# trusted publishers for sirene-core, sirene-gui, and sirene name, and the npm
+# trusted publisher for @jaemk/sirene.
 on:
   push:
     branches: [main]
@@ -393,6 +394,9 @@ jobs:
           cp target/wasm32-unknown-unknown/wasm/sirene_wasm.wasm "$dist/sirene.wasm"
           cp docs/assets/sirene-wasm.js LICENSE-MIT LICENSE-APACHE THIRD-PARTY-NOTICES "$dist/"
           tar -czf "wasm-dist/${dist}.tar.gz" "$dist/sirene.wasm" "$dist/sirene-wasm.js" "$dist/LICENSE-MIT" "$dist/LICENSE-APACHE" "$dist/THIRD-PARTY-NOTICES"
+      # The @jaemk/sirene npm package, from the same files; `publish` uploads it.
+      - name: npm package
+        run: bash bin/npm-package.sh "$VERSION" target/wasm32-unknown-unknown/wasm/sirene_wasm.wasm npm-dist
       - name: attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
@@ -401,6 +405,10 @@ jobs:
         with:
           name: wasm
           path: wasm-dist/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm
+          path: npm-dist/jaemk-sirene-*.tgz
 
   release:
     needs: [decide, sign, app, wasm]
@@ -413,7 +421,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The signed archives, the app, and sirene-wasm, not the `unsigned-*`
-    # artifacts.
+      # artifacts.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: signed
@@ -522,3 +530,19 @@ jobs:
             git commit -m "$message"
             git push origin main
           fi
+      # @jaemk/sirene, through npm trusted publishing: the package's trusted
+      # publisher names this workflow file and the `release` environment, and
+      # npm exchanges the job's OIDC token for the upload (with provenance), so
+      # no npm token exists. Trusted publishing needs npm 11.5.1 or later.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+      - name: install npm 11.16.0
+        run: npm install -g npm@11.16.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm
+          path: npm-dist
+      - name: publish to npm
+        run: bash bin/npm-publish.sh "$VERSION" "npm-dist/jaemk-sirene-${VERSION}.tgz"

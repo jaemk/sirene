@@ -825,6 +825,120 @@ fn the_release_carries_sirene_wasm() {
     assert!(repo_root().join("docs/assets/sirene-wasm.js").is_file());
 }
 
+/// The `wasm` job packs @jaemk/sirene and `publish` uploads it through trusted
+/// publishing (an OIDC token, so the job has `id-token: write` and no npm token).
+#[test]
+fn the_release_publishes_the_npm_package() {
+    let workflow = read(&repo_root().join(".github/workflows/release.yml"));
+    assert!(workflow.contains(
+        "bash bin/npm-package.sh \"$VERSION\" target/wasm32-unknown-unknown/wasm/sirene_wasm.wasm npm-dist\n"
+    ));
+    assert!(workflow.contains("          name: npm\n          path: npm-dist\n"));
+    assert!(workflow.contains(
+        "bash bin/npm-publish.sh \"$VERSION\" \"npm-dist/jaemk-sirene-${VERSION}.tgz\"\n"
+    ));
+    assert!(!workflow.contains("NPM_TOKEN"));
+    let publish = &workflow[workflow.find("\n  publish:\n").expect("publish job")..];
+    assert!(publish.contains("    environment: release\n"));
+    assert!(publish.contains("      id-token: write\n"));
+}
+
+/// A stub `npm` that logs its arguments and prints `view_output` for `npm view`.
+fn stub_npm(dir: &Path, view_output: &str) -> PathBuf {
+    let bin = dir.join("stub-bin");
+    std::fs::create_dir_all(&bin).expect("create stub bin dir");
+    write_exec(
+        &bin.join("npm"),
+        &format!(
+            "#!/bin/bash\necho \"npm $*\" >> \"{log}\"\nif [ \"$1\" = view ]; then printf '%s' '{view_output}'; [ -n '{view_output}' ]; exit; fi\n",
+            log = dir.join("npm.log").display()
+        ),
+    );
+    bin
+}
+
+#[test]
+fn npm_package_stages_the_versioned_package() {
+    let dir = scratch_dir();
+    let bin = stub_npm(dir.path(), "");
+    let wasm = dir.path().join("sirene_wasm.wasm");
+    std::fs::write(&wasm, b"\0asm").unwrap();
+    let out_dir = dir.path().join("out");
+    let out = output(
+        Command::new("bash")
+            .arg(repo_root().join("bin/npm-package.sh"))
+            .args(["1.2.3".as_ref(), wasm.as_os_str(), out_dir.as_os_str()])
+            .env("PATH", path_with(&bin)),
+    );
+    assert!(out.status.success(), "{}", stderr(&out));
+    let stage = out_dir.join("package");
+    let manifest = read(&stage.join("package.json"));
+    assert!(
+        manifest.contains("\"name\": \"@jaemk/sirene\""),
+        "{manifest}"
+    );
+    assert!(manifest.contains("\"version\": \"1.2.3\""), "{manifest}");
+    let readme = read(&stage.join("README.md"));
+    assert!(
+        readme.contains("@jaemk/sirene@1.2.3/sirene.wasm"),
+        "{readme}"
+    );
+    assert!(!readme.contains("@VERSION"), "{readme}");
+    assert_eq!(std::fs::read(stage.join("sirene.wasm")).unwrap(), b"\0asm");
+    // Every file the manifest lists is staged.
+    for name in [
+        "sirene.wasm",
+        "sirene-wasm.js",
+        "LICENSE-MIT",
+        "LICENSE-APACHE",
+        "THIRD-PARTY-NOTICES",
+    ] {
+        assert!(manifest.contains(&format!("\"{name}\"")), "{name}");
+        assert!(stage.join(name).is_file(), "{name}");
+    }
+    let log = read(&dir.path().join("npm.log"));
+    assert_eq!(
+        log,
+        format!(
+            "npm pack {} --pack-destination {}\n",
+            stage.display(),
+            out_dir.display()
+        )
+    );
+}
+
+fn npm_publish(view_output: &str) -> (Output, String) {
+    let dir = scratch_dir();
+    let bin = stub_npm(dir.path(), view_output);
+    let out = output(
+        Command::new("bash")
+            .arg(repo_root().join("bin/npm-publish.sh"))
+            .args(["1.2.3", "pkg.tgz"])
+            .env("PATH", path_with(&bin)),
+    );
+    let log = read(&dir.path().join("npm.log"));
+    (out, log)
+}
+
+#[test]
+fn npm_publish_uploads_a_new_version() {
+    let (out, log) = npm_publish("");
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert_eq!(
+        log,
+        "npm view @jaemk/sirene@1.2.3 version\nnpm publish pkg.tgz --access public\n"
+    );
+}
+
+/// A re-run of a release skips the version already on npm.
+#[test]
+fn npm_publish_skips_a_published_version() {
+    let (out, log) = npm_publish("1.2.3");
+    assert!(out.status.success(), "{}", stderr(&out));
+    assert!(stdout(&out).contains("already on npm"));
+    assert_eq!(log, "npm view @jaemk/sirene@1.2.3 version\n");
+}
+
 #[test]
 fn install_refuses_a_bad_or_missing_checksum() {
     let fx = Install::new("Linux", "x86_64");

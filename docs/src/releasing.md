@@ -28,12 +28,19 @@ To release `X.Y.Z`:
 `.github/workflows/release.yml` then runs CI and the RustSec audit, builds the binaries and
 `Sirene.app`. The `sign` job builds `xtask` before exposing the secret, decodes the key with
 `umask 077`, and signs the tarballs before their attestations and `SHA256SUMS` are generated.
-The `wasm` job builds `sirene-wasm-X.Y.Z.tar.gz` ([Web pages](embedding.md)) and attests it.
+The `wasm` job builds `sirene-wasm-X.Y.Z.tar.gz` ([Web pages](embedding.md)) and attests it,
+and packs the `@jaemk/sirene` npm package.
 The `release` job creates the `vX.Y.Z` release with the signed tarballs, app, `sirene-wasm`
 tarball, and checksums.
 After approval in the `release` environment, `publish` publishes `sirene-core`, `sirene-gui`,
-and `sirene` to crates.io and commits the Homebrew formula, the cask, and the next `-dev` version
-to `main`.
+and `sirene` to crates.io, commits the Homebrew formula, the cask, and the next `-dev` version
+to `main`, then publishes `@jaemk/sirene` to npm.
+
+## npm setup
+
+npm publishing is trusted publishing only. On npmjs.com, `@jaemk/sirene`'s settings name the
+trusted publisher (GitHub Actions, `jaemk/sirene`, workflow `release.yml`, environment
+`release`) and set publishing access to require two-factor authentication and disallow tokens.
 
 To retry a failed release, dispatch the release workflow from `main`. If the release already
 exists, `main` must still be at the commit named by its `vX.Y.Z` tag; the workflow refuses to

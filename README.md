@@ -99,8 +99,9 @@ let svg = lowered.svg(&sirene_core::scene::Theme::LIGHT)?;
 ```
 
 See [Rust library](https://jaemk.github.io/sirene/guide/library.html) and
-[docs.rs](https://docs.rs/sirene-core). In web pages, the release's
-`sirene-wasm-X.Y.Z.tar.gz` draws diagram blocks in the browser; see
+[docs.rs](https://docs.rs/sirene-core). In web pages and Node, the
+[`@jaemk/sirene`](https://www.npmjs.com/package/@jaemk/sirene) npm package (also each release's
+`sirene-wasm-X.Y.Z.tar.gz`) draws diagram blocks in the browser; see
 [Web pages](https://jaemk.github.io/sirene/guide/embedding.html) and `examples/web/index.html`.
 
 ## Agents

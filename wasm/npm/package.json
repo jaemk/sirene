@@ -1,0 +1,28 @@
+{
+  "name": "@jaemk/sirene",
+  "version": "0.0.0",
+  "description": "Mermaid, PlantUML, and Graphviz DOT diagrams drawn as SVG or ASCII, in the browser or Node, with sirene compiled to WebAssembly",
+  "keywords": ["mermaid", "plantuml", "graphviz", "dot", "diagram", "svg", "wasm"],
+  "homepage": "https://jaemk.github.io/sirene/guide/embedding.html",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaemk/sirene.git",
+    "directory": "wasm"
+  },
+  "bugs": "https://github.com/jaemk/sirene/issues",
+  "license": "MIT OR Apache-2.0",
+  "main": "sirene-wasm.js",
+  "exports": {
+    ".": "./sirene-wasm.js",
+    "./sirene.wasm": "./sirene.wasm",
+    "./sirene-wasm.js": "./sirene-wasm.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "sirene.wasm",
+    "sirene-wasm.js",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "THIRD-PARTY-NOTICES"
+  ]
+}

@@ -1,7 +1,7 @@
 // Loads sirene-wasm (wasm/src/lib.rs) and draws diagrams with it. Shared by the docs site
 // (custom.js), scripts/wasm-test.mjs, and pages that embed sirene (the release's
-// sirene-wasm-X.Y.Z.tar.gz; see docs/src/embedding.md), so it is a plain script that sets
-// `globalThis.SireneWasm`.
+// sirene-wasm-X.Y.Z.tar.gz and the @jaemk/sirene npm package; see docs/src/embedding.md), so it
+// is a plain script that sets `globalThis.SireneWasm` (and `module.exports` under CommonJS).
 //
 //   var sirene = await SireneWasm.load(fetch("sirene.wasm"));
 //   var r = sirene.render(source, { format: "svg", lang: "mermaid", theme: "dark" });
@@ -119,4 +119,6 @@
       return new Sirene(await WebAssembly.compile(bytes));
     },
   };
+  // CommonJS (the npm package's `require("@jaemk/sirene")`, or its default import).
+  if (typeof module === "object" && module.exports) module.exports = root.SireneWasm;
 })(globalThis);

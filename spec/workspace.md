@@ -77,7 +77,8 @@ tagged commit):
    then signs each tarball with `target/release/xtask sign` (UPDATE-5; the key is never in the
    environment of a compile) and gives the signed tarballs a build provenance attestation. `app` builds the
    universal `Sirene.app` zip and cask (MACOSP-6). `wasm` builds `sirene-wasm-X.Y.Z.tar.gz`
-   (WORKSP-11) and attests it; it is not signed, as nothing updates from it.
+   (WORKSP-11) and attests it; it is not signed, as nothing updates from it. It also packs the
+   `@jaemk/sirene` npm package from the same files (`bin/npm-package.sh`).
 4. `release`: creates the `vX.Y.Z` tag on the released commit and its GitHub release, with the
    changelog section as notes and the tarballs, the zip, the cask, and `SHA256SUMS` (of the
    tarballs and zip) as assets.
@@ -86,9 +87,13 @@ tagged commit):
    build here would run every build script with the token in its environment), treating an
    already-published version as a skip and any other failure as fatal. Then one commit to
    `main` writes `Formula/sirene.rb` (`bin/update-formula.sh`), `Casks/sirene.rb`, and, if
-   `main` is still on `X.Y.Z`, the next `-dev` version (`bin/bump-dev.sh`).
+   `main` is still on `X.Y.Z`, the next `-dev` version (`bin/bump-dev.sh`). Last,
+   `bin/npm-publish.sh` publishes `@jaemk/sirene` `X.Y.Z` with provenance, skipping a version
+   already on npm.
 
-crates.io authentication is trusted publishing (`rust-lang/crates-io-auth-action`) only.
+crates.io authentication is trusted publishing (`rust-lang/crates-io-auth-action`) only, and so
+is npm's: the `@jaemk/sirene` trusted publisher names `release.yml` and the `release`
+environment, the package disallows token publishing, and no npm token exists.
 Tests: `xtask/tests/release_scripts.rs`.
 
 ## WORKSP-9 Binaries
@@ -140,7 +145,8 @@ line and column (`output_ptr`/`output_len`, `diagnostics_ptr`/`diagnostics_len`)
 `docs/assets/sirene-wasm.js`, the loader, then starts a new instance for the next call. The
 `wasm` cargo profile builds it small, without `png`, for the docs site and releases.
 
-The loader is a plain script that sets `globalThis.SireneWasm`. `load` compiles the module from
+The loader is a plain script that sets `globalThis.SireneWasm`, and `module.exports` under
+CommonJS. `load` compiles the module from
 its bytes, a fetch `Response`, or a promise of either (a failed fetch is an error naming the URL
 and status). `render(source, {format, lang, theme})` returns `{ok, output, error,
 diagnostics}`. `renderAll(scope, {theme})` replaces each `<pre><code class="language-X">` (X
@@ -152,6 +158,8 @@ one of `mermaid`, `plantuml`, `puml`, `dot`, `graphviz`), `<pre class="mermaid">
 Each release attaches `sirene-wasm-X.Y.Z.tar.gz` (WORKSP-8): a `sirene-wasm-X.Y.Z/` directory
 with `sirene.wasm` (the `wasm` profile), `sirene-wasm.js`, `LICENSE-MIT`, `LICENSE-APACHE`, and
 `THIRD-PARTY-NOTICES`. `examples/web/index.html` is a page that draws its blocks with them.
+The `@jaemk/sirene` npm package (`wasm/npm/`, version `X.Y.Z`) holds the same five files, with
+`sirene-wasm.js` as its main entry and `sirene.wasm` exported as `@jaemk/sirene/sirene.wasm`.
 
 CI's `wasm` job builds `sirene-wasm` with `png` for the target and runs `scripts/wasm-test.mjs`
 under Node: through the loader, it renders each file in `examples/` and a gantt chart as SVG,

@@ -18,6 +18,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   drawing diagrams in web pages. The loader's `renderAll` replaces a page's `mermaid`,
   `plantuml`, and `dot` code blocks, and mermaid.js's `.mermaid` blocks, with their drawings;
   `examples/web/index.html` is a complete page.
+- The same files are published to npm as `@jaemk/sirene`, through trusted publishing with
+  provenance, so pages can load them from jsDelivr or unpkg. `require("@jaemk/sirene")` returns
+  the loader.
 - Guide pages for the Rust library and for web pages.
 
 ## [0.6.0] - 2026-11-17
