@@ -41,8 +41,13 @@ names the command, when the running executable (symlinks resolved) is:
 
 - in a Homebrew Cellar (a `Cellar` path component): `brew upgrade sirene`;
 - inside an app bundle (`*.app/Contents/MacOS/`): `brew upgrade --cask sirene`;
-- in Cargo's bin directory (`$CARGO_HOME/bin`, default `~/.cargo/bin`): `cargo install sirene`.
+- in Cargo's bin directory (`$CARGO_HOME/bin`, default `~/.cargo/bin`): `cargo install sirene`;
+- in `/usr/bin`, where the release `.rpm` installs it (LINUXP-4): the system's package manager,
+  e.g. `sudo dnf upgrade` with the new release's `.rpm`;
+- inside an AppImage (a path component starting with `.mount_`, where the runtime mounts it, or
+  `appimage_extracted_`, where it extracts it): the new release's AppImage (LINUXP-5).
 
+The message says which, as `this sirene was installed by Homebrew; update it with ...`.
 `--check` still reports, and adds that note.
 
 ## UPDATE-5 Verification

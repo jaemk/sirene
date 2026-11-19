@@ -10,7 +10,10 @@
     )
 )]
 //! Packaging tasks: the macOS app bundle, its icon, and the Homebrew cask (`spec/macos-packaging.md`),
-//! and release archive signing (`spec/self-update.md`).
+//! the Linux AppDir for the RPM and AppImage (`spec/linux-packaging.md`), and release archive
+//! signing (`spec/self-update.md`).
+
+pub mod linux;
 
 use std::ffi::OsString;
 use std::fs;
@@ -89,6 +92,15 @@ enum Command {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Write the Linux AppDir (the AppImage root and the RPM's files) around a built `sirene`.
+    Linux {
+        /// The `sirene` binary to package.
+        #[arg(long)]
+        binary: PathBuf,
+        /// Directory to write AppDir into.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     /// Print a Homebrew cask for a zip of Sirene.app.
     Cask {
         /// Where the zip is downloaded from.
@@ -140,6 +152,12 @@ fn run_command(args: impl IntoIterator<Item = OsString>, out: &mut impl Write) -
         Command::Bundle { binary, out: dir } => {
             let app = bundle(&binary, &dir.unwrap_or_else(default_out))?;
             writeln!(out, "{}", app.display()).map_err(Error::from)
+        }
+        Command::Linux { binary, out: dir } => {
+            let dir = dir
+                .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../target/linux"));
+            let root = linux::appdir(&binary, &dir)?;
+            writeln!(out, "{}", root.display()).map_err(Error::from)
         }
         Command::Icon { out: dir } => {
             let dir = dir.unwrap_or_else(default_out);
@@ -439,7 +457,7 @@ pub fn sign(key: &zipsign_api::SigningKey, archive: &Path) -> Result<()> {
         .map_err(|e| context(archive, e.error))
 }
 
-fn write(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn write(path: &Path, bytes: &[u8]) -> Result<()> {
     fs::write(path, bytes).map_err(|e| context(path, e))
 }
 
@@ -464,7 +482,7 @@ fn write_private_new(path: &Path, bytes: &[u8]) -> Result<()> {
     f.write_all(bytes).map_err(|e| context(path, e))
 }
 
-fn context(path: &Path, e: io::Error) -> Error {
+pub(crate) fn context(path: &Path, e: io::Error) -> Error {
     Error::with_source(path.display().to_string(), e)
 }
 

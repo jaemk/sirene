@@ -46,3 +46,26 @@ workspace = true
 [dev-dependencies]
 assert_cmd = "2.2.2"
 predicates = "3.1.4"
+
+# The release `.rpm` (LINUXP-4): `cargo generate-rpm -p crates/sirene` packs the binary and the
+# files `cargo xtask linux` writes under target/linux/AppDir. Requires come from the binary's
+# linked libraries (`--auto-req find-requires`), plus the ones gpui loads at run time with dlopen.
+[package.metadata.generate-rpm]
+summary = "Mermaid, PlantUML, and Graphviz DOT diagram editor and viewer"
+license = "MIT OR Apache-2.0"
+url = "https://github.com/jaemk/sirene"
+requires = { "libvulkan.so.1()(64bit)" = "*", "libwayland-client.so.0()(64bit)" = "*" }
+assets = [
+    { source = "target/release/sirene", dest = "/usr/bin/sirene", mode = "755" },
+    { source = "target/linux/AppDir/usr/share/applications/sirene.desktop", dest = "/usr/share/applications/sirene.desktop", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/mime/packages/sirene.xml", dest = "/usr/share/mime/packages/sirene.xml", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/icons/hicolor/scalable/apps/sirene.svg", dest = "/usr/share/icons/hicolor/scalable/apps/sirene.svg", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/icons/hicolor/32x32/apps/sirene.png", dest = "/usr/share/icons/hicolor/32x32/apps/sirene.png", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/icons/hicolor/48x48/apps/sirene.png", dest = "/usr/share/icons/hicolor/48x48/apps/sirene.png", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/icons/hicolor/128x128/apps/sirene.png", dest = "/usr/share/icons/hicolor/128x128/apps/sirene.png", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/icons/hicolor/256x256/apps/sirene.png", dest = "/usr/share/icons/hicolor/256x256/apps/sirene.png", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/icons/hicolor/512x512/apps/sirene.png", dest = "/usr/share/icons/hicolor/512x512/apps/sirene.png", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/licenses/sirene/LICENSE-MIT", dest = "/usr/share/licenses/sirene/LICENSE-MIT", mode = "644", doc = true },
+    { source = "target/linux/AppDir/usr/share/licenses/sirene/LICENSE-APACHE", dest = "/usr/share/licenses/sirene/LICENSE-APACHE", mode = "644", doc = true },
+    { source = "target/linux/AppDir/usr/share/licenses/sirene/THIRD-PARTY-NOTICES", dest = "/usr/share/licenses/sirene/THIRD-PARTY-NOTICES", mode = "644", doc = true },
+]

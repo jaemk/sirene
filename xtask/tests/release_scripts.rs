@@ -819,10 +819,64 @@ fn the_release_tarballs_carry_the_notices() {
 #[test]
 fn the_release_carries_sirene_wasm() {
     let workflow = read(&repo_root().join(".github/workflows/release.yml"));
-    assert!(workflow.contains("    needs: [decide, sign, app, wasm]\n"));
+    assert!(workflow.contains("    needs: [decide, sign, app, wasm, linux]\n"));
     assert!(workflow.contains("          name: wasm\n          path: dist\n"));
     assert!(workflow.contains("cp docs/assets/sirene-wasm.js "));
     assert!(repo_root().join("docs/assets/sirene-wasm.js").is_file());
+}
+
+/// The `linux` job packs each gnu tarball's binary as an .rpm and an AppImage (LINUXP-6), and the
+/// release attaches and checksums both.
+#[test]
+fn the_release_carries_the_linux_packages() {
+    let workflow = read(&repo_root().join(".github/workflows/release.yml"));
+    let linux = &workflow[workflow.find("\n  linux:\n").expect("linux job")..];
+    let linux = &linux[..linux.find("\n  release:\n").expect("release job")];
+    assert!(linux.contains("    needs: [decide, build]\n"));
+    assert!(linux.contains("          name: unsigned-${{ matrix.arch }}-unknown-linux-gnu\n"));
+    assert!(
+        linux.contains("cargo xtask linux --binary target/release/sirene --out target/linux\n")
+    );
+    assert!(linux.contains(
+        "cargo generate-rpm -p crates/sirene --arch ${{ matrix.arch }} --auto-req find-requires"
+    ));
+    assert!(linux.contains("bash bin/appimage.sh ${{ matrix.arch }} target/linux/AppDir"));
+    for arch in ["x86_64", "aarch64"] {
+        assert!(
+            linux.contains(&format!("          - arch: {arch}\n")),
+            "{arch}"
+        );
+    }
+    assert!(workflow.contains("sha256sum *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS\n"));
+    assert_eq!(
+        workflow
+            .matches(
+                "dist/*.tar.gz dist/*.zip dist/*.rpm dist/*.AppImage dist/sirene.rb SHA256SUMS"
+            )
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn appimage_refuses_bad_arguments_before_any_download() {
+    let dir = scratch_dir();
+    let out = run("appimage.sh", &["x86_64"]);
+    assert_eq!(out.status.code(), Some(2), "{}", stderr(&out));
+    let appdir = dir.path().to_str().unwrap();
+    let image = dir.path().join("out.AppImage");
+    let image = image.to_str().unwrap();
+    let out = run("appimage.sh", &["riscv64", appdir, image]);
+    assert!(!out.status.success());
+    assert!(
+        stderr(&out).contains("no AppImage runtime for riscv64"),
+        "{}",
+        stderr(&out)
+    );
+    let out = run("appimage.sh", &["x86_64", appdir, image]);
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("has no AppRun"), "{}", stderr(&out));
+    assert!(!Path::new(image).exists());
 }
 
 /// The `wasm` job packs @jaemk/sirene and `publish` uploads it through trusted
