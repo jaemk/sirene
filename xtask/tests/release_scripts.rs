@@ -863,11 +863,13 @@ fn npm_package_stages_the_versioned_package() {
     let bin = stub_npm(dir.path(), "");
     let wasm = dir.path().join("sirene_wasm.wasm");
     std::fs::write(&wasm, b"\0asm").unwrap();
-    let out_dir = dir.path().join("out");
+    // Relative, as the release workflow passes it.
+    let out_dir = dir.path().join("npm-dist");
     let out = output(
         Command::new("bash")
             .arg(repo_root().join("bin/npm-package.sh"))
-            .args(["1.2.3".as_ref(), wasm.as_os_str(), out_dir.as_os_str()])
+            .args(["1.2.3".as_ref(), wasm.as_os_str(), "npm-dist".as_ref()])
+            .current_dir(dir.path())
             .env("PATH", path_with(&bin)),
     );
     assert!(out.status.success(), "{}", stderr(&out));
@@ -896,6 +898,7 @@ fn npm_package_stages_the_versioned_package() {
         assert!(manifest.contains(&format!("\"{name}\"")), "{name}");
         assert!(stage.join(name).is_file(), "{name}");
     }
+    // Absolute paths: npm reads a bare `npm-dist/package` as a GitHub repo.
     let log = read(&dir.path().join("npm.log"));
     assert_eq!(
         log,
@@ -907,33 +910,43 @@ fn npm_package_stages_the_versioned_package() {
     );
 }
 
-fn npm_publish(view_output: &str) -> (Output, String) {
+/// Runs `npm-publish.sh` with the relative `npm-dist/pkg.tgz` the release
+/// workflow passes; returns its output, the stub's log, and the tarball's
+/// absolute path.
+fn npm_publish(view_output: &str) -> (Output, String, PathBuf) {
     let dir = scratch_dir();
     let bin = stub_npm(dir.path(), view_output);
+    std::fs::create_dir_all(dir.path().join("npm-dist")).unwrap();
     let out = output(
         Command::new("bash")
             .arg(repo_root().join("bin/npm-publish.sh"))
-            .args(["1.2.3", "pkg.tgz"])
+            .args(["1.2.3", "npm-dist/pkg.tgz"])
+            .current_dir(dir.path())
             .env("PATH", path_with(&bin)),
     );
     let log = read(&dir.path().join("npm.log"));
-    (out, log)
+    (out, log, dir.path().join("npm-dist/pkg.tgz"))
 }
 
+/// The tarball's path is absolute: npm reads a bare `npm-dist/pkg.tgz` as a
+/// GitHub `user/repo`.
 #[test]
 fn npm_publish_uploads_a_new_version() {
-    let (out, log) = npm_publish("");
+    let (out, log, tarball) = npm_publish("");
     assert!(out.status.success(), "{}", stderr(&out));
     assert_eq!(
         log,
-        "npm view @jaemk/sirene@1.2.3 version\nnpm publish pkg.tgz --access public\n"
+        format!(
+            "npm view @jaemk/sirene@1.2.3 version\nnpm publish {} --access public\n",
+            tarball.display()
+        )
     );
 }
 
 /// A re-run of a release skips the version already on npm.
 #[test]
 fn npm_publish_skips_a_published_version() {
-    let (out, log) = npm_publish("1.2.3");
+    let (out, log, _) = npm_publish("1.2.3");
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(stdout(&out).contains("already on npm"));
     assert_eq!(log, "npm view @jaemk/sirene@1.2.3 version\n");

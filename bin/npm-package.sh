@@ -13,6 +13,10 @@ wasm=${2:?path to sirene_wasm.wasm}
 out=${3:?output directory}
 root=$(cd "$(dirname "$0")/.." && pwd)
 
+mkdir -p "$out"
+# Absolute: npm reads a bare relative path such as `npm-dist/package` as the
+# GitHub repo `npm-dist/package`.
+out=$(cd "$out" && pwd)
 stage="$out/package"
 rm -rf "$stage"
 mkdir -p "$stage"

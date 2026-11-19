@@ -11,6 +11,8 @@ set -euo pipefail
 
 version=${1:?version}
 tarball=${2:?package tarball}
+# Absolute, so npm cannot read the path as a GitHub `user/repo` shorthand.
+tarball="$(cd "$(dirname "$tarball")" && pwd)/$(basename "$tarball")"
 
 if [ "$(npm view "@jaemk/sirene@$version" version 2>/dev/null || true)" = "$version" ]; then
     echo "@jaemk/sirene@$version is already on npm - nothing to publish."
