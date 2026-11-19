@@ -83,10 +83,28 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 16px; }
 }
 .tagline {
   max-width: 640px;
-  margin: 20px auto 40px;
+  margin: 20px auto 24px;
   color: var(--muted);
   font-size: clamp(16px, 2.2vw, 19px);
 }
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 0 40px;
+}
+.button {
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--panel);
+}
+.button:hover { border-color: var(--cyan); color: #fff; }
+.button.primary { color: var(--bg); background: var(--cyan); border-color: var(--cyan); }
+.button.primary:hover { color: var(--bg); background: var(--sky); border-color: var(--sky); }
 
 /* The editor window mock: source beside the drawing. */
 .window {
@@ -154,7 +172,8 @@ main { max-width: 1160px; margin: 0 auto; padding: 0 16px; }
   .source { border-right: 0; border-bottom: 1px solid var(--border); }
   .window-title { display: none; }
   .nav-links { gap: 16px; }
-  .nav-links a[href$="quickstart.html"] { display: none; }
+  .nav-links a[href$="quickstart.html"],
+  .nav-links a[href$="playground.html"] { display: none; }
 }
 
 /* Install */

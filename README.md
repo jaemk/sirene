@@ -3,6 +3,9 @@
 A local editor and viewer for Mermaid, PlantUML, and Graphviz DOT diagrams. Edit the source or
 the drawing, and export SVG, PNG, or text for the terminal.
 
+**[Try it in the browser](https://jaemk.github.io/sirene/guide/playground.html)**: the
+playground draws Mermaid, PlantUML, or DOT as you type, with the same renderer.
+
 <p align="center">
   <img src="https://jaemk.github.io/sirene/hero.svg" alt="a flowchart drawn by sirene" width="640">
 </p>
