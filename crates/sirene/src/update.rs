@@ -135,6 +135,16 @@ impl Owner {
 
 /// Who installed the executable at `exe` (symlinks already resolved), given Cargo's home.
 pub fn owner(exe: &Path, cargo_home: Option<&Path>) -> Option<Owner> {
+    if exe.parent() == Some(Path::new("/usr/bin")) {
+        return Some(Owner::System);
+    }
+    // The same AppDir layout works for mounted images and any extracted directory name.
+    if exe.ends_with("usr/bin/sirene")
+        && let Some(appdir) = exe.ancestors().nth(3)
+        && appdir.join(".sirene-appimage").is_file()
+    {
+        return Some(Owner::AppImage);
+    }
     let parts: Vec<&std::ffi::OsStr> = exe
         .components()
         .filter_map(|c| match c {
@@ -144,18 +154,6 @@ pub fn owner(exe: &Path, cargo_home: Option<&Path>) -> Option<Owner> {
         .collect();
     if parts.iter().any(|p| *p == "Cellar") {
         return Some(Owner::Homebrew);
-    }
-    // The AppImage runtime mounts the image at `.mount_*`, or extracts it to
-    // `appimage_extracted_*` without FUSE.
-    let appimage = parts.iter().any(|p| {
-        p.to_str()
-            .is_some_and(|s| s.starts_with(".mount_") || s.starts_with("appimage_extracted_"))
-    });
-    if appimage {
-        return Some(Owner::AppImage);
-    }
-    if exe.parent() == Some(Path::new("/usr/bin")) {
-        return Some(Owner::System);
     }
     let bundled = parts.windows(3).any(|w| {
         w[0].to_str().is_some_and(|s| s.ends_with(".app")) && w[1] == "Contents" && w[2] == "MacOS"
@@ -554,16 +552,31 @@ mod tests {
         assert_eq!(owner(Path::new("/home/u/.cargo/bin/sirene"), None), None);
         assert_eq!(of("/usr/bin/sirene"), Some(Owner::System));
         assert_eq!(of("/usr/local/bin/sirene"), None);
-        assert_eq!(
-            of("/tmp/.mount_SireneAb12/usr/bin/sirene"),
-            Some(Owner::AppImage)
-        );
-        assert_eq!(
-            of("/tmp/appimage_extracted_0123abcd/usr/bin/sirene"),
-            Some(Owner::AppImage)
-        );
         assert!(Owner::Cask.hint().ends_with("`brew upgrade --cask sirene`"));
         assert!(Owner::System.hint().contains("sudo dnf upgrade"));
         assert!(Owner::AppImage.hint().contains("/jaemk/sirene/releases"));
+    }
+
+    #[test]
+    fn appimage_owner_requires_a_marker_at_the_appdir_root() {
+        let scratch = tempfile::tempdir().unwrap();
+        for name in [
+            ".mount_SireneAb12",
+            "appimage_extracted_0123abcd",
+            "squashfs-root",
+            "renamed image",
+        ] {
+            let root = scratch.path().join(name);
+            let exe = root.join("usr/bin/sirene");
+            std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+            std::fs::write(&exe, b"").unwrap();
+            let exe = exe.canonicalize().unwrap();
+
+            assert_eq!(owner(&exe, None), None, "{name}");
+            std::fs::write(root.join(".sirene-appimage"), b"").unwrap();
+            assert_eq!(owner(&exe, None), Some(Owner::AppImage), "{name}");
+            assert_eq!(owner(&root.join("usr/local/bin/sirene"), None), None);
+            assert_eq!(owner(&root.join("usr/bin/other"), None), None);
+        }
     }
 }

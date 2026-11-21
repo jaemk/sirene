@@ -434,11 +434,10 @@ fn linux_appdir_layout() {
     }
     let share = root.join("usr/share");
     let desktop = fs::read_to_string(share.join("applications/sirene.desktop")).unwrap();
-    assert_eq!(desktop, xtask::linux::desktop_entry());
-    assert_eq!(
-        fs::read_to_string(root.join("sirene.desktop")).unwrap(),
-        desktop
-    );
+    assert!(desktop.contains("Exec=/usr/bin/sirene %F\n"));
+    let appimage_desktop = fs::read_to_string(root.join("sirene.desktop")).unwrap();
+    assert!(appimage_desktop.contains("Exec=sirene %F\n"));
+    assert!(root.join(".sirene-appimage").is_file());
     assert_eq!(
         fs::read_to_string(share.join("mime/packages/sirene.xml")).unwrap(),
         xtask::linux::mime_package()
@@ -500,6 +499,11 @@ fn rpm_assets_cover_the_appdir() {
     }
     assert_eq!(files.len(), 12);
     for f in files {
-        assert!(manifest.contains(&format!("dest = \"/{f}\"")), "{f}");
+        let asset = format!("source = \"target/linux/AppDir/{f}\", dest = \"/{f}\"");
+        let entry = manifest.lines().find(|line| line.contains(&asset));
+        let entry = entry.unwrap_or_else(|| panic!("missing staged asset: {f}"));
+        if f.starts_with("usr/share/licenses/") {
+            assert!(!entry.contains("doc = true"), "{entry}");
+        }
     }
 }

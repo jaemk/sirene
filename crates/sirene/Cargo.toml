@@ -56,7 +56,7 @@ license = "MIT OR Apache-2.0"
 url = "https://github.com/jaemk/sirene"
 requires = { "libvulkan.so.1()(64bit)" = "*", "libwayland-client.so.0()(64bit)" = "*" }
 assets = [
-    { source = "target/release/sirene", dest = "/usr/bin/sirene", mode = "755" },
+    { source = "target/linux/AppDir/usr/bin/sirene", dest = "/usr/bin/sirene", mode = "755" },
     { source = "target/linux/AppDir/usr/share/applications/sirene.desktop", dest = "/usr/share/applications/sirene.desktop", mode = "644" },
     { source = "target/linux/AppDir/usr/share/mime/packages/sirene.xml", dest = "/usr/share/mime/packages/sirene.xml", mode = "644" },
     { source = "target/linux/AppDir/usr/share/icons/hicolor/scalable/apps/sirene.svg", dest = "/usr/share/icons/hicolor/scalable/apps/sirene.svg", mode = "644" },
@@ -65,7 +65,7 @@ assets = [
     { source = "target/linux/AppDir/usr/share/icons/hicolor/128x128/apps/sirene.png", dest = "/usr/share/icons/hicolor/128x128/apps/sirene.png", mode = "644" },
     { source = "target/linux/AppDir/usr/share/icons/hicolor/256x256/apps/sirene.png", dest = "/usr/share/icons/hicolor/256x256/apps/sirene.png", mode = "644" },
     { source = "target/linux/AppDir/usr/share/icons/hicolor/512x512/apps/sirene.png", dest = "/usr/share/icons/hicolor/512x512/apps/sirene.png", mode = "644" },
-    { source = "target/linux/AppDir/usr/share/licenses/sirene/LICENSE-MIT", dest = "/usr/share/licenses/sirene/LICENSE-MIT", mode = "644", doc = true },
-    { source = "target/linux/AppDir/usr/share/licenses/sirene/LICENSE-APACHE", dest = "/usr/share/licenses/sirene/LICENSE-APACHE", mode = "644", doc = true },
-    { source = "target/linux/AppDir/usr/share/licenses/sirene/THIRD-PARTY-NOTICES", dest = "/usr/share/licenses/sirene/THIRD-PARTY-NOTICES", mode = "644", doc = true },
+    { source = "target/linux/AppDir/usr/share/licenses/sirene/LICENSE-MIT", dest = "/usr/share/licenses/sirene/LICENSE-MIT", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/licenses/sirene/LICENSE-APACHE", dest = "/usr/share/licenses/sirene/LICENSE-APACHE", mode = "644" },
+    { source = "target/linux/AppDir/usr/share/licenses/sirene/THIRD-PARTY-NOTICES", dest = "/usr/share/licenses/sirene/THIRD-PARTY-NOTICES", mode = "644" },
 ]

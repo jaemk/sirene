@@ -18,7 +18,7 @@ pub const MARKDOWN_MIME: &str = "text/markdown";
 pub const ICON_SIZES: [u32; 5] = [32, 48, 128, 256, 512];
 
 /// The desktop entry (LINUXP-2).
-pub fn desktop_entry() -> String {
+fn desktop_entry(executable: &str) -> String {
     let mimes: String = MIME_TYPES
         .iter()
         .chain([&MARKDOWN_MIME])
@@ -30,7 +30,7 @@ Type=Application
 Name={APP}
 GenericName=Diagram Editor
 Comment=Mermaid, PlantUML, and Graphviz DOT diagram editor and viewer
-Exec={NAME} %F
+Exec={executable} %F
 Icon={NAME}
 Terminal=false
 Categories=Development;
@@ -70,12 +70,11 @@ pub fn appdir(binary: &Path, dir: &Path) -> Result<PathBuf> {
     }
     let share = root.join("usr/share");
     let exe = root.join("usr/bin").join(NAME);
-    let desktop = desktop_entry();
     let mut files: Vec<(PathBuf, Vec<u8>)> = vec![
         (exe.clone(), exe_bytes),
         (
             share.join(format!("applications/{NAME}.desktop")),
-            desktop.clone().into_bytes(),
+            desktop_entry(&format!("/usr/bin/{NAME}")).into_bytes(),
         ),
         (
             share.join(format!("mime/packages/{NAME}.xml")),
@@ -85,7 +84,12 @@ pub fn appdir(binary: &Path, dir: &Path) -> Result<PathBuf> {
             share.join(format!("icons/hicolor/scalable/apps/{NAME}.svg")),
             ICON_SVG.as_bytes().to_vec(),
         ),
-        (root.join(format!("{NAME}.desktop")), desktop.into_bytes()),
+        (
+            root.join(format!("{NAME}.desktop")),
+            desktop_entry(NAME).into_bytes(),
+        ),
+        // UPDATE-4 identifies the mounted or extracted AppImage by this file.
+        (root.join(".sirene-appimage"), Vec::new()),
         (root.join(format!("{NAME}.png")), icon_png(256)?),
     ];
     for size in ICON_SIZES {
@@ -152,13 +156,15 @@ mod tests {
 
     #[test]
     fn desktop_entry_lists_every_mime_type() {
-        let d = desktop_entry();
-        assert!(
-            d.contains(
-                "MimeType=text/x-mermaid;text/vnd.graphviz;text/x-plantuml;text/markdown;\n"
-            ),
-            "{d}"
-        );
-        assert!(d.contains("Exec=sirene %F\n"), "{d}");
+        for executable in ["/usr/bin/sirene", "sirene"] {
+            let d = desktop_entry(executable);
+            assert!(
+                d.contains(
+                    "MimeType=text/x-mermaid;text/vnd.graphviz;text/x-plantuml;text/markdown;\n"
+                ),
+                "{d}"
+            );
+            assert!(d.contains(&format!("Exec={executable} %F\n")), "{d}");
+        }
     }
 }
