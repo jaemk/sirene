@@ -42,23 +42,24 @@ The repo is not named `homebrew-sirene`, so the tap needs its clone URL. Install
 formula or the cask, not both: each puts `sirene` on the PATH. The app is not signed, so macOS
 asks before the first launch.
 
-## Fedora, RHEL, and other RPM distributions
+## RPM packages
 
-Each release has an `.rpm` of the editor build for x86_64 and aarch64. `dnf` installs it from the
-release URL and pulls in the X11, Wayland, and Vulkan libraries it needs:
+The editor RPM is available for x86_64 and aarch64. It requires glibc 2.39 or later, which
+Fedora 40 and RHEL 10 provide. `dnf` installs it from the release URL and pulls in the required
+X11, Wayland, and Vulkan libraries.
 
 ```
 sudo dnf install https://github.com/jaemk/sirene/releases/download/vX.Y.Z/sirene-X.Y.Z-1.x86_64.rpm
 ```
 
-It installs `sirene` to `/usr/bin`, with a menu entry, icon, and file types for Mermaid, DOT,
-and PlantUML files. There is no package repository yet: to update, `sudo dnf upgrade` the next
-release's `.rpm` URL the same way. The binary is built on Ubuntu 24.04, so it needs glibc 2.39
-or later (Fedora 40 and later).
+The RPM installs `/usr/bin/sirene` and registers a menu entry, icon, and file types for
+Mermaid, DOT, and PlantUML files. To update, run `sudo dnf upgrade` with the next release's
+RPM URL.
 
 ## AppImage
 
-`Sirene-X.Y.Z-x86_64.AppImage` (or `aarch64`) runs on most distributions without installing:
+Download `Sirene-X.Y.Z-x86_64.AppImage` or the `aarch64` variant for your system. The editor
+requires glibc 2.39 or later and uses the system's X11 or Wayland and Vulkan libraries.
 
 ```
 chmod +x Sirene-X.Y.Z-x86_64.AppImage
@@ -66,8 +67,9 @@ chmod +x Sirene-X.Y.Z-x86_64.AppImage
 ./Sirene-X.Y.Z-x86_64.AppImage ascii file.mmd  # any sirene command
 ```
 
-It needs FUSE (`fuse` or `fuse3`); without it, add `--appimage-extract-and-run`. It uses the
-system's X11 or Wayland and Vulkan libraries. To update, download the next release's AppImage.
+The AppImage mounts through FUSE. For systems without FUSE, add
+`--appimage-extract-and-run` before the Sirene arguments. To update, download the next release's
+AppImage.
 
 ## Cargo
 
@@ -91,4 +93,5 @@ then prints `error: built without the GUI; see sirene --help`.
 
 Each [release](https://github.com/jaemk/sirene/releases) has binaries for Linux (musl and glibc,
 x86_64 and aarch64), macOS (x86_64 and aarch64), a universal `Sirene.app` zip, `.rpm` packages
-and AppImages for Linux (x86_64 and aarch64), and `SHA256SUMS`.
+and AppImages for Linux (x86_64 and aarch64), the AppImage runtime source archives, and
+`SHA256SUMS`.

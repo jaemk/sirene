@@ -44,8 +44,8 @@ names the command, when the running executable (symlinks resolved) is:
 - in Cargo's bin directory (`$CARGO_HOME/bin`, default `~/.cargo/bin`): `cargo install sirene`;
 - in `/usr/bin`, where the release `.rpm` installs it (LINUXP-4): the system's package manager,
   e.g. `sudo dnf upgrade` with the new release's `.rpm`;
-- inside an AppImage (a path component starting with `.mount_`, where the runtime mounts it, or
-  `appimage_extracted_`, where it extracts it): the new release's AppImage (LINUXP-5).
+- at `usr/bin/sirene` in an AppDir with the `.sirene-appimage` marker at its root, whether
+  mounted or extracted: the new release's AppImage (LINUXP-5).
 
 The message says which, as `this sirene was installed by Homebrew; update it with ...`.
 `--check` still reports, and adds that note.

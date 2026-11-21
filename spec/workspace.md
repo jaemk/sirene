@@ -79,10 +79,13 @@ tagged commit):
    universal `Sirene.app` zip and cask (MACOSP-6). `wasm` builds `sirene-wasm-X.Y.Z.tar.gz`
    (WORKSP-11) and attests it; it is not signed, as nothing updates from it. It also packs the
    `@jaemk/sirene` npm package from the same files (`bin/npm-package.sh`). `linux`, after
-   `build`, packs each gnu binary as an `.rpm` and an AppImage and attests them (LINUXP-6).
+   `build`, packages each GNU binary and attests the RPM, AppImage, and AppImage runtime
+   source archive (LINUXP-6). The Linux packaging workflow exercises the same commands
+   on pull requests (LINUXP-7).
 4. `release`: creates the `vX.Y.Z` tag on the released commit and its GitHub release, with the
-   changelog section as notes and the tarballs, the zip, the `.rpm` files, the AppImages, the
-   cask, and `SHA256SUMS` (of the tarballs, zip, `.rpm` files, and AppImages) as assets.
+   changelog section as notes and the tarballs, the zip, the Linux packages, the AppImage
+   runtime source archives, the cask, and `SHA256SUMS` as assets. The checksum file covers the
+   tarballs, zip, RPMs, AppImages, and runtime source archives.
 5. `publish`, in the `release` environment (approval required): `bin/publish.sh` publishes
    `sirene-core`, `sirene-gui`, then `sirene` with `--no-verify` (step 3 verified them, and a
    build here would run every build script with the token in its environment), treating an
@@ -106,7 +109,8 @@ built without it (`--no-default-features`, CLI-7).
 
 The repository is a Homebrew tap. `Formula/sirene.rb` installs the macOS and gnu binaries;
 `Casks/sirene.rb` installs `Sirene.app` (MACOSP-5). The gnu binaries are also packed as an
-`.rpm` and an AppImage for each architecture (`spec/linux-packaging.md`).
+`.rpm` and an AppImage for each architecture. Both packages use the same GNU executable
+and require glibc 2.39 or later (`spec/linux-packaging.md`).
 
 `bin/install.sh` installs the binary for the host into `SIRENE_INSTALL_DIR` (default
 `~/.local/bin`): the latest release unless `SIRENE_VERSION` is set (a leading `v` is dropped),

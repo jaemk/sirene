@@ -1,0 +1,62 @@
+name: linux packaging
+
+on:
+  pull_request:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-packaging-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTUP_TOOLCHAIN: "1.99.1"
+
+jobs:
+  package:
+    name: package and test Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            os: ubuntu-24.04
+          - arch: aarch64
+            os: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: install build and package tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libwayland-dev libfontconfig1-dev libfreetype-dev libvulkan-dev \
+            squashfs-tools rpm desktop-file-utils
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit
+        with:
+          toolchain: "1.99.1"
+          targets: ${{ matrix.arch }}-unknown-linux-gnu
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: linux-packaging-${{ matrix.arch }}
+      - name: install the release tools
+        run: |
+          cargo install cargo-auditable --version 0.7.5 --locked
+          cargo install cargo-generate-rpm --version 0.21.0 --locked
+      - name: build the GNU editor
+        run: cargo auditable build --release --locked --package sirene --target "${{ matrix.arch }}-unknown-linux-gnu"
+      - name: package and smoke test
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml)"
+          binary="target/${{ matrix.arch }}-unknown-linux-gnu/release/sirene"
+          bash bin/linux-package.sh "${{ matrix.arch }}" "$version" "$binary" linux-dist
+          bash bin/linux-package-smoke.sh "${{ matrix.arch }}" "$version" "$binary" linux-dist

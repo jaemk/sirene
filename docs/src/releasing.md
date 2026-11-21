@@ -30,9 +30,11 @@ To release `X.Y.Z`:
 `umask 077`, and signs the tarballs before their attestations and `SHA256SUMS` are generated.
 The `wasm` job builds `sirene-wasm-X.Y.Z.tar.gz` ([Web pages](embedding.md)) and attests it,
 and packs the `@jaemk/sirene` npm package.
-The `linux` job packs the gnu binaries as `.rpm` files and AppImages and attests them.
+The `linux` job packages the GNU binaries and attests each RPM, AppImage, and AppImage
+runtime source archive. The Linux packaging workflow uses the same commands to build and
+smoke-test packages on x86_64 and aarch64 for pull requests.
 The `release` job creates the `vX.Y.Z` release with the signed tarballs, app, `sirene-wasm`
-tarball, `.rpm` files, AppImages, and checksums.
+tarball, Linux packages, their runtime source archives, and checksums.
 After approval in the `release` environment, `publish` publishes `sirene-core`, `sirene-gui`,
 and `sirene` to crates.io, commits the Homebrew formula, the cask, and the next `-dev` version
 to `main`, then publishes `@jaemk/sirene` to npm.

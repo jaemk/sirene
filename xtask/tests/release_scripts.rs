@@ -834,18 +834,25 @@ fn the_release_carries_the_linux_packages() {
     let linux = &linux[..linux.find("\n  release:\n").expect("release job")];
     assert!(linux.contains("    needs: [decide, build]\n"));
     assert!(linux.contains("          name: unsigned-${{ matrix.arch }}-unknown-linux-gnu\n"));
+    assert!(linux.contains("bash bin/linux-package.sh "));
+    assert!(linux.contains("linux-dist/*.AppImage-runtime-source.tar.gz"));
+    assert!(workflow.contains("test -s \"sirene-${VERSION}-1.${arch}.rpm\""));
+    assert!(workflow.contains("test -s \"Sirene-${VERSION}-${arch}.AppImage\""));
     assert!(
-        linux.contains("cargo xtask linux --binary target/release/sirene --out target/linux\n")
+        workflow.contains("test -s \"Sirene-${VERSION}-${arch}.AppImage-runtime-source.tar.gz\"")
     );
-    assert!(linux.contains(
-        "cargo generate-rpm -p crates/sirene --arch ${{ matrix.arch }} --auto-req find-requires"
-    ));
-    assert!(linux.contains("bash bin/appimage.sh ${{ matrix.arch }} target/linux/AppDir"));
+    let checks = read(&repo_root().join(".github/workflows/linux-packaging.yml"));
+    assert!(checks.contains("  pull_request:\n"));
+    assert!(checks.contains("  contents: read\n"));
+    assert!(checks.contains("bash bin/linux-package.sh "));
+    assert!(checks.contains("bash bin/linux-package-smoke.sh "));
     for arch in ["x86_64", "aarch64"] {
-        assert!(
-            linux.contains(&format!("          - arch: {arch}\n")),
-            "{arch}"
-        );
+        for job in [linux, &checks] {
+            assert!(
+                job.contains(&format!("          - arch: {arch}\n")),
+                "{arch}"
+            );
+        }
     }
     assert!(workflow.contains("sha256sum *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS\n"));
     assert_eq!(

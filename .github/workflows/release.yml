@@ -410,8 +410,8 @@ jobs:
           name: npm
           path: npm-dist/jaemk-sirene-*.tgz
 
-  # The .rpm and the AppImage (spec/linux-packaging.md), around the same gnu binary as the
-  # tarball the `build` job made. They do not update themselves (UPDATE-4), so they are attested
+  # The .rpm, AppImage, and its runtime source (spec/linux-packaging.md), using the GNU binary
+  # from the tarball the `build` job made. The packages do not self-update, so they are attested
   # but not zipsign-signed.
   linux:
     name: linux packages ${{ matrix.arch }}
@@ -457,24 +457,22 @@ jobs:
       - name: package
         run: |
           set -euo pipefail
-          mkdir -p target/release linux-dist
+          mkdir -p target/linux-input
           tar -xzf "unsigned/sirene-${VERSION}-${{ matrix.arch }}-unknown-linux-gnu.tar.gz" \
-            -C target/release sirene
-          cargo xtask linux --binary target/release/sirene --out target/linux
-          cargo generate-rpm -p crates/sirene --arch ${{ matrix.arch }} --auto-req find-requires -o linux-dist/
-          bash bin/appimage.sh ${{ matrix.arch }} target/linux/AppDir \
-            "linux-dist/Sirene-${VERSION}-${{ matrix.arch }}.AppImage"
-          ls -l linux-dist
+            -C target/linux-input sirene
+          bash bin/linux-package.sh "${{ matrix.arch }}" "$VERSION" target/linux-input/sirene linux-dist
       - name: attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             linux-dist/*.rpm
             linux-dist/*.AppImage
+            linux-dist/*.AppImage-runtime-source.tar.gz
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-${{ matrix.arch }}
           path: linux-dist/
+          if-no-files-found: error
 
   release:
     needs: [decide, sign, app, wasm, linux]
@@ -507,9 +505,16 @@ jobs:
           merge-multiple: true
       - name: generate SHA256SUMS
         run: |
+          set -euo pipefail
           cd dist
+          for arch in x86_64 aarch64; do
+            test -s "sirene-${VERSION}-1.${arch}.rpm"
+            test -s "Sirene-${VERSION}-${arch}.AppImage"
+            test -s "Sirene-${VERSION}-${arch}.AppImage-runtime-source.tar.gz"
+          done
+          linux_packages=(*.rpm *.AppImage *.AppImage-runtime-source.tar.gz)
+          test "${#linux_packages[@]}" -eq 6
           sha256sum *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS
-          cd ..
       - name: create the tag and release
         env:
           GH_TOKEN: ${{ github.token }}
