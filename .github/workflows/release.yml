@@ -514,7 +514,7 @@ jobs:
           done
           linux_packages=(*.rpm *.AppImage *.AppImage-runtime-source.tar.gz)
           test "${#linux_packages[@]}" -eq 6
-          sha256sum *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS
+          sha256sum -- *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS
       - name: create the tag and release
         env:
           GH_TOKEN: ${{ github.token }}

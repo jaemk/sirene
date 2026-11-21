@@ -854,7 +854,7 @@ fn the_release_carries_the_linux_packages() {
             );
         }
     }
-    assert!(workflow.contains("sha256sum *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS\n"));
+    assert!(workflow.contains("sha256sum -- *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS\n"));
     assert_eq!(
         workflow
             .matches(
