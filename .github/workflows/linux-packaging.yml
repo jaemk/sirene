@@ -51,12 +51,61 @@ jobs:
         run: |
           cargo install cargo-auditable --version 0.7.5 --locked
           cargo install cargo-generate-rpm --version 0.21.0 --locked
+      # Exercise a stable release version in an isolated CI checkout.
+      - name: prepare a stable version
+        run: |
+          python3 - <<'PYVERSION'
+          import pathlib, re
+          path = pathlib.Path("Cargo.toml")
+          text = path.read_text()
+          match = re.search(r'^version = "(\d+\.\d+\.\d+)(?:-dev)?"$', text, re.M)
+          if not match:
+              raise SystemExit("expected a stable or -dev workspace version")
+          old, version = match.group(0).split('"')[1], match.group(1)
+          text = text.replace(f'version = "{old}"', f'version = "{version}"')
+          path.write_text(text)
+          with open(__import__("os").environ["GITHUB_ENV"], "a") as env:
+              env.write(f"VERSION={version}\n")
+          PYVERSION
+          cargo update --workspace
+          bash bin/check-versions.sh
       - name: build the GNU editor
         run: cargo auditable build --release --locked --package sirene --target "${{ matrix.arch }}-unknown-linux-gnu"
       - name: package and smoke test
         run: |
           set -euo pipefail
-          version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml)"
           binary="target/${{ matrix.arch }}-unknown-linux-gnu/release/sirene"
-          bash bin/linux-package.sh "${{ matrix.arch }}" "$version" "$binary" linux-dist
-          bash bin/linux-package-smoke.sh "${{ matrix.arch }}" "$version" "$binary" linux-dist
+          target="${{ matrix.arch }}-unknown-linux-gnu"
+          bash bin/release-archive.sh pack "$VERSION" "$target" "$binary" unsigned
+          bash bin/release-archive.sh extract "unsigned/sirene-${VERSION}-${target}.tar.gz" target/linux-input
+          bash bin/linux-package.sh "${{ matrix.arch }}" "$VERSION" target/linux-input/sirene linux-dist
+          bash bin/linux-package-smoke.sh "${{ matrix.arch }}" "$VERSION" "$binary" linux-dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-check-${{ matrix.arch }}
+          path: linux-dist/
+          if-no-files-found: error
+
+  assemble:
+    name: check release asset assembly
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: linux-check-*
+          path: dist
+          merge-multiple: true
+      - name: validate release asset names and checksums
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^version = "\([0-9.]*\)\(-dev\)\{0,1\}"$/\1/p' Cargo.toml)"
+          test -n "$version"
+          # Other release jobs provide these assets; exercise their inclusion without publishing.
+          printf 'fixture\n' > dist/other-release.tar.gz
+          printf 'fixture\n' > dist/other-release.zip
+          bash bin/release-checksums.sh "$version" dist SHA256SUMS
+          (cd dist && sha256sum -c ../SHA256SUMS)

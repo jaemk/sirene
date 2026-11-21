@@ -32,7 +32,9 @@ The `wasm` job builds `sirene-wasm-X.Y.Z.tar.gz` ([Web pages](embedding.md)) and
 and packs the `@jaemk/sirene` npm package.
 The `linux` job packages the GNU binaries and attests each RPM, AppImage, and AppImage
 runtime source archive. The Linux packaging workflow uses the same commands to build and
-smoke-test packages on x86_64 and aarch64 for pull requests.
+smoke-test stable-version packages on x86_64 and aarch64 for pull requests, including the
+release tarball handoff and checksum assembly. Signing, attestation, and publication remain
+release-only steps.
 The `release` job creates the `vX.Y.Z` release with the signed tarballs, app, `sirene-wasm`
 tarball, Linux packages, their runtime source archives, and checksums.
 After approval in the `release` environment, `publish` publishes `sirene-core`, `sirene-gui`,

@@ -245,11 +245,8 @@ jobs:
         run: cargo package --workspace --exclude xtask --exclude sirene-wasm --locked --target ${{ matrix.target }}
       - name: package
         run: |
-          dist="sirene-${VERSION}-${{ matrix.target }}"
-          mkdir "$dist"
-          cp "target/${{ matrix.target }}/release/sirene" "$dist/"
-          cp LICENSE-MIT LICENSE-APACHE THIRD-PARTY-NOTICES "$dist/"
-          tar -czf "${dist}.tar.gz" -C "$dist" sirene LICENSE-MIT LICENSE-APACHE THIRD-PARTY-NOTICES
+          bash bin/release-archive.sh pack "$VERSION" "${{ matrix.target }}" \
+            "target/${{ matrix.target }}/release/sirene" .
       # Signed, attested, and checksummed by the `sign` job.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -457,9 +454,8 @@ jobs:
       - name: package
         run: |
           set -euo pipefail
-          mkdir -p target/linux-input
-          tar -xzf "unsigned/sirene-${VERSION}-${{ matrix.arch }}-unknown-linux-gnu.tar.gz" \
-            -C target/linux-input sirene
+          bash bin/release-archive.sh extract \
+            "unsigned/sirene-${VERSION}-${{ matrix.arch }}-unknown-linux-gnu.tar.gz" target/linux-input
           bash bin/linux-package.sh "${{ matrix.arch }}" "$VERSION" target/linux-input/sirene linux-dist
       - name: attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -506,15 +502,7 @@ jobs:
       - name: generate SHA256SUMS
         run: |
           set -euo pipefail
-          cd dist
-          for arch in x86_64 aarch64; do
-            test -s "sirene-${VERSION}-1.${arch}.rpm"
-            test -s "Sirene-${VERSION}-${arch}.AppImage"
-            test -s "Sirene-${VERSION}-${arch}.AppImage-runtime-source.tar.gz"
-          done
-          linux_packages=(*.rpm *.AppImage *.AppImage-runtime-source.tar.gz)
-          test "${#linux_packages[@]}" -eq 6
-          sha256sum -- *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS
+          bash bin/release-checksums.sh "$VERSION" dist SHA256SUMS
       - name: create the tag and release
         env:
           GH_TOKEN: ${{ github.token }}

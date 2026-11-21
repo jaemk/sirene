@@ -85,11 +85,14 @@ The Linux packages use attestations for provenance and their own update process 
 ## LINUXP-7 Package verification
 
 `.github/workflows/linux-packaging.yml` runs on both native architectures on pull requests
-and pushes to branches. It builds the GNU binary and calls the release packaging script, then
-runs `bin/linux-package-smoke.sh ARCH VERSION BINARY DIST`. The checks compare each packaged
+and pushes to branches. It builds a stable-version GNU binary, packs and extracts it with the
+same archive script as the release, and calls the release packaging script, then runs `bin/linux-package-smoke.sh ARCH VERSION BINARY DIST`. The checks compare each packaged
 executable to the build input, render a diagram from each package, exercise AppImage
 extraction and the updater guard, relink the AppImage runtime from the shipped materials, and
-install, upgrade, and remove the RPM on Fedora 43.
+install, upgrade, and remove the RPM on Fedora 43. A final job downloads both architectures’
+artifacts and uses the release checksum script to validate the six package names and checksums,
+with fixture assets representing the other release jobs. This does not publish a release or test
+signing and attestations.
 The RPM check also verifies that licenses survive `nodocs` and validates the launcher, icon
 file, and Mermaid MIME registration.
 
