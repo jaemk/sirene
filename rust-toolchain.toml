@@ -2,7 +2,8 @@
 # CI. It is not the supported minimum; that is Cargo.toml's `rust-version`.
 #
 # Bumping is deliberate: change `channel` here and the `toolchain:` inputs and
-# `RUSTUP_TOOLCHAIN` pins in .github/workflows/release.yml together, then run
+# `RUSTUP_TOOLCHAIN` pins in .github/workflows/release.yml and linux-packaging.yml
+# together, then run
 # scripts/ci.sh and fix what newer lints report.
 [toolchain]
 channel = "1.99.1"

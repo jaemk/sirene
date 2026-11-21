@@ -843,6 +843,7 @@ fn the_release_carries_the_linux_packages() {
     assert!(workflow.contains("bash bin/release-checksums.sh "));
     let checks = read(&repo_root().join(".github/workflows/linux-packaging.yml"));
     assert!(checks.contains("  pull_request:\n"));
+    assert!(checks.contains("    branches: [main]\n"));
     assert!(checks.contains("  contents: read\n"));
     assert!(checks.contains("bash bin/linux-package.sh "));
     assert!(checks.contains("bash bin/linux-package-smoke.sh "));
