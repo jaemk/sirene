@@ -78,10 +78,11 @@ tagged commit):
    environment of a compile) and gives the signed tarballs a build provenance attestation. `app` builds the
    universal `Sirene.app` zip and cask (MACOSP-6). `wasm` builds `sirene-wasm-X.Y.Z.tar.gz`
    (WORKSP-11) and attests it; it is not signed, as nothing updates from it. It also packs the
-   `@jaemk/sirene` npm package from the same files (`bin/npm-package.sh`).
+   `@jaemk/sirene` npm package from the same files (`bin/npm-package.sh`). `linux`, after
+   `build`, packs each gnu binary as an `.rpm` and an AppImage and attests them (LINUXP-6).
 4. `release`: creates the `vX.Y.Z` tag on the released commit and its GitHub release, with the
-   changelog section as notes and the tarballs, the zip, the cask, and `SHA256SUMS` (of the
-   tarballs and zip) as assets.
+   changelog section as notes and the tarballs, the zip, the `.rpm` files, the AppImages, the
+   cask, and `SHA256SUMS` (of the tarballs, zip, `.rpm` files, and AppImages) as assets.
 5. `publish`, in the `release` environment (approval required): `bin/publish.sh` publishes
    `sirene-core`, `sirene-gui`, then `sirene` with `--no-verify` (step 3 verified them, and a
    build here would run every build script with the token in its environment), treating an
@@ -104,7 +105,8 @@ Each release carries `sirene` for `aarch64-apple-darwin`, `x86_64-apple-darwin`,
 built without it (`--no-default-features`, CLI-7).
 
 The repository is a Homebrew tap. `Formula/sirene.rb` installs the macOS and gnu binaries;
-`Casks/sirene.rb` installs `Sirene.app` (MACOSP-5).
+`Casks/sirene.rb` installs `Sirene.app` (MACOSP-5). The gnu binaries are also packed as an
+`.rpm` and an AppImage for each architecture (`spec/linux-packaging.md`).
 
 `bin/install.sh` installs the binary for the host into `SIRENE_INSTALL_DIR` (default
 `~/.local/bin`): the latest release unless `SIRENE_VERSION` is set (a leading `v` is dropped),

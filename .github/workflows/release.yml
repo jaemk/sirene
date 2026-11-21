@@ -410,8 +410,74 @@ jobs:
           name: npm
           path: npm-dist/jaemk-sirene-*.tgz
 
+  # The .rpm and the AppImage (spec/linux-packaging.md), around the same gnu binary as the
+  # tarball the `build` job made. They do not update themselves (UPDATE-4), so they are attested
+  # but not zipsign-signed.
+  linux:
+    name: linux packages ${{ matrix.arch }}
+    needs: [decide, build]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: "1.99.1"
+      VERSION: ${{ needs.decide.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            os: ubuntu-24.04
+          - arch: aarch64
+            os: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # rpm brings /usr/lib/rpm/find-requires for the .rpm's requirements:
+      # cargo-generate-rpm's builtin scan writes glibc `[WEAK]` symbol versions
+      # that no package provides, so dnf would refuse the package.
+      - name: install squashfs-tools and rpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools rpm
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable, pinned commit
+        with:
+          toolchain: "1.99.1"
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          key: linux-${{ matrix.arch }}
+      - name: install cargo-generate-rpm
+        run: cargo install cargo-generate-rpm --version 0.21.0 --locked
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unsigned-${{ matrix.arch }}-unknown-linux-gnu
+          path: unsigned
+      - name: package
+        run: |
+          set -euo pipefail
+          mkdir -p target/release linux-dist
+          tar -xzf "unsigned/sirene-${VERSION}-${{ matrix.arch }}-unknown-linux-gnu.tar.gz" \
+            -C target/release sirene
+          cargo xtask linux --binary target/release/sirene --out target/linux
+          cargo generate-rpm -p crates/sirene --arch ${{ matrix.arch }} --auto-req find-requires -o linux-dist/
+          bash bin/appimage.sh ${{ matrix.arch }} target/linux/AppDir \
+            "linux-dist/Sirene-${VERSION}-${{ matrix.arch }}.AppImage"
+          ls -l linux-dist
+      - name: attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            linux-dist/*.rpm
+            linux-dist/*.AppImage
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-${{ matrix.arch }}
+          path: linux-dist/
+
   release:
-    needs: [decide, sign, app, wasm]
+    needs: [decide, sign, app, wasm, linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -420,8 +486,8 @@ jobs:
       VERSION: ${{ needs.decide.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The signed archives, the app, and sirene-wasm, not the `unsigned-*`
-      # artifacts.
+      # The signed archives, the app, sirene-wasm, and the Linux packages, not
+      # the `unsigned-*` artifacts.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: signed
@@ -434,10 +500,15 @@ jobs:
         with:
           name: wasm
           path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: linux-*
+          path: dist
+          merge-multiple: true
       - name: generate SHA256SUMS
         run: |
           cd dist
-          sha256sum *.tar.gz *.zip > ../SHA256SUMS
+          sha256sum *.tar.gz *.zip *.rpm *.AppImage > ../SHA256SUMS
           cd ..
       - name: create the tag and release
         env:
@@ -447,10 +518,10 @@ jobs:
           tag="v${VERSION}"
           if gh release view "$tag" --json tagName >/dev/null 2>&1; then
             echo "$tag exists; re-uploading its assets"
-            gh release upload "$tag" dist/*.tar.gz dist/*.zip dist/sirene.rb SHA256SUMS --clobber
+            gh release upload "$tag" dist/*.tar.gz dist/*.zip dist/*.rpm dist/*.AppImage dist/sirene.rb SHA256SUMS --clobber
           else
             bash bin/changelog-section.sh "$VERSION" > notes.md
-            gh release create "$tag" dist/*.tar.gz dist/*.zip dist/sirene.rb SHA256SUMS \
+            gh release create "$tag" dist/*.tar.gz dist/*.zip dist/*.rpm dist/*.AppImage dist/sirene.rb SHA256SUMS \
               --target "$GITHUB_SHA" --title "$tag" --notes-file notes.md
           fi
 

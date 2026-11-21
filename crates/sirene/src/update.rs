@@ -106,15 +106,29 @@ pub enum Owner {
     Homebrew,
     Cask,
     Cargo,
+    /// The system's package manager: the release `.rpm` installs into `/usr/bin`.
+    System,
+    /// An AppImage's mounted or extracted root.
+    AppImage,
 }
 
 impl Owner {
-    /// The command that updates a binary this owner installed.
-    pub fn command(self) -> &'static str {
+    /// Who installed the binary and how to update it, after "this sirene ".
+    pub fn hint(self) -> &'static str {
         match self {
-            Owner::Homebrew => "brew upgrade sirene",
-            Owner::Cask => "brew upgrade --cask sirene",
-            Owner::Cargo => "cargo install sirene",
+            Owner::Homebrew => "was installed by Homebrew; update it with `brew upgrade sirene`",
+            Owner::Cask => {
+                "was installed by a Homebrew cask; update it with `brew upgrade --cask sirene`"
+            }
+            Owner::Cargo => "was installed by Cargo; update it with `cargo install sirene`",
+            Owner::System => {
+                "was installed by the system's package manager; update it with that, e.g. \
+                 `sudo dnf upgrade ./sirene-VERSION-1.ARCH.rpm` with the new release's .rpm"
+            }
+            Owner::AppImage => {
+                "runs from an AppImage; replace it with the new release's AppImage from \
+                 https://github.com/jaemk/sirene/releases"
+            }
         }
     }
 }
@@ -130,6 +144,18 @@ pub fn owner(exe: &Path, cargo_home: Option<&Path>) -> Option<Owner> {
         .collect();
     if parts.iter().any(|p| *p == "Cellar") {
         return Some(Owner::Homebrew);
+    }
+    // The AppImage runtime mounts the image at `.mount_*`, or extracts it to
+    // `appimage_extracted_*` without FUSE.
+    let appimage = parts.iter().any(|p| {
+        p.to_str()
+            .is_some_and(|s| s.starts_with(".mount_") || s.starts_with("appimage_extracted_"))
+    });
+    if appimage {
+        return Some(Owner::AppImage);
+    }
+    if exe.parent() == Some(Path::new("/usr/bin")) {
+        return Some(Owner::System);
     }
     let bundled = parts.windows(3).any(|w| {
         w[0].to_str().is_some_and(|s| s.ends_with(".app")) && w[1] == "Contents" && w[2] == "MacOS"
@@ -250,10 +276,7 @@ fn run_update(args: Args, out: &mut impl Write) -> Result<()> {
         .map_err(|e| Error::with_source("cannot locate the running executable", e))?;
     let owner = owner(&exe, cargo_home().as_deref());
     if let (Some(owner), false) = (owner, args.check) {
-        return Err(Error::new(format!(
-            "this sirene was installed by a package manager; update it with `{}`",
-            owner.command()
-        )));
+        return Err(Error::new(format!("this sirene {}", owner.hint())));
     }
     let explicit = pinned.is_some();
     let version = match pinned {
@@ -267,10 +290,7 @@ fn run_update(args: Args, out: &mut impl Write) -> Result<()> {
     log::debug!("update decision for {current} -> {version}: {decision:?}");
     let note = |out: &mut _| {
         if let Some(owner) = owner {
-            say(
-                out,
-                format_args!("note: update this sirene with `{}`", owner.command()),
-            )?;
+            say(out, format_args!("note: this sirene {}", owner.hint()))?;
         }
         Ok(())
     };
@@ -532,6 +552,18 @@ mod tests {
         assert_eq!(of("/home/u/.local/bin/sirene"), None);
         assert_eq!(of("/home/u/.cargo/bin/x/sirene"), None);
         assert_eq!(owner(Path::new("/home/u/.cargo/bin/sirene"), None), None);
-        assert_eq!(Owner::Cask.command(), "brew upgrade --cask sirene");
+        assert_eq!(of("/usr/bin/sirene"), Some(Owner::System));
+        assert_eq!(of("/usr/local/bin/sirene"), None);
+        assert_eq!(
+            of("/tmp/.mount_SireneAb12/usr/bin/sirene"),
+            Some(Owner::AppImage)
+        );
+        assert_eq!(
+            of("/tmp/appimage_extracted_0123abcd/usr/bin/sirene"),
+            Some(Owner::AppImage)
+        );
+        assert!(Owner::Cask.hint().ends_with("`brew upgrade --cask sirene`"));
+        assert!(Owner::System.hint().contains("sudo dnf upgrade"));
+        assert!(Owner::AppImage.hint().contains("/jaemk/sirene/releases"));
     }
 }

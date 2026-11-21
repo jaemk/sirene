@@ -69,4 +69,10 @@ cargo build --release --package sirene
 cargo xtask bundle --binary target/release/sirene    # target/bundle/Sirene.app
 cargo xtask icon                                     # target/bundle/sirene.{icns,png}
 cargo xtask cask --url URL --sha256 HEX --homepage URL
+
+# Linux: needs `cargo install cargo-generate-rpm`, rpm, and squashfs-tools
+cargo xtask linux --binary target/release/sirene     # target/linux/AppDir
+cargo generate-rpm -p crates/sirene --auto-req find-requires  # target/generate-rpm/sirene-*.rpm
+#   (between releases add: --set-metadata 'version = "X.Y.Z~dev"')
+bash bin/appimage.sh x86_64 target/linux/AppDir Sirene.AppImage
 ```
