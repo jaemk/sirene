@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-21
+
 ### Added
 
 - Each release attaches an `.rpm` (`sudo dnf install` its URL) and an AppImage of the editor build
@@ -17,6 +19,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `sirene update` also refuses to replace a binary in `/usr/bin` (the `.rpm`) or in a mounted
   or extracted Sirene AppImage, and explains how to update it.
+- Update locked dependencies to their latest compatible versions, including `rustls-webpki`
+  0.103.17, `ureq` 3.5.2, `clap` 4.6.9, and `wgpu` 30.0.2.
 
 ## [0.6.2] - 2026-11-19
 
