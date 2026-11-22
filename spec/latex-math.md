@@ -65,9 +65,10 @@ one error and is drawn as text. The fuzz targets cover the parser and the expand
 
 - PlantUML `@startlatex` and `@startmath` (PCREO-2, PCREO-3): a document that is one formula.
   AsciiMath would be a second front end onto the same math list.
-- Mermaid labels between `$$` delimiters, which Mermaid renders with KaTeX in flowcharts and
-  sequence diagrams (to be confirmed against the Mermaid reference before a spec of its own).
-- Markdown `$...$` and `$$...$$`, if MARKDO adds it.
+- Mermaid labels between `$$` delimiters in flowcharts and sequence diagrams, which Mermaid
+  renders with KaTeX (LEMB-1, confirmed against its reference).
+- PlantUML `<latex>` and `<math>` tags in Creole text (LEMB-2).
+- Markdown `$...$` and `$$...$$`, if MARKDO adds it (LEMB-3).
 
 ## LMATH-8 Feasibility
 
@@ -80,11 +81,13 @@ ASCII renderer about 1,000; tests and fixtures on top. The first usable subset i
 of focused work, and broad KaTeX coverage is a multi-month effort that never ends, since
 coverage is a long tail of commands.
 
-Alternatives, not verified against their sources here: pure-Rust crates that already lay out
-formulas from the OpenType MATH table (`formulary`, `formel`, `noad`, which take MathML) or follow
-KaTeX's metrics (`RaTeX`, with a LaTeX parser). Adopting one saves the parser and layout but
-brings its dependency, its maintenance risk, a MathML detour, and output sized to its model
-rather than the display list; each needs a trial before a decision, as does their license. The
+Alternatives (details in `latex-prior-art.md`, read from their READMEs, not their sources):
+`formulary` (MIT or Apache-2.0) and `formel` (MIT) lay out MathML from the OpenType MATH table
+and give glyph positions, so a LaTeX parser would still be ours; `RaTeX` (MIT) has a LaTeX
+parser and layout on KaTeX's fonts and metrics. They are small projects (formulary: 35 commits;
+formel: 224). Adopting one saves layout work but brings its dependency, its maintenance risk, a
+MathML detour, and output shaped by its model rather than the display list; each needs a trial
+before a decision (LPA-T5). Their license is compatible; the other costs are open. The
 project's rule of owning its parsers and layout (sirene architecture decisions) favors writing
 the subset in-tree and borrowing the TeX algorithm, not code.
 

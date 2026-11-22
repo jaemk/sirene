@@ -7,20 +7,52 @@ are in LEMB-T.
 
 ## LEMB-1 Mermaid
 
-Research (LEMB-T1). Mermaid renders KaTeX in labels written between `$$` delimiters. To record
-from the Mermaid reference: the delimiter rule and escaping, the diagram types that accept math
-(flowchart and sequence are expected; check the rest), whether it works in node, edge, subgraph,
-participant, and note text, what the `legacyMathML` and `forceLegacyMathML` settings change, how
-a formula mixes with plain text and Markdown strings in one label, and what an unparsable
-formula renders as.
+From the Mermaid math reference (<https://mermaid.js.org/config/math.html>): a formula is
+written between `$$` delimiters, e.g. `$$x^2$$`, and is rendered by KaTeX. The reference lists
+only two diagram types as supporting it:
+
+- flowcharts: node labels (`A["$$x^2$$"]`) and edge labels (`|"$$\sqrt{x+3}$$"|`);
+- sequence diagrams: participant aliases (`participant 1 as $$\alpha$$`), message text
+  (`Solve: $$\sqrt{2+2}$$`), and notes (`Note right of 2: $$...$$`).
+
+Text and a formula share a label (the sequence example mixes them); the reference gives no rule
+for several formulas in one label, for escaping `$$`, or for what an unparsable formula
+becomes. The `legacyMathML` and `forceLegacyMathML` settings choose between the browser's
+MathML and KaTeX's stylesheet rendering; sirene draws the formula itself, so neither applies
+and both are ignored. The reference states no KaTeX version, so KaTeX's current supported
+functions list is the syntax target (LPA-2).
+
+Decisions: sirene reads `$$...$$` in the flowchart and sequence label positions above, and
+nowhere else in Mermaid (LEMB-T6 tracks whether other types should follow, since a source
+that uses it elsewhere draws as plain text in Mermaid too). An unclosed `$$` is plain text. A
+formula that fails to parse is drawn as its source (LEMB-4).
+
+To verify in Mermaid's source (LEMB-T7): the delimiter regular expression, multiple formulas per
+label, `$$` inside quoted and Markdown strings, and whether display or inline style is used.
 
 ## LEMB-2 PlantUML
 
-Research (LEMB-T2). Two forms are expected: a whole document (`@startlatex`, `@startmath`,
-PCREO-2, PCREO-3), and an inline tag in Creole text (`<math>` and `<latex>`), usable wherever
-Creole is (labels, notes, titles). To record from the PlantUML reference: the exact tags and
-closers, whether `<math>` is AsciiMath and `<latex>` is LaTeX, how an inline formula is aligned
-with surrounding text, and the document options.
+From the PlantUML math reference (<https://plantuml.com/ascii-math>; the Creole page does not
+list the tags):
+
+- inline tags: `<math>...</math>` is AsciiMath and `<latex>...</latex>` is LaTeX, used in
+  activity actions (`:<math>int_0^1f(x)dx</math>;`), notes, and sequence messages
+  (`Bob -> Alice : Can you solve: <math>ax^2+bx+c=0</math>`);
+- documents: `@startmath` ... `@endmath` (AsciiMath) and `@startlatex` ... `@endlatex` (LaTeX),
+  one formula each (PCREO-2, PCREO-3).
+
+PlantUML converts AsciiMath to LaTeX and renders that with JLaTeXMath, which is not bundled and
+must be installed beside PlantUML. AsciiMath support was ported to Java in V1.2021.8 and
+improved in V1.2024.5. The page's examples show `_` written as `\_` and LaTeX commands with a
+doubled backslash; this looks like a Markdown artifact of the page, to confirm (LEMB-T8).
+
+Decisions: AsciiMath is a front end that translates to the LaTeX math list, as PlantUML does,
+so the typesetter has one input. A `<math>` or `<latex>` tag is read wherever the PlantUML
+kind already reads Creole text (PCREO-1), not only in the three positions the reference
+shows. An unclosed tag is plain text.
+
+To verify (LEMB-T8): the exact escape rules inside the tags, nesting and multiple tags per line,
+and how PlantUML aligns an inline formula with the text baseline.
 
 ## LEMB-3 Markdown
 
@@ -43,9 +75,12 @@ nested text).
 
 ## LEMB-T Tasks
 
-- [ ] LEMB-T1 Read the Mermaid math reference and its source; fill LEMB-1; list the fixtures to
-  write.
-- [ ] LEMB-T2 Read the PlantUML creole, math, and latex references; fill LEMB-2.
+- [x] LEMB-T1 Read the Mermaid math reference; LEMB-1 is filled from it.
+- [x] LEMB-T2 Read the PlantUML math reference; LEMB-2 is filled from it.
+- [ ] LEMB-T6 Check which other Mermaid types render `$$` in the Mermaid release sirene tracks,
+  against its source and a live render, and extend LEMB-1.
+- [ ] LEMB-T7 Read Mermaid's source for the `$$` rules listed at the end of LEMB-1.
+- [ ] LEMB-T8 Read PlantUML's source or run it for the escape and alignment rules in LEMB-2.
 - [ ] LEMB-T3 Decide LEMB-3 with the Markdown spec.
 - [ ] LEMB-T4 Define `Formula` and the inline-label item in the display list (DISPLA).
 - [ ] LEMB-T5 Per diagram kind: where a label is measured and drawn today, and what must change

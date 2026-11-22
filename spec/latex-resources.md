@@ -14,6 +14,19 @@ and after subsetting to the command table's glyphs, glyph coverage (Greek, Frakt
 bold, script, arrows, relations, big operators and their size variants), and MATH table
 completeness (variants and assemblies for delimiters, radicals, and braces).
 
+Findings so far (2026-11-22):
+
+| Font | License | Size | Notes |
+|---|---|---|---|
+| Latin Modern Math | GUST Font License (legally the LPPL 1.3c or later) | 733,736 bytes (`latinmodern-math.otf`, CTAN `fonts/lm-math/opentype`) | Computer Modern look, closest to LaTeX output; the license's rules for modified (subset) versions are to read (LRES-T4). |
+| STIX Two Math | SIL OFL 1.1 (STIX Fonts Project Authors, 2001-2021) | not measured; the CTAN path tried was wrong | Has a MATH table; formulary vendors it as a test font. The OFL has a reserved font name, so a subset needs a new name. |
+| KaTeX fonts (19 faces) | to read (KaTeX's font license) | not measured | No MATH table; RaTeX pairs them with KaTeX's metric tables. An alternative that matches Mermaid's own output exactly. |
+| Noto Sans Math, Fira Math, Libertinus Math, TeX Gyre | not read | not measured | Candidates to check. |
+
+The choice is between a MATH-table font (layout from the font, LRES-T1) and the KaTeX font set
+with its metric tables (LRES-T7). The first follows MathML Core (LPA-4), the second matches
+what Mermaid users see. Either way the font ships in the binary and the wasm package.
+
 ## LRES-2 Text font in formulas
 
 `\text`, `\mathrm`, and `\mathbf` take their glyphs from the math font's upright and bold
@@ -46,7 +59,11 @@ data are checked in.
 
 ## LRES-T Tasks
 
-- [ ] LRES-T1 Measure the candidate fonts (license, size, coverage, MATH table) and pick one.
+- [x] LRES-T1a Measure Latin Modern Math (733,736 bytes) and read its license.
+- [ ] LRES-T1b Measure STIX Two Math, Noto Sans Math, Fira Math, Libertinus Math, and TeX Gyre
+  (license, size, coverage, MATH table completeness), then pick one.
+- [ ] LRES-T7 Read the KaTeX font set's license and sizes, and compare the KaTeX-metrics path
+  with the MATH-table path (LRES-1).
 - [ ] LRES-T2 Decide the text font inside formulas.
 - [ ] LRES-T3 Compare the symbol data sources and pick the generation input.
 - [ ] LRES-T4 Record each source's license and what attribution it needs.
