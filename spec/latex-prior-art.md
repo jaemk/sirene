@@ -2,8 +2,9 @@
 
 What existing open source LaTeX math implementations teach about syntax coverage, directives,
 layout rules, and test cases, and how the typesetter of `latex-math.md` uses them. The rule
-for any of it: borrow the algorithm and the test ideas, not the code, and give every
-test input or data table taken from a project its license's attribution (THIRD-PARTY-NOTICES).
+for any of it: code, data, and tests may be ported from MIT and Apache-2.0 projects with a
+file header and a THIRD-PARTY-NOTICES entry giving the source and license (the attribution
+rule); a project under another license is read for ideas only until its license is checked.
 Status: research; the open items are in LPA-T. Facts below come from each project's README or
 site on 2026-11-22 and are marked unverified where a source was not read.
 

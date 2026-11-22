@@ -89,7 +89,7 @@ formel: 224). Adopting one saves layout work but brings its dependency, its main
 MathML detour, and output shaped by its model rather than the display list; each needs a trial
 before a decision (LPA-T5). Their license is compatible; the other costs are open. The
 project's rule of owning its parsers and layout (sirene architecture decisions) favors writing
-the subset in-tree and borrowing the TeX algorithm, not code.
+the subset in-tree, porting from KaTeX with attribution where useful (LMATH-11).
 
 ## LMATH-9 Order
 
@@ -101,6 +101,33 @@ the subset in-tree and borrowing the TeX algorithm, not code.
 5. ASCII renderer.
 6. `@startlatex` in PlantUML, then the other consumers.
 7. Fuzz target and limits (LMATH-6), landing with step 2 so the parser is never unfuzzed.
+
+## LMATH-11 Decision: KaTeX as the target (proposed)
+
+KaTeX is the target in three ways, in this order of confidence:
+
+1. Syntax and behavior: the command set, macros, error behavior, and `$$` use in Mermaid are
+   KaTeX's (LMATH-5, LEMB-1). Settled; it is what Mermaid users write.
+2. Reference and test source: KaTeX is MIT licensed (Khan Academy and other contributors,
+   2013-2020), so its algorithms, symbol tables, metrics, and test inputs may be ported with a
+   file header and a THIRD-PARTY-NOTICES entry (the attribution rule), as can Temml's (MIT).
+   This replaces the earlier "borrow the algorithm, not code": the rule holds only for
+   sources whose licenses do not allow it. Reading KaTeX's `buildHTML`, delimiter, radical,
+   and spacing code is the fastest route to a correct layout.
+3. Layout path, proposed: KaTeX's fonts and metrics first (LRES-1), since they are 514 KB
+   as TTF against a 734 KB MATH-table font, match Mermaid's own drawing, and have a
+   working reference. A MATH-table path (LPA-4) stays possible behind the same box tree, for a
+   user-chosen font or for AsciiMath-heavy PlantUML documents, if there is demand.
+
+Open before it is final: the metrics data's provenance (LRES-T7b), the stretchy-shape SVG data
+(LRES-T7d), and whether to depend on `RaTeX` (MIT, the same KaTeX fonts and metrics, a
+parser, layout, and display list, pure Rust) instead of porting (LPA-T5). RaTeX also shows the
+approach works in Rust, and its crate split is a model; its maintenance, dependency set, and
+fit to sirene's display list decide whether it is adopted or only learned from.
+
+Where PlantUML differs: it renders with JLaTeXMath, not KaTeX, so a `<latex>` formula can differ
+slightly from PlantUML's own output. KaTeX's behavior is the target for both, since there is
+one typesetter (LMATH-7).
 
 ## LMATH-T Tasks
 
