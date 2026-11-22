@@ -89,7 +89,9 @@ jobs:
         run: |
           mkdir fuzz-corpus
           cp fuzz/corpus/parser/* fuzz-corpus/
-          cargo +nightly-2026-09-01 fuzz run parser fuzz-corpus -- -max_total_time=60 -max_len=4096
+          # The prebuilt cargo-fuzz is a musl binary, which makes it default to a musl target
+          # that sanitizers don't support, so name the GNU target.
+          cargo +nightly-2026-09-01 fuzz run --target x86_64-unknown-linux-gnu parser fuzz-corpus -- -max_total_time=60 -max_len=4096
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
