@@ -75,6 +75,23 @@ warning, except `actorStyle` in use case diagrams, and `!theme` is a warning. Te
 - Open: an evaluator for `!define`, variables, and conditionals (`plantuml-preprocessor.md`),
   since real files use them, and mapping `skinparam` colors and fonts to the theme
   (`plantuml-skinparam.md`). `@startdef` blocks go with the preprocessor, and `@startlatex`
-  stays an error (`plantuml-creole-and-math.md`).
+  waits on the LaTeX typesetter (`latex-math.md`).
+
+## PUML-6 Remaining work
+
+What is not drawn or read yet, by value and cost. Each has its own spec and feature row.
+
+| Item | Spec | Status | Cost | Notes |
+|---|---|---|---|---|
+| Preprocessor | `plantuml-preprocessor.md` | research | medium | Most real files use it; stdlib `!include`s still fail. Needs diagnostics mapped to the source and fuzzed limits. |
+| Skinparam | `plantuml-skinparam.md` | research | medium | A subset maps onto the graph model's `Style` and theme fields. |
+| Salt | `plantuml-salt.md` | pending | large | New wireframe model, layout, scene, and ASCII renderer. |
+| Creole | `plantuml-creole-and-math.md` | research | medium | Needs a rich text run model in the display list first. |
+| Math, LaTeX | `plantuml-creole-and-math.md`, `latex-math.md` | research | large | One typesetter serves both; first subset is weeks, broad coverage months. |
+| Ditaa | `plantuml-ditaa.md` | research | medium | Rectangles and orthogonal lines first. |
+| Wire, board | `plantuml-wire-and-board.md` | research | unknown | Beta in PlantUML, grammar only in its sources. |
+| `@startdef` | `plantuml-preprocessor.md` | research | small | Draws nothing; goes with `!includedef`. |
+
+Order: preprocessor, skinparam, Salt; the rest as demand shows.
 
 Each kind has its own spec, listed above.

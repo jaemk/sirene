@@ -22,11 +22,12 @@ is drawn as text.
 ## PCREO-3 LaTeX
 
 `@startlatex` needs the JLaTeXMath jars next to PlantUML, and the reference does not bundle
-them. It is an error naming the kind: `@startlatex is not supported`.
+them. It is an error naming the kind until sirene has its own typesetter (`latex-math.md`),
+which then draws it, and AsciiMath (PCREO-2) shares its math list.
 
 ## PCREO-4 Open questions
 
 - Neither the scene nor the ASCII renderer has rich text spans; Creole needs them, so this
   starts with a text-run model in the display list (DISPLA).
 - AsciiMath typesetting needs a math layout (boxes, baselines, stretchy delimiters) that no
-  other model shares. Whether a small one is worth it for one input language.
+  other model shares. It builds on the typesetter of `latex-math.md` (LMATH-7), not on its own.
