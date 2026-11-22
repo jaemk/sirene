@@ -125,7 +125,8 @@ Every Mermaid type comes first, so that any Mermaid file draws:
 6. Graphviz DOT: a small, well-defined grammar on the same layout.
 7. PlantUML sequence and activity, on the sequence and graph models.
 8. Edit modules for state and class.
-9. D2 and the rest of PlantUML, after their research.
+9. D2, after its research. The PlantUML kinds and settings not yet drawn have their own specs
+   and feature rows (PUML-5).
 
 ## LANGS-8 Limits
 

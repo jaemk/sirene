@@ -47,7 +47,7 @@ accepts (`start` or `:action;` for activity, `class` for class, `[*]` or `state`
 | Chen (`@startchen`) and network (`nwdiag`) | graph | 5 |
 | Chronology (`@startchronology`) | timeline (TIMELI-2) | 5 |
 | Timing (`robust`, `concise`, `@0`, ...) | timing (TIMING-1) | 5 |
-| Salt, ditaa, math, LaTeX, wire, board, creole, def | not drawn: an error naming the kind | - |
+| Salt (`plantuml-salt.md`), ditaa (`plantuml-ditaa.md`), creole and math (`plantuml-creole-and-math.md`), wire and board (`plantuml-wire-and-board.md`), LaTeX, def | not drawn: an error naming the kind | - |
 
 ## PUML-3 Sequence
 
@@ -71,8 +71,10 @@ warning, except `actorStyle` in use case diagrams, and `!theme` is a warning. Te
 
 - Resolved: the reference is the current language reference guide and plantuml.com, and the
   fixtures are written for sirene rather than copied from PlantUML's examples (PSEQ).
-- Resolved: the non-UML kinds draw on the Mermaid models (PUML-2); Salt is not drawn.
-- Open: whether a small evaluator for `!define`, variables, and conditionals is worth it, since
-  real files use them. Mapping `skinparam` colors and fonts to the theme is open too.
+- Resolved: the non-UML kinds draw on the Mermaid models (PUML-2).
+- Open: an evaluator for `!define`, variables, and conditionals (`plantuml-preprocessor.md`),
+  since real files use them, and mapping `skinparam` colors and fonts to the theme
+  (`plantuml-skinparam.md`). `@startdef` blocks go with the preprocessor, and `@startlatex`
+  stays an error (`plantuml-creole-and-math.md`).
 
 Each kind has its own spec, listed above.
