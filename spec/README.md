@@ -84,6 +84,9 @@ can be built). Keep each row's status current with `spec.py set`.
 | PlantUML Salt Wireframes | pending | [plantuml-salt.md](plantuml-salt.md) |
 | PlantUML Creole and Math | research | [plantuml-creole-and-math.md](plantuml-creole-and-math.md) |
 | LaTeX Math | research | [latex-math.md](latex-math.md) |
+| LaTeX Embedding | research | [latex-embedding.md](latex-embedding.md) |
+| LaTeX Resources | research | [latex-resources.md](latex-resources.md) |
+| LaTeX Prior Art and Tests | research | [latex-prior-art.md](latex-prior-art.md) |
 | PlantUML Ditaa | research | [plantuml-ditaa.md](plantuml-ditaa.md) |
 | PlantUML Wire and Board | research | [plantuml-wire-and-board.md](plantuml-wire-and-board.md) |
 | Error Handling and Logging | done | [error-handling-and-logging.md](error-handling-and-logging.md) |

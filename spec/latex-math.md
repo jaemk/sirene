@@ -99,6 +99,20 @@ the subset in-tree and borrowing the TeX algorithm, not code.
 6. `@startlatex` in PlantUML, then the other consumers.
 7. Fuzz target and limits (LMATH-6), landing with step 2 so the parser is never unfuzzed.
 
+## LMATH-T Tasks
+
+The work is split over four specs: this one (the engine), `latex-embedding.md` (Mermaid,
+PlantUML, and Markdown), `latex-resources.md` (font, tables, licenses, size), and
+`latex-prior-art.md` (other libraries, syntax coverage, tests). Their task lists are the
+tracker; this one holds what is left for the engine itself.
+
+- [ ] LMATH-T1 Finish the three research specs (their `-T` lists) before any code.
+- [ ] LMATH-T2 Fix the first subset (LMATH-1) from the command table of LPA-2.
+- [ ] LMATH-T3 Write the box tree and `Formula` types, and the TeX-to-MATH parameter table
+  (LPA-T4).
+- [ ] LMATH-T4 Decide in-tree or an existing crate (LPA-T5) and record the decision here.
+- [ ] LMATH-T5 Build in the order of LMATH-9.
+
 ## LMATH-10 Open questions
 
 - Which math font; a subset keeps the wasm bundle small (the docs site loads `sirene-wasm`)
