@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-11-22
+
 ### Added
 
 - A libFuzzer target for the diagram parsers (`fuzz/`), run in CI, and property and compatibility
@@ -18,7 +20,6 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - An unfinished `%%{` directive recovers at the end of its line, or before a later unquoted
   opener on the same line, the same way in detection, theme reading, and every parser (LANGS-13).
-
 - A DOT graph keeps at most 100,000 pending edges and 64 MiB of copied edge attributes, ports,
   endpoint IDs, and expanded edge labels. Past a limit, later edges are left out and a warning
   says so (DOT-6).
