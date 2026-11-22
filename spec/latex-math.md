@@ -120,10 +120,22 @@ KaTeX is the target in three ways, in this order of confidence:
    user-chosen font or for AsciiMath-heavy PlantUML documents, if there is demand.
 
 Open before it is final: the metrics data's provenance (LRES-T7b), the stretchy-shape SVG data
-(LRES-T7d), and whether to depend on `RaTeX` (MIT, the same KaTeX fonts and metrics, a
-parser, layout, and display list, pure Rust) instead of porting (LPA-T5). RaTeX also shows the
-approach works in Rust, and its crate split is a model; its maintenance, dependency set, and
-fit to sirene's display list decide whether it is adopted or only learned from.
+(LRES-T7d), and how to get a parser and layout: three options.
+
+- Depend on RaTeX crates (`ratex-parser`, `ratex-layout`, `ratex-font`, `ratex-types`; MIT,
+  KaTeX fonts and metrics, pure Rust, errors with a location, built-in expansion and stack
+  limits; LPA-5). Fastest, but a 0.1.x project that releases monthly, with a 262 KB `engine.rs`,
+  and its display list needs an adapter.
+- Vendor it into `sirene_core::math` with a header and a THIRD-PARTY-NOTICES entry. We own the
+  code, limits, diagnostics, and fuzzing, at the cost of maintaining about a megabyte of Rust
+  that tracks KaTeX.
+- Write it in-tree, porting from KaTeX (the JavaScript) as needed. Smallest result and the
+  best fit, the most work (LMATH-8).
+
+Recommendation: a time-boxed spike on the first option (LMATH-T6), with the second as the
+fallback if the spike finds panics, spans that do not map, or a size cost over budget (LRES-4).
+The third is the choice only if both fail or the dependency is refused. Whatever is chosen, the
+box tree and `Formula` interface (LEMB-4) stay ours, so the engine behind them can change.
 
 Where PlantUML differs: it renders with JLaTeXMath, not KaTeX, so a `<latex>` formula can differ
 slightly from PlantUML's own output. KaTeX's behavior is the target for both, since there is
@@ -142,6 +154,11 @@ tracker; this one holds what is left for the engine itself.
   (LPA-T4).
 - [ ] LMATH-T4 Decide in-tree or an existing crate (LPA-T5) and record the decision here.
 - [ ] LMATH-T5 Build in the order of LMATH-9.
+- [ ] LMATH-T6 Spike on RaTeX (LPA-5): a throwaway branch that typesets 20 fixtures through
+  `ratex-parser` and `ratex-layout`, reports spans, converts the display list to scene
+  items for one SVG, builds for wasm32 and Rust 1.92 with `mhchem` off, runs the parser under
+  a one-minute fuzz, and measures the size. Output: a table of answers in LPA-5, and the decision
+  in LMATH-11. Throwaway: nothing from it is merged.
 
 ## LMATH-10 Open questions
 

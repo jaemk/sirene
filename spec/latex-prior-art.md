@@ -22,6 +22,41 @@ site on 2026-11-22 and are marked unverified where a source was not read.
 Not surveyed yet (LPA-T1): noad, ReX, pulldown-latex, latex2mathml, Typst's math layout, MiTeX,
 and JLaTeXMath (the renderer PlantUML uses).
 
+## LPA-5 RaTeX evaluation
+
+Read from its repository and GitHub API on 2026-11-22; no code built or run yet (the spike is
+LMATH-T6).
+
+- Project: created 2026-03-10, 1,599 stars, 88 forks, 15 open issues, last push 2026-11-22,
+  releases roughly monthly (0.1.14 on 2026-07-28, 0.1.15 on 2026-10-16, 0.1.16 on 2026-11-16),
+  so fast-moving and pre-1.0. Rust is 1.74 MB of source across 15 crates, plus platform
+  bindings (iOS, Android, Flutter, web).
+- License: MIT (copyright erweixin) at the root. The bundled KaTeX fonts are not under it; they
+  are OFL 1.1, with `licenses/KaTeX-fonts-NOTICE.txt` and the OFL text beside them. GitHub's
+  license detector reports no assertion because of that second paragraph.
+- Crates a consumer would use: `ratex-types` (display list: `DisplayItem`, `MathStyle`,
+  `PathCommand`, `Color`), `ratex-font` (KaTeX metrics `metrics_data.rs` 98 KB and symbol
+  tables `symbols_data.rs` 90 KB, as Rust data), `ratex-lexer`, `ratex-parser`, `ratex-layout`
+  (`engine.rs` 262 KB, `katex_svg.rs` 69 KB for the stretchy shapes, `stacked_delim.rs`,
+  `spacing.rs`, `resource_limits.rs`), and optionally `ratex-katex-fonts` (the OFL TTFs).
+- Dependencies of the parser: the workspace crates, `thiserror`, `serde`, `serde_json`,
+  `unicode-normalization`, `regex-lite`; `fancy-regex` and `regex` only for the `mhchem`
+  feature, which is on by default and can be turned off. The workspace's own dependencies are
+  `phf`, `thiserror`, `serde`, `serde_json`, all pure Rust. No MSRV is declared (edition 2021).
+- Limits: the parser has `expansion_budget.rs` and `stack_safety.rs`, the layout has
+  `resource_limits.rs`; the shapes LMATH-6 needs are there, with their bounds to compare.
+- Errors: `ParseError { message, loc: Option<SourceLocation> }`, modeled on KaTeX's, one error
+  and no recovery, as KaTeX. A source range per error is enough for LEMB-5 if `loc` is the
+  byte span in the formula text.
+- Tests: `crates/ratex-parser/src/tests.rs` (51 KB), `tests/golden`, and a per-formula support
+  table against KaTeX.
+
+What a spike must answer: whether `loc` maps to byte ranges, how the display list converts to
+sirene's scene items (glyph runs with fonts, rules, and paths), what the wasm and binary size
+cost is with the KaTeX fonts subset, whether the crates build on Rust 1.92 and offline with
+`mhchem` off, whether fuzzing finds panics or runaway time, and how much of `engine.rs` is
+KaTeX-specific logic worth porting versus depending on.
+
 ## LPA-2 Language and directive support
 
 KaTeX's supported-functions families (<https://katex.org/docs/supported.html>) as the command
@@ -112,6 +147,8 @@ classes, and style changes).
   license.
 - [ ] LPA-T4 Read MathML Core's layout sections and TeXbook Appendix G in full; write the
   rules reference and the TeX-to-MATH parameter table; decide between them (LPA-4).
-- [ ] LPA-T5 Decide whether to depend on, vendor, or only learn from each Rust crate:
-  maintenance (formulary has 35 commits and 3 stars, formel 224 commits and 1 star, as of
-  the survey), license, dependency weight, and fit to the display list.
+- [x] LPA-T5a Read RaTeX's repository for maintenance, license, dependencies, limits, and
+  errors (LPA-5).
+- [ ] LPA-T5b Run the RaTeX spike (LMATH-T6) and decide: depend, vendor with attribution, or
+  port selectively; record the decision in LMATH-11.
+- [ ] LPA-T5c Same read for formulary and formel if the MATH-table path (LPA-4) is pursued.
