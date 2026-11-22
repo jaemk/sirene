@@ -68,6 +68,14 @@ fn known_document(data: &[u8], newline: &str) {
     // The header is fixed, while mutations reach the grammar below it.
     let body = String::from_utf8_lossy(data.get(7..).unwrap_or_default());
     let src = format!("{prefix}{header}{newline}{body}");
+    // `graph TD {` is a DOT graph, so a body that opens with a brace is one, unless a Mermaid
+    // preamble comes first.
+    let dot = header.starts_with("graph") && body.trim_start().starts_with('{');
+    let expected = if dot && matches!(prefix.as_str(), "" | "\u{feff}") {
+        Kind::Dot
+    } else {
+        expected
+    };
     assert_eq!(check(&src, None).kind, expected, "{src:?}");
 }
 

@@ -165,3 +165,12 @@ fn no_final_newline() {
         );
     }
 }
+
+#[test]
+fn a_brace_after_a_graph_header_reads_as_dot() {
+    // `graph TD {` is a DOT graph, however the line ends.
+    for newline in ["\n", "\r\n", "\r"] {
+        let src = format!("graph TD{newline}{{ A -- B }}{newline}");
+        assert_eq!(diagram::Kind::of(&src), diagram::Kind::Dot, "{src:?}");
+    }
+}
