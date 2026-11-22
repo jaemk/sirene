@@ -5,8 +5,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, keyword};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -35,15 +34,6 @@ impl DerefMut for Parser<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
-}
-
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
 }
 
 /// The length of a number at the start of `s`: an optional `-`, digits, and an optional
@@ -89,11 +79,7 @@ impl Parser<'_> {
         if keyword(r, "accTitle") || keyword(r, "accDescr") {
             self.acc();
         } else if keyword(r, "title") {
-            self.start(TITLE_STMT);
-            self.token(TITLE_KW, "title".len());
-            self.ws();
-            self.rest_of_line(TEXT);
-            self.finish();
+            self.title_line();
         } else if r.starts_with(['"', '\'']) {
             self.slice();
         }
@@ -104,7 +90,7 @@ impl Parser<'_> {
         self.start(SLICE_STMT);
         let r = self.rest();
         let quote = &r[..1];
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         match line[1..].find(quote) {
             Some(i) => self.token(STRING, i + 2),
             None => {

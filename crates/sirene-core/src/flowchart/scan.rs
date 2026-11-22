@@ -34,70 +34,10 @@ pub(crate) fn keyword(s: &str, kw: &str) -> bool {
     s.starts_with(kw) && id_len(s) == kw.len()
 }
 
-/// The byte order mark a file may start with (LANGS-9). It reads as inline whitespace.
-pub(crate) const BOM: char = '\u{feff}';
+use crate::lines::line_len;
 
-/// Whether `c` is whitespace or a byte order mark.
-pub(crate) fn is_space(c: char) -> bool {
-    c.is_whitespace() || c == BOM
-}
-
-/// Length of the byte order mark at the start of `s`, or 0.
-pub(crate) fn bom_len(s: &str) -> usize {
-    if s.starts_with(BOM) {
-        BOM.len_utf8()
-    } else {
-        0
-    }
-}
-
-/// Length of inline whitespace (not newlines) at the start of `s`.
-pub(crate) fn ws_len(s: &str) -> usize {
-    let mut chars = s.char_indices().peekable();
-    while let Some((i, c)) = chars.next() {
-        let newline = c == '\n' || (c == '\r' && chars.peek().is_some_and(|&(_, n)| n == '\n'));
-        if newline || !is_space(c) {
-            return i;
-        }
-    }
-    s.len()
-}
-
-/// Length of the newline at the start of `s` (`\n` or `\r\n`), or 0.
-pub(crate) fn newline_len(s: &str) -> usize {
-    if s.starts_with("\r\n") {
-        2
-    } else if s.starts_with('\n') {
-        1
-    } else {
-        0
-    }
-}
-
-/// Length up to (not including) the next newline.
-pub(crate) fn line_len(s: &str) -> usize {
-    match s.find('\n') {
-        Some(i) if i > 0 && s.as_bytes()[i - 1] == b'\r' => i - 1,
-        Some(i) => i,
-        None => s.len(),
-    }
-}
-
-/// Whether `s` starts at a statement separator or end of input.
-pub(crate) fn is_stmt_end(s: &str) -> bool {
-    s.is_empty() || s.starts_with(';') || newline_len(s) > 0
-}
-
-/// Length up to (not including) the next statement separator.
-pub(crate) fn stmt_len(s: &str) -> usize {
-    let line = line_len(s);
-    s[..line].find(';').unwrap_or(line)
-}
-
-/// `len` with trailing inline whitespace of `s[..len]` removed.
-pub(crate) fn trim_end_len(s: &str, len: usize) -> usize {
-    s[..len].trim_end().len()
-}
+#[cfg(test)]
+use crate::lines::{bom_len, is_stmt_end, newline_len, stmt_len, trim_end_len, ws_len};
 
 /// Length of a direction keyword valid in a header (FLOWCH-4), or 0.
 pub(crate) fn header_dir_len(s: &str) -> usize {
@@ -155,20 +95,6 @@ pub(crate) fn line_string_len(s: &str) -> Option<usize> {
     let body = s.strip_prefix('"')?;
     let end = body.find(['"', '\n'])?;
     (body.as_bytes()[end] == b'"').then_some(end + 2)
-}
-
-/// Length of a metadata body after `@{`, up to (not including) the closing `}`, if closed.
-/// Braces inside double-quoted strings are ignored.
-pub(crate) fn meta_body_len(s: &str) -> Option<usize> {
-    let mut in_string = false;
-    for (i, c) in s.char_indices() {
-        match c {
-            '"' => in_string = !in_string,
-            '}' if !in_string => return Some(i),
-            _ => {}
-        }
-    }
-    None
 }
 
 /// Shape opening delimiters (FLOWCH-7).
@@ -517,13 +443,6 @@ mod tests {
         ] {
             assert_eq!(line_string_len(s), string_len(&s[..line_len(s)]), "{s:?}");
         }
-    }
-
-    #[test]
-    fn metadata_bodies() {
-        assert_eq!(meta_body_len(" shape: rect }"), Some(13));
-        assert_eq!(meta_body_len("label: \"a}b\" }x"), Some(13));
-        assert_eq!(meta_body_len("label: x"), None);
     }
 
     #[test]

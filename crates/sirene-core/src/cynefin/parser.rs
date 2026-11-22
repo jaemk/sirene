@@ -6,7 +6,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -104,7 +103,7 @@ impl Parser<'_> {
             let start = self.pos;
             self.error(
                 start,
-                start + scan::stmt_len(r),
+                start + crate::lines::stmt_len(r),
                 "expected `cynefin-beta` header",
             );
             return false;
@@ -134,7 +133,7 @@ impl Parser<'_> {
         let n = domain_len(r);
         if n > 0 {
             let after = &r[n..];
-            if after[scan::ws_len(after)..].starts_with("-->") {
+            if after[crate::lines::ws_len(after)..].starts_with("-->") {
                 self.in_domain = false;
                 self.transition(n);
             } else {
@@ -165,7 +164,7 @@ impl Parser<'_> {
     fn eol(&mut self) {
         self.ws();
         if self.rest().starts_with("%%") {
-            let n = scan::line_len(self.rest());
+            let n = crate::lines::line_len(self.rest());
             self.token(COMMENT, n);
         }
         self.end();
@@ -177,9 +176,9 @@ impl Parser<'_> {
         self.token(TITLE_KW, "title".len());
         self.ws();
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let end = line.find("%%").unwrap_or(line.len());
-        let len = scan::trim_end_len(r, end);
+        let len = crate::lines::trim_end_len(r, end);
         self.token(TEXT, len);
         self.eol();
         self.finish();

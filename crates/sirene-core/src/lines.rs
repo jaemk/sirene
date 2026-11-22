@@ -8,6 +8,107 @@ use crate::diagnostic::Diagnostic;
 use crate::flowchart::scan;
 use crate::syntax::SyntaxKind::{self, *};
 
+/// The byte order mark a file may start with (LANGS-9). It reads as inline whitespace.
+pub(crate) const BOM: char = '\u{feff}';
+
+/// Whether `c` is whitespace or a byte order mark.
+pub(crate) fn is_space(c: char) -> bool {
+    c.is_whitespace() || c == BOM
+}
+
+/// Length of the byte order mark at the start of `s`, or 0.
+pub(crate) fn bom_len(s: &str) -> usize {
+    if s.starts_with(BOM) {
+        BOM.len_utf8()
+    } else {
+        0
+    }
+}
+
+/// Length of inline whitespace (not newlines) at the start of `s`.
+pub(crate) fn ws_len(s: &str) -> usize {
+    let mut chars = s.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        let newline = c == '\n' || (c == '\r' && chars.peek().is_some_and(|&(_, n)| n == '\n'));
+        if newline || !is_space(c) {
+            return i;
+        }
+    }
+    s.len()
+}
+
+/// Length of the newline at the start of `s` (`\n` or `\r\n`), or 0.
+pub(crate) fn newline_len(s: &str) -> usize {
+    if s.starts_with("\r\n") {
+        2
+    } else if s.starts_with('\n') {
+        1
+    } else {
+        0
+    }
+}
+
+/// Length up to (not including) the next newline.
+pub(crate) fn line_len(s: &str) -> usize {
+    match s.find('\n') {
+        Some(i) if i > 0 && s.as_bytes()[i - 1] == b'\r' => i - 1,
+        Some(i) => i,
+        None => s.len(),
+    }
+}
+
+/// Whether `s` starts at a statement separator or end of input.
+pub(crate) fn is_stmt_end(s: &str) -> bool {
+    s.is_empty() || s.starts_with(';') || newline_len(s) > 0
+}
+
+/// Length up to (not including) the next statement separator.
+pub(crate) fn stmt_len(s: &str) -> usize {
+    let line = line_len(s);
+    s[..line].find(';').unwrap_or(line)
+}
+
+/// `len` with trailing inline whitespace of `s[..len]` removed.
+pub(crate) fn trim_end_len(s: &str, len: usize) -> usize {
+    s[..len].trim_end().len()
+}
+
+/// Length of a metadata body after `@{`, up to (not including) the closing `}`, if closed.
+/// Braces inside double-quoted strings are ignored.
+pub(crate) fn meta_body_len(s: &str) -> Option<usize> {
+    let mut in_string = false;
+    for (i, c) in s.char_indices() {
+        match c {
+            '"' => in_string = !in_string,
+            '}' if !in_string => return Some(i),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Length of a word made of Unicode alphanumerics, `-`, and `_`, in bytes.
+pub(crate) fn word_len(s: &str) -> usize {
+    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
+        .unwrap_or(s.len())
+}
+
+/// Whether `kw` is the complete leading word, case sensitively.
+pub(crate) fn keyword(s: &str, kw: &str) -> bool {
+    s.starts_with(kw) && word_len(s) == kw.len()
+}
+
+/// Length of a word made of Unicode alphanumerics and underscores, in bytes.
+pub(crate) fn identifier_word_len(s: &str) -> usize {
+    s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
+        .unwrap_or(s.len())
+}
+
+/// Whether `kw` is the complete leading identifier word, case sensitively.
+pub(crate) fn identifier_keyword(s: &str, kw: &str) -> bool {
+    s.starts_with(kw) && identifier_word_len(s) == kw.len()
+}
+
 pub(crate) struct Base<'a> {
     pub src: &'a str,
     pub pos: usize,
@@ -24,7 +125,7 @@ pub(crate) fn only_space_before(src: &str, pos: usize) -> bool {
         .chars()
         .rev()
         .take_while(|&c| c != '\n')
-        .all(scan::is_space)
+        .all(is_space)
 }
 
 /// The next match of a needle at or after a position. A later search from a position no further
@@ -51,7 +152,7 @@ impl Next {
     }
 }
 
-/// The `}` closing a metadata body, as `scan::meta_body_len` finds it, for searches from many
+/// The `}` closing a metadata body, as `meta_body_len` finds it, for searches from many
 /// positions. Which quotes open strings depends on where a search starts, so the quotes are
 /// counted from the start of the text, and a search reuses an earlier one that started with
 /// the same count's parity.
@@ -83,7 +184,7 @@ impl MetaClose {
         {
             return at;
         }
-        let at = scan::meta_body_len(&src[pos..]).map(|i| pos + i);
+        let at = meta_body_len(&src[pos..]).map(|i| pos + i);
         *slot = Some((pos, at));
         at
     }
@@ -183,7 +284,7 @@ pub(crate) fn end_block_len(s: &str, openers: &[&str]) -> Option<usize> {
     let mut depth = 0usize;
     let mut at = 0;
     while at < s.len() {
-        at += scan::ws_len(&s[at..]);
+        at += ws_len(&s[at..]);
         let word = &s[at..];
         if scan::keyword(word, "end") {
             if depth == 0 {
@@ -196,16 +297,16 @@ pub(crate) fn end_block_len(s: &str, openers: &[&str]) -> Option<usize> {
         }) {
             depth += 1;
         }
-        at += scan::stmt_len(word);
+        at += stmt_len(word);
         let rest = &s[at..];
-        at += scan::newline_len(rest).max(usize::from(rest.starts_with(';')));
+        at += newline_len(rest).max(usize::from(rest.starts_with(';')));
     }
     None
 }
 
 /// Whether a statement may end here: end of input, a newline, `;`, or a closing `}`.
 pub(crate) fn is_end(s: &str) -> bool {
-    scan::is_stmt_end(s) || s.starts_with('}')
+    is_stmt_end(s) || s.starts_with('}')
 }
 
 /// The length of a string in the langium diagrams' `STRING` terminal at the start of `s`:
@@ -366,7 +467,7 @@ impl<'a> Base<'a> {
     }
 
     pub fn ws(&mut self) {
-        let n = scan::ws_len(self.rest());
+        let n = ws_len(self.rest());
         self.token(WHITESPACE, n);
     }
 
@@ -375,7 +476,7 @@ impl<'a> Base<'a> {
     pub fn fail(&mut self, message: &str) {
         self.ws();
         let start = self.pos;
-        let len = scan::line_len(self.rest());
+        let len = line_len(self.rest());
         if len == 0 {
             self.error(start, start, message);
             return;
@@ -388,12 +489,12 @@ impl<'a> Base<'a> {
 
     /// Requires the statement to end here, allowing a `%%` comment after whitespace.
     pub fn end(&mut self) {
-        let n = scan::ws_len(self.rest());
+        let n = ws_len(self.rest());
         let after = &self.rest()[n..];
         let spaced = n > 0 || self.src[..self.pos].ends_with([' ', '\t']);
         if spaced && after.starts_with("%%") && !after.starts_with("%%{") {
             self.token(WHITESPACE, n);
-            self.token(COMMENT, scan::line_len(self.rest()));
+            self.token(COMMENT, line_len(self.rest()));
             return;
         }
         if !is_end(after) {
@@ -403,7 +504,7 @@ impl<'a> Base<'a> {
 
     /// The rest of the line as one `kind` token, without trailing whitespace.
     pub fn rest_of_line(&mut self, kind: SyntaxKind) {
-        let len = scan::trim_end_len(self.rest(), scan::line_len(self.rest()));
+        let len = trim_end_len(self.rest(), line_len(self.rest()));
         self.token(kind, len);
     }
 
@@ -411,11 +512,29 @@ impl<'a> Base<'a> {
     /// trailing whitespace, then the end of the statement.
     pub fn title_text(&mut self) {
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..line_len(r)];
         let end = line.find("%%").unwrap_or(line.len());
-        let n = scan::trim_end_len(line, end);
+        let n = trim_end_len(line, end);
         self.token(TEXT, n);
         self.end();
+    }
+
+    /// A `title` whose text is the rest of its line, without trailing whitespace.
+    pub fn title_line(&mut self) {
+        self.start(TITLE_STMT);
+        self.token(TITLE_KW, "title".len());
+        self.ws();
+        self.rest_of_line(TEXT);
+        self.finish();
+    }
+
+    /// A langium `title` statement, with the comment handling of `title_text`.
+    pub fn langium_title(&mut self) {
+        self.start(TITLE_STMT);
+        self.token(TITLE_KW, "title".len());
+        self.ws();
+        self.title_text();
+        self.finish();
     }
 
     /// The length of a `"..."` string at the cursor, closed on the same line.
@@ -446,7 +565,7 @@ impl<'a> Base<'a> {
             self.end();
             self.finish();
         } else {
-            let end = self.pos + scan::stmt_len(r);
+            let end = self.pos + stmt_len(r);
             self.error(self.pos, end, format!("expected `{first}` header"));
         }
     }
@@ -454,21 +573,21 @@ impl<'a> Base<'a> {
     /// A frontmatter block at the start of the source, if any, after a byte order mark
     /// (LANGS-9).
     pub fn frontmatter(&mut self) {
-        self.token(WHITESPACE, scan::bom_len(self.src));
+        self.token(WHITESPACE, bom_len(self.src));
         let (start, src) = (self.pos, self.rest());
-        let first = scan::line_len(src);
+        let first = line_len(src);
         if src[..first].trim_end() != "---" {
             return;
         }
-        let mut line_start = first + scan::newline_len(&src[first..]);
+        let mut line_start = first + newline_len(&src[first..]);
         while line_start < src.len() {
             let rest = &src[line_start..];
-            let len = scan::line_len(rest);
+            let len = line_len(rest);
             if rest[..len].trim() == "---" {
                 self.token(FRONTMATTER, line_start + len);
                 return;
             }
-            line_start += len + scan::newline_len(&rest[len..]);
+            line_start += len + newline_len(&rest[len..]);
         }
         self.start(ERROR);
         self.token(ERROR_TOKEN, first);
@@ -484,8 +603,8 @@ impl<'a> Base<'a> {
     pub fn trivia(&mut self) {
         loop {
             let r = self.rest();
-            let ws = scan::ws_len(r);
-            let nl = scan::newline_len(r);
+            let ws = ws_len(r);
+            let nl = newline_len(r);
             if ws > 0 {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {
@@ -498,12 +617,12 @@ impl<'a> Base<'a> {
                     Some(at) => self.token(DIRECTIVE, at - from + 6),
                     None => {
                         let start = self.pos;
-                        self.token(DIRECTIVE, scan::line_len(r));
+                        self.token(DIRECTIVE, line_len(r));
                         self.error(start, start + 3, "unclosed directive: expected `}%%`");
                     }
                 }
             } else if r.starts_with("%%") && self.at_line_start() {
-                self.token(COMMENT, scan::line_len(r));
+                self.token(COMMENT, line_len(r));
             } else {
                 return;
             }
@@ -644,7 +763,7 @@ impl<'a> Base<'a> {
         let end = end.map_or(self.src.len(), |n| n.max(self.pos));
         loop {
             let r = &self.src[self.pos..end];
-            let (ws, nl) = (scan::ws_len(r), scan::newline_len(r));
+            let (ws, nl) = (ws_len(r), newline_len(r));
             if ws > 0 {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {
@@ -655,7 +774,7 @@ impl<'a> Base<'a> {
         }
         let start = self.pos;
         let len = end - start;
-        let line = scan::line_len(self.rest()).min(len);
+        let line = line_len(self.rest()).min(len);
         self.error(start, start + line, message);
         if len > 0 {
             self.start(ERROR);
@@ -709,7 +828,7 @@ impl<'a> Base<'a> {
             if p.rest().starts_with('}') {
                 if depth > 0 {
                     p.token(R_BRACE, 1);
-                    let n = scan::ws_len(p.rest());
+                    let n = ws_len(p.rest());
                     let after = &p.rest()[n..];
                     if after.starts_with("%%") && !after.starts_with("%%{") {
                         p.end();
@@ -738,6 +857,54 @@ mod tests {
     use super::*;
     use crate::syntax::SyntaxNode;
 
+    #[test]
+    fn shared_scanners_respect_boundaries() {
+        assert_eq!(bom_len("\u{feff}é"), 3);
+        assert_eq!(bom_len("é\u{feff}"), 0);
+        assert_eq!(ws_len("\u{feff}\u{2003}\rX"), 7);
+        assert_eq!(ws_len(" \r\nX"), 1);
+        assert_eq!(newline_len("\rX"), 0);
+        assert_eq!(newline_len("\r\nX"), 2);
+        assert_eq!(line_len("é\r\nX"), 2);
+        assert_eq!(line_len("é\rX"), 4);
+        assert!(is_stmt_end(""));
+        assert!(is_stmt_end(";x"));
+        assert!(is_stmt_end("\r\nx"));
+        assert!(!is_stmt_end("\rx"));
+        assert_eq!(stmt_len("é;z\r\n"), 2);
+        assert_eq!(stmt_len("é\r\n;"), 2);
+        assert_eq!(stmt_len(""), 0);
+        let text = "é\u{2003} \t;";
+        assert_eq!(trim_end_len(text, text.len() - 1), "é".len());
+        assert_eq!(trim_end_len("", 0), 0);
+    }
+
+    #[test]
+    fn metadata_bodies() {
+        assert_eq!(meta_body_len(" shape: rect }"), Some(13));
+        assert_eq!(meta_body_len("label: \"a}b\" }x"), Some(13));
+        assert_eq!(meta_body_len("label: x"), None);
+        assert_eq!(meta_body_len("é \"x}y\" }"), Some(9));
+        assert_eq!(meta_body_len("\"unclosed }"), None);
+        // Unlike brace blocks, unquoted nested braces do not affect this scan.
+        assert_eq!(meta_body_len("{a} }"), Some(2));
+    }
+
+    #[test]
+    fn words_and_keywords() {
+        assert_eq!(word_len("é-中_2: rest"), "é-中_2".len());
+        assert_eq!(word_len("!title"), 0);
+        assert!(keyword("title: x", "title"));
+        assert!(keyword("title", "title"));
+        for s in ["titles", "title_2", "title-é", "Title"] {
+            assert!(!keyword(s, "title"), "{s:?}");
+        }
+        assert_eq!(identifier_word_len("é_中-2"), "é_中".len());
+        assert!(identifier_keyword("title-name", "title"));
+        assert!(!identifier_keyword("titleé", "title"));
+        assert!(!identifier_keyword("title_2", "title"));
+    }
+
     /// Searches from every position, forward and then backward, agree with a fresh scan.
     #[test]
     fn closers_match_a_fresh_scan() {
@@ -750,7 +917,7 @@ mod tests {
         ] {
             let mut meta = MetaClose::default();
             let mut next = Next::default();
-            let fresh = |p: usize| scan::meta_body_len(&src[p..]).map(|i| p + i);
+            let fresh = |p: usize| meta_body_len(&src[p..]).map(|i| p + i);
             let plain = |p: usize| src[p..].find('}').map(|i| p + i);
             let order: Vec<usize> = (0..=src.len()).chain((0..=src.len()).rev()).collect();
             for p in order {
@@ -819,6 +986,20 @@ mod tests {
             .map(|d| (d.range.start().into()..d.range.end().into(), d.message))
             .collect();
         (kinds.join(" "), messages)
+    }
+
+    #[test]
+    fn title_forms_keep_distinct_comment_rules() {
+        let src = "title A; B %% comment";
+        let (tree, d) = built(src, |p| p.title_line());
+        assert_eq!(tree, "TITLE_STMT TITLE_KW WHITESPACE TEXT");
+        assert!(d.is_empty());
+        let (tree, d) = built(src, |p| p.langium_title());
+        assert_eq!(
+            tree,
+            "TITLE_STMT TITLE_KW WHITESPACE TEXT WHITESPACE COMMENT"
+        );
+        assert!(d.is_empty());
     }
 
     #[test]

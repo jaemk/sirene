@@ -5,8 +5,8 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
+use crate::lines::word_len;
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -73,12 +73,6 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-/// Length of a word at the start of `s`: letters, digits, `-`, and `_`.
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
 /// The keyword `s` starts with, as written in [`KEYWORDS`].
 pub(crate) fn keyword(s: &str) -> Option<&'static str> {
     let word = &s[..word_len(s)];
@@ -107,7 +101,7 @@ fn line_len(s: &str) -> usize {
     while let Some(i) = s[from..].find([';', '\n']) {
         let at = from + i;
         if s.as_bytes()[at] == b'\n' {
-            return scan::line_len(&s[..=at]);
+            return crate::lines::line_len(&s[..=at]);
         }
         let before = &s[..at];
         let word = before.trim_end_matches(|c: char| c.is_alphanumeric() || c == '_');
@@ -123,7 +117,7 @@ impl Parser<'_> {
     /// The rest of the statement as one `kind` token, without trailing whitespace.
     fn text(&mut self, kind: crate::syntax::SyntaxKind) {
         let r = self.rest();
-        let len = scan::trim_end_len(r, line_len(r));
+        let len = crate::lines::trim_end_len(r, line_len(r));
         self.token(kind, len);
     }
 }
@@ -148,7 +142,7 @@ fn name_len(s: &str) -> usize {
         }
         from = at + 2;
     }
-    scan::trim_end_len(line, end)
+    crate::lines::trim_end_len(line, end)
 }
 
 impl Parser<'_> {
@@ -211,7 +205,7 @@ impl Parser<'_> {
         if self.rest().starts_with("@{") {
             self.token(META_OPEN, 2);
             let r = self.rest();
-            match r[..scan::line_len(r)].find('}') {
+            match r[..crate::lines::line_len(r)].find('}') {
                 // Metadata is JSON and may hold `;`, so it runs to the end of the line.
                 Some(i) => {
                     self.token(META_BODY, i);
@@ -265,7 +259,7 @@ impl Parser<'_> {
             let r = self.rest();
             let line = &r[..line_len(r)];
             let stop = line.find([',', ':']).unwrap_or(line.len());
-            let n = scan::trim_end_len(line, stop);
+            let n = crate::lines::trim_end_len(line, stop);
             if n == 0 {
                 self.finish();
                 self.fail("expected a participant name");
@@ -314,7 +308,7 @@ impl Parser<'_> {
             "destroy" | "activate" | "deactivate" => {
                 self.ws();
                 let r = self.rest();
-                let n = scan::trim_end_len(r, line_len(r));
+                let n = crate::lines::trim_end_len(r, line_len(r));
                 if n == 0 {
                     self.fail("expected a participant name");
                 } else {
@@ -338,7 +332,7 @@ impl Parser<'_> {
             return;
         };
         self.start(MESSAGE_STMT);
-        let from = scan::trim_end_len(head, at);
+        let from = crate::lines::trim_end_len(head, at);
         if from == 0 {
             self.fail("expected a participant before the arrow");
             self.finish();
@@ -355,7 +349,7 @@ impl Parser<'_> {
         self.ws();
         let r = self.rest();
         let line = &r[..line_len(r)];
-        let to = scan::trim_end_len(line, line.find(':').unwrap_or(line.len()));
+        let to = crate::lines::trim_end_len(line, line.find(':').unwrap_or(line.len()));
         if to == 0 {
             self.fail("expected a participant after the arrow");
             self.finish();

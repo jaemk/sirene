@@ -2,6 +2,7 @@
 //! A line holds any number of statements: blocks, `space`, edges between blocks, and `columns`;
 //! `block:id` ... `end` nests a group.
 
+use crate::lines::word_len;
 use std::ops::{Deref, DerefMut};
 
 use rowan::GreenNode;
@@ -44,11 +45,6 @@ impl DerefMut for Parser<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
-}
-
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
 }
 
 fn keyword(s: &str, kw: &str) -> bool {
@@ -176,7 +172,7 @@ impl Parser<'_> {
         self.start(VERTEX_STMT);
         self.node();
         loop {
-            let ws = scan::ws_len(self.rest());
+            let ws = crate::lines::ws_len(self.rest());
             if scan::stroke(&self.rest()[ws..]).is_none() {
                 break;
             }
@@ -229,7 +225,7 @@ impl Parser<'_> {
                     let r = self.rest();
                     let n = scan::shape_text_len(r, opener);
                     let n = if r[..n].contains('\n') || r[..n].ends_with('\r') {
-                        n.min(scan::line_len(r))
+                        n.min(crate::lines::line_len(r))
                     } else {
                         n
                     };
@@ -263,7 +259,7 @@ impl Parser<'_> {
         self.token(SHAPE_OPEN, 2);
         self.start(LABEL);
         let r = self.rest();
-        let line = scan::line_len(r);
+        let line = crate::lines::line_len(r);
         if r.starts_with('"') {
             match scan::string_len(&r[..line]) {
                 Some(n) => self.token(STRING, n),
@@ -331,7 +327,7 @@ impl Parser<'_> {
                 self.ws();
                 self.start(EDGE_LABEL);
                 let r = self.rest();
-                let line = scan::line_len(r);
+                let line = crate::lines::line_len(r);
                 if r.starts_with('"') {
                     match scan::string_len(&r[..line]) {
                         Some(n) => self.token(STRING, n),
@@ -344,7 +340,7 @@ impl Parser<'_> {
                     }
                 } else {
                     let n = scan::inline_edge_text_len(r, kind);
-                    let n = scan::trim_end_len(r, n);
+                    let n = crate::lines::trim_end_len(r, n);
                     self.token(TEXT, n);
                 }
                 self.finish();

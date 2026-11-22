@@ -7,7 +7,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -96,7 +95,7 @@ fn frame_len(s: &str) -> usize {
 /// The length of inline data: `{...}` up to the line's last `}`, or `"..."` or `'...'` up to
 /// the line's last matching quote.
 fn inline_len(s: &str) -> Option<usize> {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let close = match line.chars().next()? {
         '{' => '}',
         q @ ('"' | '\'') => q,
@@ -110,17 +109,17 @@ fn inline_len(s: &str) -> Option<usize> {
 /// indented no deeper than `indent`. `Err` holds the length to the end of input when the
 /// block is unclosed.
 fn block_len(s: &str, indent: usize) -> Result<usize, usize> {
-    let first = scan::line_len(s);
-    let mut at = first + scan::newline_len(&s[first..]);
+    let first = crate::lines::line_len(s);
+    let mut at = first + crate::lines::newline_len(&s[first..]);
     while at < s.len() {
         let rest = &s[at..];
-        let len = scan::line_len(rest);
+        let len = crate::lines::line_len(rest);
         let line = &rest[..len];
         let lead = line.len() - line.trim_start().len();
         if line.trim() == "}" && lead <= indent {
             return Ok(at + lead + 1);
         }
-        at += len + scan::newline_len(&rest[len..]);
+        at += len + crate::lines::newline_len(&rest[len..]);
     }
     Err(s.len())
 }
@@ -158,7 +157,7 @@ impl Parser<'_> {
     fn comment(&mut self) -> bool {
         let r = self.rest();
         if r.starts_with("%%") || r.starts_with("//") {
-            let n = scan::line_len(r);
+            let n = crate::lines::line_len(r);
             self.token(COMMENT, n);
         } else if let Some(body) = r.strip_prefix("/*") {
             match body.find("*/") {
@@ -180,7 +179,7 @@ impl Parser<'_> {
         loop {
             self.ws();
             let r = self.rest();
-            if r.starts_with("/*") && !r[2..scan::line_len(r)].contains("*/") {
+            if r.starts_with("/*") && !r[2..crate::lines::line_len(r)].contains("*/") {
                 // A comment running onto later lines ends the statement.
                 self.comment();
                 return;
@@ -223,9 +222,9 @@ impl Parser<'_> {
         self.token(TITLE_KW, "title".len());
         self.ws();
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let end = line.find("%%").unwrap_or(line.len());
-        let len = scan::trim_end_len(r, end);
+        let len = crate::lines::trim_end_len(r, end);
         self.token(TEXT, len);
         self.eol();
         self.finish();
@@ -248,7 +247,7 @@ impl Parser<'_> {
         if !r.starts_with('`') {
             return true;
         }
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         match line[1..].find('`') {
             Some(i) if DATA_TYPES.contains(&&line[1..=i]) => {
                 self.token(EM_DATA_TYPE, i + 2);
@@ -349,7 +348,7 @@ impl Parser<'_> {
         if !r.starts_with('{') {
             return self.fail("expected `{` and the data on the lines below it");
         }
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         if !line[1..].trim().is_empty() {
             return self.fail("expected a newline after `{`; a data block's lines go below it");
         }
@@ -412,8 +411,8 @@ impl Parser<'_> {
     fn skip_gap(&mut self) {
         loop {
             let r = self.rest();
-            let ws = scan::ws_len(r);
-            let nl = scan::newline_len(r);
+            let ws = crate::lines::ws_len(r);
+            let nl = crate::lines::newline_len(r);
             if ws > 0 {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {

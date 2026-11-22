@@ -126,3 +126,12 @@ a syntax error, not a flowchart. The editor reads a file by its extension or blo
 way (`Lang::of_path`, `Lang::of_info`, `diagram::lower_as`). Tests: `forced_languages` in
 `diagram.rs` and in `crates/sirene/tests/cli.rs`, and `refusals.rs` in `sirene-gui`. Drawing
 edits are adding, renaming, connecting, and deleting nodes and edges (WYSIWY-29).
+
+## DOT-6 Edge expansion limits
+
+A graph keeps at most 100,000 pending edges and at most 64 MiB of copied edge attribute, port,
+and endpoint ID data and expanded edge labels, including attribute and port element overhead.
+The limits apply before strict graphs merge duplicate edges. An edge product keeps the prefix
+that fits in source order; once a limit is exceeded, later edges are left out and a warning
+reports each limiting budget once. Operands and later statements are still read, so their nodes
+remain available.

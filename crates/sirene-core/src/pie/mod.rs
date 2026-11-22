@@ -73,9 +73,7 @@ impl Parse {
     /// position.
     pub fn lower(&self) -> (Pie, Vec<Diagnostic>) {
         let (pie, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a pie chart: {} slices; {} diagnostics",
             pie.slices.len(),

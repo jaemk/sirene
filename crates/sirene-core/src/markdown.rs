@@ -159,7 +159,7 @@ fn lines(src: &str) -> Vec<(usize, &str)> {
     let mut at = 0;
     for raw in src.split_inclusive('\n') {
         let text = if at == 0 {
-            raw.trim_start_matches(crate::flowchart::scan::BOM)
+            raw.trim_start_matches(crate::lines::BOM)
         } else {
             raw
         };

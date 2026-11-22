@@ -5,8 +5,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, keyword, word_len};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -37,21 +36,12 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
-}
-
 /// The length of text at the start of `s` up to one of `stops` or the end of the line, without
 /// trailing whitespace.
 fn text_len(s: &str, stops: &[char]) -> usize {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let end = line.find(stops).unwrap_or(line.len());
-    scan::trim_end_len(line, end)
+    crate::lines::trim_end_len(line, end)
 }
 
 impl Parser<'_> {
@@ -85,7 +75,7 @@ impl Parser<'_> {
         self.ws();
         let r = self.rest();
         if r.starts_with('#') {
-            self.token(COMMENT, scan::line_len(r));
+            self.token(COMMENT, crate::lines::line_len(r));
         }
         self.end();
     }

@@ -6,6 +6,19 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- A libFuzzer target for the diagram parsers (`fuzz/`), run in CI, and property and compatibility
+  tests across all 34 public parsers.
+
+### Changed
+
+- A DOT graph keeps at most 100,000 pending edges and 64 MiB of copied edge attributes, ports,
+  endpoint IDs, and expanded edge labels. Past a limit, later edges are left out and a warning
+  says so (DOT-6).
+- The use-case parser no longer rescans repeated unclosed metadata.
+- The parsers share scanning, title, and diagnostic helpers.
+
 ## [0.6.3] - 2026-11-21
 
 ### Added

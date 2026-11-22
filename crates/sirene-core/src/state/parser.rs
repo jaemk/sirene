@@ -8,7 +8,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::{Base, is_end};
 use crate::syntax::SyntaxKind::*;
 
@@ -125,7 +124,7 @@ impl Parser<'_> {
             self.token(COLON, 1);
             self.ws();
             self.rest_of_line(TEXT);
-        } else if side.is_some() && scan::is_stmt_end(self.rest()) {
+        } else if side.is_some() && crate::lines::is_stmt_end(self.rest()) {
             self.note_body();
         } else {
             // A floating note, `note "text" as N`; the lowering reports it.
@@ -147,18 +146,18 @@ impl Parser<'_> {
                 self.error(start, end, "unclosed note: expected `end note`");
                 return;
             }
-            let len = scan::line_len(rest);
+            let len = crate::lines::line_len(rest);
             let line = rest[..len].trim();
             let words: Vec<&str> = line.split_whitespace().collect();
             if at > start && words == ["end", "note"] {
-                let indent = scan::ws_len(rest);
+                let indent = crate::lines::ws_len(rest);
                 self.token(TEXT, at + indent - start);
                 self.token(END_KW, 3);
                 self.ws();
                 self.token(NOTE_KW, 4);
                 return;
             }
-            at += len + scan::newline_len(&rest[len..]);
+            at += len + crate::lines::newline_len(&rest[len..]);
         }
     }
 
@@ -212,7 +211,7 @@ impl Parser<'_> {
         };
         if let Some(close) = close {
             // The close on this line, else the rest of the line.
-            let line = scan::line_len(r);
+            let line = crate::lines::line_len(r);
             let len = r[..line].find(close).map_or(line, |i| i + 2);
             self.token(STEREOTYPE, len);
             self.builder.start_node_at(checkpoint, STATE_STMT.into());
@@ -266,7 +265,7 @@ impl Parser<'_> {
         if !self.reference() {
             return;
         }
-        let n = scan::ws_len(self.rest());
+        let n = crate::lines::ws_len(self.rest());
         let after = &self.rest()[n..];
         if after.starts_with("-->") {
             self.builder

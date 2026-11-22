@@ -6,8 +6,8 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
+use crate::lines::{keyword, word_len};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -63,18 +63,9 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
 fn ident_len(s: &str) -> usize {
     s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
         .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
 }
 
 /// The length of the word at the start of `s` when it is one of `words`, ignoring case.
@@ -90,11 +81,11 @@ pub(crate) fn name_len(s: &str) -> usize {
     if !s.starts_with(|c: char| c.is_alphanumeric() || c == '_') {
         return 0;
     }
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let end = line
         .find([':', ',', '{', '<', '>', '-', '=', ';'])
         .unwrap_or(line.len());
-    scan::trim_end_len(line, end)
+    crate::lines::trim_end_len(line, end)
 }
 
 impl Parser<'_> {
@@ -192,9 +183,9 @@ impl Parser<'_> {
                 match self.string_len() {
                     Some(n) => self.token(STRING, n),
                     None => {
-                        let line = &self.rest()[..scan::line_len(self.rest())];
+                        let line = &self.rest()[..crate::lines::line_len(self.rest())];
                         let end = line.find('}').unwrap_or(line.len());
-                        let n = scan::trim_end_len(line, end);
+                        let n = crate::lines::trim_end_len(line, end);
                         self.token(TEXT, n);
                     }
                 }
@@ -211,7 +202,7 @@ impl Parser<'_> {
         if !self.name() {
             return;
         }
-        let ws = scan::ws_len(self.rest());
+        let ws = crate::lines::ws_len(self.rest());
         let after = &self.rest()[ws..];
         if after.starts_with(":::") {
             self.builder.start_node_at(checkpoint, CLASS_STMT.into());

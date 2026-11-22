@@ -101,9 +101,7 @@ impl Parse {
     /// by position.
     pub fn lower(&self) -> (Kanban, Vec<Diagnostic>) {
         let (board, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a kanban board: {} columns; {} diagnostics",
             board.columns.len(),

@@ -10,7 +10,6 @@ use rowan::GreenNode;
 
 use super::Notation;
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::{Base, MAX_DEPTH, too_deep};
 use crate::syntax::SyntaxKind::*;
 
@@ -97,7 +96,7 @@ fn string_len(s: &str, notation: Notation) -> Option<Result<usize, usize>> {
             return Some(Ok(i + 1));
         }
     }
-    Some(Err(scan::line_len(s)))
+    Some(Err(crate::lines::line_len(s)))
 }
 
 /// The length of an ABNF number such as `%x41`, `%d65`, `%b1000001`, `%x30-39`, or `%x0D.0A`.
@@ -175,7 +174,7 @@ impl<'a> Parser<'a> {
             let ws = r
                 .find(|c: char| !matches!(c, ' ' | '\t' | '\r' | '\n'))
                 .unwrap_or(r.len());
-            let line = scan::line_len(r);
+            let line = crate::lines::line_len(r);
             if ws > 0 {
                 let nl = r[..ws].contains('\n');
                 self.token(if nl { NEWLINE } else { WHITESPACE }, ws);
@@ -200,7 +199,7 @@ impl<'a> Parser<'a> {
 
     /// The length of a comment in this notation at the start of `r`.
     fn comment_len(&mut self, r: &str, rule_start: bool) -> Option<usize> {
-        let line = scan::line_len(r);
+        let line = crate::lines::line_len(r);
         let block = |open: &str, close: &str| -> Option<Result<usize, ()>> {
             let body = r.strip_prefix(open)?;
             Some(
@@ -237,7 +236,7 @@ impl<'a> Parser<'a> {
 
     fn statement(&mut self) {
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         if line == "title" || line.starts_with("title ") || line.starts_with("title\t") {
             self.title();
             return;
@@ -258,9 +257,9 @@ impl<'a> Parser<'a> {
         self.token(TITLE_KW, "title".len());
         self.ws();
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let end = line.find("%%").unwrap_or(line.len());
-        let n = scan::trim_end_len(r, end);
+        let n = crate::lines::trim_end_len(r, end);
         self.token(TEXT, n);
         self.finish();
     }
@@ -505,7 +504,7 @@ impl<'a> Parser<'a> {
                 n += ws;
                 continue;
             }
-            let line = scan::line_len(s);
+            let line = crate::lines::line_len(s);
             let close = |open: &str, close: &str| {
                 s.strip_prefix(open).map(|b| {
                     b.find(close)

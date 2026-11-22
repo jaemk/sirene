@@ -6,8 +6,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, keyword, word_len};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -39,15 +38,6 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
-}
-
 /// A class name: a letter or `_`, then letters, digits, and `_`.
 fn id_len(s: &str) -> usize {
     if !s.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_') {
@@ -69,11 +59,7 @@ impl Parser<'_> {
         if keyword(r, "accTitle") || keyword(r, "accDescr") {
             self.acc();
         } else if keyword(r, "title") {
-            self.start(TITLE_STMT);
-            self.token(TITLE_KW, "title".len());
-            self.ws();
-            self.rest_of_line(TEXT);
-            self.finish();
+            self.title_line();
         } else if keyword(r, "classDef") {
             self.class_def(id_len);
         } else if r.starts_with(['"', '\'']) {
@@ -88,7 +74,7 @@ impl Parser<'_> {
         self.start(NODE);
         let r = self.rest();
         let quote = &r[..1];
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let Some(close) = line[1..].find(quote) else {
             self.fail(&format!(
                 "unclosed `{quote}`: expected a closing `{quote}` on the same line"

@@ -5,7 +5,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -87,7 +86,7 @@ pub(crate) fn name_len(s: &str) -> usize {
     let mut n = 1 + run_len(&s[1..]);
     loop {
         let after = &s[n..];
-        let ws = scan::ws_len(after);
+        let ws = crate::lines::ws_len(after);
         if ws == 0 {
             return n;
         }
@@ -133,7 +132,7 @@ fn port_len(s: &str) -> Option<(usize, bool)> {
         }
     }
     let body = s.strip_prefix("+'")?;
-    let line = &body[..scan::line_len(body)];
+    let line = &body[..crate::lines::line_len(body)];
     let close = line.find('\'')?;
     let after = &line[close + 1..];
     let tail = ["<>", "<", ">"]
@@ -213,7 +212,7 @@ impl Parser<'_> {
     fn eol(&mut self) {
         self.ws();
         if self.rest().starts_with("%%") {
-            let n = scan::line_len(self.rest());
+            let n = crate::lines::line_len(self.rest());
             self.token(COMMENT, n);
         }
         self.end();
@@ -225,9 +224,9 @@ impl Parser<'_> {
         self.token(TITLE_KW, "title".len());
         self.ws();
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let end = line.find("%%").unwrap_or(line.len());
-        let len = scan::trim_end_len(r, end);
+        let len = crate::lines::trim_end_len(r, end);
         self.token(TEXT, len);
         self.eol();
         self.finish();

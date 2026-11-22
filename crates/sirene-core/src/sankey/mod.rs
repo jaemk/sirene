@@ -130,9 +130,7 @@ impl Parse {
     /// by position.
     pub fn lower(&self) -> (Sankey, Vec<Diagnostic>) {
         let (sankey, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a sankey diagram: {} nodes, {} links; {} diagnostics",
             sankey.nodes.len(),

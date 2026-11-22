@@ -1,11 +1,11 @@
 //! Line-oriented parser for Mermaid mindmaps, producing a lossless rowan tree (MMIND-1).
 
+use crate::lines::word_len;
 use std::ops::{Deref, DerefMut};
 
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::{Base, Next};
 use crate::syntax::SyntaxKind::*;
 
@@ -54,20 +54,15 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
 /// The length of a node id at the start of `s`: text up to a shape delimiter, `@{`, or the end
 /// of the line, without trailing whitespace.
 fn id_len(s: &str) -> usize {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let mut end = line.find(['(', '[', ')', '{', '}']).unwrap_or(line.len());
     if let Some(at) = line.find("@{") {
         end = end.min(at);
     }
-    scan::trim_end_len(line, end)
+    crate::lines::trim_end_len(line, end)
 }
 
 impl Parser<'_> {
@@ -77,7 +72,7 @@ impl Parser<'_> {
             self.start(CLASS_SHORTHAND);
             self.token(TRIPLE_COLON, 3);
             self.ws();
-            if scan::line_len(self.rest()) == 0 {
+            if crate::lines::line_len(self.rest()) == 0 {
                 self.fail("expected a class name");
             } else {
                 self.rest_of_line(TEXT);
@@ -96,7 +91,7 @@ impl Parser<'_> {
         self.token(ICON_KW, "::icon".len());
         self.token(L_PAREN, 1);
         let r = self.rest();
-        match r[..scan::line_len(r)].find(')') {
+        match r[..crate::lines::line_len(r)].find(')') {
             Some(i) => {
                 self.token(TEXT, i);
                 self.token(R_PAREN, 1);
@@ -111,7 +106,7 @@ impl Parser<'_> {
     fn node(&mut self) {
         let n = id_len(self.rest());
         let r = &self.rest()[n..];
-        let r = &r[scan::ws_len(r)..];
+        let r = &r[crate::lines::ws_len(r)..];
         let shape = SHAPES.iter().find(|(open, _)| r.starts_with(open));
         if n == 0 && shape.is_none() {
             return;
@@ -146,7 +141,7 @@ impl Parser<'_> {
             }
             None => {
                 let start = self.pos;
-                let n = scan::line_len(self.rest());
+                let n = crate::lines::line_len(self.rest());
                 self.token(META_BODY, n);
                 self.error(start - 2, start + n, "unclosed `@{`: expected `}`");
                 false
@@ -162,9 +157,9 @@ impl Parser<'_> {
         self.start(SHAPE);
         self.token(SHAPE_OPEN, open.len());
         let r = self.rest();
-        let ws = scan::ws_len(r);
+        let ws = crate::lines::ws_len(r);
         let quoted = &r[ws..];
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         if quoted.starts_with("\"`") {
             self.token(WHITESPACE, ws);
             // A markdown string may span lines.

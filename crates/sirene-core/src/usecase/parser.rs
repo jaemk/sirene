@@ -6,7 +6,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -24,6 +23,7 @@ const PLANTUML: &[&str] = &[
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
     let mut p = Parser {
         base: Base::new(src),
+        meta_close: crate::lines::MetaClose::default(),
     };
     p.start(ROOT);
     p.header(HEADERS, "usecase-beta", header_len);
@@ -72,7 +72,7 @@ fn markdown_len(s: &str) -> Option<usize> {
 /// The length of a `"..."` or `'...'` string closed on its line.
 fn plain_len(s: &str) -> Option<usize> {
     let q = s.chars().next().filter(|c| *c == '"' || *c == '\'')?;
-    let line = &s[1..scan::line_len(s)];
+    let line = &s[1..crate::lines::line_len(s)];
     line.find(q).map(|i| i + 2)
 }
 
@@ -131,7 +131,7 @@ pub(crate) fn op(s: &str) -> Option<(Op, usize)> {
 /// The length of unquoted label text: up to a delimiter, a quote, an operator, a suffix
 /// marker, or the end of the line, without trailing whitespace.
 fn text_len(s: &str) -> usize {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let mut end = line.len();
     for (i, c) in line.char_indices() {
         let r = &line[i..];
@@ -144,7 +144,7 @@ fn text_len(s: &str) -> usize {
             break;
         }
     }
-    scan::trim_end_len(s, end)
+    crate::lines::trim_end_len(s, end)
 }
 
 /// Whether `s` starts a `json name@{` declaration.
@@ -152,7 +152,7 @@ fn json_follows(s: &str) -> bool {
     let Some(r) = s.strip_prefix("json") else {
         return false;
     };
-    let ws = scan::ws_len(r);
+    let ws = crate::lines::ws_len(r);
     if ws == 0 {
         return false;
     }
@@ -162,8 +162,8 @@ fn json_follows(s: &str) -> bool {
         return false;
     }
     let r = &r[n..];
-    let r = r[scan::ws_len(r)..].strip_prefix('@');
-    r.is_some_and(|r| r[scan::ws_len(r)..].starts_with('{'))
+    let r = r[crate::lines::ws_len(r)..].strip_prefix('@');
+    r.is_some_and(|r| r[crate::lines::ws_len(r)..].starts_with('{'))
 }
 
 /// The length of a name at `s`: an id, a plain string, or a Markdown string.
@@ -181,7 +181,7 @@ fn name_len(s: &str) -> Option<usize> {
 fn meta_follows(s: &str) -> bool {
     name_len(s).is_some_and(|n| {
         let r = &s[n..];
-        r[scan::ws_len(r)..].starts_with("@{")
+        r[crate::lines::ws_len(r)..].starts_with("@{")
     })
 }
 
@@ -216,6 +216,7 @@ fn json_len(s: &str) -> Option<usize> {
 
 struct Parser<'a> {
     base: Base<'a>,
+    meta_close: crate::lines::MetaClose,
 }
 
 impl<'a> Deref for Parser<'a> {
@@ -237,8 +238,8 @@ impl<'a> Parser<'a> {
     fn trivia(&mut self) {
         loop {
             let r = self.rest();
-            let ws = scan::ws_len(r);
-            let nl = scan::newline_len(r);
+            let ws = crate::lines::ws_len(r);
+            let nl = crate::lines::newline_len(r);
             if ws > 0 {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {
@@ -248,12 +249,12 @@ impl<'a> Parser<'a> {
                     Some(i) => self.token(DIRECTIVE, i + 6),
                     None => {
                         let start = self.pos;
-                        self.token(DIRECTIVE, scan::line_len(r));
+                        self.token(DIRECTIVE, crate::lines::line_len(r));
                         self.error(start, start + 3, "unclosed directive: expected `}%%`");
                     }
                 }
             } else if r.starts_with("%%") && self.at_line_start() {
-                self.token(COMMENT, scan::line_len(r));
+                self.token(COMMENT, crate::lines::line_len(r));
             } else {
                 return;
             }
@@ -263,14 +264,14 @@ impl<'a> Parser<'a> {
     fn at_line_start(&self) -> bool {
         let before = &self.src[..self.pos];
         let line = before.rfind('\n').map_or(before, |i| &before[i + 1..]);
-        line.chars().all(scan::is_space)
+        line.chars().all(crate::lines::is_space)
     }
 
     /// Requires the statement to end with its line.
     fn eol(&mut self) {
-        let n = scan::ws_len(self.rest());
+        let n = crate::lines::ws_len(self.rest());
         let r = &self.rest()[n..];
-        if !(r.is_empty() || scan::newline_len(r) > 0) {
+        if !(r.is_empty() || crate::lines::newline_len(r) > 0) {
             self.fail("expected the end of the line: put each statement on its own line");
         }
     }
@@ -279,7 +280,7 @@ impl<'a> Parser<'a> {
         let r = self.rest();
         let w = word(r);
         let after = &r[w.len()..];
-        let acc = |c: &[char]| after[scan::ws_len(after)..].starts_with(c);
+        let acc = |c: &[char]| after[crate::lines::ws_len(after)..].starts_with(c);
         match w {
             "accTitle" if acc(&[':']) => self.acc(),
             "accDescr" if acc(&[':', '{']) => self.acc(),
@@ -327,7 +328,7 @@ impl<'a> Parser<'a> {
         }
         self.token(IDENT, n);
         let r = self.rest();
-        let ws = scan::ws_len(r);
+        let ws = crate::lines::ws_len(r);
         let open = r[ws..].chars().next();
         if open == Some('(') || (rect && open == Some('[')) {
             self.ws();
@@ -381,7 +382,7 @@ impl<'a> Parser<'a> {
         if stereotype && self.peek().starts_with("<<") {
             self.ws();
             let r = self.rest();
-            let line = &r[..scan::line_len(r)];
+            let line = &r[..crate::lines::line_len(r)];
             match line[2..].find(">>") {
                 Some(i) if !line[2..2 + i].trim().is_empty() => self.token(STEREOTYPE, i + 4),
                 Some(_) => self.fail("expected a stereotype between `<<` and `>>`"),
@@ -397,16 +398,17 @@ impl<'a> Parser<'a> {
     /// The rest of the line after whitespace.
     fn peek(&self) -> &'a str {
         let r = self.rest();
-        &r[scan::ws_len(r)..]
+        &r[crate::lines::ws_len(r)..]
     }
 
     /// `@{ key: value, ... }`, which may span lines.
     fn metadata(&mut self) {
         self.start(METADATA);
         self.token(META_OPEN, 2);
-        match scan::meta_body_len(self.rest()) {
-            Some(n) => {
-                self.token(META_BODY, n);
+        let start = self.base.pos;
+        match self.meta_close.find(self.base.src, start) {
+            Some(end) => {
+                self.token(META_BODY, end - start);
                 self.token(META_CLOSE, 1);
             }
             None => self.fail("unclosed `@{`: expected `}`"),
@@ -461,7 +463,7 @@ impl<'a> Parser<'a> {
             && let Some(after) = r[n..].strip_prefix('@')
             && !after.starts_with('{')
         {
-            let ws = scan::ws_len(after);
+            let ws = crate::lines::ws_len(after);
             if let Some((o, len)) = op(&after[ws..]) {
                 return Some((n, o, len));
             }
@@ -530,7 +532,7 @@ impl<'a> Parser<'a> {
         };
         let Some(n) = n else { return };
         let after = &r[n..];
-        let ws = scan::ws_len(after);
+        let ws = crate::lines::ws_len(after);
         let Some((_, len)) = op(&after[ws..]).filter(|(o, _)| closers.contains(o)) else {
             return;
         };

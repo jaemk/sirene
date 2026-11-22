@@ -5,8 +5,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, keyword, word_len};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -37,15 +36,6 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
-}
-
 /// The length of an unquoted name or title: up to whitespace or one of `[],"#;`.
 fn name_len(s: &str) -> usize {
     s.find(|c: char| c.is_whitespace() || "[],\"#;".contains(c))
@@ -60,7 +50,7 @@ fn text_len(s: &str, stops: &[char]) -> usize {
         .find(|c: char| c == '\n' || stops.contains(&c))
         .unwrap_or(s.len());
     // Trimming drops the `\r` of a `\r\n` too.
-    scan::trim_end_len(s, end)
+    crate::lines::trim_end_len(s, end)
 }
 
 /// The length of a number at the start of `s`: an optional sign, then digits with an optional

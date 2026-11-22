@@ -159,9 +159,7 @@ impl Parse {
     /// by position.
     pub fn lower(&self) -> (Radar, Vec<Diagnostic>) {
         let (radar, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a radar chart: {} axes, {} curves; {} diagnostics",
             radar.axes.len(),

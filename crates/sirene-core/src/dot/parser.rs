@@ -3,7 +3,6 @@
 use rowan::{GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::{MAX_DEPTH, too_deep};
 use crate::syntax::SyntaxKind::{self, *};
 
@@ -72,16 +71,16 @@ impl Iterator for Lexer<'_> {
         let line_start = self.line_start;
         let r = &src[self.at..];
         let c = r.chars().next()?;
-        let bom = self.at == 0 && c == scan::BOM;
+        let bom = self.at == 0 && c == crate::lines::BOM;
         let (kind, len) = if bom {
             (WHITESPACE, c.len_utf8())
         } else if c == '\n' {
             (NEWLINE, 1)
         } else if r.starts_with("\r\n") {
             (NEWLINE, 2)
-        } else if scan::is_space(c) {
+        } else if crate::lines::is_space(c) {
             let n = r
-                .find(|c: char| !scan::is_space(c) || c == '\n' || c == '\r')
+                .find(|c: char| !crate::lines::is_space(c) || c == '\n' || c == '\r')
                 .unwrap_or(r.len());
             (WHITESPACE, n.max(c.len_utf8()))
         } else if r.starts_with("//") || (c == '#' && line_start) {

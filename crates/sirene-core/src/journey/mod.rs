@@ -83,9 +83,7 @@ impl Parse {
     /// by position.
     pub fn lower(&self) -> (Journey, Vec<Diagnostic>) {
         let (journey, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a journey: {} sections, {} tasks; {} diagnostics",
             journey.sections.len(),

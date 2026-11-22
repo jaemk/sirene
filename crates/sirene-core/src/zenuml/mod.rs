@@ -39,9 +39,7 @@ impl Parse {
             .map(|d| d.range.start())
             .collect();
         let (seq, lowering) = lower::lower(&self.syntax(), errors);
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a ZenUML diagram: {} participants, {} events; {} diagnostics",
             seq.participants.len(),

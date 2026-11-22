@@ -28,7 +28,6 @@ pub use detect::{Kind, kind};
 
 use crate::diagnostic::Diagnostic;
 use crate::diagram::Diagram;
-use crate::flowchart::scan;
 use crate::syntax::SyntaxNode;
 
 /// Whether sirene draws diagrams of `kind` yet (PUML-2).
@@ -159,9 +158,7 @@ impl Parse {
             // The parser reports the kinds not drawn yet; their drawing is empty.
             _ => (Diagram::default(), Vec::new()),
         };
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a PlantUML {} diagram; {} diagnostics",
             self.kind.name(),
@@ -194,7 +191,7 @@ pub fn parse(src: &str) -> Parse {
 /// Whether `src` has a PlantUML `@start...` line, which may follow other text as PlantUML
 /// allows (PSEQ-1, LANGS-1).
 pub fn is_plantuml(src: &str) -> bool {
-    src[scan::bom_len(src)..]
+    src[crate::lines::bom_len(src)..]
         .lines()
         .any(|l| l.trim_start().starts_with("@start"))
 }

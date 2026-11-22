@@ -652,7 +652,7 @@ fn from_hsl(h: f32, s: f32, l: f32) -> (u8, u8, u8) {
 
 /// The frontmatter's `config:` `theme` and `themeVariables`; returns where the body starts.
 fn frontmatter(src: &str, out: &mut ThemeConfig) -> usize {
-    let bom = crate::flowchart::scan::bom_len(src);
+    let bom = crate::lines::bom_len(src);
     let mut lines = src[bom..].split_inclusive('\n');
     let Some(first) = lines.next() else {
         return 0;

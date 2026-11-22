@@ -91,9 +91,7 @@ impl Parse {
     /// ordered by position.
     pub fn lower(&self) -> (QuadrantChart, Vec<Diagnostic>) {
         let (chart, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a quadrant chart: {} points; {} diagnostics",
             chart.points.len(),

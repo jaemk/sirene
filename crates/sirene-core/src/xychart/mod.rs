@@ -251,9 +251,7 @@ impl Parse {
     /// ordered by position.
     pub fn lower(&self) -> (XyChart, Vec<Diagnostic>) {
         let (chart, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered an XY chart: {} series; {} diagnostics",
             chart.series.len(),

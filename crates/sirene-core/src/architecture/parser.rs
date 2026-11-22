@@ -2,12 +2,12 @@
 //! (MARCH-1): one statement per line, each a `group`, `service`, or `junction` declaration, an
 //! edge between sides, or `align`.
 
+use crate::lines::{keyword, word_len};
 use std::ops::{Deref, DerefMut};
 
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -53,19 +53,10 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
 /// An id: letters, digits, and `_`.
 pub(crate) fn id_len(s: &str) -> usize {
     s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
         .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
 }
 
 fn is_side(c: Option<char>) -> bool {
@@ -109,7 +100,7 @@ impl Parser<'_> {
             self.start(SHAPE);
             self.token(L_PAREN, 1);
             let r = self.rest();
-            let line = scan::line_len(r);
+            let line = crate::lines::line_len(r);
             let Some(close) = r[..line].find(')') else {
                 self.fail("expected `)` after the icon");
                 self.finish();
@@ -124,7 +115,7 @@ impl Parser<'_> {
             self.start(LABEL);
             self.token(L_BRACKET, 1);
             let r = self.rest();
-            let line = scan::line_len(r);
+            let line = crate::lines::line_len(r);
             let text = if r.starts_with('"') {
                 r[1..line].find('"').map(|i| (STRING, i + 2))
             } else {
@@ -147,7 +138,7 @@ impl Parser<'_> {
             }
             self.finish();
         }
-        let ws = scan::ws_len(self.rest());
+        let ws = crate::lines::ws_len(self.rest());
         if keyword(&self.rest()[ws..], "in") {
             self.ws();
             self.token(OF_KW, 2);
@@ -178,7 +169,7 @@ impl Parser<'_> {
             return;
         }
         loop {
-            let ws = scan::ws_len(self.rest());
+            let ws = crate::lines::ws_len(self.rest());
             let n = id_len(&self.rest()[ws..]);
             if n == 0 {
                 break;
@@ -268,7 +259,7 @@ impl Parser<'_> {
             self.token(STROKE_OPEN, 2);
             self.start(EDGE_LABEL);
             let r = self.rest();
-            let line = scan::line_len(r);
+            let line = crate::lines::line_len(r);
             match r[..line].find("]-") {
                 Some(n) => {
                     self.token(TEXT, n);

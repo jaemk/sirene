@@ -280,9 +280,7 @@ impl Parse {
     /// position.
     pub fn lower_at(&self, now: Time) -> (Gantt, Vec<Diagnostic>) {
         let (gantt, lowering) = lower::lower(&self.syntax(), now);
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a gantt chart: {} sections, {} tasks; {} diagnostics",
             gantt.sections.len(),

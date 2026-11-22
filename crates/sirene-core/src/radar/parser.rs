@@ -5,8 +5,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
-use crate::lines::{Base, number_len, quoted_len};
+use crate::lines::{Base, keyword, number_len, quoted_len, word_len};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -38,15 +37,6 @@ impl DerefMut for Parser<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
-}
-
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
 }
 
 /// An axis or curve id: letters, digits, and `_`, with `-` inside but not at either end.
@@ -83,11 +73,7 @@ impl Parser<'_> {
         if keyword(r, "accTitle") || keyword(r, "accDescr") {
             self.acc();
         } else if keyword(r, "title") {
-            self.start(TITLE_STMT);
-            self.token(TITLE_KW, "title".len());
-            self.ws();
-            self.title_text();
-            self.finish();
+            self.langium_title();
         } else if keyword(r, "axis") {
             self.list(AXIS_STMT, AXIS_KW, "axis", false);
         } else if keyword(r, "curve") {
@@ -183,7 +169,7 @@ impl Parser<'_> {
     fn gap(&mut self) {
         loop {
             let r = self.rest();
-            let (ws, nl) = (scan::ws_len(r), scan::newline_len(r));
+            let (ws, nl) = (crate::lines::ws_len(r), crate::lines::newline_len(r));
             if ws > 0 {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {

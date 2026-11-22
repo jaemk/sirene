@@ -5,7 +5,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -74,7 +73,7 @@ fn metadata(t: &str) -> bool {
 /// The length of a bare name: up to the end of the line or an annotation (` :::class`,
 /// ` icon(`, or ` ##`), without trailing whitespace.
 fn bare_len(s: &str) -> usize {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let mut end = line.len();
     for (i, c) in line.char_indices() {
         if (c == ' ' || c == '\t') && i > 0 && stops(&line[i..]) {
@@ -82,15 +81,15 @@ fn bare_len(s: &str) -> usize {
             break;
         }
     }
-    scan::trim_end_len(s, end)
+    crate::lines::trim_end_len(s, end)
 }
 
 /// Whether whitespace at `s` starts an annotation, as Mermaid's bare names stop for one even
 /// when it does not parse.
 fn stops(s: &str) -> bool {
-    let r = &s[scan::ws_len(s)..];
+    let r = &s[crate::lines::ws_len(s)..];
     if let Some(body) = r.strip_prefix(":::") {
-        let body = &body[scan::ws_len(body)..];
+        let body = &body[crate::lines::ws_len(body)..];
         return body.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_');
     }
     r.starts_with("icon(") || r.starts_with("##")
@@ -98,14 +97,14 @@ fn stops(s: &str) -> bool {
 
 /// An annotation at `s`, after its leading whitespace: its kind and its length.
 fn annotation_len(s: &str) -> Option<(crate::syntax::SyntaxKind, usize)> {
-    let ws = scan::ws_len(s);
+    let ws = crate::lines::ws_len(s);
     if ws == 0 {
         return None;
     }
     let r = &s[ws..];
-    let line = &r[..scan::line_len(r)];
+    let line = &r[..crate::lines::line_len(r)];
     if let Some(body) = line.strip_prefix(":::") {
-        let lead = scan::ws_len(body);
+        let lead = crate::lines::ws_len(body);
         let name = &body[lead..];
         let mut chars = name.char_indices();
         match chars.next() {
@@ -133,7 +132,7 @@ fn annotation_len(s: &str) -> Option<(crate::syntax::SyntaxKind, usize)> {
         return body[n..].starts_with(')').then_some((TREE_ICON, 5 + n + 1));
     }
     if line.starts_with("##") {
-        return Some((TREE_DESC, scan::trim_end_len(r, line.len())));
+        return Some((TREE_DESC, crate::lines::trim_end_len(r, line.len())));
     }
     None
 }
@@ -160,7 +159,7 @@ impl DerefMut for Parser<'_> {
 impl Parser<'_> {
     fn line(&mut self) {
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         if metadata(line.trim_end()) {
             if line.starts_with("title") {
                 self.title();
@@ -190,7 +189,7 @@ impl Parser<'_> {
             }
             if line.chars().all(|c| c.is_whitespace() || BOX.contains(&c)) {
                 // Decoration, such as a `│` alone, is skipped.
-                let n = scan::trim_end_len(r, line.len());
+                let n = crate::lines::trim_end_len(r, line.len());
                 self.token(TREE_BRANCH, n);
                 return;
             }
@@ -202,7 +201,7 @@ impl Parser<'_> {
 
     fn at_line_end(&self) -> bool {
         let r = self.rest();
-        scan::trim_end_len(r, scan::line_len(r)) == 0
+        crate::lines::trim_end_len(r, crate::lines::line_len(r)) == 0
     }
 
     /// A name, quoted or bare, then its annotations.
@@ -211,7 +210,7 @@ impl Parser<'_> {
         let quote = r.chars().next().filter(|c| *c == '"' || *c == '\'');
         match quote {
             Some(q) => {
-                let line = &r[1..scan::line_len(r)];
+                let line = &r[1..crate::lines::line_len(r)];
                 match line.find(q) {
                     Some(i) => self.token(STRING, i + 2),
                     None => {
@@ -234,7 +233,7 @@ impl Parser<'_> {
             }
             break;
         }
-        let n = scan::ws_len(self.rest());
+        let n = crate::lines::ws_len(self.rest());
         if !lines_end(&self.rest()[n..]) {
             self.fail("expected `:::class`, `icon(name)`, or `## description`");
         }
@@ -252,7 +251,7 @@ impl Parser<'_> {
 
 /// Whether `s` starts at the end of a line.
 fn lines_end(s: &str) -> bool {
-    scan::line_len(s) == 0
+    crate::lines::line_len(s) == 0
 }
 
 #[cfg(test)]

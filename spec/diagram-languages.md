@@ -154,6 +154,9 @@ more than 64 deep`, which is reported once per diagram (once per rule in a railr
 - JSON (use case sources, `%%{init}%%` directives): a deeper value is invalid JSON. A directive
   that is not valid JSON is ignored, as Mermaid ignores it.
 
+Flowchart and use case metadata closers are cached, so repeated unclosed `@{` lines do not
+each rescan the remaining source. Test: `crates/sirene-core/tests/usecase_limits.rs`.
+
 A diagram reports at most `diagram::MAX_DIAGNOSTICS` (500) problems; the rest are one more,
 `<n> more problems not shown`, at the first one left out, an error when any of them is.
 
@@ -175,3 +178,22 @@ A source draws the same with `\n` or `\r\n` line endings, with or without a fina
 after a byte order mark (U+FEFF), which reads as whitespace and may come before frontmatter or a
 Markdown fence. The tree keeps it. Tests: `crates/sirene-core/tests/text.rs` draws every
 fixture each way.
+
+## LANGS-10 Shared parser foundations
+
+Parsers may share lexical and statement helpers where their rules match; sharing must preserve
+each language's accepted input, lossless tree, diagnostics, and recovery. Common parser tests
+check lossless text and diagnostic ranges on valid and malformed sources, including recovery
+to a later statement. Language-specific grammar and differing lexical rules remain explicit.
+Generic scanners live in shared modules and callers use them directly; flowchart-specific
+scanning stays with the flowchart grammar. Shared rules retain their existing byte and Unicode
+semantics across every migrated parser.
+
+## LANGS-11 Parser property and fuzz coverage
+
+Property tests exercise lossless parsing, valid diagnostic ranges, recovery, and generated valid
+and malformed inputs across diagram languages. A reproducible fuzz harness exercises untrusted
+input through parser entry points and records findings as regression tests. Fuzz runs are bounded
+when used as smoke checks; longer campaigns can reuse the same targets and corpus. CI's `fuzz`
+job runs `fuzz/`'s `parser` target for a minute on a copy of the seed corpus with cargo-fuzz's
+sanitizers, and fails on a crash. `cargo audit` also scans `fuzz/Cargo.lock`.

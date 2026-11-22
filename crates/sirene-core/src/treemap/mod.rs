@@ -129,9 +129,7 @@ impl Parse {
     /// by position.
     pub fn lower(&self) -> (Treemap, Vec<Diagnostic>) {
         let (treemap, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a treemap: {} items; {} diagnostics",
             treemap.items.len(),

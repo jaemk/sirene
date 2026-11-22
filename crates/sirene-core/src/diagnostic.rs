@@ -18,6 +18,14 @@ pub struct Diagnostic {
     pub severity: Severity,
 }
 
+/// Combine parse and lowering diagnostics in source order, keeping their order at equal offsets.
+pub(crate) fn merge(parsed: &[Diagnostic], lowering: Vec<Diagnostic>) -> Vec<Diagnostic> {
+    let mut diagnostics = parsed.to_vec();
+    diagnostics.extend(lowering);
+    diagnostics.sort_by_key(|d| d.range.start());
+    diagnostics
+}
+
 impl Diagnostic {
     /// An error diagnostic.
     pub fn new(range: TextRange, message: impl Into<String>) -> Self {
@@ -106,6 +114,40 @@ mod tests {
 
     fn at(offset: u32) -> Diagnostic {
         Diagnostic::new(TextRange::empty(TextSize::new(offset)), "m")
+    }
+
+    #[test]
+    fn merge_preserves_input_and_equal_position_order() {
+        assert!(merge(&[], vec![]).is_empty());
+        let diagnostic =
+            |offset, message| Diagnostic::new(TextRange::empty(TextSize::new(offset)), message);
+        let parsed = vec![
+            diagnostic(4, "parse first"),
+            diagnostic(1, "early"),
+            diagnostic(4, "parse second"),
+        ];
+        let original = parsed.clone();
+        let lowering = vec![
+            diagnostic(4, "lower first"),
+            diagnostic(4, "lower second"),
+            diagnostic(7, "late"),
+        ];
+        let merged = merge(&parsed, lowering);
+        assert_eq!(parsed, original);
+        assert_eq!(
+            merged
+                .iter()
+                .map(|d| d.message.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "early",
+                "parse first",
+                "parse second",
+                "lower first",
+                "lower second",
+                "late"
+            ]
+        );
     }
 
     #[test]

@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::lines::{Base, quoted_len};
+use crate::lines::{Base, keyword, quoted_len, word_len};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -36,15 +36,6 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
-}
-
 fn digits(s: &str) -> usize {
     s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len())
 }
@@ -55,11 +46,7 @@ impl Parser<'_> {
         if keyword(r, "accTitle") || keyword(r, "accDescr") {
             self.acc();
         } else if keyword(r, "title") {
-            self.start(TITLE_STMT);
-            self.token(TITLE_KW, "title".len());
-            self.ws();
-            self.title_text();
-            self.finish();
+            self.langium_title();
         } else if r.starts_with('+') || digits(r) > 0 {
             self.field();
         }

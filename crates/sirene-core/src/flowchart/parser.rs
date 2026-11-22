@@ -157,7 +157,7 @@ impl<'a> Parser<'a> {
 
     /// Eats inline whitespace.
     fn ws(&mut self) {
-        let n = scan::ws_len(self.rest());
+        let n = crate::lines::ws_len(self.rest());
         if n > 0 {
             self.token(WHITESPACE, n);
         }
@@ -166,7 +166,7 @@ impl<'a> Parser<'a> {
     /// Eats inline whitespace only if `pred` holds for the text after it. Returns whether
     /// `pred` held.
     fn ws_then(&mut self, pred: impl FnOnce(&str) -> bool) -> bool {
-        let n = scan::ws_len(self.rest());
+        let n = crate::lines::ws_len(self.rest());
         if !pred(&self.rest()[n..]) {
             return false;
         }
@@ -184,7 +184,7 @@ impl<'a> Parser<'a> {
     /// Wraps the rest of the statement in an `ERROR` node and reports `message`.
     fn error_rest(&mut self, message: &str) {
         let start = self.pos;
-        let len = scan::stmt_len(self.rest());
+        let len = crate::lines::stmt_len(self.rest());
         self.start(ERROR);
         if len > 0 {
             self.token(ERROR_TOKEN, len);
@@ -196,7 +196,7 @@ impl<'a> Parser<'a> {
     /// Reports `message` for whatever follows: a zero-width error at a statement end, or the
     /// remaining statement text wrapped in an `ERROR` node.
     fn fail(&mut self, message: &str) {
-        if self.ws_then(|r| !scan::is_stmt_end(r)) {
+        if self.ws_then(|r| !crate::lines::is_stmt_end(r)) {
             self.error_rest(message);
         } else {
             self.error(self.pos, self.pos, message);
@@ -205,8 +205,8 @@ impl<'a> Parser<'a> {
 
     /// Requires the statement to end here (after optional whitespace, which is left in place).
     fn end_of_statement(&mut self) {
-        let n = scan::ws_len(self.rest());
-        if !scan::is_stmt_end(&self.rest()[n..]) {
+        let n = crate::lines::ws_len(self.rest());
+        if !crate::lines::is_stmt_end(&self.rest()[n..]) {
             self.fail("expected newline or `;`");
         }
     }
@@ -243,7 +243,7 @@ impl<'a> Parser<'a> {
             self.finish();
             return;
         } else {
-            let end = self.pos + scan::stmt_len(r);
+            let end = self.pos + crate::lines::stmt_len(r);
             self.error(self.pos, end, "expected `flowchart` or `graph` header");
         }
         self.statements(0);
@@ -253,24 +253,24 @@ impl<'a> Parser<'a> {
     /// FLOWCH-3: frontmatter block at the start of the source, after a byte order mark
     /// (LANGS-9).
     fn frontmatter(&mut self) {
-        let bom = scan::bom_len(self.src);
+        let bom = crate::lines::bom_len(self.src);
         if bom > 0 {
             self.token(WHITESPACE, bom);
         }
         let (start, src) = (self.pos, self.rest());
-        let first = scan::line_len(src);
+        let first = crate::lines::line_len(src);
         if src[..first].trim_end() != "---" {
             return;
         }
-        let mut line_start = first + scan::newline_len(&src[first..]);
+        let mut line_start = first + crate::lines::newline_len(&src[first..]);
         while line_start < src.len() {
             let rest = &src[line_start..];
-            let len = scan::line_len(rest);
+            let len = crate::lines::line_len(rest);
             if rest[..len].trim() == "---" {
                 self.token(FRONTMATTER, line_start + len);
                 return;
             }
-            line_start += len + scan::newline_len(&rest[len..]);
+            line_start += len + crate::lines::newline_len(&rest[len..]);
         }
         self.start(ERROR);
         self.token(ERROR_TOKEN, first);
@@ -286,8 +286,8 @@ impl<'a> Parser<'a> {
     fn trivia(&mut self) {
         loop {
             let r = self.rest();
-            let ws = scan::ws_len(r);
-            let nl = scan::newline_len(r);
+            let ws = crate::lines::ws_len(r);
+            let nl = crate::lines::newline_len(r);
             if ws > 0 {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {
@@ -297,7 +297,7 @@ impl<'a> Parser<'a> {
             } else if r.starts_with("%%{") {
                 self.directive();
             } else if r.starts_with("%%") && self.at_line_start() {
-                self.token(COMMENT, scan::line_len(r));
+                self.token(COMMENT, crate::lines::line_len(r));
             } else {
                 return;
             }
@@ -311,7 +311,7 @@ impl<'a> Parser<'a> {
             Some(at) => self.token(DIRECTIVE, at - from + 6),
             None => {
                 let start = self.pos;
-                self.token(DIRECTIVE, scan::line_len(r));
+                self.token(DIRECTIVE, crate::lines::line_len(r));
                 self.error(start, start + 3, "unclosed directive: expected `}%%`");
             }
         }
@@ -321,7 +321,7 @@ impl<'a> Parser<'a> {
     fn header(&mut self) {
         self.start(HEADER);
         self.token(GRAPH_KW, scan::id_len(self.rest()));
-        if self.ws_then(|r| !scan::is_stmt_end(r)) {
+        if self.ws_then(|r| !crate::lines::is_stmt_end(r)) {
             let n = scan::header_dir_len(self.rest());
             if n > 0 {
                 self.token(DIR, n);
@@ -353,7 +353,7 @@ impl<'a> Parser<'a> {
         let r = self.rest();
         let after_kw = |kw: &str| {
             let tail = &r[kw.len()..];
-            tail[scan::ws_len(tail)..].chars().next()
+            tail[crate::lines::ws_len(tail)..].chars().next()
         };
         let container = if self.agentflow { "flow" } else { "subgraph" };
         if scan::keyword(r, container) {
@@ -510,7 +510,7 @@ impl<'a> Parser<'a> {
     fn label(&mut self, text_len: impl Fn(&str, usize) -> usize, closes: impl Fn(&str) -> bool) {
         self.start(LABEL);
         let r = self.rest();
-        if r[scan::ws_len(r)..].starts_with('"') {
+        if r[crate::lines::ws_len(r)..].starts_with('"') {
             self.ws();
             self.string();
             self.ws();
@@ -519,7 +519,7 @@ impl<'a> Parser<'a> {
             let r = self.rest();
             let mut len = text_len(r, stop);
             if !closes(&r[len..]) {
-                len = len.min(scan::line_len(r));
+                len = len.min(crate::lines::line_len(r));
             }
             if len > 0 {
                 self.token(TEXT, len);
@@ -545,7 +545,7 @@ impl<'a> Parser<'a> {
             Some(n) => self.token(kind, n),
             None => {
                 let start = self.pos;
-                self.token(kind, scan::line_len(r));
+                self.token(kind, crate::lines::line_len(r));
                 self.error(start, start + 1, "unclosed string: expected `\"`");
             }
         }
@@ -565,7 +565,7 @@ impl<'a> Parser<'a> {
                 self.token(META_CLOSE, 1);
             }
             None => {
-                let n = scan::line_len(self.rest());
+                let n = crate::lines::line_len(self.rest());
                 if n > 0 {
                     self.token(META_BODY, n);
                 }
@@ -657,11 +657,11 @@ impl<'a> Parser<'a> {
         self.start(SUBGRAPH);
         self.start(SUBGRAPH_HEADER);
         self.token(SUBGRAPH_KW, keyword.len());
-        if self.ws_then(|r| !scan::is_stmt_end(r)) {
+        if self.ws_then(|r| !crate::lines::is_stmt_end(r)) {
             let r = self.rest();
             let n = scan::id_len(r);
             let after = &r[n..];
-            let after = &after[scan::ws_len(after)..];
+            let after = &after[crate::lines::ws_len(after)..];
             if r.starts_with('"') {
                 self.start(LABEL);
                 self.string();
@@ -673,7 +673,7 @@ impl<'a> Parser<'a> {
                 if self.agentflow && self.ws_then(|r| r.starts_with("@{")) {
                     self.metadata();
                 }
-            } else if n > 0 && scan::is_stmt_end(after) {
+            } else if n > 0 && crate::lines::is_stmt_end(after) {
                 self.token(IDENT, n);
             } else if self.agentflow && n > 0 && after.starts_with("@{") {
                 // MAGF-2: `flow id@{ ... }`.
@@ -681,7 +681,7 @@ impl<'a> Parser<'a> {
                 self.ws();
                 self.metadata();
             } else {
-                let len = scan::trim_end_len(r, scan::stmt_len(r));
+                let len = crate::lines::trim_end_len(r, crate::lines::stmt_len(r));
                 self.start(LABEL);
                 self.token(TEXT, len);
                 self.finish();
@@ -719,7 +719,7 @@ impl<'a> Parser<'a> {
             let end = end_block_len(self.rest(), openers);
             let start = self.pos;
             let len = end.unwrap_or(self.rest().len());
-            let line = scan::line_len(self.rest()).min(len);
+            let line = crate::lines::line_len(self.rest()).min(len);
             self.error(start, start + line, too_deep(what, MAX_DEPTH));
             if len > 0 {
                 self.start(ERROR);
@@ -782,7 +782,10 @@ impl<'a> Parser<'a> {
     /// Raw style declarations to the end of the statement (FLOWCH-12).
     fn style_text(&mut self) {
         let r = self.rest();
-        self.token(STYLE_TEXT, scan::trim_end_len(r, scan::stmt_len(r)));
+        self.token(
+            STYLE_TEXT,
+            crate::lines::trim_end_len(r, crate::lines::stmt_len(r)),
+        );
     }
 
     /// FLOWCH-12: `classDef <names> <styles>`.
@@ -793,7 +796,7 @@ impl<'a> Parser<'a> {
             self.fail("expected a class name");
         } else {
             self.id_list(false);
-            if self.ws_then(|r| !scan::is_stmt_end(r)) {
+            if self.ws_then(|r| !crate::lines::is_stmt_end(r)) {
                 self.style_text();
             } else {
                 self.fail("expected style declarations");
@@ -827,7 +830,7 @@ impl<'a> Parser<'a> {
             self.fail("expected a node id");
         } else {
             self.token(IDENT, scan::id_len(self.rest()));
-            if self.ws_then(|r| !scan::is_stmt_end(r)) {
+            if self.ws_then(|r| !crate::lines::is_stmt_end(r)) {
                 self.style_text();
             } else {
                 self.fail("expected style declarations");
@@ -859,7 +862,7 @@ impl<'a> Parser<'a> {
                 return;
             }
         }
-        if self.ws_then(|r| !scan::is_stmt_end(r)) {
+        if self.ws_then(|r| !crate::lines::is_stmt_end(r)) {
             self.style_text();
         }
         self.finish();
@@ -875,7 +878,7 @@ impl<'a> Parser<'a> {
             return;
         }
         self.token(IDENT, scan::id_len(self.rest()));
-        if !self.ws_then(|r| !scan::is_stmt_end(r)) {
+        if !self.ws_then(|r| !crate::lines::is_stmt_end(r)) {
             self.fail("expected a callback, `call`, `href`, or a URL string");
             self.finish();
             return;
@@ -916,7 +919,7 @@ impl<'a> Parser<'a> {
         let open = self.pos;
         self.token(L_PAREN, 1);
         let r = self.rest();
-        let line = scan::line_len(r);
+        let line = crate::lines::line_len(r);
         match r[..line].find(')') {
             Some(n) => {
                 if n > 0 {
@@ -952,7 +955,7 @@ impl<'a> Parser<'a> {
             self.token(COLON, 1);
             self.ws();
             let r = self.rest();
-            let n = scan::trim_end_len(r, scan::line_len(r));
+            let n = crate::lines::trim_end_len(r, crate::lines::line_len(r));
             if n > 0 {
                 self.token(ACC_TEXT, n);
             }
@@ -974,7 +977,7 @@ impl<'a> Parser<'a> {
                     self.token(R_BRACE, 1);
                 }
                 None => {
-                    let n = scan::line_len(r);
+                    let n = crate::lines::line_len(r);
                     if n > 0 {
                         self.token(ACC_TEXT, n);
                     }

@@ -7,7 +7,7 @@ use crate::c4::{self, C4};
 use crate::cynefin::{self, Cynefin};
 use crate::diagnostic::{Diagnostic, Severity};
 use crate::eventmodel::{self, EventModel};
-use crate::flowchart::{self, Flowchart, scan};
+use crate::flowchart::{self, Flowchart};
 use crate::gantt::{self, Gantt};
 use crate::git::{self, GitGraph};
 use crate::info::{self, Info};
@@ -489,13 +489,13 @@ impl From<flowchart::Lowered> for Lowered {
 
 /// The first word of `src` after frontmatter, comments, and directives.
 pub(crate) fn header(src: &str) -> &str {
-    let mut r = &src[scan::bom_len(src)..];
-    let first = scan::line_len(r);
+    let mut r = &src[crate::lines::bom_len(src)..];
+    let first = crate::lines::line_len(r);
     if r[..first].trim_end() == "---" {
-        let mut at = first + scan::newline_len(&r[first..]);
+        let mut at = first + crate::lines::newline_len(&r[first..]);
         while at < r.len() {
-            let len = scan::line_len(&r[at..]);
-            let next = at + len + scan::newline_len(&r[at + len..]);
+            let len = crate::lines::line_len(&r[at..]);
+            let next = at + len + crate::lines::newline_len(&r[at + len..]);
             if r[at..at + len].trim() == "---" {
                 r = &r[next..];
                 break;
@@ -508,7 +508,7 @@ pub(crate) fn header(src: &str) -> &str {
         if let Some(body) = r.strip_prefix("%%{") {
             r = body.find("}%%").map_or("", |i| &body[i + 3..]);
         } else if r.starts_with("%%") {
-            r = &r[scan::line_len(r)..];
+            r = &r[crate::lines::line_len(r)..];
         } else {
             break;
         }

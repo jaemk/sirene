@@ -44,9 +44,7 @@ impl Parse {
     /// Lowers the first graph to the graph model.
     pub fn lower(&self) -> Lowered {
         let out = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(out.diagnostics);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, out.diagnostics);
         log::debug!(
             "lowered a DOT graph: {} nodes, {} edges, {} clusters; {} diagnostics",
             out.flowchart.nodes.len(),

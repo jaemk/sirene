@@ -125,9 +125,7 @@ impl Parse {
     /// by position.
     pub fn lower(&self) -> (Mindmap, Vec<Diagnostic>) {
         let (mindmap, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a mindmap: {} nodes; {} diagnostics",
             mindmap.nodes.len(),

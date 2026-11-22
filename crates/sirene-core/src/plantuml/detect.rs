@@ -2,7 +2,7 @@
 //! statement only one kind accepts.
 
 use super::link::Link;
-use crate::flowchart::{Arrow, Stroke, scan};
+use crate::flowchart::{Arrow, Stroke};
 
 /// A PlantUML diagram kind (PUML-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -408,7 +408,7 @@ fn statement_lines(src: &str) -> (Option<&str>, Vec<&str>) {
     let mut in_comment = false;
     let mut body = None;
     let mut started = !super::is_plantuml(src);
-    for line in src[scan::bom_len(src)..].lines() {
+    for line in src[crate::lines::bom_len(src)..].lines() {
         let line = line.trim();
         if !started {
             if let Some(word) = line.strip_prefix("@start") {

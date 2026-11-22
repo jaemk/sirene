@@ -7,8 +7,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
-use crate::lines::Base;
+use crate::lines::{Base, identifier_keyword as keyword, identifier_word_len as word_len};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -46,26 +45,13 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
-}
-
 impl Parser<'_> {
     fn statement(&mut self, depth: usize) {
         let r = self.rest();
         if keyword(r, "accTitle") || keyword(r, "accDescr") {
             self.acc();
         } else if keyword(r, "title") {
-            self.start(TITLE_STMT);
-            self.token(TITLE_KW, 5);
-            self.ws();
-            self.rest_of_line(TEXT);
-            self.finish();
+            self.title_line();
         } else if word_len(r) > 0
             && r[word_len(r)..]
                 .trim_start_matches([' ', '\t'])
@@ -77,11 +63,11 @@ impl Parser<'_> {
 
     /// `Name(arg, $key="value", ...)`, and `{` ... `}` after it for a boundary.
     fn call(&mut self, depth: usize) {
-        let ws = scan::ws_len(&self.rest()[word_len(self.rest())..]);
+        let ws = crate::lines::ws_len(&self.rest()[word_len(self.rest())..]);
         let after = word_len(self.rest()) + ws;
         let r = self.rest();
         // A `{` after the closing paren, on the same line or the next, opens a boundary.
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let close = args_end(&line[after..]).map(|n| after + n);
         let same_line = close.is_some_and(|c| line[c..].trim_start().starts_with('{'));
         let next_line = close.is_some_and(|c| line[c..].trim().is_empty())
@@ -102,7 +88,7 @@ impl Parser<'_> {
                 self.token(R_PAREN, 1);
                 break;
             }
-            if scan::line_len(r) == 0 {
+            if crate::lines::line_len(r) == 0 {
                 self.fail("expected `)` to close the arguments");
                 self.finish();
                 if braced {
@@ -173,9 +159,9 @@ impl Parser<'_> {
             };
             self.token(STRING, n);
         } else {
-            let line = &r[..scan::line_len(r)];
+            let line = &r[..crate::lines::line_len(r)];
             let n = line.find([',', ')']).unwrap_or(line.len());
-            let n = scan::trim_end_len(line, n);
+            let n = crate::lines::trim_end_len(line, n);
             self.token(TEXT, n);
         }
         self.finish();

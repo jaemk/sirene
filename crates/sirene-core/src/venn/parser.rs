@@ -5,7 +5,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::{Base, number_len};
 use crate::syntax::SyntaxKind::*;
 
@@ -51,7 +50,7 @@ fn word_len(s: &str) -> usize {
 /// The length of an identifier: a word, or a `"..."` string closed on the same line.
 fn id_len(s: &str) -> usize {
     if let Some(body) = s.strip_prefix('"') {
-        let line = &body[..scan::line_len(body)];
+        let line = &body[..crate::lines::line_len(body)];
         return line.find('"').map_or(0, |i| i + 2);
     }
     word_len(s)
@@ -139,9 +138,9 @@ impl Parser<'_> {
         }
         self.ws();
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let end = line.find(['#', ';']).unwrap_or(line.len());
-        let len = scan::trim_end_len(r, end);
+        let len = crate::lines::trim_end_len(r, end);
         self.token(TEXT, len);
         self.end();
         self.finish();
@@ -189,7 +188,7 @@ impl Parser<'_> {
         if !r.starts_with('[') {
             return true;
         }
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let (kind, len) = if let Some(body) = line.strip_prefix("[\"") {
             match body.find("\"]") {
                 Some(i) => (STRING, i + 2),
@@ -266,7 +265,7 @@ impl Parser<'_> {
         let r = self.rest();
         let first = text_id_len(r);
         let after = &r[first..];
-        let after = &after[scan::ws_len(after)..];
+        let after = &after[crate::lines::ws_len(after)..];
         let lone = first > 0 && !after.starts_with(',') && id_len(after) == 0;
         if lone && !(indented && self.indent_mode) {
             self.fail("expected sets before the text id, or an indented line under a `set`");

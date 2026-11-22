@@ -5,7 +5,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -42,7 +41,7 @@ impl DerefMut for Parser<'_> {
 /// line (`--`, `..`). A name in backticks, such as `` `Animal Class!` ``, is one id.
 pub(crate) fn id_len(s: &str) -> usize {
     if let Some(body) = s.strip_prefix('`')
-        && let Some(i) = body[..scan::line_len(body)].find('`')
+        && let Some(i) = body[..crate::lines::line_len(body)].find('`')
         && i > 0
     {
         return i + 2;
@@ -90,7 +89,7 @@ fn generic_len(s: &str) -> Option<usize> {
     if !s.starts_with('~') {
         return None;
     }
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let mut depth = 0;
     for (i, c) in line.char_indices() {
         if c != '~' {
@@ -187,7 +186,7 @@ impl Parser<'_> {
     /// `<<interface>>` and the like.
     fn stereotype(&mut self) {
         let r = self.rest();
-        let line = scan::line_len(r);
+        let line = crate::lines::line_len(r);
         let len = r[..line].find(">>").map_or(line, |i| i + 2);
         self.token(STEREOTYPE, len);
     }
@@ -314,12 +313,12 @@ impl Parser<'_> {
                 continue;
             }
             // A member runs to the end of the line, or to a `}` that closes the body on it.
-            let line = &r[..scan::line_len(r)];
+            let line = &r[..crate::lines::line_len(r)];
             let len = match line.rfind('}') {
                 Some(i) if line[i + 1..].trim().is_empty() && !line[..i].trim().is_empty() => i,
                 _ => line.len(),
             };
-            let len = scan::trim_end_len(r, len);
+            let len = crate::lines::trim_end_len(r, len);
             self.token(MEMBER, len);
         }
     }
@@ -351,7 +350,7 @@ impl Parser<'_> {
         if !self.reference() {
             return;
         }
-        let n = scan::ws_len(self.rest());
+        let n = crate::lines::ws_len(self.rest());
         let after = &self.rest()[n..];
         if after.starts_with('"') || relation_len(after) > 0 {
             self.builder.start_node_at(checkpoint, RELATION_STMT.into());

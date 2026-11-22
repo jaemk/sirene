@@ -1,11 +1,11 @@
 //! Line-oriented parser for Mermaid gantt charts, producing a lossless rowan tree (MGANTT-1).
 
+use crate::lines::word_len;
 use std::ops::{Deref, DerefMut};
 
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::{self, *};
 
@@ -51,17 +51,12 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
 /// The length of the text at the start of `s` before any of `stops` or the end of the line,
 /// without trailing whitespace.
 fn value_len(s: &str, stops: &[char]) -> usize {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let end = line.find(stops).unwrap_or(line.len());
-    scan::trim_end_len(line, end)
+    crate::lines::trim_end_len(line, end)
 }
 
 impl Parser<'_> {
@@ -83,7 +78,7 @@ impl Parser<'_> {
     fn end_or_comment(&mut self) {
         self.ws();
         if self.rest().starts_with('#') {
-            let n = scan::line_len(self.rest());
+            let n = crate::lines::line_len(self.rest());
             self.token(COMMENT, n);
         }
         self.end();
@@ -92,7 +87,7 @@ impl Parser<'_> {
     fn statement(&mut self, _depth: usize) {
         let r = self.rest();
         if r.starts_with('#') {
-            let n = scan::line_len(r);
+            let n = crate::lines::line_len(r);
             self.token(COMMENT, n);
             return;
         }
@@ -151,11 +146,11 @@ impl Parser<'_> {
     /// `NAME : DATA`.
     fn task(&mut self) {
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let Some(colon) = line.find(':') else {
             return;
         };
-        let name = scan::trim_end_len(line, colon);
+        let name = crate::lines::trim_end_len(line, colon);
         if name == 0 {
             return;
         }

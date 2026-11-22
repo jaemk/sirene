@@ -7,7 +7,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::{GreenNode, TextRange, TextSize};
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -102,7 +101,7 @@ fn keyword_in(s: &str, words: &[&'static str]) -> Option<&'static str> {
 /// run of characters other than whitespace and the arrow and statement punctuation.
 pub(crate) fn name_len(s: &str) -> usize {
     if let Some(body) = s.strip_prefix('"') {
-        let line = &body[..scan::line_len(body)];
+        let line = &body[..crate::lines::line_len(body)];
         return line.find('"').map_or(0, |i| i + 2);
     }
     s.find(|c: char| c.is_whitespace() || "-<>:[]?+*!\"#\\/&,=".contains(c))
@@ -223,7 +222,7 @@ impl Parser<'_> {
     /// The text before `@startuml` (ignored), the header, the statements, and `@enduml`.
     /// Without any `@start` line, as in Markdown blocks, the whole source is the statements.
     fn document(&mut self) {
-        let bom = scan::bom_len(self.src);
+        let bom = crate::lines::bom_len(self.src);
         self.token(WHITESPACE, bom);
         if !super::is_plantuml(self.src) {
             self.diagram(false);
@@ -237,11 +236,11 @@ impl Parser<'_> {
                 self.error(at, at, "expected `@startuml`");
                 return;
             }
-            if r[scan::ws_len(r)..].starts_with("@start") {
+            if r[crate::lines::ws_len(r)..].starts_with("@start") {
                 break;
             }
-            self.token(COMMENT, scan::line_len(r));
-            let nl = scan::newline_len(self.rest());
+            self.token(COMMENT, crate::lines::line_len(r));
+            let nl = crate::lines::newline_len(self.rest());
             self.token(NEWLINE, nl);
         }
         self.ws();
@@ -277,7 +276,7 @@ impl Parser<'_> {
         }
         if !super::supported(self.kind) {
             let start = self.pos;
-            let len = scan::line_len(self.rest());
+            let len = crate::lines::line_len(self.rest());
             let message = format!(
                 "PlantUML {} diagrams are not supported yet",
                 self.kind.name()
@@ -341,7 +340,7 @@ impl Parser<'_> {
                 return;
             }
             let r = self.rest();
-            let len = scan::trim_end_len(r, scan::line_len(r));
+            let len = crate::lines::trim_end_len(r, crate::lines::line_len(r));
             self.start(TEXT_STMT);
             self.token(TEXT, len);
             self.finish();
@@ -370,9 +369,9 @@ impl Parser<'_> {
         let rest = self.rest();
         let mut at = 0;
         while at < rest.len() {
-            let len = scan::line_len(&rest[at..]);
+            let len = crate::lines::line_len(&rest[at..]);
             let line = &rest[at..at + len];
-            let ws = scan::ws_len(line);
+            let ws = crate::lines::ws_len(line);
             if line[ws..].starts_with("@start") {
                 let s = start + at + ws;
                 self.warn(
@@ -382,7 +381,7 @@ impl Parser<'_> {
                 );
                 break;
             }
-            at += len + scan::newline_len(&rest[at + len..]);
+            at += len + crate::lines::newline_len(&rest[at + len..]);
         }
         let n = rest.len();
         self.token(COMMENT, n);
@@ -392,8 +391,8 @@ impl Parser<'_> {
     fn blank(&mut self) {
         loop {
             let r = self.rest();
-            let ws = scan::ws_len(r);
-            let nl = scan::newline_len(r);
+            let ws = crate::lines::ws_len(r);
+            let nl = crate::lines::newline_len(r);
             if ws > 0 {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {
@@ -408,8 +407,8 @@ impl Parser<'_> {
     fn trivia(&mut self) {
         loop {
             let r = self.rest();
-            let ws = scan::ws_len(r);
-            let nl = scan::newline_len(r);
+            let ws = crate::lines::ws_len(r);
+            let nl = crate::lines::newline_len(r);
             if ws > 0 {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {
@@ -424,7 +423,7 @@ impl Parser<'_> {
                     }
                 }
             } else if r.starts_with('\'') {
-                self.token(COMMENT, scan::line_len(r));
+                self.token(COMMENT, crate::lines::line_len(r));
             } else {
                 return;
             }
@@ -435,7 +434,7 @@ impl Parser<'_> {
     fn eol(&mut self) {
         self.ws();
         let r = self.rest();
-        if !(r.is_empty() || scan::newline_len(r) > 0) {
+        if !(r.is_empty() || crate::lines::newline_len(r) > 0) {
             self.fail("expected the end of the line");
         }
     }
@@ -453,7 +452,7 @@ impl Parser<'_> {
 
     fn statement(&mut self) {
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         if r.starts_with('!') {
             self.directive();
         } else if line.starts_with("==") {
@@ -508,7 +507,7 @@ impl Parser<'_> {
         self.token(SEQ_KW, open);
         self.ws();
         let r = self.rest();
-        let line = scan::trim_end_len(r, scan::line_len(r));
+        let line = crate::lines::trim_end_len(r, crate::lines::line_len(r));
         let body = &r[..line];
         let close = body.len() - body.trim_end_matches(c).len();
         if line == 0 {
@@ -523,7 +522,7 @@ impl Parser<'_> {
             self.finish();
             return;
         }
-        let text = scan::trim_end_len(body, line - close);
+        let text = crate::lines::trim_end_len(body, line - close);
         self.token(TEXT, text);
         self.ws();
         let r = self.rest();
@@ -585,7 +584,7 @@ impl Parser<'_> {
         loop {
             self.ws();
             let r = self.rest();
-            if r.is_empty() || scan::newline_len(r) > 0 {
+            if r.is_empty() || crate::lines::newline_len(r) > 0 {
                 break;
             }
             if keyword_in(r, &["as"]).is_some() {
@@ -596,7 +595,7 @@ impl Parser<'_> {
                     break;
                 }
             } else if r.starts_with("<<") {
-                match r[..scan::line_len(r)].find(">>") {
+                match r[..crate::lines::line_len(r)].find(">>") {
                     Some(i) => self.token(STEREOTYPE, i + 2),
                     None => {
                         self.fail("unclosed `<<`: expected `>>`");
@@ -723,7 +722,7 @@ impl Parser<'_> {
             self.token(COLON, 1);
             self.ws();
             self.rest_of_line(TEXT);
-        } else if r.is_empty() || scan::newline_len(r) > 0 {
+        } else if r.is_empty() || crate::lines::newline_len(r) > 0 {
             self.body(closers, what);
         } else {
             self.fail("expected `:` and the text, or the end of the line");
@@ -734,7 +733,7 @@ impl Parser<'_> {
     /// space), each a `TEXT`, and the closer an `END_KW`.
     fn body(&mut self, closers: &[&str], what: &str) {
         loop {
-            let nl = scan::newline_len(self.rest());
+            let nl = crate::lines::newline_len(self.rest());
             if nl == 0 {
                 self.unclosed(format!("unclosed `{what}`: expected `{}`", closers[0]));
                 return;
@@ -742,7 +741,7 @@ impl Parser<'_> {
             self.token(NEWLINE, nl);
             self.ws();
             let r = self.rest();
-            let len = scan::trim_end_len(r, scan::line_len(r));
+            let len = crate::lines::trim_end_len(r, crate::lines::line_len(r));
             if self.end_len().is_some() {
                 self.unclosed(format!("unclosed `{what}`: expected `{}`", closers[0]));
                 return;
@@ -763,7 +762,7 @@ impl Parser<'_> {
         self.token(TITLE_KW, 5);
         self.ws();
         let r = self.rest();
-        if r.is_empty() || scan::newline_len(r) > 0 {
+        if r.is_empty() || crate::lines::newline_len(r) > 0 {
             self.body(&["end title", "endtitle"], "title");
         } else {
             if r.starts_with(':') {
@@ -782,7 +781,7 @@ impl Parser<'_> {
         self.token(SEQ_KW, kw.len());
         self.ws();
         let r = self.rest();
-        let line = scan::trim_end_len(r, scan::line_len(r));
+        let line = crate::lines::trim_end_len(r, crate::lines::line_len(r));
         let block = match kw {
             "legend" => true,
             "header" | "footer" => line == 0,
@@ -806,7 +805,7 @@ impl Parser<'_> {
         self.start(SEQ_STMT);
         self.token(SEQ_KW, 7);
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let one_line = line.to_ascii_lowercase().contains("</style>");
         self.rest_of_line(TEXT);
         self.ws();
@@ -851,12 +850,12 @@ impl Parser<'_> {
     /// nothing when the line has no arrow.
     fn message(&mut self) {
         let r = self.rest();
-        let line = &r[..scan::line_len(r)];
+        let line = &r[..crate::lines::line_len(r)];
         let Some((at, len)) = find_arrow(line) else {
             return;
         };
         self.start(MESSAGE_STMT);
-        let from = &line[..scan::trim_end_len(line, at)];
+        let from = &line[..crate::lines::trim_end_len(line, at)];
         match from {
             "[" => self.token(L_BRACKET, 1),
             "?" => self.token(IDENT, 1),

@@ -171,6 +171,92 @@ struct PendingEdge {
     range: TextRange,
 }
 
+/// Limits apply to pending edges before strict graphs merge duplicates.
+const MAX_EDGES: usize = 100_000;
+const MAX_EDGE_COPY_BYTES: usize = 64 * 1024 * 1024;
+
+/// Heap bytes replicated with one pending edge, including vector elements and string payloads.
+fn edge_copy_bytes(attrs: &[Attr], ports: [&Option<Port>; 2]) -> usize {
+    let attrs = attrs.iter().fold(0usize, |total, attr| {
+        total
+            .saturating_add(std::mem::size_of::<Attr>())
+            .saturating_add(attr.key.len())
+            .saturating_add(attr.value.text.len())
+    });
+    ports.into_iter().flatten().fold(attrs, |total, port| {
+        port.parts.iter().fold(
+            total.saturating_add(std::mem::size_of::<Port>()),
+            |n, part| {
+                n.saturating_add(std::mem::size_of::<String>())
+                    .saturating_add(part.len())
+            },
+        )
+    })
+}
+
+/// Upper bound on intermediate edge-label expansions. Scan each attribute once per statement.
+#[derive(Default)]
+struct EdgeLabelExpansion {
+    base: usize,
+    graph: usize,
+    tail: usize,
+    head: usize,
+    edge: usize,
+}
+
+impl EdgeLabelExpansion {
+    fn new(attrs: &[Attr]) -> Self {
+        let mut size = Self::default();
+        for key in ["label", "taillabel", "headlabel"] {
+            let Some(attr) = get(attrs, key) else {
+                continue;
+            };
+            size.base = size.base.saturating_add(attr.value.text.len());
+            if attr.value.html {
+                continue;
+            }
+            let mut chars = attr.value.text.chars();
+            while let Some(c) = chars.next() {
+                if c != '\\' {
+                    continue;
+                }
+                match chars.next() {
+                    Some('G') => size.graph = size.graph.saturating_add(1),
+                    Some('T') => size.tail = size.tail.saturating_add(1),
+                    Some('H') => size.head = size.head.saturating_add(1),
+                    Some('E') => size.edge = size.edge.saturating_add(1),
+                    _ => {}
+                }
+            }
+        }
+        size
+    }
+
+    fn bytes(&self, graph: usize, tail: usize, head: usize) -> usize {
+        self.base
+            .saturating_add(self.graph.saturating_mul(graph))
+            .saturating_add(self.tail.saturating_mul(tail))
+            .saturating_add(self.head.saturating_mul(head))
+            .saturating_add(
+                self.edge
+                    .saturating_mul(tail.saturating_add(head).saturating_add(2)),
+            )
+    }
+}
+
+/// The count that fits, and whether each budget independently limits this product.
+fn edge_allowance(pairs: usize, used: usize, bytes: usize, cost: usize) -> (usize, bool, bool) {
+    let available_edges = MAX_EDGES.saturating_sub(used);
+    let available_bytes = MAX_EDGE_COPY_BYTES.saturating_sub(bytes);
+    let by_bytes = available_bytes.checked_div(cost).unwrap_or(usize::MAX);
+    let keep = pairs.min(available_edges).min(by_bytes);
+    (
+        keep,
+        keep < pairs && available_edges <= by_bytes,
+        keep < pairs && by_bytes <= available_edges,
+    )
+}
+
 #[derive(Default)]
 struct Lowerer {
     diagnostics: Vec<Diagnostic>,
@@ -186,6 +272,8 @@ struct Lowerer {
     /// Each node's record port names and their lines (`Edge::rows`), once it is lowered.
     record_ports: Vec<HashMap<String, usize>>,
     edges: Vec<PendingEdge>,
+    edge_copy_bytes: usize,
+    edge_limit_reached: bool,
     clusters: Vec<Cluster>,
     cluster_index: HashMap<String, usize>,
     /// The nodes of each named subgraph over all its bodies.
@@ -984,14 +1072,49 @@ impl Lowerer {
                 _ => {}
             }
         }
+        let own_attrs = self.attr_lists(stmt, Target::Edge);
+        if self.edge_limit_reached {
+            return operands.into_iter().flat_map(|(n, _, _)| n).collect();
+        }
         let mut attrs = scope.edge.clone();
         let own = attrs.len();
-        attrs.extend(self.attr_lists(stmt, Target::Edge));
+        attrs.extend(own_attrs);
+        let label_expansion = EdgeLabelExpansion::new(&attrs);
         for pair in operands.windows(2) {
             let ((from, tail, a), (to, head, b)) = (&pair[0], &pair[1]);
             let range = a.cover(*b);
+            if self.edge_limit_reached {
+                continue;
+            }
+            let base_cost = edge_copy_bytes(&attrs, [tail, head]);
             for &f in from {
                 for &t in to {
+                    // Lowering copies both endpoint IDs into every resulting edge, so count
+                    // their actual lengths, which can vary within a product.
+                    // Strict undirected duplicates retain the first edge's orientation, which
+                    // may be the reverse of this occurrence.
+                    let (mut tail_len, mut head_len) = (self.ids[f].len(), self.ids[t].len());
+                    if self.strict && !self.directed {
+                        tail_len = tail_len.max(head_len);
+                        head_len = tail_len;
+                    }
+                    let cost = base_cost
+                        .saturating_add(self.ids[f].len())
+                        .saturating_add(self.ids[t].len())
+                        .saturating_add(label_expansion.bytes(self.name.len(), tail_len, head_len));
+                    let (keep, edge_cap, copy_cap) =
+                        edge_allowance(1, self.edges.len(), self.edge_copy_bytes, cost);
+                    if keep == 0 {
+                        self.edge_limit_reached = true;
+                        if edge_cap {
+                            self.warning(range, format!("a DOT graph has at most {MAX_EDGES} pending edges; leaving out the rest"));
+                        }
+                        if copy_cap {
+                            self.warning(range, "DOT edge copies and expanded labels exceed 64 MiB; leaving out the rest");
+                        }
+                        break;
+                    }
+                    self.edge_copy_bytes = self.edge_copy_bytes.saturating_add(cost);
                     self.edges.push(PendingEdge {
                         from: f,
                         to: t,
@@ -1000,6 +1123,9 @@ impl Lowerer {
                         own,
                         range,
                     });
+                }
+                if self.edge_limit_reached {
+                    break;
                 }
             }
         }
@@ -1753,6 +1879,31 @@ impl Lowerer {
 mod tests {
     use super::*;
 
+    #[test]
+    fn edge_budget_arithmetic_saturates() {
+        assert_eq!(
+            edge_allowance(usize::MAX, 0, 0, 0),
+            (MAX_EDGES, true, false)
+        );
+        assert_eq!(edge_allowance(10, usize::MAX, 0, 0), (0, true, false));
+        assert_eq!(
+            edge_allowance(10, 0, usize::MAX, usize::MAX),
+            (0, false, true)
+        );
+        assert_eq!(
+            edge_allowance(2, 0, MAX_EDGE_COPY_BYTES - 1, 1),
+            (1, false, true)
+        );
+        assert_eq!(
+            edge_allowance(1, MAX_EDGES - 1, MAX_EDGE_COPY_BYTES - 1, 1),
+            (1, false, false)
+        );
+        assert_eq!(
+            edge_allowance(2, MAX_EDGES - 1, MAX_EDGE_COPY_BYTES - 1, 1),
+            (1, true, true)
+        );
+    }
+
     fn names() -> Names<'static> {
         Names {
             graph: "G",
@@ -1760,6 +1911,30 @@ mod tests {
             tail: "a",
             head: "b",
             directed: true,
+        }
+    }
+
+    #[test]
+    fn edge_label_expansion_bounds_substitutions_and_escaped_backslashes() {
+        let n = Names {
+            graph: "graph\\nname",
+            node: "",
+            tail: "tail&name",
+            head: "head",
+            directed: false,
+        };
+        for text in [r"\G \T \H \E", r"\\T \E &amp; \n", r"trailing\"] {
+            let attrs = [Attr {
+                key: "label".into(),
+                value: Value {
+                    text: text.into(),
+                    html: false,
+                },
+                range: TextRange::default(),
+            }];
+            let bound =
+                EdgeLabelExpansion::new(&attrs).bytes(n.graph.len(), n.tail.len(), n.head.len());
+            assert!(escape(text, &n).len() <= bound, "{text:?}");
         }
     }
 

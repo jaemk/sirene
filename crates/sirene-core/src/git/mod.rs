@@ -90,9 +90,7 @@ impl Parse {
     /// ordered by position.
     pub fn lower(&self) -> (GitGraph, Vec<Diagnostic>) {
         let (graph, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a git graph: {} branches, {} commits; {} diagnostics",
             graph.branches.len(),

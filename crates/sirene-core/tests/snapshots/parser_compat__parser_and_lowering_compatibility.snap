@@ -1,0 +1,1368 @@
+---
+source: crates/sirene-core/tests/parser_compat.rs
+expression: out
+---
+=== c4_keywords ===
+source: "C4Context\ntitleé(x)\ntitle_name(x)\ntitle-name(x)\naccTitleX(x)\nPerson(a, \"A\")\nBad(x)\n"
+syntax:
+node ROOT 0..84
+node HEADER 0..9
+token GRAPH_KW 0..9 "C4Context"
+token NEWLINE 9..10 "\n"
+node ENTITY 10..20
+token IDENT 10..17 "titleé"
+token L_PAREN 17..18 "("
+node ATTR 18..19
+token TEXT 18..19 "x"
+token R_PAREN 19..20 ")"
+token NEWLINE 20..21 "\n"
+node ENTITY 21..34
+token IDENT 21..31 "title_name"
+token L_PAREN 31..32 "("
+node ATTR 32..33
+token TEXT 32..33 "x"
+token R_PAREN 33..34 ")"
+token NEWLINE 34..35 "\n"
+node TITLE_STMT 35..48
+token TITLE_KW 35..40 "title"
+token TEXT 40..48 "-name(x)"
+token NEWLINE 48..49 "\n"
+node ENTITY 49..61
+token IDENT 49..58 "accTitleX"
+token L_PAREN 58..59 "("
+node ATTR 59..60
+token TEXT 59..60 "x"
+token R_PAREN 60..61 ")"
+token NEWLINE 61..62 "\n"
+node ENTITY 62..76
+token IDENT 62..68 "Person"
+token L_PAREN 68..69 "("
+node ATTR 69..70
+token TEXT 69..70 "a"
+token COMMA 70..71 ","
+token WHITESPACE 71..72 " "
+node ATTR 72..75
+token STRING 72..75 "\"A\""
+token R_PAREN 75..76 ")"
+token NEWLINE 76..77 "\n"
+node ENTITY 77..83
+token IDENT 77..80 "Bad"
+token L_PAREN 80..81 "("
+node ATTR 81..82
+token TEXT 81..82 "x"
+token R_PAREN 82..83 ")"
+token NEWLINE 83..84 "\n"
+parse diagnostics: []
+lower diagnostics: [
+    Diagnostic {
+        range: 10..17,
+        message: "`titleé` is not supported; ignoring it",
+        severity: Warning,
+    },
+    Diagnostic {
+        range: 21..31,
+        message: "`title_name` is not supported; ignoring it",
+        severity: Warning,
+    },
+    Diagnostic {
+        range: 49..58,
+        message: "`accTitleX` is not supported; ignoring it",
+        severity: Warning,
+    },
+    Diagnostic {
+        range: 77..80,
+        message: "`Bad` is not supported; ignoring it",
+        severity: Warning,
+    },
+]
+
+model: C4 {
+    chart: Flowchart {
+        direction: TopBottom,
+        title: Some(
+            "-name(x)",
+        ),
+        acc_title: None,
+        acc_descr: None,
+        nodes: [
+            Node {
+                id: "a",
+                label: Label {
+                    text: "A",
+                    markdown: false,
+                },
+                shape: Rounded,
+                sections: [],
+                classes: [],
+                styles: [],
+                click: None,
+                tooltip: None,
+                metadata: [],
+                mentions: [
+                    62..76,
+                ],
+            },
+        ],
+        edges: [],
+        subgraphs: [],
+        classes: [],
+        notes: [],
+        default_edge_styles: [],
+        default_curve: None,
+        lanes: false,
+        agentflow: false,
+        same_rank: [],
+        end_ranks: [],
+        ordering: [],
+        groups: [],
+    },
+    elements: [
+        Element {
+            base: Person,
+            body: Box,
+            external: false,
+            techn: None,
+            descr: None,
+            colors: Colors {
+                background: None,
+                font: None,
+                line: None,
+            },
+        },
+    ],
+    node_parent: [
+        None,
+    ],
+    boundaries: [],
+    boundary_parent: [],
+    rels: [],
+    shapes_in_row: 4,
+    boundaries_in_row: 2,
+}
+
+=== c4_titles ===
+source: "C4Context\r\ntitle\r\ntitle  spaced  \r\ntitle hello %% comment\r\ntitle a; Person(x, \"X\")\r\ntitle"
+syntax:
+node ROOT 0..89
+node HEADER 0..9
+token GRAPH_KW 0..9 "C4Context"
+token NEWLINE 9..11 "\r\n"
+node TITLE_STMT 11..16
+token TITLE_KW 11..16 "title"
+token NEWLINE 16..18 "\r\n"
+node TITLE_STMT 18..31
+token TITLE_KW 18..23 "title"
+token WHITESPACE 23..25 "  "
+token TEXT 25..31 "spaced"
+token WHITESPACE 31..33 "  "
+token NEWLINE 33..35 "\r\n"
+node TITLE_STMT 35..57
+token TITLE_KW 35..40 "title"
+token WHITESPACE 40..41 " "
+token TEXT 41..57 "hello %% comment"
+token NEWLINE 57..59 "\r\n"
+node TITLE_STMT 59..82
+token TITLE_KW 59..64 "title"
+token WHITESPACE 64..65 " "
+token TEXT 65..82 "a; Person(x, \"X\")"
+token NEWLINE 82..84 "\r\n"
+node TITLE_STMT 84..89
+token TITLE_KW 84..89 "title"
+parse diagnostics: []
+lower diagnostics: []
+
+model: C4 {
+    chart: Flowchart {
+        direction: TopBottom,
+        title: None,
+        acc_title: None,
+        acc_descr: None,
+        nodes: [],
+        edges: [],
+        subgraphs: [],
+        classes: [],
+        notes: [],
+        default_edge_styles: [],
+        default_curve: None,
+        lanes: false,
+        agentflow: false,
+        same_rank: [],
+        end_ranks: [],
+        ordering: [],
+        groups: [],
+    },
+    elements: [],
+    node_parent: [],
+    boundaries: [],
+    boundary_parent: [],
+    rels: [],
+    shapes_in_row: 4,
+    boundaries_in_row: 2,
+}
+
+=== c4_recovery ===
+source: "C4Context\nPerson(a, \"A\")\nPerson(b, $foo)\nPerson(c, \"C\")\nRel(c, missing, \"uses\")\n"
+syntax:
+node ROOT 0..80
+node HEADER 0..9
+token GRAPH_KW 0..9 "C4Context"
+token NEWLINE 9..10 "\n"
+node ENTITY 10..24
+token IDENT 10..16 "Person"
+token L_PAREN 16..17 "("
+node ATTR 17..18
+token TEXT 17..18 "a"
+token COMMA 18..19 ","
+token WHITESPACE 19..20 " "
+node ATTR 20..23
+token STRING 20..23 "\"A\""
+token R_PAREN 23..24 ")"
+token NEWLINE 24..25 "\n"
+node ENTITY 25..40
+token IDENT 25..31 "Person"
+token L_PAREN 31..32 "("
+node ATTR 32..33
+token TEXT 32..33 "b"
+token COMMA 33..34 ","
+token WHITESPACE 34..35 " "
+node ATTR 35..40
+node ERROR 35..40
+token ERROR_TOKEN 35..40 "$foo)"
+token NEWLINE 40..41 "\n"
+node ENTITY 41..55
+token IDENT 41..47 "Person"
+token L_PAREN 47..48 "("
+node ATTR 48..49
+token TEXT 48..49 "c"
+token COMMA 49..50 ","
+token WHITESPACE 50..51 " "
+node ATTR 51..54
+token STRING 51..54 "\"C\""
+token R_PAREN 54..55 ")"
+token NEWLINE 55..56 "\n"
+node ENTITY 56..79
+token IDENT 56..59 "Rel"
+token L_PAREN 59..60 "("
+node ATTR 60..61
+token TEXT 60..61 "c"
+token COMMA 61..62 ","
+token WHITESPACE 62..63 " "
+node ATTR 63..70
+token TEXT 63..70 "missing"
+token COMMA 70..71 ","
+token WHITESPACE 71..72 " "
+node ATTR 72..78
+token STRING 72..78 "\"uses\""
+token R_PAREN 78..79 ")"
+token NEWLINE 79..80 "\n"
+parse diagnostics: [
+    Diagnostic {
+        range: 35..40,
+        message: "expected `=` after the argument's name",
+        severity: Error,
+    },
+]
+lower diagnostics: [
+    Diagnostic {
+        range: 35..40,
+        message: "expected `=` after the argument's name",
+        severity: Error,
+    },
+    Diagnostic {
+        range: 56..79,
+        message: "no element or boundary `missing`; ignoring this",
+        severity: Error,
+    },
+]
+
+model: C4 {
+    chart: Flowchart {
+        direction: TopBottom,
+        title: None,
+        acc_title: None,
+        acc_descr: None,
+        nodes: [
+            Node {
+                id: "a",
+                label: Label {
+                    text: "A",
+                    markdown: false,
+                },
+                shape: Rounded,
+                sections: [],
+                classes: [],
+                styles: [],
+                click: None,
+                tooltip: None,
+                metadata: [],
+                mentions: [
+                    10..24,
+                ],
+            },
+            Node {
+                id: "b",
+                label: Label {
+                    text: "b",
+                    markdown: false,
+                },
+                shape: Rounded,
+                sections: [],
+                classes: [],
+                styles: [],
+                click: None,
+                tooltip: None,
+                metadata: [],
+                mentions: [
+                    25..40,
+                ],
+            },
+            Node {
+                id: "c",
+                label: Label {
+                    text: "C",
+                    markdown: false,
+                },
+                shape: Rounded,
+                sections: [],
+                classes: [],
+                styles: [],
+                click: None,
+                tooltip: None,
+                metadata: [],
+                mentions: [
+                    41..55,
+                ],
+            },
+        ],
+        edges: [],
+        subgraphs: [],
+        classes: [],
+        notes: [],
+        default_edge_styles: [],
+        default_curve: None,
+        lanes: false,
+        agentflow: false,
+        same_rank: [],
+        end_ranks: [],
+        ordering: [],
+        groups: [],
+    },
+    elements: [
+        Element {
+            base: Person,
+            body: Box,
+            external: false,
+            techn: None,
+            descr: None,
+            colors: Colors {
+                background: None,
+                font: None,
+                line: None,
+            },
+        },
+        Element {
+            base: Person,
+            body: Box,
+            external: false,
+            techn: None,
+            descr: None,
+            colors: Colors {
+                background: None,
+                font: None,
+                line: None,
+            },
+        },
+        Element {
+            base: Person,
+            body: Box,
+            external: false,
+            techn: None,
+            descr: None,
+            colors: Colors {
+                background: None,
+                font: None,
+                line: None,
+            },
+        },
+    ],
+    node_parent: [
+        None,
+        None,
+        None,
+    ],
+    boundaries: [],
+    boundary_parent: [],
+    rels: [],
+    shapes_in_row: 4,
+    boundaries_in_row: 2,
+}
+
+=== zen_keywords ===
+source: "zenuml\nifx\nif_2\nifé\nif-x\nnewbie\nreturnValue\nA.call()\n"
+syntax:
+node ROOT 0..54
+node HEADER 0..6
+token GRAPH_KW 0..6 "zenuml"
+token NEWLINE 6..7 "\n"
+node PARTICIPANT_STMT 7..10
+token IDENT 7..10 "ifx"
+token NEWLINE 10..11 "\n"
+node PARTICIPANT_STMT 11..15
+token IDENT 11..15 "if_2"
+token NEWLINE 15..16 "\n"
+node PARTICIPANT_STMT 16..20
+token IDENT 16..20 "ifé"
+token NEWLINE 20..21 "\n"
+node FRAGMENT 21..25
+node BRANCH 21..25
+token ZEN_KW 21..23 "if"
+node ERROR 23..25
+token ERROR_TOKEN 23..25 "-x"
+token NEWLINE 25..26 "\n"
+node PARTICIPANT_STMT 26..32
+token IDENT 26..32 "newbie"
+token NEWLINE 32..33 "\n"
+node PARTICIPANT_STMT 33..44
+token IDENT 33..44 "returnValue"
+token NEWLINE 44..45 "\n"
+node CALL 45..53
+token IDENT 45..46 "A"
+token DOT 46..47 "."
+token IDENT 47..51 "call"
+token L_PAREN 51..52 "("
+token R_PAREN 52..53 ")"
+token NEWLINE 53..54 "\n"
+parse diagnostics: [
+    Diagnostic {
+        range: 23..25,
+        message: "expected `{`",
+        severity: Error,
+    },
+]
+lower diagnostics: [
+    Diagnostic {
+        range: 23..25,
+        message: "expected `{`",
+        severity: Error,
+    },
+]
+
+model: Sequence {
+    title: None,
+    acc_title: None,
+    acc_descr: None,
+    participants: [
+        Participant {
+            id: "",
+            label: [],
+            kind: Hidden,
+            group: None,
+        },
+        Participant {
+            id: "ifx",
+            label: [
+                "ifx",
+            ],
+            kind: Participant,
+            group: None,
+        },
+        Participant {
+            id: "if_2",
+            label: [
+                "if_2",
+            ],
+            kind: Participant,
+            group: None,
+        },
+        Participant {
+            id: "ifé",
+            label: [
+                "ifé",
+            ],
+            kind: Participant,
+            group: None,
+        },
+        Participant {
+            id: "newbie",
+            label: [
+                "newbie",
+            ],
+            kind: Participant,
+            group: None,
+        },
+        Participant {
+            id: "returnValue",
+            label: [
+                "returnValue",
+            ],
+            kind: Participant,
+            group: None,
+        },
+        Participant {
+            id: "A",
+            label: [
+                "A",
+            ],
+            kind: Participant,
+            group: None,
+        },
+    ],
+    groups: [],
+    events: [
+        Message(
+            Message {
+                from: 0,
+                to: 6,
+                arrow: Arrow {
+                    line: Solid,
+                    head: Filled,
+                    both: false,
+                },
+                text: [
+                    "call()",
+                ],
+                activate: true,
+                deactivate: false,
+                number: None,
+            },
+        ),
+        Deactivate(
+            6,
+        ),
+    ],
+    hide_footbox: false,
+}
+
+=== zen_recovery ===
+source: "zenuml\nif(x) {\nA.call(\nB->C: later\n}\nA.call()\n"
+syntax:
+node ROOT 0..46
+node HEADER 0..6
+token GRAPH_KW 0..6 "zenuml"
+token NEWLINE 6..7 "\n"
+node FRAGMENT 7..36
+node BRANCH 7..36
+token ZEN_KW 7..9 "if"
+token L_PAREN 9..10 "("
+token TEXT 10..11 "x"
+token R_PAREN 11..12 ")"
+token WHITESPACE 12..13 " "
+token L_BRACE 13..14 "{"
+token NEWLINE 14..15 "\n"
+node CALL 15..22
+token IDENT 15..16 "A"
+token DOT 16..17 "."
+token IDENT 17..21 "call"
+node ERROR 21..22
+token ERROR_TOKEN 21..22 "("
+token NEWLINE 22..23 "\n"
+node MESSAGE_STMT 23..34
+token IDENT 23..24 "B"
+token ARROW 24..26 "->"
+token IDENT 26..27 "C"
+token COLON 27..28 ":"
+token WHITESPACE 28..29 " "
+token TEXT 29..34 "later"
+token NEWLINE 34..35 "\n"
+token R_BRACE 35..36 "}"
+token NEWLINE 36..37 "\n"
+node CALL 37..45
+token IDENT 37..38 "A"
+token DOT 38..39 "."
+token IDENT 39..43 "call"
+token L_PAREN 43..44 "("
+token R_PAREN 44..45 ")"
+token NEWLINE 45..46 "\n"
+parse diagnostics: [
+    Diagnostic {
+        range: 21..22,
+        message: "expected `)` to close the arguments",
+        severity: Error,
+    },
+]
+lower diagnostics: [
+    Diagnostic {
+        range: 21..22,
+        message: "expected `)` to close the arguments",
+        severity: Error,
+    },
+]
+
+model: Sequence {
+    title: None,
+    acc_title: None,
+    acc_descr: None,
+    participants: [
+        Participant {
+            id: "",
+            label: [],
+            kind: Hidden,
+            group: None,
+        },
+        Participant {
+            id: "B",
+            label: [
+                "B",
+            ],
+            kind: Participant,
+            group: None,
+        },
+        Participant {
+            id: "C",
+            label: [
+                "C",
+            ],
+            kind: Participant,
+            group: None,
+        },
+        Participant {
+            id: "A",
+            label: [
+                "A",
+            ],
+            kind: Participant,
+            group: None,
+        },
+    ],
+    groups: [],
+    events: [
+        Start(
+            Alt,
+            "x",
+        ),
+        Message(
+            Message {
+                from: 1,
+                to: 2,
+                arrow: Arrow {
+                    line: Solid,
+                    head: Open,
+                    both: false,
+                },
+                text: [
+                    "later",
+                ],
+                activate: false,
+                deactivate: false,
+                number: None,
+            },
+        ),
+        End,
+        Message(
+            Message {
+                from: 0,
+                to: 3,
+                arrow: Arrow {
+                    line: Solid,
+                    head: Filled,
+                    both: false,
+                },
+                text: [
+                    "call()",
+                ],
+                activate: true,
+                deactivate: false,
+                number: None,
+            },
+        ),
+        Deactivate(
+            3,
+        ),
+    ],
+    hide_footbox: false,
+}
+
+=== flow_metadata ===
+source: "flowchart TD\nA@{ label: \"café } { x\", shape: rect }\nB@{ label: \"unclosed\nC@{ label: \"ok }\" }\nD --> E\n"
+syntax:
+node ROOT 0..102
+node HEADER 0..12
+token GRAPH_KW 0..9 "flowchart"
+token WHITESPACE 9..10 " "
+token DIR 10..12 "TD"
+token NEWLINE 12..13 "\n"
+node VERTEX_STMT 13..52
+node NODE_GROUP 13..52
+node NODE 13..52
+token IDENT 13..14 "A"
+node METADATA 14..52
+token META_OPEN 14..16 "@{"
+token META_BODY 16..51 " label: \"café } { x\", shape: rect "
+token META_CLOSE 51..52 "}"
+token NEWLINE 52..53 "\n"
+node VERTEX_STMT 53..90
+node NODE_GROUP 53..90
+node NODE 53..90
+token IDENT 53..54 "B"
+node METADATA 54..90
+token META_OPEN 54..56 "@{"
+token META_BODY 56..89 " label: \"unclosed\nC@{ label: \"ok "
+token META_CLOSE 89..90 "}"
+node ERROR 90..93
+token ERROR_TOKEN 90..93 "\" }"
+token NEWLINE 93..94 "\n"
+node VERTEX_STMT 94..101
+node NODE_GROUP 94..95
+node NODE 94..95
+token IDENT 94..95 "D"
+token WHITESPACE 95..96 " "
+node EDGE 96..99
+token STROKE 96..99 "-->"
+token WHITESPACE 99..100 " "
+node NODE_GROUP 100..101
+node NODE 100..101
+token IDENT 100..101 "E"
+token NEWLINE 101..102 "\n"
+parse diagnostics: [
+    Diagnostic {
+        range: 90..93,
+        message: "expected newline or `;`",
+        severity: Error,
+    },
+]
+lower diagnostics: [
+    Diagnostic {
+        range: 90..93,
+        message: "expected newline or `;`",
+        severity: Error,
+    },
+]
+
+model: Flowchart {
+    direction: TopBottom,
+    title: None,
+    acc_title: None,
+    acc_descr: None,
+    nodes: [
+        Node {
+            id: "A",
+            label: Label {
+                text: "café } { x",
+                markdown: true,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [
+                (
+                    "label",
+                    "café } { x",
+                ),
+                (
+                    "shape",
+                    "rect",
+                ),
+            ],
+            mentions: [
+                13..52,
+            ],
+        },
+        Node {
+            id: "B",
+            label: Label {
+                text: "\"unclosed",
+                markdown: true,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [
+                (
+                    "label",
+                    "\"unclosed",
+                ),
+                (
+                    "C@{ label",
+                    "\"ok",
+                ),
+            ],
+            mentions: [
+                53..90,
+            ],
+        },
+        Node {
+            id: "D",
+            label: Label {
+                text: "D",
+                markdown: false,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                94..95,
+            ],
+        },
+        Node {
+            id: "E",
+            label: Label {
+                text: "E",
+                markdown: false,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                100..101,
+            ],
+        },
+    ],
+    edges: [
+        Edge {
+            id: None,
+            from: "D",
+            to: "E",
+            stroke: Normal,
+            start: None,
+            end: Some(
+                Point,
+            ),
+            length: 1,
+            constraint: true,
+            ports: [
+                None,
+                None,
+            ],
+            rows: [
+                None,
+                None,
+            ],
+            label: None,
+            start_label: None,
+            end_label: None,
+            classes: [],
+            styles: [],
+            curve: None,
+            animate: false,
+            animation: None,
+            metadata: [],
+            range: 96..99,
+        },
+    ],
+    subgraphs: [],
+    classes: [],
+    notes: [],
+    default_edge_styles: [],
+    default_curve: None,
+    lanes: false,
+    agentflow: false,
+    same_rank: [],
+    end_ranks: [],
+    ordering: [],
+    groups: [],
+}
+
+=== flow_metadata_repeated ===
+source: "flowchart TD\nA@{ label: \"x }\" }\nB@{ label: \"y }\" }\nC@{ bad\nD@{ bad\nE --> F\n"
+syntax:
+node ROOT 0..75
+node HEADER 0..12
+token GRAPH_KW 0..9 "flowchart"
+token WHITESPACE 9..10 " "
+token DIR 10..12 "TD"
+token NEWLINE 12..13 "\n"
+node VERTEX_STMT 13..31
+node NODE_GROUP 13..31
+node NODE 13..31
+token IDENT 13..14 "A"
+node METADATA 14..31
+token META_OPEN 14..16 "@{"
+token META_BODY 16..30 " label: \"x }\" "
+token META_CLOSE 30..31 "}"
+token NEWLINE 31..32 "\n"
+node VERTEX_STMT 32..50
+node NODE_GROUP 32..50
+node NODE 32..50
+token IDENT 32..33 "B"
+node METADATA 33..50
+token META_OPEN 33..35 "@{"
+token META_BODY 35..49 " label: \"y }\" "
+token META_CLOSE 49..50 "}"
+token NEWLINE 50..51 "\n"
+node VERTEX_STMT 51..58
+node NODE_GROUP 51..58
+node NODE 51..58
+token IDENT 51..52 "C"
+node METADATA 52..58
+token META_OPEN 52..54 "@{"
+token META_BODY 54..58 " bad"
+token NEWLINE 58..59 "\n"
+node VERTEX_STMT 59..66
+node NODE_GROUP 59..66
+node NODE 59..66
+token IDENT 59..60 "D"
+node METADATA 60..66
+token META_OPEN 60..62 "@{"
+token META_BODY 62..66 " bad"
+token NEWLINE 66..67 "\n"
+node VERTEX_STMT 67..74
+node NODE_GROUP 67..68
+node NODE 67..68
+token IDENT 67..68 "E"
+token WHITESPACE 68..69 " "
+node EDGE 69..72
+token STROKE 69..72 "-->"
+token WHITESPACE 72..73 " "
+node NODE_GROUP 73..74
+node NODE 73..74
+token IDENT 73..74 "F"
+token NEWLINE 74..75 "\n"
+parse diagnostics: [
+    Diagnostic {
+        range: 52..54,
+        message: "unclosed `@{`: expected `}`",
+        severity: Error,
+    },
+    Diagnostic {
+        range: 60..62,
+        message: "unclosed `@{`: expected `}`",
+        severity: Error,
+    },
+]
+lower diagnostics: [
+    Diagnostic {
+        range: 52..54,
+        message: "unclosed `@{`: expected `}`",
+        severity: Error,
+    },
+    Diagnostic {
+        range: 52..58,
+        message: "expected `key: value` in metadata, found `bad`",
+        severity: Error,
+    },
+    Diagnostic {
+        range: 60..62,
+        message: "unclosed `@{`: expected `}`",
+        severity: Error,
+    },
+    Diagnostic {
+        range: 60..66,
+        message: "expected `key: value` in metadata, found `bad`",
+        severity: Error,
+    },
+]
+
+model: Flowchart {
+    direction: TopBottom,
+    title: None,
+    acc_title: None,
+    acc_descr: None,
+    nodes: [
+        Node {
+            id: "A",
+            label: Label {
+                text: "x }",
+                markdown: true,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [
+                (
+                    "label",
+                    "x }",
+                ),
+            ],
+            mentions: [
+                13..31,
+            ],
+        },
+        Node {
+            id: "B",
+            label: Label {
+                text: "y }",
+                markdown: true,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [
+                (
+                    "label",
+                    "y }",
+                ),
+            ],
+            mentions: [
+                32..50,
+            ],
+        },
+        Node {
+            id: "C",
+            label: Label {
+                text: "C",
+                markdown: false,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                51..58,
+            ],
+        },
+        Node {
+            id: "D",
+            label: Label {
+                text: "D",
+                markdown: false,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                59..66,
+            ],
+        },
+        Node {
+            id: "E",
+            label: Label {
+                text: "E",
+                markdown: false,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                67..68,
+            ],
+        },
+        Node {
+            id: "F",
+            label: Label {
+                text: "F",
+                markdown: false,
+            },
+            shape: Rect,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                73..74,
+            ],
+        },
+    ],
+    edges: [
+        Edge {
+            id: None,
+            from: "E",
+            to: "F",
+            stroke: Normal,
+            start: None,
+            end: Some(
+                Point,
+            ),
+            length: 1,
+            constraint: true,
+            ports: [
+                None,
+                None,
+            ],
+            rows: [
+                None,
+                None,
+            ],
+            label: None,
+            start_label: None,
+            end_label: None,
+            classes: [],
+            styles: [],
+            curve: None,
+            animate: false,
+            animation: None,
+            metadata: [],
+            range: 69..72,
+        },
+    ],
+    subgraphs: [],
+    classes: [],
+    notes: [],
+    default_edge_styles: [],
+    default_curve: None,
+    lanes: false,
+    agentflow: false,
+    same_rank: [],
+    end_ranks: [],
+    ordering: [],
+    groups: [],
+}
+
+=== usecase_metadata ===
+source: "usecase-beta\nactor A@{ label: \"café }\", type: hollow }\njson J@{ \"a\": {\"b\": \"}\"} }\nU(\"Use\")\n"
+syntax:
+node ROOT 0..92
+node HEADER 0..12
+token GRAPH_KW 0..12 "usecase-beta"
+token NEWLINE 12..13 "\n"
+node VERTEX_STMT 13..55
+token USECASE_KW 13..18 "actor"
+token WHITESPACE 18..19 " "
+node NODE 19..55
+token IDENT 19..20 "A"
+node METADATA 20..55
+token META_OPEN 20..22 "@{"
+token META_BODY 22..54 " label: \"café }\", type: hollow "
+token META_CLOSE 54..55 "}"
+token NEWLINE 55..56 "\n"
+node JSON_STMT 56..82
+token USECASE_KW 56..60 "json"
+token WHITESPACE 60..61 " "
+token IDENT 61..62 "J"
+token AT 62..63 "@"
+token JSON_BODY 63..82 "{ \"a\": {\"b\": \"}\"} }"
+token NEWLINE 82..83 "\n"
+node VERTEX_STMT 83..91
+node NODE 83..91
+token IDENT 83..84 "U"
+node SHAPE 84..91
+token SHAPE_OPEN 84..85 "("
+token STRING 85..90 "\"Use\""
+token SHAPE_CLOSE 90..91 ")"
+token NEWLINE 91..92 "\n"
+parse diagnostics: []
+lower diagnostics: [
+    Diagnostic {
+        range: 20..55,
+        message: "ignoring metadata `label: café }`, which is not valid for actor `A`",
+        severity: Warning,
+    },
+]
+
+model: Flowchart {
+    direction: LeftRight,
+    title: None,
+    acc_title: None,
+    acc_descr: None,
+    nodes: [
+        Node {
+            id: "A",
+            label: Label {
+                text: "A",
+                markdown: false,
+            },
+            shape: HollowActor,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                19..20,
+            ],
+        },
+        Node {
+            id: "U",
+            label: Label {
+                text: "Use",
+                markdown: false,
+            },
+            shape: UseCase,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                83..84,
+            ],
+        },
+        Node {
+            id: "J",
+            label: Label {
+                text: "J",
+                markdown: false,
+            },
+            shape: Rect,
+            sections: [
+                [
+                    Row {
+                        cells: [
+                            "a.b",
+                            "}",
+                        ],
+                        italic: false,
+                        underline: false,
+                    },
+                ],
+            ],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                61..62,
+            ],
+        },
+    ],
+    edges: [],
+    subgraphs: [],
+    classes: [],
+    notes: [],
+    default_edge_styles: [],
+    default_curve: None,
+    lanes: false,
+    agentflow: false,
+    same_rank: [],
+    end_ranks: [],
+    ordering: [],
+    groups: [],
+}
+
+=== usecase_unclosed ===
+source: "usecase-beta\nactor A@{ type: \"unclosed\nactor B@{ type: \"hollow\" }\nU(\"later\")\n"
+syntax:
+node ROOT 0..77
+node HEADER 0..12
+token GRAPH_KW 0..12 "usecase-beta"
+token NEWLINE 12..13 "\n"
+node VERTEX_STMT 13..38
+token USECASE_KW 13..18 "actor"
+token WHITESPACE 18..19 " "
+node NODE 19..38
+token IDENT 19..20 "A"
+node METADATA 20..38
+token META_OPEN 20..22 "@{"
+token WHITESPACE 22..23 " "
+node ERROR 23..38
+token ERROR_TOKEN 23..38 "type: \"unclosed"
+token NEWLINE 38..39 "\n"
+node VERTEX_STMT 39..65
+token USECASE_KW 39..44 "actor"
+token WHITESPACE 44..45 " "
+node NODE 45..65
+token IDENT 45..46 "B"
+node METADATA 46..65
+token META_OPEN 46..48 "@{"
+token META_BODY 48..64 " type: \"hollow\" "
+token META_CLOSE 64..65 "}"
+token NEWLINE 65..66 "\n"
+node VERTEX_STMT 66..76
+node NODE 66..76
+token IDENT 66..67 "U"
+node SHAPE 67..76
+token SHAPE_OPEN 67..68 "("
+token STRING 68..75 "\"later\""
+token SHAPE_CLOSE 75..76 ")"
+token NEWLINE 76..77 "\n"
+parse diagnostics: [
+    Diagnostic {
+        range: 23..38,
+        message: "unclosed `@{`: expected `}`",
+        severity: Error,
+    },
+]
+lower diagnostics: [
+    Diagnostic {
+        range: 23..38,
+        message: "unclosed `@{`: expected `}`",
+        severity: Error,
+    },
+]
+
+model: Flowchart {
+    direction: LeftRight,
+    title: None,
+    acc_title: None,
+    acc_descr: None,
+    nodes: [
+        Node {
+            id: "A",
+            label: Label {
+                text: "A",
+                markdown: false,
+            },
+            shape: Actor,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                19..20,
+            ],
+        },
+        Node {
+            id: "B",
+            label: Label {
+                text: "B",
+                markdown: false,
+            },
+            shape: HollowActor,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                45..46,
+            ],
+        },
+        Node {
+            id: "U",
+            label: Label {
+                text: "later",
+                markdown: false,
+            },
+            shape: UseCase,
+            sections: [],
+            classes: [],
+            styles: [],
+            click: None,
+            tooltip: None,
+            metadata: [],
+            mentions: [
+                66..67,
+            ],
+        },
+    ],
+    edges: [],
+    subgraphs: [],
+    classes: [],
+    notes: [],
+    default_edge_styles: [],
+    default_curve: None,
+    lanes: false,
+    agentflow: false,
+    same_rank: [],
+    end_ranks: [],
+    ordering: [],
+    groups: [],
+}

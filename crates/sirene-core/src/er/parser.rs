@@ -6,7 +6,6 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::Base;
 use crate::syntax::SyntaxKind::*;
 
@@ -117,7 +116,7 @@ pub(crate) fn relation_len(s: &str) -> usize {
     if a == 0 {
         return 0;
     }
-    let mut at = a + scan::ws_len(&s[a..]);
+    let mut at = a + crate::lines::ws_len(&s[a..]);
     let connector = ["optionally to", "to"].into_iter().find(|c| {
         let r = &s[at..];
         starts_with_ci(r, c) && (id_len(&r[c.len()..]) == 0 || r[c.len()..].starts_with(' '))
@@ -126,7 +125,7 @@ pub(crate) fn relation_len(s: &str) -> usize {
         return 0;
     };
     at += c.len();
-    at += scan::ws_len(&s[at..]);
+    at += crate::lines::ws_len(&s[at..]);
     let b = words_len(&s[at..]);
     if b == 0 { 0 } else { at + b }
 }
@@ -193,7 +192,7 @@ impl Parser<'_> {
         if !self.reference() {
             return;
         }
-        let n = scan::ws_len(self.rest());
+        let n = crate::lines::ws_len(self.rest());
         let after = &self.rest()[n..];
         if relation_len(after) > 0 {
             self.builder.start_node_at(checkpoint, RELATION_STMT.into());
@@ -293,12 +292,12 @@ fn keys_len(s: &str) -> usize {
         at += k.len();
         end = at;
         let r = &s[at..];
-        let ws = scan::ws_len(r);
+        let ws = crate::lines::ws_len(r);
         if !r[ws..].starts_with(',') {
             return end;
         }
         at += ws + 1;
-        at += scan::ws_len(&s[at..]);
+        at += crate::lines::ws_len(&s[at..]);
     }
 }
 

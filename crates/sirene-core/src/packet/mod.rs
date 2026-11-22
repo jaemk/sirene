@@ -128,9 +128,7 @@ impl Parse {
     /// by position.
     pub fn lower(&self) -> (Packet, Vec<Diagnostic>) {
         let (packet, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a packet: {} fields; {} diagnostics",
             packet.fields.len(),

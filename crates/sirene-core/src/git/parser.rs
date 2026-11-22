@@ -1,11 +1,11 @@
 //! Line-oriented parser for Mermaid git graphs, producing a lossless rowan tree (MGIT-1).
 
+use crate::lines::{keyword, word_len};
 use std::ops::{Deref, DerefMut};
 
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
 use crate::lines::{self, Base};
 use crate::syntax::SyntaxKind::*;
 
@@ -48,16 +48,6 @@ impl DerefMut for Parser<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
-}
-
-/// Length of a word at the start of `s`: letters, digits, `-`, and `_`.
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
 }
 
 /// Length of an unquoted branch name or value at the start of `s`: up to whitespace or `;`.
@@ -137,7 +127,7 @@ impl Parser<'_> {
     /// attribute without a key: a commit's `msg:` is optional.
     fn attributes(&mut self, message: bool) {
         loop {
-            let n = scan::ws_len(self.rest());
+            let n = crate::lines::ws_len(self.rest());
             if lines::is_end(&self.rest()[n..]) {
                 return;
             }
@@ -154,7 +144,7 @@ impl Parser<'_> {
                 continue;
             }
             let key = word_len(r);
-            let colon = key + scan::ws_len(&r[key..]);
+            let colon = key + crate::lines::ws_len(&r[key..]);
             if !ATTRIBUTES.contains(&&r[..key]) || !r[colon..].starts_with(':') {
                 self.fail("expected an attribute such as `id: \"...\"`");
                 return;

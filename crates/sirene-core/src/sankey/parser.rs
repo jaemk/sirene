@@ -6,7 +6,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
+use crate::lines::word_len;
 use crate::lines::{Base, number_len};
 use crate::syntax::SyntaxKind::*;
 
@@ -38,14 +38,9 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_'))
-        .unwrap_or(s.len())
-}
-
 /// A `"..."` field at the start of `s`, with `""` for a quote inside, closed on the same line.
 fn quoted_len(s: &str) -> Option<usize> {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let mut chars = line.char_indices().skip(1).peekable();
     while let Some((i, c)) = chars.next() {
         if c == '"' {
@@ -93,8 +88,8 @@ impl Parser<'_> {
         }
         let r = self.rest();
         let n = with_exponent(r, number_len(r));
-        let line = scan::line_len(r);
-        if n == 0 || scan::trim_end_len(r, line) != n {
+        let line = crate::lines::line_len(r);
+        if n == 0 || crate::lines::trim_end_len(r, line) != n {
             let message = if r[..line].contains(',') {
                 "expected 3 fields: a row is `source,target,value`"
             } else {
@@ -127,9 +122,9 @@ impl Parser<'_> {
                 }
             }
         } else {
-            let line = &r[..scan::line_len(r)];
+            let line = &r[..crate::lines::line_len(r)];
             let end = line.find(',').unwrap_or(line.len());
-            let n = scan::trim_end_len(line, end);
+            let n = crate::lines::trim_end_len(line, end);
             if n == 0 {
                 self.fail(&format!("expected the {what} name"));
                 return false;

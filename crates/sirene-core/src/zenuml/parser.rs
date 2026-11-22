@@ -7,8 +7,7 @@ use std::ops::{Deref, DerefMut};
 use rowan::GreenNode;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::scan;
-use crate::lines::{Base, is_end};
+use crate::lines::{Base, identifier_keyword as keyword, identifier_word_len as word_len, is_end};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -45,20 +44,11 @@ impl DerefMut for Parser<'_> {
     }
 }
 
-fn word_len(s: &str) -> usize {
-    s.find(|c: char| !(c.is_alphanumeric() || c == '_'))
-        .unwrap_or(s.len())
-}
-
-fn keyword(s: &str, kw: &str) -> bool {
-    s.starts_with(kw) && word_len(s) == kw.len()
-}
-
 /// The length of a participant name at the start of `s`: a word or a `"..."` string on one
 /// line; 0 when there is none.
 fn name_len(s: &str) -> usize {
     if let Some(body) = s.strip_prefix('"') {
-        let line = &body[..scan::line_len(body)];
+        let line = &body[..crate::lines::line_len(body)];
         return line.find('"').map_or(0, |i| i + 2);
     }
     word_len(s)
@@ -66,7 +56,7 @@ fn name_len(s: &str) -> usize {
 
 /// The length of `(` ... `)` at the start of `s`, nested and skipping strings, on one line.
 fn parens_len(s: &str) -> Option<usize> {
-    let line = &s[..scan::line_len(s)];
+    let line = &s[..crate::lines::line_len(s)];
     let mut depth = 0;
     let mut quoted = false;
     for (i, c) in line.char_indices() {
@@ -99,7 +89,7 @@ fn assignee_len(line: &str) -> usize {
         .chars()
         .all(|c| c.is_alphanumeric() || " \t_<>[],".contains(c));
     if ok && !before.trim().is_empty() {
-        scan::trim_end_len(before, before.len())
+        crate::lines::trim_end_len(before, before.len())
     } else {
         0
     }
@@ -167,13 +157,9 @@ impl Parser<'_> {
     fn statement(&mut self, depth: usize) {
         let r = self.rest();
         if r.starts_with("//") {
-            self.token(COMMENT, scan::line_len(r));
+            self.token(COMMENT, crate::lines::line_len(r));
         } else if keyword(r, "title") {
-            self.start(TITLE_STMT);
-            self.token(TITLE_KW, 5);
-            self.ws();
-            self.rest_of_line(TEXT);
-            self.finish();
+            self.title_line();
         } else if r.starts_with('@') {
             self.annotation();
         } else if let Some(kw) = FRAGMENTS.iter().find(|kw| keyword(r, kw)) {
@@ -185,7 +171,7 @@ impl Parser<'_> {
             self.rest_of_line(TEXT);
             self.finish();
         } else {
-            match classify(&r[..scan::line_len(r)]) {
+            match classify(&r[..crate::lines::line_len(r)]) {
                 Line::Call => self.call(depth),
                 Line::Async => self.message(),
                 Line::Participant => self.participant(),
@@ -285,7 +271,7 @@ impl Parser<'_> {
     /// `[Type] a = ` before `[A->]B.method(args)` or `new B(args)`, then an optional body.
     fn call(&mut self, depth: usize) {
         self.start(CALL);
-        let a = assignee_len(&self.rest()[..scan::line_len(self.rest())]);
+        let a = assignee_len(&self.rest()[..crate::lines::line_len(self.rest())]);
         if a > 0 {
             self.start(LABEL);
             self.token(TEXT, a);
@@ -373,7 +359,7 @@ impl Parser<'_> {
             let r = self.rest();
             let mut ws = 0;
             loop {
-                let n = scan::ws_len(&r[ws..]) + scan::newline_len(&r[ws..]);
+                let n = crate::lines::ws_len(&r[ws..]) + crate::lines::newline_len(&r[ws..]);
                 if n == 0 {
                     break;
                 }
@@ -384,7 +370,7 @@ impl Parser<'_> {
             };
             loop {
                 let r = self.rest();
-                let (w, nl) = (scan::ws_len(r), scan::newline_len(r));
+                let (w, nl) = (crate::lines::ws_len(r), crate::lines::newline_len(r));
                 if w > 0 {
                     self.token(WHITESPACE, w);
                 } else if nl > 0 {

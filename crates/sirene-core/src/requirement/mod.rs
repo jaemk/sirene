@@ -33,9 +33,7 @@ impl Parse {
     /// ordered by position.
     pub fn lower(&self) -> Lowered {
         let (flowchart, lowering) = lower::lower(&self.syntax());
-        let mut diagnostics = self.diagnostics.clone();
-        diagnostics.extend(lowering);
-        diagnostics.sort_by_key(|d| d.range.start());
+        let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a requirement diagram: {} nodes, {} relationships; {} diagnostics",
             flowchart.nodes.len(),
