@@ -1,0 +1,7 @@
+eventmodeling
+tf 01 ui Cart
+tf 02 cmd Add [[D]]
+tf 03 evt Cart.ItemAdded { saved: true }
+data D {
+  size: 7
+}

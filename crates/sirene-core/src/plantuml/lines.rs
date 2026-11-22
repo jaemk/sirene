@@ -15,16 +15,12 @@ pub(crate) struct Line {
 }
 
 impl Line {
-    /// The range of `part`, a subslice of `self.text`.
+    /// The range of `part` when it points into this line, or the full line otherwise.
     pub fn range_of(&self, part: &str) -> TextRange {
-        let base = self.text.as_ptr() as usize;
-        let at = (part.as_ptr() as usize)
-            .checked_sub(base)
-            .filter(|&at| at + part.len() <= self.text.len())
-            .unwrap_or(0);
-        // Both are offsets into a CST line, bounded by the parser's source limit.
-        let start = self.range.start() + TextSize::new(at as u32);
-        TextRange::at(start, TextSize::new(part.len() as u32))
+        subslice_offset(&self.text, part).map_or(self.range, |at| {
+            let start = self.range.start() + TextSize::new(at as u32);
+            TextRange::at(start, TextSize::new(part.len() as u32))
+        })
     }
 
     /// The first word, lowercased.
@@ -42,6 +38,12 @@ impl Line {
     pub fn squeezed(&self) -> String {
         squeeze(&self.text)
     }
+}
+
+pub(crate) fn subslice_offset(text: &str, part: &str) -> Option<usize> {
+    (part.as_ptr() as usize)
+        .checked_sub(text.as_ptr() as usize)
+        .filter(|&at| at <= text.len() && part.len() <= text.len() - at)
 }
 
 /// The word at the start of `s`: letters, digits, and `_`.

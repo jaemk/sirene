@@ -3,7 +3,8 @@ source: crates/sirene-core/tests/flowchart_cst.rs
 expression: out
 ---
 ROOT@0..52
-  DIRECTIVE@0..26 "%%{init: {\"theme\": \"d ..."
+  ERROR@0..26
+    ERROR_TOKEN@0..26 "%%{init: {\"theme\": \"d ..."
   NEWLINE@26..27 "\n"
   HEADER@27..39
     GRAPH_KW@27..36 "flowchart"

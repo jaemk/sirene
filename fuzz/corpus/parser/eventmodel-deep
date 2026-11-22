@@ -1,0 +1,10 @@
+tf 01 ui Cart
+tf 02 cmd Add [[D]]
+tf 03 evt Cart.Added `json`{ "a": 1 }
+data D {
+ key: value
+}
+gwt 03
+ given evt Added
+ when cmd Add
+ then evt Done

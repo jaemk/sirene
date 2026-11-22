@@ -1,0 +1,5 @@
+accDescr{ni%%it: {
+ theme: "dark"
+}}%%se
+quenceDiagram
+A->>B: hi

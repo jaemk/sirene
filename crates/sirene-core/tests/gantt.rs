@@ -44,6 +44,27 @@ fn diagnostics(src: &str, lowered: &Lowered) -> String {
     out
 }
 
+#[test]
+fn directive_formats_and_diagnostics_keep_controls_out_of_output() {
+    let src = r#"%%{init: {gantt: {axisFormat: "\u001b%Y", dateFormat: "\nYYYY", weekday: "\u001b"}}}%%
+gantt
+"#;
+    let lowered = diagram::lower(src);
+    let Diagram::Gantt(chart) = lowered.diagram else {
+        panic!("expected a gantt chart")
+    };
+    let defaults = Gantt::default();
+    assert_eq!(chart.axis_format, defaults.axis_format);
+    assert_eq!(chart.date_format, defaults.date_format);
+    assert_eq!(lowered.diagnostics.len(), 3);
+    assert!(
+        lowered
+            .diagnostics
+            .iter()
+            .all(|d| !d.message.chars().any(char::is_control))
+    );
+}
+
 /// Each fixture's diagnostics and drawing; the tree always holds the source exactly.
 #[test]
 fn snapshots() {

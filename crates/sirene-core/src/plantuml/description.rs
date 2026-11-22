@@ -342,11 +342,15 @@ impl Lower {
     ) {
         // A quoted name may run over lines up to its closing `"`.
         let joined;
+        // Joined lines omit indentation and may have normalized line endings.
+        let mut offsets = Vec::new();
         let rest = if rest.matches('"').count() % 2 == 1 {
             let mut text = rest.to_owned();
+            offsets.push((0, line.range_of(rest).start()));
             let mut closed = false;
             while let Some(next) = cursor.next() {
                 text.push('\n');
+                offsets.push((text.len(), next.range.start()));
                 text.push_str(&next.text);
                 if next.text.contains('"') {
                     closed = true;
@@ -361,11 +365,24 @@ impl Lower {
         } else {
             rest
         };
+        let range_of = |part: &str| {
+            if offsets.is_empty() {
+                return line.range_of(part);
+            }
+            let Some(at) = lines::subslice_offset(rest, part) else {
+                return line.range;
+            };
+            let source_offset = |at: usize| {
+                let (from, source) = offsets[offsets.partition_point(|(from, _)| *from <= at) - 1];
+                source + rowan::TextSize::new((at - from) as u32)
+            };
+            TextRange::new(source_offset(at), source_offset(at + part.len()))
+        };
         let Some((short, id, label, rest)) = element(rest) else {
             // An unnamed container: `cloud {` or `node #color {`.
             let tail = rest.trim_start();
             if !kw.is_empty() && (tail.starts_with('{') || tail.starts_with('#')) {
-                let decor = self.decor(line, tail, cursor);
+                let decor = self.decor(line.range, tail, cursor, &range_of);
                 if decor.open {
                     let id = format!("__unnamed{}", self.chart.subgraphs.len());
                     let i = self.chart.subgraphs.len();
@@ -393,7 +410,7 @@ impl Lower {
             return self.error(line.range, what);
         };
         let shape = shape.or(short).unwrap_or(Shape::Rect);
-        let decor = self.decor(line, rest, cursor);
+        let decor = self.decor(line.range, rest, cursor, &range_of);
         let mut title = decor.description.unwrap_or(label);
         if !decor.stereotypes.is_empty() {
             let s: Vec<String> = decor.stereotypes.iter().map(|s| format!("«{s}»")).collect();
@@ -432,7 +449,13 @@ impl Lower {
     }
 
     /// The stereotypes, color, description, and `{` after an element's name.
-    fn decor(&mut self, line: &Line, mut rest: &str, cursor: &mut Cursor) -> Decor {
+    fn decor(
+        &mut self,
+        range: TextRange,
+        mut rest: &str,
+        cursor: &mut Cursor,
+        range_of: &impl Fn(&str) -> TextRange,
+    ) -> Decor {
         let mut decor = Decor::default();
         while !rest.is_empty() {
             if let Some(r) = rest.strip_prefix("<<") {
@@ -454,7 +477,7 @@ impl Lower {
                     None => {
                         let (body, end) = cursor.until(&["]"]);
                         if end.is_none() {
-                            self.error(line.range, "unclosed `[`: expected `]`");
+                            self.error(range, "unclosed `[`: expected `]`");
                         }
                         let mut text: Vec<&str> = Vec::new();
                         if !r.trim().is_empty() {
@@ -474,7 +497,7 @@ impl Lower {
                     match lines::color(fill) {
                         Some(c) => decor.fill = Some(c),
                         None => self.warn(
-                            line.range_of(spec),
+                            range_of(spec),
                             format!("unknown color `{fill}`; drawing the default"),
                         ),
                     }
@@ -486,7 +509,7 @@ impl Lower {
             } else {
                 let end = rest.find(char::is_whitespace).unwrap_or(rest.len());
                 self.warn(
-                    line.range_of(&rest[..end]),
+                    range_of(&rest[..end]),
                     format!("`{}` is not drawn; ignoring it", &rest[..end]),
                 );
                 rest = rest[end..].trim_start();

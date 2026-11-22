@@ -1,0 +1,7 @@
+evolution Genesis@0.2 -> Custom -> Product -> Commodity@1.0
+anchor User [90, 50]
+pipeline User {
+ component App [0.5] label [5, -5]
+}
+note "text" [0.3, 0.49]
+annotation 1,[0.6, 0.65] "x"

@@ -8,7 +8,7 @@ use rowan::{GreenNode, GreenNodeBuilder, TextRange, TextSize};
 
 use super::scan::{self, Opener, Stroke};
 use crate::diagnostic::Diagnostic;
-use crate::lines::{MAX_DEPTH, MetaClose, Next, end_block_len, too_deep};
+use crate::lines::{DirectiveEnd, MAX_DEPTH, MetaClose, Next, end_block_len, too_deep};
 use crate::syntax::SyntaxKind::{self, *};
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
@@ -46,11 +46,11 @@ struct Parser<'a> {
 
 #[derive(Default)]
 struct Closers {
-    directive: Next,
     quote: Next,
     md_quote: Next,
     brace: Next,
     meta: MetaClose,
+    directive: DirectiveEnd,
 }
 
 /// Mermaid's other diagram types, by the keyword that starts them.
@@ -257,29 +257,22 @@ impl<'a> Parser<'a> {
         if bom > 0 {
             self.token(WHITESPACE, bom);
         }
-        let (start, src) = (self.pos, self.rest());
-        let first = crate::lines::line_len(src);
-        if src[..first].trim_end() != "---" {
+        let start = self.pos;
+        let Some((len, closed)) = crate::lines::frontmatter_len(self.rest()) else {
             return;
+        };
+        if closed {
+            self.token(FRONTMATTER, len);
+        } else {
+            self.start(ERROR);
+            self.token(ERROR_TOKEN, len);
+            self.finish();
+            self.error(
+                start,
+                start + len,
+                "unclosed frontmatter: expected a closing `---` line",
+            );
         }
-        let mut line_start = first + crate::lines::newline_len(&src[first..]);
-        while line_start < src.len() {
-            let rest = &src[line_start..];
-            let len = crate::lines::line_len(rest);
-            if rest[..len].trim() == "---" {
-                self.token(FRONTMATTER, line_start + len);
-                return;
-            }
-            line_start += len + crate::lines::newline_len(&rest[len..]);
-        }
-        self.start(ERROR);
-        self.token(ERROR_TOKEN, first);
-        self.finish();
-        self.error(
-            start,
-            start + first,
-            "unclosed frontmatter: expected a closing `---` line",
-        );
     }
 
     /// Whitespace, newlines, `;`, comments, and directives between statements (FLOWCH-3).
@@ -305,15 +298,15 @@ impl<'a> Parser<'a> {
     }
 
     fn directive(&mut self) {
-        let r = self.rest();
-        let from = self.pos + 3;
-        match self.closers.directive.find(self.src, from, "}%%") {
-            Some(at) => self.token(DIRECTIVE, at - from + 6),
-            None => {
-                let start = self.pos;
-                self.token(DIRECTIVE, crate::lines::line_len(r));
-                self.error(start, start + 3, "unclosed directive: expected `}%%`");
-            }
+        let start = self.pos;
+        let (len, closed) = self.closers.directive.len(self.src, start);
+        if closed {
+            self.token(DIRECTIVE, len);
+        } else {
+            self.start(ERROR);
+            self.token(ERROR_TOKEN, len);
+            self.finish();
+            self.error(start, start + 3, "unclosed directive: expected `}%%`");
         }
     }
 
@@ -519,7 +512,7 @@ impl<'a> Parser<'a> {
             let r = self.rest();
             let mut len = text_len(r, stop);
             if !closes(&r[len..]) {
-                len = len.min(crate::lines::line_len(r));
+                len = crate::lines::line_len(&r[..len]);
             }
             if len > 0 {
                 self.token(TEXT, len);
@@ -919,15 +912,15 @@ impl<'a> Parser<'a> {
         let open = self.pos;
         self.token(L_PAREN, 1);
         let r = self.rest();
-        let line = crate::lines::line_len(r);
-        match r[..line].find(')') {
-            Some(n) => {
+        match r.find([')', '\n']) {
+            Some(n) if r.as_bytes()[n] == b')' => {
                 if n > 0 {
                     self.token(CALLBACK_ARGS, n);
                 }
                 self.token(R_PAREN, 1);
             }
-            None => {
+            _ => {
+                let line = crate::lines::line_len(r);
                 if line > 0 {
                     self.token(CALLBACK_ARGS, line);
                 }

@@ -23,9 +23,9 @@ Statements after the error parse normally.
 - A comment is a line whose first non-whitespace characters are `%%` and is not a directive. It
   runs to the end of the line. `%%` after other content on a line is not a comment (matching
   mermaid, which only strips whole-line comments).
-- A directive starts with `%%{` and ends at the next `}%%`, and may span lines.
-- Frontmatter is a block at byte 0 that opens with a `---` line and closes with the next `---`
-  line. It is a single token; its YAML body is interpreted by the model.
+- A directive starts with `%%{` and ends at the next unquoted `}%%`, and may span lines.
+- Frontmatter opens with a `---` line at the start of the source, after an optional BOM.
+  The next unindented `---` line closes it. The syntax tree keeps the whole block in one token.
 - Whitespace, comments, and directives may appear between any two statements.
 
 ## FLOWCH-4 Header
@@ -102,7 +102,7 @@ document.
 ## FLOWCH-9 Edges
 
 An edge is an optional edge id (`id@`), a stroke, and an optional label. An edge id is any run
-of characters except whitespace, `"`, brackets, braces, `|`, and `@` (so `e:1@-->` is an edge id).
+of characters except whitespace, `;`, `"`, brackets, braces, `|`, and `@` (so `e:1@-->` is an edge id).
 
 | Stroke | Forms |
 |---|---|
@@ -164,8 +164,9 @@ the next `}` and may span lines.
 `<id>@{ ... }` attaches metadata to a node, edge, or subgraph. It is valid after a node in a
 vertex statement and as a statement of its own (e.g. `e1@{ animate: true }`). Inline whitespace
 may separate the id or shape from `@{` (`A @{ shape: circle }`). The body runs to
-the first `}` outside double-quoted strings (bodies do not nest) and may span lines. Its content
-is interpreted by the model. An unclosed block ends at the end of its line, with a diagnostic.
+the first `}` outside double-quoted strings (bodies do not nest) and may span lines.
+Backslash-escaped double quotes are literal. The model interprets the body's content.
+An unclosed block ends at the end of its line, with a diagnostic.
 
 ## FLOWCH-16 Other diagram types
 
@@ -178,3 +179,10 @@ is `diagram::DRAWN`). Nothing of it is drawn. Every Mermaid 12.3 type has a pars
 direct `flowchart::parse` sees this: `diagram::lower` sends each type to its own (MSTATE-1, MCLASS-1, MER-1, MGIT-1, TIMELI-1, MPIE-1,
 MGANTT-1, MMIND-1, MJOUR-1, MQUAD-1, MXY-1, MREQ-1, MKAN-1, MPKT-1, MRADAR-1, MSANKEY-1, MTREE-1, MINFO-1, MISH-1). Tests: `other_diagram_types_are_one_error` in
 `crates/sirene-core/tests/flowchart_model.rs`.
+
+## FLOWCH-17 Unfinished directive recovery
+
+When a directive is unfinished before a later unquoted directive opener, it ends at the end of
+its opening line or just before the later opener on the same line. The parser reports a diagnostic
+and preserves subsequent statements and directives. Marker text inside quoted directive values
+does not end a valid multiline directive.

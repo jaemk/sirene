@@ -392,8 +392,7 @@ fn unescape(s: &str) -> String {
 /// Parses railroad diagram source in the notation its header names. Never fails; problems
 /// are reported as diagnostics.
 pub fn parse(src: &str) -> Parse {
-    let notation = Notation::of_header(crate::diagram::header(src)).unwrap_or_default();
-    let (green, diagnostics) = parser::parse(src, notation);
+    let (green, diagnostics, notation) = parser::parse(src);
     Parse {
         green,
         notation,

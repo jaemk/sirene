@@ -1,0 +1,3 @@
+@startdot
+digraph { a -> b }
+@enddot

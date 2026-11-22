@@ -145,6 +145,20 @@ fn name_len(s: &str) -> usize {
     crate::lines::trim_end_len(line, end)
 }
 
+/// Offset of the closing brace of a participant's inline metadata.
+fn metadata_len(s: &str) -> Option<usize> {
+    let mut rest = s;
+    loop {
+        let at = rest.find(['}', '\n', '"', '\''])?;
+        rest = &rest[at..];
+        match rest.as_bytes()[0] {
+            b'}' => return Some(s.len() - rest.len()),
+            b'\n' => return None,
+            _ => rest = &rest[crate::lines::quoted_len(rest)?..],
+        }
+    }
+}
+
 impl Parser<'_> {
     /// `sequenceDiagram`.
     fn header(&mut self) {
@@ -205,7 +219,7 @@ impl Parser<'_> {
         if self.rest().starts_with("@{") {
             self.token(META_OPEN, 2);
             let r = self.rest();
-            match r[..crate::lines::line_len(r)].find('}') {
+            match metadata_len(r) {
                 // Metadata is JSON and may hold `;`, so it runs to the end of the line.
                 Some(i) => {
                     self.token(META_BODY, i);

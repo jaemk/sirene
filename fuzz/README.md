@@ -9,6 +9,15 @@ each parser and lone-CR cases. It does not exercise rendering or input bytes bef
 
 CI's `fuzz` job (`.github/workflows/ci.yml`) runs the same smoke test on every pull request.
 
+`document` instead sends arbitrary complete UTF-8 documents through dispatch and lowering,
+checking diagnostic ranges, theme ranges, and agreement with the standalone theme reader.
+It also selects a forced language, mutates the grammar body under a known header, or checks
+theme extraction and recovery from an unfinished directive. The known headers include aliases,
+preambles, and LF, CRLF, and lone-CR line endings. Its corpus
+includes frontmatter, BOMs, directives, and PlantUML embedded formats. Run it with a separate
+corpus copy and `cargo +nightly fuzz run document /tmp/sirene-document-smoke -- -runs=1000
+-seed=1 -max_len=4096`; failures are saved under `fuzz/artifacts/document/`.
+
 Install [cargo-fuzz](https://github.com/rust-fuzz/cargo-fuzz) and a Rust nightly toolchain, then
 from the repository root run a bounded smoke test on a disposable corpus copy:
 
@@ -23,6 +32,12 @@ persistent corpus directory; libFuzzer adds new inputs there. Failures are saved
 `fuzz/artifacts/parser/`. Reproduce with `cargo +nightly fuzz run parser PATH_TO_ARTIFACT`, and
 turn confirmed issues into ordinary regression tests. `cargo fuzz` enables coverage
 instrumentation and sanitizers; this target is separate from the regular workspace tests.
+
+Run `bash scripts/parser-coverage.sh` with `cargo-llvm-cov` and the repository toolchain's
+`llvm-tools-preview` component to measure source coverage from the parser properties and the
+checked-in fuzz seeds. Pass the two corpus directories as positional arguments to measure a
+campaign instead. The command writes `properties.json` and `fuzz.json` under
+`target/parser-coverage/`. Fuzz coverage comes from replaying those inputs.
 
 If cargo-fuzz is unavailable, on x86-64 Linux with nightly and cached dependencies this command
 runs the target with coverage instrumentation (but without cargo-fuzz's sanitizers):

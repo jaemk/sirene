@@ -1,0 +1,5 @@
+%%{unfinishedclassDiagram-v2r{ni%%it: {
+ theme: "dark"
+}}%%se
+quenceDiagram
+A->>B: hi

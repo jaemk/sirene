@@ -2,6 +2,10 @@
 
 use crate::lines::{MAX_DEPTH, too_deep};
 
+/// Separate budgets for the value slots read and the rows built from them.
+const TABLE_BYTES: usize = 1 << 24;
+const MAX_VALUES: usize = TABLE_BYTES / size_of::<Value>();
+
 #[derive(Debug, Clone, PartialEq)]
 enum Value {
     Null,
@@ -19,6 +23,7 @@ struct Reader<'a> {
     pos: usize,
     /// How many arrays and objects are open around the cursor (LANGS-8).
     depth: usize,
+    remaining_values: usize,
 }
 
 impl Reader<'_> {
@@ -48,6 +53,10 @@ impl Reader<'_> {
 
     fn value(&mut self) -> Result<Value, String> {
         self.ws();
+        self.remaining_values = self
+            .remaining_values
+            .checked_sub(1)
+            .ok_or_else(|| format!("a JSON table may read at most {MAX_VALUES} values"))?;
         let r = &self.s[self.pos..];
         for (word, v) in [
             ("null", Value::Null),
@@ -225,64 +234,80 @@ fn hex4(chars: &mut std::str::CharIndices) -> Option<u32> {
     (0..4).try_fold(0, |n, _| Some(n * 16 + chars.next()?.1.to_digit(16)?))
 }
 
-/// The most key and value bytes the rows of one table may hold, since each row repeats its path.
-const MAX_ROW_BYTES: usize = 1 << 24;
-
-fn scalar(v: &Value) -> Option<String> {
+fn scalar(v: &Value) -> Option<&str> {
     match v {
-        Value::Null => Some("null".into()),
-        Value::Bool(b) => Some(b.to_string()),
-        Value::Number(n) => Some(n.clone()),
-        Value::String(s) => Some(s.clone()),
+        Value::Null => Some("null"),
+        Value::Bool(true) => Some("true"),
+        Value::Bool(false) => Some("false"),
+        Value::Number(s) | Value::String(s) => Some(s),
         _ => None,
     }
 }
 
+#[derive(Default)]
 struct Rows {
     rows: Vec<(String, String)>,
+    path: String,
     bytes: usize,
 }
 
 impl Rows {
-    fn push(&mut self, key: String, value: String) -> Result<(), String> {
-        self.bytes += key.len() + value.len();
-        if self.bytes > MAX_ROW_BYTES {
+    fn check_budget(&self, key_len: usize, value_len: usize) -> Result<usize, String> {
+        let cost = size_of::<(String, String)>()
+            .saturating_add(key_len)
+            .saturating_add(value_len);
+        if cost > TABLE_BYTES - self.bytes {
             return Err(format!(
-                "a JSON table's rows may hold at most {MAX_ROW_BYTES} bytes"
+                "a JSON table's rows may hold at most {TABLE_BYTES} bytes"
             ));
         }
-        self.rows.push((key, value));
+        Ok(cost)
+    }
+
+    fn push(&mut self, include_path: bool, value: &str) -> Result<(), String> {
+        let key = if include_path { &self.path } else { "" };
+        self.bytes += self.check_budget(key.len(), value.len())?;
+        self.rows.push((key.to_owned(), value.to_owned()));
         Ok(())
     }
 
-    fn flatten(&mut self, prefix: &str, v: &Value) -> Result<(), String> {
+    fn descend(&mut self, separator: &str, key: &str, value: &Value) -> Result<(), String> {
+        let len = self.path.len();
+        // Every subtree emits at least one row with its path. Bound the path before copying.
+        self.check_budget(
+            len.saturating_add(separator.len())
+                .saturating_add(key.len()),
+            0,
+        )?;
+        self.path.push_str(separator);
+        self.path.push_str(key);
+        let result = self.flatten(value);
+        self.path.truncate(len);
+        result
+    }
+
+    fn flatten(&mut self, v: &Value) -> Result<(), String> {
         match v {
-            Value::Object(entries) if entries.is_empty() => self.push(prefix.into(), "{}".into()),
+            Value::Object(entries) if entries.is_empty() => self.push(true, "{}"),
             Value::Object(entries) => {
                 for (k, v) in entries {
-                    let key = if prefix.is_empty() {
-                        k.clone()
-                    } else {
-                        format!("{prefix}.{k}")
-                    };
-                    self.flatten(&key, v)?;
+                    let separator = if self.path.is_empty() { "" } else { "." };
+                    self.descend(separator, k, v)?;
                 }
                 Ok(())
             }
-            Value::Array(items) if items.is_empty() => self.push(prefix.into(), "[]".into()),
+            Value::Array(items) if items.is_empty() => self.push(true, "[]"),
             Value::Array(items) => {
                 for (i, item) in items.iter().enumerate() {
                     match scalar(item) {
                         // A list of values puts the key on its first row only.
-                        Some(s) => {
-                            self.push(if i == 0 { prefix.into() } else { String::new() }, s)?
-                        }
-                        None => self.flatten(&format!("{prefix}[{i}]"), item)?,
+                        Some(s) => self.push(i == 0, s)?,
+                        None => self.descend("", &format!("[{i}]"), item)?,
                     }
                 }
                 Ok(())
             }
-            v => self.push(prefix.into(), scalar(v).unwrap_or_default()),
+            v => self.push(true, scalar(v).unwrap_or_default()),
         }
     }
 }
@@ -293,6 +318,7 @@ pub(crate) fn rows(src: &str) -> Result<Vec<(String, String)>, String> {
         s: src,
         pos: 0,
         depth: 0,
+        remaining_values: MAX_VALUES,
     };
     let v = r.value()?;
     r.ws();
@@ -302,11 +328,8 @@ pub(crate) fn rows(src: &str) -> Result<Vec<(String, String)>, String> {
     if !matches!(v, Value::Object(_)) {
         return Err("a JSON table must be an object".into());
     }
-    let mut out = Rows {
-        rows: Vec::new(),
-        bytes: 0,
-    };
-    out.flatten("", &v)?;
+    let mut out = Rows::default();
+    out.flatten(&v)?;
     Ok(out.rows)
 }
 
@@ -360,6 +383,40 @@ mod tests {
         let inner: Vec<String> = (0..300).map(|i| format!("\"{i}\": 1")).collect();
         let src = format!("{{\"{key}\": {{{}}}}}", inner.join(","));
         assert!(rows(&src).unwrap_err().contains("at most"));
+    }
+
+    #[test]
+    fn empty_cells_still_spend_row_storage() {
+        let mut out = Rows {
+            bytes: TABLE_BYTES - size_of::<(String, String)>(),
+            ..Rows::default()
+        };
+        assert!(out.push(false, "").is_ok());
+        assert_eq!(out.rows, [p("", "")]);
+        assert!(out.push(false, "").is_err());
+    }
+
+    #[test]
+    fn row_budget_is_checked_before_copying_a_path() {
+        let mut out = Rows {
+            bytes: TABLE_BYTES - size_of::<(String, String)>() - 3,
+            ..Rows::default()
+        };
+        assert!(out.descend("", "café", &Value::Null).is_err());
+        assert!(out.path.is_empty());
+        assert_eq!(out.path.capacity(), 0);
+    }
+
+    #[test]
+    fn reading_stops_at_the_value_limit() {
+        let mut reader = Reader {
+            s: "[null, null, null]",
+            pos: 0,
+            depth: 0,
+            remaining_values: 2,
+        };
+        assert!(reader.value().unwrap_err().contains("values"));
+        assert_eq!(&reader.s[reader.pos..], "null, null]");
     }
 
     #[test]

@@ -1,0 +1,10 @@
+---
+config:
+  theme: dark
+  themeVariables:
+    lineColor: '#ffaa88'
+---
+flowchart TD
+%%{init: {theme: 'neutral', themeVariables: {leak: red}, invalid: [1 2]}}%%
+%%{"initialize": {theme: "f\u006frest", themeVariables: {lineColor: red}, ignored: [{value: "}%%"}]}}%%
+A

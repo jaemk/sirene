@@ -1,5 +1,7 @@
 //! The entry point for every Mermaid diagram type sirene draws (LANGS-2).
 
+use std::borrow::Cow;
+
 use crate::architecture::{self, Architecture};
 use crate::ascii::{self, Options};
 use crate::block::{self, Block};
@@ -216,19 +218,10 @@ impl Kind {
     /// The type of the diagram `src` starts with, read as `lang` when given (DOT-5): DOT
     /// whatever the source looks like, or a Mermaid type even when it starts like a DOT graph.
     pub fn of_lang(src: &str, lang: Option<Lang>) -> Kind {
-        match lang {
-            Some(Lang::Dot) => Kind::Dot,
-            Some(Lang::PlantUml) => Kind::PlantUml,
-            Some(Lang::Mermaid) => Kind::mermaid(src),
-            None if dot::is_dot(src) => Kind::Dot,
-            None if plantuml::is_plantuml(src) => Kind::PlantUml,
-            None => Kind::mermaid(src),
-        }
+        prepare(src, lang).0
     }
 
-    /// The Mermaid type `src`'s header names, and a flowchart when it names none.
-    fn mermaid(src: &str) -> Kind {
-        let word = header(src);
+    fn mermaid_word(word: &str) -> Kind {
         // `gitGraph:` and `gitGraph TB:` name the direction in the same word or the next.
         let word = word.strip_suffix(':').unwrap_or(word);
         if sequence::HEADERS.contains(&word) {
@@ -489,34 +482,78 @@ impl From<flowchart::Lowered> for Lowered {
 
 /// The first word of `src` after frontmatter, comments, and directives.
 pub(crate) fn header(src: &str) -> &str {
-    let mut r = &src[crate::lines::bom_len(src)..];
-    let first = crate::lines::line_len(r);
-    if r[..first].trim_end() == "---" {
-        let mut at = first + crate::lines::newline_len(&r[first..]);
-        while at < r.len() {
-            let len = crate::lines::line_len(&r[at..]);
-            let next = at + len + crate::lines::newline_len(&r[at + len..]);
-            if r[at..at + len].trim() == "---" {
-                r = &r[next..];
-                break;
-            }
-            at = next;
-        }
-    }
-    loop {
-        r = r.trim_start();
-        if let Some(body) = r.strip_prefix("%%{") {
-            r = body.find("}%%").map_or("", |i| &body[i + 3..]);
-        } else if r.starts_with("%%") {
-            r = &r[crate::lines::line_len(r)..];
-        } else {
-            break;
-        }
-    }
+    let r = &src[crate::lines::preamble_end(src)..];
     let end = r
         .find(|c: char| c.is_whitespace() || c == ';')
         .unwrap_or(r.len());
     &r[..end]
+}
+
+/// Pick the language and prepare its source without changing byte offsets. DOT treats
+/// lone CR as whitespace. The PlantUML parser handles its own line endings.
+fn prepare(src: &str, lang: Option<Lang>) -> (Kind, Cow<'_, str>) {
+    match lang {
+        Some(Lang::Dot) => return (Kind::Dot, Cow::Borrowed(src)),
+        Some(Lang::PlantUml) => return (Kind::PlantUml, Cow::Borrowed(src)),
+        None if dot::is_dot(src) => return (Kind::Dot, Cow::Borrowed(src)),
+        _ => {}
+    }
+    let prepared = crate::lines::lone_cr_as_lf(src);
+    let word = header(&prepared);
+    let mermaid = Kind::mermaid_word(word);
+    let kind = if lang.is_none()
+        && mermaid == Kind::Flowchart
+        && !matches!(word, "flowchart" | "flowchart-elk" | "graph")
+        && plantuml::is_plantuml(&prepared)
+    {
+        Kind::PlantUml
+    } else {
+        mermaid
+    };
+    (kind, prepared)
+}
+
+// The same kind-to-parser mapping drives model lowering and syntax-only theme extraction.
+// Graph parsers use their existing Lowered conversion. Others name their Diagram variant.
+macro_rules! dispatch {
+    ($kind:expr, $mermaid:ident, $dot:expr, $plantuml:expr) => {
+        match $kind {
+            Kind::Dot => $dot,
+            Kind::PlantUml => $plantuml,
+            Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => $mermaid!(flowchart),
+            Kind::State => $mermaid!(state),
+            Kind::Class => $mermaid!(class),
+            Kind::Er => $mermaid!(er),
+            Kind::Requirement => $mermaid!(requirement),
+            Kind::UseCase => $mermaid!(usecase),
+            Kind::Sequence => $mermaid!(sequence, Sequence),
+            Kind::Git => $mermaid!(git, Git),
+            Kind::Timeline => $mermaid!(timeline, Timeline),
+            Kind::Pie => $mermaid!(pie, Pie),
+            Kind::Gantt => $mermaid!(gantt, Gantt),
+            Kind::Mindmap => $mermaid!(mindmap, Mindmap),
+            Kind::Journey => $mermaid!(journey, Journey),
+            Kind::Quadrant => $mermaid!(quadrant, Quadrant),
+            Kind::XyChart => $mermaid!(xychart, XyChart),
+            Kind::Kanban => $mermaid!(kanban, Kanban),
+            Kind::Packet => $mermaid!(packet, Packet),
+            Kind::Radar => $mermaid!(radar, Radar),
+            Kind::Sankey => $mermaid!(sankey, Sankey),
+            Kind::Treemap => $mermaid!(treemap, Treemap),
+            Kind::Block => $mermaid!(block, Block),
+            Kind::Architecture => $mermaid!(architecture, Architecture),
+            Kind::C4 => $mermaid!(c4, C4),
+            Kind::ZenUml => $mermaid!(zenuml, Sequence),
+            Kind::Info => $mermaid!(info, Info),
+            Kind::Ishikawa => $mermaid!(ishikawa, Ishikawa),
+            Kind::Venn => $mermaid!(venn, Venn),
+            Kind::Wardley => $mermaid!(wardley, Wardley),
+            Kind::TreeView => $mermaid!(treeview, TreeView),
+            Kind::Railroad => $mermaid!(railroad, Railroad),
+            Kind::Cynefin => $mermaid!(cynefin, Cynefin),
+            Kind::EventModel => $mermaid!(eventmodel, EventModel),
+        }
+    };
 }
 
 /// Parses and lowers `src` with the parser its header picks (LANGS-2), and reads its theme
@@ -538,24 +575,10 @@ fn lower_as_with_limit(src: &str, lang: Option<Lang>, limit: usize) -> Lowered {
             ..Default::default()
         };
     }
-    // Graphviz reads a lone `\r` as a space, and Mermaid as a line break.
-    let mut kind = Kind::of_lang(src, lang);
-    let mermaid = crate::lines::lone_cr_as_lf(src);
-    if kind != Kind::Dot && mermaid != src {
-        kind = Kind::of_lang(&mermaid, lang);
-    }
-    let mut lowered = if kind == Kind::Dot {
-        lower_dot(src)
-    } else if kind == Kind::PlantUml {
-        lower_diagram(&mermaid, kind)
-    } else {
-        let src = &*mermaid;
-        let mut lowered = lower_diagram(src, kind);
-        lowered.theme = ThemeConfig::read(src);
-        lowered.diagnostics.extend(lowered.theme.diagnostics());
-        lowered
-    };
+    let (kind, src) = prepare(src, lang);
+    let mut lowered = lower_prepared(&src, kind);
     lowered.kind = kind;
+    lowered.diagnostics.sort_by_key(|d| d.range.start());
     cap(&mut lowered.diagnostics);
     lowered
 }
@@ -579,6 +602,20 @@ fn cap(diagnostics: &mut Vec<Diagnostic>) {
     });
 }
 
+/// Extract theme settings from the same directive tokens as the selected Mermaid parser.
+pub(crate) fn read_theme(src: &str) -> ThemeConfig {
+    if src.len() > u32::MAX as usize {
+        return ThemeConfig::default();
+    }
+    let (kind, src) = prepare(src, Some(Lang::Mermaid));
+    macro_rules! read {
+        ($module:ident $(, $variant:ident)?) => {
+            ThemeConfig::from_syntax(&$module::parse(&src).syntax())
+        };
+    }
+    dispatch!(kind, read, ThemeConfig::default(), ThemeConfig::default())
+}
+
 /// A DOT graph (DOT-2), its `bgcolor` as the theme's background.
 fn lower_dot(src: &str) -> Lowered {
     let l = dot::parse(src).lower();
@@ -595,237 +632,347 @@ fn lower_dot(src: &str) -> Lowered {
     }
 }
 
-fn lower_diagram(src: &str, kind: Kind) -> Lowered {
-    match kind {
-        Kind::Dot => lower_dot(src),
-        Kind::PlantUml => {
-            let (diagram, diagnostics) = plantuml::parse(src).lower();
+fn lower_prepared(src: &str, kind: Kind) -> Lowered {
+    macro_rules! into_lowered {
+        ($value:expr) => {
+            Lowered::from($value)
+        };
+        ($value:expr, $variant:ident) => {{
+            let (model, diagnostics) = $value;
             Lowered {
-                diagram,
+                diagram: Diagram::$variant(model),
                 diagnostics,
                 ..Default::default()
             }
-        }
-        Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => flowchart::parse(src).lower().into(),
-        Kind::Sequence => {
-            let (seq, diagnostics) = sequence::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Sequence(seq),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::State => state::parse(src).lower().into(),
-        Kind::Class => class::parse(src).lower().into(),
-        Kind::Er => er::parse(src).lower().into(),
-        Kind::Requirement => requirement::parse(src).lower().into(),
-        Kind::UseCase => usecase::parse(src).lower().into(),
-        Kind::Git => {
-            let (graph, diagnostics) = git::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Git(graph),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Timeline => {
-            let (timeline, diagnostics) = timeline::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Timeline(timeline),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Pie => {
-            let (pie, diagnostics) = pie::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Pie(pie),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Gantt => {
-            let (gantt, diagnostics) = gantt::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Gantt(gantt),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Mindmap => {
-            let (mindmap, diagnostics) = mindmap::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Mindmap(mindmap),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Journey => {
-            let (journey, diagnostics) = journey::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Journey(journey),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Quadrant => {
-            let (chart, diagnostics) = quadrant::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Quadrant(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::XyChart => {
-            let (chart, diagnostics) = xychart::parse(src).lower();
-            Lowered {
-                diagram: Diagram::XyChart(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Kanban => {
-            let (board, diagnostics) = kanban::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Kanban(board),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Packet => {
-            let (packet, diagnostics) = packet::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Packet(packet),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Radar => {
-            let (chart, diagnostics) = radar::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Radar(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Sankey => {
-            let (chart, diagnostics) = sankey::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Sankey(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Treemap => {
-            let (treemap, diagnostics) = treemap::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Treemap(treemap),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Block => {
-            let (block, diagnostics) = block::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Block(block),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Architecture => {
-            let (arch, diagnostics) = architecture::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Architecture(arch),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::C4 => {
-            let (c4, diagnostics) = c4::parse(src).lower();
-            Lowered {
-                diagram: Diagram::C4(c4),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::ZenUml => {
-            let (seq, diagnostics) = zenuml::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Sequence(seq),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Info => {
-            let (info, diagnostics) = info::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Info(info),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Ishikawa => {
-            let (chart, diagnostics) = ishikawa::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Ishikawa(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Venn => {
-            let (chart, diagnostics) = venn::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Venn(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Wardley => {
-            let (map, diagnostics) = wardley::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Wardley(map),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::TreeView => {
-            let (view, diagnostics) = treeview::parse(src).lower();
-            Lowered {
-                diagram: Diagram::TreeView(view),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Railroad => {
-            let (chart, diagnostics) = railroad::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Railroad(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::Cynefin => {
-            let (chart, diagnostics) = cynefin::parse(src).lower();
-            Lowered {
-                diagram: Diagram::Cynefin(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
-        Kind::EventModel => {
-            let (chart, diagnostics) = eventmodel::parse(src).lower();
-            Lowered {
-                diagram: Diagram::EventModel(chart),
-                diagnostics,
-                ..Default::default()
-            }
-        }
+        }};
     }
+
+    macro_rules! lower {
+        ($module:ident $(, $variant:ident)?) => {{
+            let parsed = $module::parse(src);
+            let mut lowered = into_lowered!(parsed.lower() $(, $variant)?);
+            lowered.theme = ThemeConfig::from_syntax(&parsed.syntax());
+            lowered.diagnostics.extend(lowered.theme.diagnostics());
+            lowered
+        }};
+    }
+
+    dispatch!(kind, lower, lower_dot(src), {
+        let (diagram, diagnostics) = plantuml::parse(src).lower();
+        Lowered {
+            diagram,
+            diagnostics,
+            ..Default::default()
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // LANGS-13, MTHEME-6: all public entry points agree on preparation and recovery.
+    #[test]
+    fn recovered_directives_and_theme_across_line_endings() {
+        for nl in ["\n", "\r\n", "\r"] {
+            let src = [
+                "flowchart TD",
+                "%%{broken",
+                "A[\"literal %%{ marker\"]",
+                "%%{init: {'theme':'dark'}}%%",
+                "B",
+                "",
+            ]
+            .join(nl);
+            let result = lower(&src);
+            assert_eq!(Kind::of(&src), Kind::Flowchart);
+            assert_eq!(ThemeConfig::read(&src), result.theme);
+            assert_eq!(
+                result.theme.name.as_ref().map(|n| n.0.as_str()),
+                Some("dark")
+            );
+            let start = src.find("%%{broken").unwrap();
+            assert_eq!(
+                result.diagnostics.len(),
+                1,
+                "{nl:?}: {:?}",
+                result.diagnostics
+            );
+            assert_eq!(
+                result.diagnostics[0].message,
+                "unclosed directive: expected `}%%`"
+            );
+            assert_eq!(
+                result.diagnostics[0].range,
+                rowan::TextRange::new((start as u32).into(), ((start + 3) as u32).into())
+            );
+            let Diagram::Graph(graph) = result.diagram else {
+                panic!("expected graph")
+            };
+            assert_eq!(
+                graph
+                    .nodes
+                    .iter()
+                    .map(|n| n.id.as_str())
+                    .collect::<Vec<_>>(),
+                ["A", "B"]
+            );
+
+            let pie = [
+                "%% comment",
+                "%%{init: {'theme':'dark'}}%%",
+                "pie",
+                "\"A\": 1",
+                "",
+            ]
+            .join(nl);
+            assert_eq!(Kind::of(&pie), Kind::Pie);
+            let lowered = lower(&pie);
+            assert_eq!(lowered.kind, Kind::Pie);
+            assert_eq!(ThemeConfig::read(&pie), lowered.theme);
+            assert_eq!(lowered.theme.name.unwrap().0, "dark");
+            assert_eq!(lowered.diagnostics, []);
+
+            let invalid = ["---", "config:", "  theme: dark", "pie", "\"A\": 1", ""].join(nl);
+            let lowered = lower(&invalid);
+            assert_eq!(lowered.theme, ThemeConfig::default());
+            assert_eq!(ThemeConfig::read(&invalid), lowered.theme);
+            assert_eq!(
+                lowered.diagnostics[0].range,
+                rowan::TextRange::new(0.into(), 3.into())
+            );
+        }
+    }
+
+    // LANGS-13: quotes protect literal markers and a malformed quote cannot conceal the next
+    // directive, even across many successive unclosed openers.
+    #[test]
+    fn directive_recovery_and_quoted_markers() {
+        let valid =
+            "%%{init: {\n 'theme': 'dark',\n 'unused': '%%{ literal'\n}}%%\npie\n\"A\": 1\n";
+        let result = lower(valid);
+        assert_eq!(result.kind, Kind::Pie);
+        assert_eq!(result.theme.name.unwrap().0, "dark");
+        assert_eq!(result.diagnostics, []);
+        let mut src = "flowchart TD\n".to_owned();
+        for _ in 0..10_000 {
+            src.push_str("%%{'unclosed\n");
+        }
+        src.push_str("A\n%%{init: {'theme':'dark'}}%%\n");
+        let result = lower(&src);
+        assert_eq!(result.diagnostics.len(), MAX_DIAGNOSTICS + 1);
+        assert_eq!(result.theme.name.unwrap().0, "dark");
+        let Diagram::Graph(graph) = result.diagram else {
+            panic!("expected graph")
+        };
+        assert_eq!(graph.nodes[0].id, "A");
+    }
+
+    #[test]
+    fn directive_recovery_in_custom_trivia_parsers() {
+        let theme = "%%{init: {unused: '}%%', theme: dark}}%%";
+        for (header, body, expected) in [
+            ("usecase-beta", "actor A", Kind::UseCase),
+            ("railroad-ebnf-beta", "r = 'token';", Kind::Railroad),
+        ] {
+            for nl in ["\n", "\r\n", "\r"] {
+                let src = ["%%{broken", header, "%%{unfinished", body, theme, ""].join(nl);
+                assert_eq!(Kind::of(&src), expected);
+                let result = lower(&src);
+                assert_eq!(ThemeConfig::read(&src), result.theme);
+                assert_eq!(result.theme.name.unwrap().0, "dark");
+                assert_eq!(
+                    result.diagnostics.len(),
+                    2,
+                    "{src:?}: {:?}",
+                    result.diagnostics
+                );
+                assert!(
+                    result
+                        .diagnostics
+                        .iter()
+                        .all(|d| d.message.starts_with("unclosed directive"))
+                );
+                match result.diagram {
+                    Diagram::Graph(graph) => assert_eq!(graph.nodes[0].id, "A"),
+                    Diagram::Railroad(chart) => assert_eq!(chart.rules[0].name, "r"),
+                    _ => panic!("expected a use case or railroad diagram"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn unclosed_directive_quote_does_not_consume_later_lines() {
+        for newline in ["\n", "\r\n", "\r"] {
+            let src = [
+                "%%{init: {theme: 'broken",
+                "pie",
+                "\"Kept\": 1",
+                "%% Unrelated marker }%%",
+            ]
+            .join(newline);
+            assert_eq!(Kind::of(&src), Kind::Pie);
+            let lowered = lower(&src);
+            assert_eq!(lowered.diagnostics.len(), 1);
+            assert!(
+                lowered.diagnostics[0]
+                    .message
+                    .starts_with("unclosed directive")
+            );
+            let Diagram::Pie(pie) = lowered.diagram else {
+                panic!("expected pie diagram")
+            };
+            assert_eq!(pie.slices[0].label, "Kept");
+        }
+    }
+
+    #[test]
+    fn directive_recovery_at_statement_separators() {
+        for sep in ["\n;", " ; "] {
+            let src =
+                format!("flowchart TD\n%%{{unfinished{sep}%%{{init: {{theme: dark}}}}%%\nA\n");
+            let result = lower(&src);
+            assert_eq!(result.theme.name.unwrap().0, "dark");
+            assert_eq!(
+                result.diagnostics.len(),
+                1,
+                "{src:?}: {:?}",
+                result.diagnostics
+            );
+            assert!(
+                result.diagnostics[0]
+                    .message
+                    .starts_with("unclosed directive")
+            );
+            assert_eq!(flowchart::parse(&src).syntax().to_string(), src);
+        }
+        // An apostrophe in a node ID is not a directive quote. Even if later directives
+        // appear quoted to the lookahead scanner, its search for the next marker is shared.
+        let src = format!(
+            "flowchart TD\n{}%%{{init: {{theme: dark}}}}%%\nB\n",
+            "A';%%{unfinished\n".repeat(10_000)
+        );
+        let result = lower(&src);
+        assert_eq!(result.diagnostics.len(), MAX_DIAGNOSTICS + 1);
+        let Diagram::Graph(graph) = result.diagram else {
+            panic!("expected graph")
+        };
+        assert!(graph.nodes.iter().any(|n| n.id == "B"));
+        assert_eq!(flowchart::parse(&src).syntax().to_string(), src);
+    }
+
+    // LANGS-12, MTHEME-5: dispatch and theme extraction share parser boundaries.
+    #[test]
+    fn preamble_dispatch_and_theme_boundaries() {
+        let src = "---\ntitle: |\n  @startuml\n---\npie\n  \"A\": 1\n";
+        let result = lower(src);
+        assert_eq!(result.kind, Kind::Pie);
+        assert_eq!(
+            Kind::of(&src.replace("pie", "flowchart-elk")),
+            Kind::Flowchart
+        );
+        assert_eq!(result.diagnostics, []);
+        let Diagram::Pie(pie) = result.diagram else {
+            panic!("expected pie")
+        };
+        assert_eq!(
+            pie.slices,
+            [crate::pie::Slice {
+                label: "A".into(),
+                value: 1.0
+            }]
+        );
+
+        let src = "%%{unclosed\npie\n  \"A\": 1\n";
+        let result = lower(src);
+        assert_eq!(result.kind, Kind::Pie);
+        assert_eq!(result.diagnostics.len(), 1);
+        assert_eq!(
+            result.diagnostics[0].message,
+            "unclosed directive: expected `}%%`"
+        );
+        assert_eq!(result.diagnostics[0].line_col(src), (1, 1));
+        let Diagram::Pie(pie) = result.diagram else {
+            panic!("expected pie")
+        };
+        assert_eq!(pie.slices[0].label, "A");
+
+        let src = "---\npie\n  \"A\": 1\n";
+        let result = lower(src);
+        assert_eq!(result.kind, Kind::Pie);
+        assert_eq!(result.diagnostics.len(), 1);
+        assert_eq!(
+            result.diagnostics[0].message,
+            "unclosed frontmatter: expected a closing `---` line"
+        );
+        let Diagram::Pie(pie) = result.diagram else {
+            panic!("expected pie")
+        };
+        assert_eq!(pie.slices[0].label, "A");
+
+        let src = "flowchart TD\nA[\"%%{init: {'theme':'bogus'}}%%\"]\n%% %%{init: {'theme':'bogus'}}%%\n";
+        let result = lower(src);
+        assert_eq!(result.kind, Kind::Flowchart);
+        assert_eq!(result.diagnostics, []);
+        assert_eq!(result.theme, ThemeConfig::default());
+        let Diagram::Graph(graph) = result.diagram else {
+            panic!("expected graph")
+        };
+        assert_eq!(graph.nodes.len(), 1);
+        assert_eq!(graph.nodes[0].id, "A");
+
+        let multiline = "%%{init: {\n 'theme': 'dark'\n}}%%\npie\n\"A\": 1\n";
+        let result = lower(multiline);
+        assert_eq!(result.kind, Kind::Pie);
+        assert_eq!(result.theme.name.unwrap().0, "dark");
+        assert_eq!(result.diagnostics, []);
+        // MTHEME-5: C4 directives are collected from its parser too.
+        let c4 = lower("%%{init: {'theme':'dark'}}%%\nC4Context\nPerson(user, \"User\")\n");
+        assert_eq!(c4.kind, Kind::C4);
+        assert_eq!(c4.theme.name.unwrap().0, "dark");
+        assert_eq!(c4.diagnostics, []);
+        assert_eq!(
+            Kind::of("leading text\n@startuml\nAlice -> Bob: hi\n@enduml\n"),
+            Kind::PlantUml
+        );
+        assert_eq!(Kind::of_lang(src, Some(Lang::PlantUml)), Kind::PlantUml);
+        assert_eq!(
+            Kind::of_lang("@startuml\n", Some(Lang::Mermaid)),
+            Kind::Flowchart
+        );
+    }
+
+    #[test]
+    fn diagnostics_are_ordered_before_cap() {
+        let mut src = "%%{init: {'theme':'bogus'}}%%\npie\n".to_owned();
+        for _ in 0..510 {
+            src.push_str("?\n");
+        }
+        let result = lower(&src);
+        assert_eq!(result.diagnostics.len(), MAX_DIAGNOSTICS + 1);
+        assert_eq!(result.diagnostics[0].line_col(&src), (1, 20));
+        assert_eq!(result.diagnostics[0].severity, Severity::Warning);
+        assert!(
+            result.diagnostics[0]
+                .message
+                .starts_with("`bogus` is not a Mermaid theme")
+        );
+        assert!(
+            result
+                .diagnostics
+                .windows(2)
+                .all(|w| w[0].range.start() <= w[1].range.start())
+        );
+        assert_eq!(
+            result.diagnostics[MAX_DIAGNOSTICS].message,
+            "11 more problems not shown"
+        );
+        assert_eq!(
+            result.diagnostics[MAX_DIAGNOSTICS].severity,
+            Severity::Error
+        );
+    }
 
     #[test]
     fn oversized_source_skips_normalization_and_theme_processing() {

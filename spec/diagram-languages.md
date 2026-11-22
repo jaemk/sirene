@@ -195,5 +195,26 @@ Property tests exercise lossless parsing, valid diagnostic ranges, recovery, and
 and malformed inputs across diagram languages. A reproducible fuzz harness exercises untrusted
 input through parser entry points and records findings as regression tests. Fuzz runs are bounded
 when used as smoke checks; longer campaigns can reuse the same targets and corpus. CI's `fuzz`
-job runs `fuzz/`'s `parser` target for a minute on a copy of the seed corpus with cargo-fuzz's
-sanitizers, and fails on a crash. `cargo audit` also scans `fuzz/Cargo.lock`.
+job runs each of `fuzz/`'s `parser` and `document` targets for a minute on a copy of its seed
+corpus with cargo-fuzz's sanitizers, and fails on a crash. `cargo audit` also scans `fuzz/Cargo.lock`.
+The `scripts/parser-coverage.sh` command exports separate LLVM source coverage reports for the
+parser property tests and for a replay of the fuzz corpora.
+
+## LANGS-12 Dispatch and diagnostic ordering
+
+Detection recognizes Mermaid frontmatter, comments, and directives using the parser's recovery
+boundaries. A recognized Mermaid header takes precedence over PlantUML markers in frontmatter.
+The closing frontmatter delimiter starts at column one, so an indented `---` stays in the block.
+An unclosed directive recovers as specified in LANGS-13. Explicit language selection still overrides
+detection, and PlantUML markers following leading text remain detectable. Combined diagnostics
+are stably ordered by source offset before the display limit and its summary are applied.
+The fuzz job also exercises full documents and dispatch, including known-kind generated inputs.
+
+## LANGS-13 Consistent preparation and recovery
+
+Mermaid detection, theme reading, and lowering agree for LF, CRLF, and lone CR line endings.
+An unfinished directive recovers at the end of its opening line or before a subsequent unquoted
+opener on the same line. Detection and parsing use these boundaries in the preamble and between
+statements. Valid multiline directives remain supported. A quoted value must close on its line.
+The full-document fuzz target covers the shared kind registry, aliases, line endings, theme
+configuration, and directive recovery.

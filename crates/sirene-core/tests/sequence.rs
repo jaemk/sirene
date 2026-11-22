@@ -165,6 +165,22 @@ fn participants() {
     assert_eq!(ids, ["Web Server", "my-db"]);
 }
 
+#[test]
+fn quoted_participant_metadata_delimiters() {
+    let src = r#"sequenceDiagram
+participant A@{alias: "Queue \"a};b\"", type: database}
+participant B@{alias: 'Queue } B', type: entity}
+A->>B: hi
+"#;
+    let parsed = sirene_core::sequence::parse(src);
+    assert_eq!(parsed.syntax().to_string(), src);
+    let s = sequence(src);
+    assert_eq!(s.participants[0].label, ["Queue \"a};b\""]);
+    assert_eq!(s.participants[0].kind, ParticipantKind::Database);
+    assert_eq!(s.participants[1].label, ["Queue } B"]);
+    assert_eq!(s.participants[1].kind, ParticipantKind::Entity);
+}
+
 /// MSEQ-1: each arrow's line and head.
 #[test]
 fn arrows() {

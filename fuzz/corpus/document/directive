@@ -1,0 +1,5 @@
+%%{init: {
+ theme: "dark"
+}}%%
+sequenceDiagram
+A->>B: hi

@@ -1,0 +1,4 @@
+leading text
+@startjson
+{"a": 1}
+@endjson

@@ -13,8 +13,8 @@ picks it by the header keyword. Tests: `crates/sirene-core/tests/usecase.rs` and
 - Ids are `\w+` (ASCII). Names are an id, a `"..."` or `'...'` string on one line, or a
   `"`...`"` Markdown string. An id takes an optional `(label)` or `[label]`; unquoted label text
   stops at `()[]{}"'` and at `--`, `<--`, `..>`, `:::`, `@{`, and `<<`.
-- After a name, in order and each optional: `@{ ... }` metadata, `<<stereotype>>`, and
-  `:::a,b` classes (every name after a comma is a class).
+- A name can take `@{ ... }` metadata (FLOWCH-15 quote rules), a `<<stereotype>>`, and
+  `:::a,b` classes in that order. Every name after a comma is a class.
 - `actor a, b` declares actors; `actor a --> b` declares `a` and relates it.
 - `systemBoundary name ... end` holds only actor and use case declarations, one level deep.
 - `note for id text`, `json id@{ ... }:::classes`, `name@{ ... }` on its own line, `classDef`,
@@ -65,8 +65,10 @@ A JSON table is a rectangle titled by its id, with one two-column row per leaf o
 object: nested keys as `a.b` and `items[0].name`, a list of values with the key on its first row
 only, `{}` and `[]` for empty ones, JSON spelling for `null`, booleans, and numbers, and the last
 value of a repeated key in its first place. A `\u` surrogate pair is one character; a lone
-surrogate is U+FFFD. Invalid JSON, and rows holding more than 16 MiB of keys and values, are a
-warning. Tests: `notes_tables_boundaries` and the unit tests in `usecase/json.rs`.
+surrogate is U+FFFD. Invalid JSON and tables that exceed their storage limits produce a warning.
+The parser reads at most as many values as fit in 16 MiB of value slots. Flattened rows have a
+separate 16 MiB budget that counts each row and its key and value bytes, including repeated paths.
+Tests include `notes_tables_boundaries` and the unit tests in `usecase/json.rs`.
 
 ## MUSE-6 System boundaries
 

@@ -10,8 +10,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - A libFuzzer target for the diagram parsers (`fuzz/`), run in CI, and property and compatibility
   tests across all 34 public parsers.
+- A full-document fuzz target (`fuzz/`), also run in CI, covering kind detection, line endings,
+  theme configuration, and directive recovery, and `scripts/parser-coverage.sh` for LLVM coverage
+  of the property tests and fuzz corpora.
 
 ### Changed
+
+- An unfinished `%%{` directive recovers at the end of its line, or before a later unquoted
+  opener on the same line, the same way in detection, theme reading, and every parser (LANGS-13).
 
 - A DOT graph keeps at most 100,000 pending edges and 64 MiB of copied edge attributes, ports,
   endpoint IDs, and expanded edge labels. Past a limit, later edges are left out and a warning

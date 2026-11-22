@@ -176,8 +176,6 @@ fn diagnostics() {
                 Severity::Error,
                 "frame `01` is defined again; each frame needs its own number"
             ),
-            (Severity::Error, "frame `08` is not defined"),
-            (Severity::Error, "frame `07` is not defined"),
             (Severity::Error, "data block `Missing` is not defined"),
             (
                 Severity::Error,
@@ -188,6 +186,8 @@ fn diagnostics() {
                 Severity::Warning,
                 "a relation from frame `04` to itself is not drawn"
             ),
+            (Severity::Error, "frame `08` is not defined"),
+            (Severity::Error, "frame `07` is not defined"),
         ]
     );
     let Diagram::EventModel(c) = l.diagram else {

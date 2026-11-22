@@ -24,10 +24,10 @@ pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
     let mut p = Parser {
         base: Base::new(src),
         meta_close: crate::lines::MetaClose::default(),
+        markdown_close: crate::lines::Next::default(),
     };
     p.start(ROOT);
-    p.header(HEADERS, "usecase-beta", header_len);
-    if !p.diagnostics.is_empty() {
+    if !p.header(HEADERS, "usecase-beta", header_len) {
         // Without the header, the rest is not read.
         let len = p.rest().len();
         p.start(ERROR);
@@ -62,11 +62,6 @@ pub(crate) fn id_len(s: &str) -> usize {
 
 fn word(s: &str) -> &str {
     &s[..id_len(s)]
-}
-
-/// The length of a `"`...`"` Markdown string, which may span lines, if closed.
-fn markdown_len(s: &str) -> Option<usize> {
-    s.strip_prefix("\"`")?.find("`\"").map(|i| i + 4)
 }
 
 /// The length of a `"..."` or `'...'` string closed on its line.
@@ -166,25 +161,6 @@ fn json_follows(s: &str) -> bool {
     r.is_some_and(|r| r[crate::lines::ws_len(r)..].starts_with('{'))
 }
 
-/// The length of a name at `s`: an id, a plain string, or a Markdown string.
-fn name_len(s: &str) -> Option<usize> {
-    if s.starts_with("\"`") {
-        markdown_len(s)
-    } else if s.starts_with(['"', '\'']) {
-        plain_len(s)
-    } else {
-        Some(id_len(s)).filter(|&n| n > 0)
-    }
-}
-
-/// Whether `s` starts a standalone `name@{ ... }` statement.
-fn meta_follows(s: &str) -> bool {
-    name_len(s).is_some_and(|n| {
-        let r = &s[n..];
-        r[crate::lines::ws_len(r)..].starts_with("@{")
-    })
-}
-
 /// The length of the JSON object at `s`, which starts with `{`, honoring strings.
 fn json_len(s: &str) -> Option<usize> {
     let (mut depth, mut quoted, mut escaped) = (0usize, false, false);
@@ -217,6 +193,7 @@ fn json_len(s: &str) -> Option<usize> {
 struct Parser<'a> {
     base: Base<'a>,
     meta_close: crate::lines::MetaClose,
+    markdown_close: crate::lines::Next,
 }
 
 impl<'a> Deref for Parser<'a> {
@@ -233,6 +210,35 @@ impl DerefMut for Parser<'_> {
 }
 
 impl<'a> Parser<'a> {
+    /// Length of a Markdown string in the input suffix `r`. Reuse the search across lines
+    /// when malformed strings have no closer.
+    fn markdown_len(&mut self, r: &str) -> Option<usize> {
+        let src = self.src;
+        let start = src.len() - r.len();
+        self.markdown_close
+            .find(src, start + 2, "`\"")
+            .map(|end| end + 2 - start)
+    }
+
+    /// The length of a name at the cursor, including its quotes when present.
+    fn name_len(&mut self) -> Option<usize> {
+        let r = self.rest();
+        if r.starts_with("\"`") {
+            self.markdown_len(r)
+        } else if r.starts_with(['"', '\'']) {
+            plain_len(r)
+        } else {
+            Some(id_len(r)).filter(|&n| n > 0)
+        }
+    }
+
+    fn meta_follows(&mut self) -> bool {
+        self.name_len().is_some_and(|n| {
+            let r = &self.rest()[n..];
+            r[crate::lines::ws_len(r)..].starts_with("@{")
+        })
+    }
+
     /// Whitespace, newlines, `%%` comments on their own lines, and directives. Unlike other
     /// diagrams, `;` does not separate statements.
     fn trivia(&mut self) {
@@ -244,27 +250,14 @@ impl<'a> Parser<'a> {
                 self.token(WHITESPACE, ws);
             } else if nl > 0 {
                 self.token(NEWLINE, nl);
-            } else if let Some(body) = r.strip_prefix("%%{") {
-                match body.find("}%%") {
-                    Some(i) => self.token(DIRECTIVE, i + 6),
-                    None => {
-                        let start = self.pos;
-                        self.token(DIRECTIVE, crate::lines::line_len(r));
-                        self.error(start, start + 3, "unclosed directive: expected `}%%`");
-                    }
-                }
-            } else if r.starts_with("%%") && self.at_line_start() {
+            } else if r.starts_with("%%{") {
+                self.directive();
+            } else if r.starts_with("%%") && crate::lines::only_space_before(self.src, self.pos) {
                 self.token(COMMENT, crate::lines::line_len(r));
             } else {
                 return;
             }
         }
-    }
-
-    fn at_line_start(&self) -> bool {
-        let before = &self.src[..self.pos];
-        let line = before.rfind('\n').map_or(before, |i| &before[i + 1..]);
-        line.chars().all(crate::lines::is_space)
     }
 
     /// Requires the statement to end with its line.
@@ -296,7 +289,7 @@ impl<'a> Parser<'a> {
             _ if PLANTUML.contains(&w.to_ascii_lowercase().as_str()) => self.fail(&format!(
                 "`{w}` is PlantUML syntax that Mermaid use case diagrams do not support"
             )),
-            _ if meta_follows(r) => self.meta_stmt(),
+            _ if self.meta_follows() => self.meta_stmt(),
             _ => self.entity_stmt(false),
         }
     }
@@ -306,7 +299,7 @@ impl<'a> Parser<'a> {
     fn name(&mut self, rect: bool) -> bool {
         let r = self.rest();
         if r.starts_with("\"`") {
-            match markdown_len(r) {
+            match self.markdown_len(r) {
                 Some(n) => self.token(MD_STRING, n),
                 None => {
                     self.fail("unclosed Markdown string: expected `` `\" ``");
@@ -445,7 +438,7 @@ impl<'a> Parser<'a> {
 
     /// An actor or use case occurrence: a name and its suffixes.
     fn node(&mut self, rect: bool) -> bool {
-        if name_len(self.rest()).is_none() && !self.rest().starts_with(['"', '\'']) {
+        if self.name_len().is_none() && !self.rest().starts_with(['"', '\'']) {
             return false;
         }
         self.start(NODE);
@@ -524,7 +517,7 @@ impl<'a> Parser<'a> {
     fn edge_label(&mut self, closers: &[Op]) {
         let r = self.peek();
         let n = if r.starts_with("\"`") {
-            markdown_len(r)
+            self.markdown_len(r)
         } else if r.starts_with(['"', '\'']) {
             plain_len(r)
         } else {
@@ -640,7 +633,7 @@ impl<'a> Parser<'a> {
                     "a system boundary holds only actor and use case declarations; move this \
                      after its `end`",
                 ),
-                _ if meta_follows(r) => self.fail(
+                _ if self.meta_follows() => self.fail(
                     "a system boundary holds only actor and use case declarations; move this \
                      after its `end`",
                 ),
@@ -716,7 +709,7 @@ impl<'a> Parser<'a> {
     /// `name@{ ... }` on its own line.
     fn meta_stmt(&mut self) {
         self.start(META_STMT);
-        let n = name_len(self.rest()).unwrap_or(0);
+        let n = self.name_len().unwrap_or(0);
         let kind = if self.rest().starts_with("\"`") {
             MD_STRING
         } else if self.rest().starts_with(['"', '\'']) {

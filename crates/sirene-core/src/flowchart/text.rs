@@ -506,27 +506,35 @@ pub(crate) fn frontmatter_config(block: &str, section: &str) -> Vec<(String, Str
     let header = format!("{section}:");
     let mut out = Vec::new();
     let mut in_config = false;
-    let mut section_at: Option<usize> = None;
+    let mut config_child = None;
+    let mut in_section = false;
+    let mut section_child = None;
     for line in block.lines() {
-        if line.trim().is_empty() || line.trim() == "---" {
+        if line.trim().is_empty() || line.trim() == "---" || line.trim_start().starts_with('#') {
             continue;
         }
         let at = indent(line);
         if at == 0 {
             in_config = line.trim_end() == "config:";
-            section_at = None;
+            config_child = None;
+            in_section = false;
+            section_child = None;
             continue;
         }
         if !in_config {
             continue;
         }
-        match section_at {
-            Some(s) if at > s => {
-                if let Some((k, v)) = line.trim().split_once(':') {
-                    out.push((unquote(k), unquote(v)));
-                }
-            }
-            _ => section_at = (line.trim() == header).then_some(at),
+        let config_child = *config_child.get_or_insert(at);
+        if at == config_child {
+            in_section = line.trim() == header;
+            section_child = None;
+        } else if in_section
+            && at > config_child
+            && at == *section_child.get_or_insert(at)
+            && let Some((k, v)) = line.trim().split_once(':')
+            && !v.trim().is_empty()
+        {
+            out.push((unquote(k), unquote(v)));
         }
     }
     out

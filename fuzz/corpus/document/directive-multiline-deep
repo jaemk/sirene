@@ -1,0 +1,6 @@
+%%{init: {
+ ignored: [{value: ' }%% '}],
+ theme: 'forest', themeVariables: {primaryColor: '#fff'}
+}}%%
+pie
+"A": 2

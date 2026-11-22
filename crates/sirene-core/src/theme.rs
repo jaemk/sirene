@@ -9,8 +9,9 @@ use std::ops::Range;
 use rowan::{TextRange, TextSize};
 
 use crate::diagnostic::Diagnostic;
-use crate::lines::MAX_DEPTH;
+use crate::directive::Part::Key;
 use crate::scene::{Color, Theme, parse_color};
+use crate::syntax::{SyntaxKind, SyntaxNode, SyntaxToken};
 
 /// Mermaid's theme names.
 pub const NAMES: &[&str] = &[
@@ -42,9 +43,27 @@ pub struct ThemeConfig {
 impl ThemeConfig {
     /// Reads the frontmatter `config:` and then every `%%{init}%%` directive, which win.
     pub fn read(src: &str) -> ThemeConfig {
+        crate::diagram::read_theme(src)
+    }
+
+    pub(crate) fn from_syntax(root: &SyntaxNode) -> ThemeConfig {
         let mut out = ThemeConfig::default();
-        let body = frontmatter(src, &mut out);
-        directives(src, body, &mut out);
+        for token in root
+            .descendants_with_tokens()
+            .filter_map(|e| e.into_token())
+        {
+            match token.kind() {
+                SyntaxKind::FRONTMATTER => {
+                    frontmatter(
+                        token.text(),
+                        usize::from(token.text_range().start()),
+                        &mut out,
+                    );
+                }
+                SyntaxKind::DIRECTIVE => directive(&token, &mut out),
+                _ => {}
+            }
+        }
         out
     }
 
@@ -70,7 +89,8 @@ impl ThemeConfig {
             out.push(Diagnostic::warning(
                 text_range(range),
                 format!(
-                    "`{name}` is not a Mermaid theme; expected one of {}",
+                    "`{}` is not a Mermaid theme; expected one of {}",
+                    name.escape_debug(),
                     NAMES.join(", ")
                 ),
             ));
@@ -650,26 +670,23 @@ fn from_hsl(h: f32, s: f32, l: f32) -> (u8, u8, u8) {
     )
 }
 
-/// The frontmatter's `config:` `theme` and `themeVariables`; returns where the body starts.
-fn frontmatter(src: &str, out: &mut ThemeConfig) -> usize {
-    let bom = crate::lines::bom_len(src);
-    let mut lines = src[bom..].split_inclusive('\n');
-    let Some(first) = lines.next() else {
-        return 0;
-    };
-    if first.trim_end() != "---" {
-        return 0;
+/// The `config:` settings of a frontmatter token that the parser accepted.
+fn frontmatter(src: &str, mut at: usize, out: &mut ThemeConfig) {
+    let mut lines = src.split_inclusive('\n');
+    if let Some(opener) = lines.next() {
+        at += opener.len();
     }
-    let mut at = bom + first.len();
     let indent = |line: &str| line.len() - line.trim_start().len();
     let mut in_config = false;
-    let mut vars_at: Option<usize> = None;
+    let mut config_child = None;
+    let mut in_vars = false;
+    let mut vars_child = None;
     for line in lines {
         let start = at;
         at += line.len();
         let text = line.trim_end_matches(['\n', '\r']);
-        if text.trim() == "---" {
-            return at;
+        if crate::lines::is_frontmatter_marker(text) {
+            break;
         }
         if text.trim().is_empty() || text.trim_start().starts_with('#') {
             continue;
@@ -677,80 +694,74 @@ fn frontmatter(src: &str, out: &mut ThemeConfig) -> usize {
         let ind = indent(text);
         if ind == 0 {
             in_config = text.trim_end() == "config:";
-            vars_at = None;
+            config_child = None;
+            in_vars = false;
+            vars_child = None;
             continue;
         }
         if !in_config {
             continue;
         }
-        let Some((key, value)) = text.trim().split_once(':') else {
+        let config_child = *config_child.get_or_insert(ind);
+        if ind == config_child {
+            in_vars = false;
+            vars_child = None;
+        }
+        let Some((key, value)) = text[ind..].split_once(':') else {
             continue;
         };
+        let value_start = start + ind + key.len() + 1;
         let key = unquote(key);
-        if let Some(v) = vars_at {
-            if ind > v {
-                if !value.trim().is_empty() {
-                    out.variables.push((key, unquote(value)));
-                }
-                continue;
+        if ind != config_child {
+            if in_vars
+                && ind > config_child
+                && ind == *vars_child.get_or_insert(ind)
+                && !value.trim().is_empty()
+            {
+                out.variables.push((key, unquote(value)));
             }
-            vars_at = None;
+            continue;
         }
         match key.as_str() {
             "theme" => {
                 let raw = value.trim();
-                let offset = start + ind + text.trim().len() - value.trim_start().len();
+                let offset = value_start + value.len() - value.trim_start().len();
                 let name = unquote(raw);
                 out.name = Some((name, offset..offset + raw.len()));
             }
-            "themeVariables" if value.trim().is_empty() => vars_at = Some(ind),
+            "themeVariables" if value.trim().is_empty() => in_vars = true,
             _ => {}
         }
     }
-    0
 }
 
-/// Every `%%{init: ...}%%` (or `initialize`) directive after `from`.
-fn directives(src: &str, from: usize, out: &mut ThemeConfig) {
-    let mut at = from;
-    while let Some(i) = src[at..].find("%%{") {
-        let open = at + i + 3;
-        let Some(j) = src[open..].find("}%%") else {
-            return;
-        };
-        let close = open + j;
-        let mut p = Parser {
-            src,
-            at: open,
-            end: close,
-            depth: 0,
-        };
-        let mut entries = Vec::new();
-        if p.object_body("", &mut entries).is_none() {
-            // Other directives, such as `%%{wrap}%%`, are not settings.
-            let key = src[open..close]
-                .trim_start()
-                .trim_start_matches(['"', '\'']);
-            if key.starts_with("init") {
-                out.unread.push(open - 3..close + 3);
-            }
-        } else {
-            for (path, value, range) in entries {
-                let key = path
-                    .strip_prefix("init.")
-                    .or_else(|| path.strip_prefix("initialize."));
-                match key {
-                    Some("theme") => out.name = Some((value, range)),
-                    Some(k) => {
-                        if let Some(var) = k.strip_prefix("themeVariables.") {
-                            out.variables.push((var.to_owned(), value));
-                        }
-                    }
-                    None => {}
-                }
-            }
+/// An accepted directive token. Only a complete init directive commits settings.
+fn directive(token: &SyntaxToken, out: &mut ThemeConfig) {
+    let range = token.text_range();
+    let span = usize::from(range.start())..usize::from(range.end());
+    let directive = token.text();
+    let mut next = ThemeConfig::default();
+    let parsed = crate::directive::read(directive, |path, value, range| match path {
+        [Key(init), Key(key)] if crate::directive::is_init(init) && key == "theme" => {
+            next.name = Some((
+                value.to_owned(),
+                span.start + range.start..span.start + range.end,
+            ));
         }
-        at = close + 3;
+        [Key(init), Key(section), Key(key)]
+            if crate::directive::is_init(init) && section == "themeVariables" =>
+        {
+            next.variables.push((key.to_string(), value.to_owned()));
+        }
+        _ => {}
+    });
+    if parsed.is_some() {
+        if next.name.is_some() {
+            out.name = next.name;
+        }
+        out.variables.extend(next.variables);
+    } else if crate::directive::starts_init(directive) {
+        out.unread.push(span);
     }
 }
 
@@ -764,146 +775,10 @@ fn unquote(s: &str) -> String {
     s.to_owned()
 }
 
-/// A lenient reader of a directive's JSON, which may use single quotes and bare words.
-struct Parser<'a> {
-    src: &'a str,
-    at: usize,
-    end: usize,
-    /// How many objects are open around the cursor.
-    depth: usize,
-}
-
-type Entry = (String, String, Range<usize>);
-
-impl Parser<'_> {
-    fn peek(&self) -> Option<char> {
-        self.src[self.at..self.end].chars().next()
-    }
-
-    fn skip_space(&mut self) {
-        while let Some(c) = self.peek() {
-            if !c.is_whitespace() {
-                break;
-            }
-            self.at += c.len_utf8();
-        }
-    }
-
-    fn eat(&mut self, c: char) -> bool {
-        self.skip_space();
-        if self.peek() == Some(c) {
-            self.at += c.len_utf8();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// `key: value` pairs up to a `}` or the end.
-    fn object_body(&mut self, path: &str, out: &mut Vec<Entry>) -> Option<()> {
-        loop {
-            self.skip_space();
-            match self.peek() {
-                None | Some('}') => return Some(()),
-                _ => {}
-            }
-            let (key, _) = self.scalar(true)?;
-            if !self.eat(':') {
-                return None;
-            }
-            let path = if path.is_empty() {
-                key
-            } else {
-                format!("{path}.{key}")
-            };
-            self.value(&path, out)?;
-            if !self.eat(',') {
-                self.skip_space();
-                return matches!(self.peek(), None | Some('}')).then_some(());
-            }
-        }
-    }
-
-    fn value(&mut self, path: &str, out: &mut Vec<Entry>) -> Option<()> {
-        self.skip_space();
-        match self.peek()? {
-            '{' => {
-                // LANGS-8: a directive nested deeper than any setting is not read.
-                if self.depth >= MAX_DEPTH {
-                    return None;
-                }
-                self.at += 1;
-                self.depth += 1;
-                let body = self.object_body(path, out);
-                self.depth -= 1;
-                body?;
-                self.eat('}').then_some(())
-            }
-            '[' => {
-                let mut depth = 0;
-                while let Some(c) = self.peek() {
-                    self.at += c.len_utf8();
-                    match c {
-                        '[' => depth += 1,
-                        ']' => {
-                            depth -= 1;
-                            if depth == 0 {
-                                return Some(());
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                None
-            }
-            _ => {
-                let (v, range) = self.scalar(false)?;
-                out.push((path.to_owned(), v, range));
-                Some(())
-            }
-        }
-    }
-
-    /// A quoted string, or a bare word up to a delimiter; a key also stops at `:`.
-    fn scalar(&mut self, key: bool) -> Option<(String, Range<usize>)> {
-        self.skip_space();
-        let q = self.peek()?;
-        if q == '"' || q == '\'' {
-            let start = self.at + 1;
-            let mut i = start;
-            let bytes = self.src.as_bytes();
-            while i < self.end {
-                match bytes[i] {
-                    b'\\' => i += 2,
-                    b if b == q as u8 => {
-                        self.at = i + 1;
-                        return Some((self.src[start..i].to_owned(), start..i));
-                    }
-                    _ => i += 1,
-                }
-            }
-            return None;
-        }
-        let start = self.at;
-        while let Some(c) = self.peek() {
-            if matches!(c, ',' | '}' | ']') || (key && c == ':') {
-                break;
-            }
-            self.at += c.len_utf8();
-        }
-        let raw = &self.src[start..self.at];
-        let trimmed = raw.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-        let s = start + (raw.len() - raw.trim_start().len());
-        Some((trimmed.to_owned(), s..s + trimmed.len()))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lines::MAX_DEPTH;
 
     fn hex(c: Color) -> String {
         format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b)
@@ -939,6 +814,29 @@ mod tests {
                 ("lineColor".into(), "#00ff00".into())
             ]
         );
+    }
+
+    #[test]
+    fn frontmatter_theme_range_with_trailing_space() {
+        for newline in ["\n", "\r\n", "\r"] {
+            let src = ["\u{feff}---", "config:", "  theme: é   ", "---", "pie"].join(newline);
+            let lowered = crate::diagram::lower(&src);
+            let (name, range) = lowered.theme.name.unwrap();
+            assert_eq!(name, "é");
+            assert_eq!(src.get(range), Some("é"));
+            let range = lowered.diagnostics[0].range;
+            let range = usize::from(range.start())..usize::from(range.end());
+            assert_eq!(src.get(range), Some("é"));
+        }
+    }
+
+    #[test]
+    fn frontmatter_settings_respect_indentation() {
+        let cfg = ThemeConfig::read(
+            "---\nconfig:\n  theme: dark\n  themeVariables:\n    background: '#fff'\n    other:\n      lineColor: red\n  flowchart:\n    theme: forest\n    themeVariables:\n      fontSize: 60px\n---\nflowchart\n",
+        );
+        assert_eq!(cfg.name.unwrap().0, "dark");
+        assert_eq!(cfg.variables, [("background".into(), "#fff".into())]);
     }
 
     #[test]
@@ -996,6 +894,67 @@ mod tests {
             "}".repeat(MAX_DEPTH - 2)
         );
         assert!(ThemeConfig::read(&shallow).unread.is_empty());
+    }
+
+    #[test]
+    fn directive_settings_respect_structure_and_nesting() {
+        let src = r#"%%{init: {'list': ["]", ["["], {"x":"}%%"}], 'theme': 'dark'}}%%
+%%{'init.theme': 'forest', 'init': {'themeVariables.lineColor': red}}%%
+%%{init: {'theme': 'neutral'}}}%%
+%%{initialize: {'theme': 'base', 'list': [1, {'x': 2]}}}%%
+%%{init: {'theme': 'forest', 'list': [1 2]}}%%
+flowchart
+"#;
+        let cfg = ThemeConfig::read(src);
+        assert_eq!(cfg.name.unwrap().0, "dark");
+        assert!(cfg.variables.is_empty());
+        assert_eq!(cfg.unread.len(), 3);
+
+        for count in [MAX_DEPTH - 1, MAX_DEPTH] {
+            let src = format!(
+                "%%{{init: {{theme: dark, list: {}0{}}}}}%%\nflowchart\n",
+                "[".repeat(count),
+                "]".repeat(count)
+            );
+            let cfg = ThemeConfig::read(&src);
+            let within_limit = count < MAX_DEPTH;
+            assert_eq!(cfg.unread.is_empty(), within_limit, "{src}");
+            assert_eq!(cfg.name.is_some(), within_limit, "{src}");
+        }
+    }
+
+    #[test]
+    fn directive_strings_decode_escapes_and_keep_source_ranges() {
+        let src = r#"%%{"\u0069nit": {"th\u0065me": "\u0064ark",
+          "themeVariables": {"fontFamily": 'Joe\'s \ud83d\ude00'}}}%%
+flowchart
+"#;
+        let cfg = ThemeConfig::read(src);
+        let (name, range) = cfg.name.unwrap();
+        assert_eq!(name, "dark");
+        assert_eq!(&src[range], r"\u0064ark");
+        assert_eq!(cfg.variables, [("fontFamily".into(), "Joe's 😀".into())]);
+        assert!(cfg.unread.is_empty());
+
+        for invalid in [r"\q", r"\uD834\u0000", r"\uDD1E", r"\u12", "\t"] {
+            let src = format!(
+                "%%{{\"\\u0069nit\": {{theme: dark, ignored: \"{invalid}\"}}}}%%\nflowchart\n"
+            );
+            let cfg = ThemeConfig::read(&src);
+            assert!(cfg.name.is_none(), "{src:?}");
+            assert_eq!(cfg.unread.len(), 1, "{src:?}");
+        }
+    }
+
+    #[test]
+    fn escaped_theme_name_diagnostic_keeps_controls_printable() {
+        let src = r#"%%{init: {theme: "\u001b"}}%%
+flowchart
+"#;
+        let lowered = crate::diagram::lower(src);
+        assert_eq!(lowered.diagnostics.len(), 1);
+        assert!(!lowered.diagnostics[0].message.chars().any(char::is_control));
+        assert!(lowered.diagnostics[0].message.contains(r"\u{1b}"));
     }
 
     #[test]

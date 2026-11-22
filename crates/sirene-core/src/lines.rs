@@ -57,6 +57,129 @@ pub(crate) fn line_len(s: &str) -> usize {
     }
 }
 
+/// YAML frontmatter delimiters start in the first column, outside indented content.
+pub(crate) fn is_frontmatter_marker(line: &str) -> bool {
+    line.trim_end() == "---"
+}
+
+/// Frontmatter length and whether it closed, after any leading BOM.
+pub(crate) fn frontmatter_len(src: &str) -> Option<(usize, bool)> {
+    let first = line_len(src);
+    if !is_frontmatter_marker(&src[..first]) {
+        return None;
+    }
+    let mut at = first + newline_len(&src[first..]);
+    while at < src.len() {
+        let len = line_len(&src[at..]);
+        if is_frontmatter_marker(&src[at..at + len]) {
+            return Some((at + len, true));
+        }
+        at += len + newline_len(&src[at + len..]);
+    }
+    Some((first, false))
+}
+
+#[derive(Default)]
+pub(crate) struct DirectiveEnd {
+    // From the start of a later line, the first unquoted marker or EOF. Quoting resets on
+    // each line, so another opener can reuse the result even if its own line has other text.
+    lookahead: Option<(usize, usize, Option<bool>)>,
+}
+
+impl DirectiveEnd {
+    /// Length and whether the directive closed. Recover on its opening line.
+    pub fn len(&mut self, src: &str, start: usize) -> (usize, bool) {
+        let (at, marker) = directive_boundary(src, start + 3, false);
+        match marker {
+            Some(true) => return (at + 3 - start, true),
+            Some(false) => return (at - start, false),
+            None => {}
+        }
+        let next = at + newline_len(&src[at..]);
+        if next == src.len() {
+            return (at - start, false);
+        }
+        let (_, end, marker) = if let Some(found) = self.lookahead
+            && (found.0..=found.1).contains(&next)
+        {
+            found
+        } else {
+            let (end, marker) = directive_boundary(src, next, true);
+            let found = (next, end, marker);
+            self.lookahead = Some(found);
+            found
+        };
+        if marker == Some(true) {
+            (end + 3 - start, true)
+        } else {
+            (at - start, false)
+        }
+    }
+}
+
+/// The offset of an unquoted marker (true for a closer), line break, or EOF.
+fn directive_boundary(src: &str, start: usize, multiline: bool) -> (usize, Option<bool>) {
+    let bytes = src.as_bytes();
+    let mut quote = None;
+    let mut escaped = false;
+    for (i, &b) in bytes[start..].iter().enumerate() {
+        let at = start + i;
+        if b == b'\n' || bytes[at..].starts_with(b"\r\n") {
+            // A string cannot continue on the next line. A later closer could belong to
+            // other text and must not make an unfinished directive eat the intervening lines.
+            if quote.is_some() {
+                return (at, Some(false));
+            }
+            if !multiline {
+                return (at, None);
+            }
+        } else if let Some(q) = quote {
+            if escaped {
+                escaped = false;
+            } else if b == b'\\' {
+                escaped = true;
+            } else if b == q {
+                quote = None;
+            }
+        } else {
+            match b {
+                b'}' if bytes[at..].starts_with(b"}%%") => return (at, Some(true)),
+                b'%' if bytes[at..].starts_with(b"%%{") => return (at, Some(false)),
+                b'\'' | b'"' => quote = Some(b),
+                _ => {}
+            }
+        }
+    }
+    (src.len(), None)
+}
+
+/// End of the parser's initial frontmatter and trivia (LANGS-12).
+pub(crate) fn preamble_end(src: &str) -> usize {
+    let mut at = bom_len(src);
+    let mut directives = DirectiveEnd::default();
+    if let Some((len, _)) = frontmatter_len(&src[at..]) {
+        at += len;
+    }
+    loop {
+        let rest = &src[at..];
+        let ws = ws_len(rest);
+        let nl = newline_len(rest);
+        if ws > 0 {
+            at += ws;
+        } else if nl > 0 {
+            at += nl;
+        } else if rest.starts_with(';') {
+            at += 1;
+        } else if rest.starts_with("%%{") {
+            at += directives.len(src, at).0;
+        } else if rest.starts_with("%%") && only_space_before(src, at) {
+            at += line_len(rest);
+        } else {
+            return at;
+        }
+    }
+}
+
 /// Whether `s` starts at a statement separator or end of input.
 pub(crate) fn is_stmt_end(s: &str) -> bool {
     s.is_empty() || s.starts_with(';') || newline_len(s) > 0
@@ -64,8 +187,14 @@ pub(crate) fn is_stmt_end(s: &str) -> bool {
 
 /// Length up to (not including) the next statement separator.
 pub(crate) fn stmt_len(s: &str) -> usize {
-    let line = line_len(s);
-    s[..line].find(';').unwrap_or(line)
+    let Some(end) = s.find([';', '\n']) else {
+        return s.len();
+    };
+    if s.as_bytes()[end] == b'\n' && s[..end].ends_with('\r') {
+        end - 1
+    } else {
+        end
+    }
 }
 
 /// `len` with trailing inline whitespace of `s[..len]` removed.
@@ -77,12 +206,14 @@ pub(crate) fn trim_end_len(s: &str, len: usize) -> usize {
 /// Braces inside double-quoted strings are ignored.
 pub(crate) fn meta_body_len(s: &str) -> Option<usize> {
     let mut in_string = false;
-    for (i, c) in s.char_indices() {
-        match c {
-            '"' => in_string = !in_string,
-            '}' if !in_string => return Some(i),
+    let mut escaped = false;
+    for (i, b) in s.bytes().enumerate() {
+        match b {
+            b'"' if !escaped => in_string = !in_string,
+            b'}' if !in_string => return Some(i),
             _ => {}
         }
+        escaped = b == b'\\' && !escaped;
     }
     None
 }
@@ -114,8 +245,7 @@ pub(crate) struct Base<'a> {
     pub pos: usize,
     pub builder: GreenNodeBuilder<'static>,
     pub diagnostics: Vec<Diagnostic>,
-    /// The next `}%%`, for directives.
-    directive: Next,
+    pub directives: DirectiveEnd,
 }
 
 /// Whether only spaces come between the start of `pos`'s line and `pos`. Reads back only over
@@ -154,28 +284,28 @@ impl Next {
 
 /// The `}` closing a metadata body, as `meta_body_len` finds it, for searches from many
 /// positions. Which quotes open strings depends on where a search starts, so the quotes are
-/// counted from the start of the text, and a search reuses an earlier one that started with
-/// the same count's parity.
+/// counted from the start of the text, skipping escaped quotes. A search reuses an earlier
+/// one that started with the same count's parity.
 #[derive(Default)]
 pub(crate) struct MetaClose {
     /// How far quotes are counted, and whether an odd number come before there.
     counted: usize,
     odd: bool,
+    escaped: bool,
     /// By parity: where a search started, and what it found.
     found: [Option<(usize, Option<usize>)>; 2],
 }
 
 impl MetaClose {
-    /// The offset in `src` of the `}` closing a body that starts at `pos`.
+    /// The offset in `src` of the `}` closing a body that starts just after an `@{`.
     pub fn find(&mut self, src: &str, pos: usize) -> Option<usize> {
         if pos < self.counted {
-            (self.counted, self.odd) = (0, false);
+            (self.counted, self.odd, self.escaped) = (0, false, false);
         }
-        let quotes = src.as_bytes()[self.counted..pos]
-            .iter()
-            .filter(|&&b| b == b'"')
-            .count();
-        self.odd ^= quotes % 2 == 1;
+        for &b in &src.as_bytes()[self.counted..pos] {
+            self.odd ^= b == b'"' && !self.escaped;
+            self.escaped = b == b'\\' && !self.escaped;
+        }
         self.counted = pos;
         let slot = &mut self.found[usize::from(self.odd)];
         if let Some((from, at)) = *slot
@@ -203,18 +333,21 @@ pub(crate) fn too_deep(what: &str, limit: usize) -> String {
 /// `src` with each `\r` not followed by `\n` read as `\n`, as Mermaid reads it. Byte offsets are
 /// unchanged, so ranges into the result are ranges into `src`.
 pub(crate) fn lone_cr_as_lf(src: &str) -> std::borrow::Cow<'_, str> {
-    if !src.contains('\r') {
+    let mut lone_crs = src
+        .match_indices('\r')
+        .map(|(at, _)| at)
+        .filter(|&at| src.as_bytes().get(at + 1) != Some(&b'\n'));
+    let Some(first) = lone_crs.next() else {
         return src.into();
-    }
+    };
     let mut out = String::with_capacity(src.len());
-    let mut chars = src.chars().peekable();
-    while let Some(c) = chars.next() {
-        out.push(if c == '\r' && chars.peek() != Some(&'\n') {
-            '\n'
-        } else {
-            c
-        });
+    let mut from = 0;
+    for at in std::iter::once(first).chain(lone_crs) {
+        out.push_str(&src[from..at]);
+        out.push('\n');
+        from = at + 1;
     }
+    out.push_str(&src[from..]);
     out.into()
 }
 
@@ -428,7 +561,7 @@ impl<'a> Base<'a> {
             pos: 0,
             builder: GreenNodeBuilder::new(),
             diagnostics: diagnostic.into_iter().collect(),
-            directive: Next::default(),
+            directives: DirectiveEnd::default(),
         }
     }
 
@@ -551,15 +684,27 @@ impl<'a> Base<'a> {
     }
 
     /// Frontmatter, trivia, and a `HEADER` holding one of `headers` (each a whole word, per
-    /// `id_len`), or an error naming `first`.
-    pub fn header(&mut self, headers: &[&str], first: &str, id_len: fn(&str) -> usize) {
+    /// `id_len`), or an error naming `first`. Returns whether the header parsed successfully.
+    pub fn header(&mut self, headers: &[&str], first: &str, id_len: fn(&str) -> usize) -> bool {
+        self.header_keyword(headers, first, id_len).1
+    }
+
+    /// Also returns the recognized keyword when there is trailing junk after it.
+    pub fn header_keyword(
+        &mut self,
+        headers: &[&str],
+        first: &str,
+        id_len: fn(&str) -> usize,
+    ) -> (Option<&'a str>, bool) {
         self.frontmatter();
         self.trivia();
+        let before_header = self.diagnostics.len();
         let r = self.rest();
-        if let Some(kw) = headers
+        let keyword = headers
             .iter()
             .find(|kw| r.starts_with(*kw) && id_len(r) == kw.len())
-        {
+            .map(|kw| &r[..kw.len()]);
+        if let Some(kw) = keyword {
             self.start(HEADER);
             self.token(GRAPH_KW, kw.len());
             self.end();
@@ -568,35 +713,29 @@ impl<'a> Base<'a> {
             let end = self.pos + stmt_len(r);
             self.error(self.pos, end, format!("expected `{first}` header"));
         }
+        (keyword, self.diagnostics.len() == before_header)
     }
 
     /// A frontmatter block at the start of the source, if any, after a byte order mark
     /// (LANGS-9).
     pub fn frontmatter(&mut self) {
         self.token(WHITESPACE, bom_len(self.src));
-        let (start, src) = (self.pos, self.rest());
-        let first = line_len(src);
-        if src[..first].trim_end() != "---" {
+        let start = self.pos;
+        let Some((len, closed)) = frontmatter_len(self.rest()) else {
             return;
+        };
+        if closed {
+            self.token(FRONTMATTER, len);
+        } else {
+            self.start(ERROR);
+            self.token(ERROR_TOKEN, len);
+            self.finish();
+            self.error(
+                start,
+                start + len,
+                "unclosed frontmatter: expected a closing `---` line",
+            );
         }
-        let mut line_start = first + newline_len(&src[first..]);
-        while line_start < src.len() {
-            let rest = &src[line_start..];
-            let len = line_len(rest);
-            if rest[..len].trim() == "---" {
-                self.token(FRONTMATTER, line_start + len);
-                return;
-            }
-            line_start += len + newline_len(&rest[len..]);
-        }
-        self.start(ERROR);
-        self.token(ERROR_TOKEN, first);
-        self.finish();
-        self.error(
-            start,
-            start + first,
-            "unclosed frontmatter: expected a closing `---` line",
-        );
     }
 
     /// Whitespace, newlines, `;`, comments, and directives between statements.
@@ -612,20 +751,25 @@ impl<'a> Base<'a> {
             } else if r.starts_with(';') {
                 self.token(SEMI, 1);
             } else if r.starts_with("%%{") {
-                let from = self.pos + 3;
-                match self.directive.find(self.src, from, "}%%") {
-                    Some(at) => self.token(DIRECTIVE, at - from + 6),
-                    None => {
-                        let start = self.pos;
-                        self.token(DIRECTIVE, line_len(r));
-                        self.error(start, start + 3, "unclosed directive: expected `}%%`");
-                    }
-                }
+                self.directive();
             } else if r.starts_with("%%") && self.at_line_start() {
                 self.token(COMMENT, line_len(r));
             } else {
                 return;
             }
+        }
+    }
+
+    pub fn directive(&mut self) {
+        let start = self.pos;
+        let (len, closed) = self.directives.len(self.src, start);
+        if closed {
+            self.token(DIRECTIVE, len);
+        } else {
+            self.start(ERROR);
+            self.token(ERROR_TOKEN, len);
+            self.finish();
+            self.error(start, start + 3, "unclosed directive: expected `}%%`");
         }
     }
 
@@ -924,6 +1068,18 @@ mod tests {
                 assert_eq!(meta.find(src, p), fresh(p), "{src:?} at {p}");
                 assert_eq!(next.find(src, p, "}"), plain(p), "{src:?} at {p}");
             }
+        }
+    }
+
+    #[test]
+    fn metadata_closer_cache_accounts_for_escaped_quotes() {
+        let src = r#"A@{ label: "a\"}b\\" } B@{ label: "c" } C@{ bad"#;
+        let mut meta = MetaClose::default();
+        let offsets: Vec<_> = src.match_indices("@{").map(|(i, _)| i + 2).collect();
+        for &pos in offsets.iter().chain(offsets.iter().rev()) {
+            let body = &src[pos..];
+            let expected = body.find(" }").map(|i| pos + i + 1);
+            assert_eq!(meta.find(src, pos), expected, "{body:?}");
         }
     }
 

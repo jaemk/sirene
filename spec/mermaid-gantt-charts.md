@@ -34,8 +34,9 @@ milliseconds) as Mermaid falls back to `Date`; anything else is an error. `axisF
 %V %w %W %x %X %y %Y %Z %%`, with the `-`, `_`, and `0` padding flags, in the en-US locale.
 
 Both formats, `tickInterval`, `topAxis`, `weekday`, and `displayMode: compact` may also be set in
-frontmatter (`config: gantt: axisFormat: ...`) or an `%%{init: {"gantt": {...}}}%%` directive; a
-statement in the diagram wins. Pixel settings (`barHeight`, `fontSize`, ...) are
+frontmatter (`config: gantt: axisFormat: ...`) or a valid `%%{init: {"gantt": {...}}}%%` directive; a
+statement in the diagram wins. Date and axis formats with control characters produce an error
+and leave the previous format in effect. Pixel settings (`barHeight`, `fontSize`, ...) are
 ignored. Tests: `dates`, `formats`, `config`.
 
 ## MGANTT-3 Model

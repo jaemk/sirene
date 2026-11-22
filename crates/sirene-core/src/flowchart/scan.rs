@@ -34,6 +34,7 @@ pub(crate) fn keyword(s: &str, kw: &str) -> bool {
     s.starts_with(kw) && id_len(s) == kw.len()
 }
 
+#[cfg(test)]
 use crate::lines::line_len;
 
 #[cfg(test)]
@@ -298,30 +299,43 @@ pub(crate) fn closing_stroke(s: &str, kind: StrokeKind) -> Option<usize> {
 /// Length of inline edge label text of `kind`: up to where a closing stroke may begin, or the
 /// end of the line.
 pub(crate) fn inline_edge_text_len(s: &str, kind: StrokeKind) -> usize {
-    let line = &s[..line_len(s)];
-    for (i, _) in line.char_indices() {
-        let r = &line[i..];
-        let stop = match kind {
-            StrokeKind::Normal => r.starts_with("--"),
-            StrokeKind::Thick => r.starts_with("=="),
-            StrokeKind::Dotted => closing_stroke(r, kind).is_some(),
-        };
-        if stop {
-            return i;
+    let bytes = s.as_bytes();
+    let mut at = 0;
+    while let Some(&b) = bytes.get(at) {
+        match b {
+            b'\n' => return at - usize::from(s[..at].ends_with('\r')),
+            b'-' if kind == StrokeKind::Normal && bytes.get(at + 1) == Some(&b'-') => return at,
+            b'=' if kind == StrokeKind::Thick && bytes.get(at + 1) == Some(&b'=') => return at,
+            b'.' | b'-' if kind == StrokeKind::Dotted => {
+                let dots_at = at + usize::from(b == b'-');
+                let dots = run(bytes, dots_at, b'.');
+                if dots > 0 {
+                    let end = dots_at + dots;
+                    if bytes.get(end) == Some(&b'-') {
+                        return at;
+                    }
+                    // No suffix of this run can close the stroke either.
+                    at = end;
+                    continue;
+                }
+            }
+            _ => {}
         }
+        at += 1;
     }
-    line.len()
+    at
 }
 
 /// Length of an edge id at the start of `s` (`id` in `id@-->`), if one is there.
 pub(crate) fn edge_id_len(s: &str) -> Option<usize> {
-    // Mermaid's LINK_ID: any run except whitespace, quotes, brackets, braces and `|`.
+    // Mermaid's LINK_ID, stopping at a statement separator.
     if stroke(s).is_some() {
         return None;
     }
     let n = s
         .find(|c: char| {
-            c.is_whitespace() || matches!(c, '"' | '[' | ']' | '(' | ')' | '{' | '}' | '|' | '@')
+            c.is_whitespace()
+                || matches!(c, ';' | '"' | '[' | ']' | '(' | ')' | '{' | '}' | '|' | '@')
         })
         .unwrap_or(s.len());
     let after = s[n..].strip_prefix('@')?;
@@ -540,6 +554,10 @@ mod tests {
         assert_eq!(inline_edge_text_len(" t.x .->B", StrokeKind::Dotted), 5);
         assert_eq!(inline_edge_text_len(" no close\nB", StrokeKind::Normal), 9);
         assert_eq!(inline_edge_text_len(" x", StrokeKind::Thick), 2);
+        assert_eq!(inline_edge_text_len(" é\r\n.->B", StrokeKind::Dotted), 3);
+        let dots = ".".repeat(100_000);
+        let label = format!("é{dots}x .->B");
+        assert_eq!(inline_edge_text_len(&label, StrokeKind::Dotted), 100_004);
     }
 
     #[test]
@@ -551,6 +569,7 @@ mod tests {
         assert_eq!(edge_id_len("e1@B"), None);
         assert_eq!(edge_id_len("e1"), None);
         assert_eq!(edge_id_len("@-->"), None);
+        assert_eq!(edge_id_len(";e1@-->B"), None);
         assert!(edge_start("-->"));
         assert!(edge_start("e1@-->"));
         assert!(!edge_start("B"));

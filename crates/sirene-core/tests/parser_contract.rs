@@ -2,11 +2,14 @@
 
 use proptest::prelude::*;
 use sirene_core::Diagnostic;
+use sirene_core::diagram::{self, Diagram, Kind, Lang};
+use sirene_core::railroad::Notation;
 use sirene_core::syntax::{SyntaxKind, SyntaxNode};
+use sirene_core::theme::ThemeConfig;
 
 #[path = "common/parser_registry.rs"]
 mod parser_registry;
-use parser_registry::PARSERS;
+use parser_registry::{PARSERS, check_ranges};
 
 #[test]
 fn fuzz_selector_mapping_is_stable_and_unique() {
@@ -56,49 +59,21 @@ fn fuzz_selector_mapping_is_stable_and_unique() {
         );
         assert!(names.insert(parser.name));
         assert!(headers.insert(parser.header));
+        assert_eq!(Kind::of(parser.header), parser.kind);
     }
 }
 
 fn check_contract(src: &str, tree: &SyntaxNode, diagnostics: &[Diagnostic]) {
     assert_eq!(tree.to_string(), src);
-    for d in diagnostics {
-        let start = u32::from(d.range.start()) as usize;
-        let end = u32::from(d.range.end()) as usize;
-        assert!(start <= end && end <= src.len(), "{d:?} in {src:?}");
-        assert!(
-            src.is_char_boundary(start) && src.is_char_boundary(end),
-            "{d:?} in {src:?}"
-        );
-    }
-}
-
-fn normalized(src: &str) -> String {
-    let mut chars = src.chars().peekable();
-    let mut out = String::new();
-    while let Some(c) = chars.next() {
-        out.push(if c == '\r' && chars.peek() != Some(&'\n') {
-            '\n'
-        } else {
-            c
-        });
-    }
-    out
+    check_ranges(src, diagnostics);
 }
 
 #[test]
 fn carriage_returns_follow_each_parsers_contract() {
     for parser in PARSERS {
-        let (name, parse, header, normalizes) = (
-            parser.name,
-            parser.parse,
-            parser.header,
-            parser.normalize_cr,
-        );
-        let src = format!("{header}\rcafé\r\nnext\r");
-        let (tree, diagnostics) = parse(&src);
-        let expected = if normalizes { normalized(&src) } else { src };
-        assert_eq!(tree.to_string(), expected, "{name}");
-        check_contract(&expected, &tree, &diagnostics);
+        let src = format!("{}\rcafé\r\nnext\r", parser.header);
+        let (tree, diagnostics) = (parser.parse)(&src);
+        check_contract(&parser.syntax_source(&src), &tree, &diagnostics);
     }
 }
 
@@ -154,19 +129,141 @@ fn valid_sources_and_recovery() {
     }
 }
 
+fn body_text() -> impl Strategy<Value = String> {
+    prop::collection::vec(
+        prop_oneof![
+            4 => prop::sample::select("abc01 ;\n\r\t->{}[]()@%:/\"'".chars().collect::<Vec<_>>()),
+            1 => any::<char>(),
+        ],
+        0..80,
+    )
+    .prop_map(|chars| chars.into_iter().collect())
+}
+
 proptest! {
     #[test]
     fn arbitrary_unicode_text_is_lossless_and_diagnostics_are_in_bounds(
-        body in prop::collection::vec(any::<char>(), 0..100)
+        body in body_text(),
+        nl in prop::sample::select(vec!["\n", "\r\n", "\r"]),
     ) {
-        let body: String = body.into_iter().collect();
         for parser in PARSERS {
-        let (name, parse, header, normalizes) = (parser.name, parser.parse, parser.header, parser.normalize_cr);
-            let src = format!("{header}\n{body}");
-            let (tree, diagnostics) = parse(&src);
-            let expected = if normalizes { normalized(&src) } else { src.clone() };
-            assert_eq!(tree.to_string(), expected, "{name}");
-            check_contract(&expected, &tree, &diagnostics);
+            let src = format!("{}{nl}{body}", parser.header);
+            let (tree, diagnostics) = (parser.parse)(&src);
+            check_contract(&parser.syntax_source(&src), &tree, &diagnostics);
+            let lowered = diagram::lower(&src);
+            prop_assert_eq!(lowered.kind, parser.kind, "{}", parser.name);
+            check_ranges(&src, &lowered.diagnostics);
         }
+    }
+
+    #[test]
+    fn forced_languages_dispatch_and_keep_ordered_diagnostics(body in body_text()) {
+        for lang in [Lang::Mermaid, Lang::Dot, Lang::PlantUml] {
+            let lowered = diagram::lower_as(&body, Some(lang));
+            prop_assert_eq!(lowered.kind, Kind::of_lang(&body, Some(lang)));
+            prop_assert_eq!(lowered.kind.lang(), lang);
+            prop_assert!(lowered.diagnostics.len() <= diagram::MAX_DIAGNOSTICS + 1);
+            prop_assert!(lowered.diagnostics.windows(2).all(|d| d[0].range.start() <= d[1].range.start()));
+            check_ranges(&body, &lowered.diagnostics);
+            if lang == Lang::Mermaid {
+                prop_assert_eq!(ThemeConfig::read(&body), lowered.theme);
+            }
+        }
+    }
+
+    #[test]
+    fn plantuml_multiline_description_warnings_point_to_original_text(
+        nl in prop::sample::select(vec!["\n", "\r\n", "\r"]),
+        indent in 0_usize..12,
+        label in "[a-z]{1,12}",
+        token in "[ࠀ-ࠫ𐀀-𐀝]{1,12}",
+    ) {
+        let padding = " ".repeat(indent);
+        let src = format!("@startuml{nl}component \"{label}{nl}{padding}second line\" {token}{nl}@enduml");
+        let lowered = diagram::lower(&src);
+        prop_assert_eq!(lowered.diagnostics.len(), 1, "{:?}", lowered.diagnostics);
+        let range = lowered.diagnostics[0].range;
+        let at = src.find(&token).unwrap();
+        prop_assert_eq!(usize::from(range.start()), at);
+        prop_assert_eq!(usize::from(range.end()), at + token.len());
+    }
+
+    #[test]
+    fn railroad_recovers_before_the_header_and_uses_its_notation(
+        nl in prop::sample::select(vec!["\n", "\r\n", "\r"]),
+        name in "[a-z]{1,12}",
+        terminal in "[a-z]{1,12}",
+    ) {
+        for (header, notation, definition) in [
+            ("railroad-beta", Notation::Ir, format!("= terminal(\"{terminal}\")")),
+            ("railroad-ebnf-beta", Notation::Ebnf, format!("= '{terminal}'")),
+            ("railroad-abnf-beta", Notation::Abnf, format!("= \"{terminal}\"")),
+            ("railroad-peg-beta", Notation::Peg, format!("<- '{terminal}'")),
+        ] {
+            let src = format!("%%{{unfinished{nl}{header}{nl}{name} {definition} ;{nl}");
+            let lowered = diagram::lower(&src);
+            prop_assert_eq!(lowered.diagnostics.len(), 1, "{:?}", lowered.diagnostics);
+            prop_assert_eq!(&lowered.diagnostics[0].message, "unclosed directive: expected `}%%`");
+            let Diagram::Railroad(chart) = lowered.diagram else {
+                return Err(proptest::test_runner::TestCaseError::fail("expected a railroad diagram"));
+            };
+            prop_assert_eq!(chart.notation, notation);
+            prop_assert_eq!(chart.rules.len(), 1);
+            prop_assert_eq!(&chart.rules[0].name, &name);
+        }
+    }
+
+    #[test]
+    fn indented_frontmatter_content_cannot_change_dispatch(
+        indent in 1_usize..9,
+        nl in prop::sample::select(vec!["\n", "\r\n", "\r"]),
+        bom in prop::sample::select(vec!["", "\u{feff}"]),
+        title in "[a-z ]{1,20}",
+        theme in prop::sample::select(vec!["dark", "forest", "default"]),
+        label in "[a-z]{1,10}",
+        value in 1_u16..100,
+    ) {
+        let spaces = " ".repeat(indent);
+        let src = format!(
+            "{bom}---{nl}title: |{nl}{spaces}{title}{nl}{spaces}---{nl}{spaces}@startuml{nl}config:{nl}  theme: {theme}{nl}---{nl}pie{nl}\"{label}\": {value}{nl}"
+        );
+        prop_assert_eq!(Kind::of(&src), Kind::Pie);
+        let lowered = diagram::lower(&src);
+        prop_assert_eq!(lowered.kind, Kind::Pie);
+        prop_assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+        prop_assert_eq!(ThemeConfig::read(&src), lowered.theme.clone());
+        let (name, range) = lowered.theme.name.unwrap();
+        prop_assert_eq!(name.as_str(), theme);
+        prop_assert_eq!(src.get(range), Some(theme));
+        let Diagram::Pie(pie) = lowered.diagram else {
+            return Err(proptest::test_runner::TestCaseError::fail("expected a pie chart"));
+        };
+        prop_assert_eq!(pie.slices.len(), 1);
+        prop_assert_eq!(&pie.slices[0].label, &label);
+    }
+
+    #[test]
+    fn theme_directives_commit_only_complete_settings(
+        nl in prop::sample::select(vec!["\n", "\r\n", "\r"]),
+        key in "[a-zA-Z]{1,10}",
+        first in "[a-z]{1,10}",
+        last in "[a-z]{1,10}",
+    ) {
+        let malformed = r#"%%{init: {theme: 'neutral', themeVariables: {leak: red}, invalid: [1 2]}}%%"#;
+        let valid = format!(
+            r#"%%{{"initialize": {{theme: "f\u006frest", themeVariables: {{{key}: "{last}"}}, ignored: [{{value: "}}%%"}}]}}}}%%"#,
+        );
+        let src = [
+            "---", "config:", "  theme: dark", "  themeVariables:",
+            &format!("    {key}: '{first}'"), "---", "flowchart TD", malformed, &valid, "A",
+        ].join(nl);
+        let config = ThemeConfig::read(&src);
+        prop_assert_eq!(&config, &diagram::lower(&src).theme);
+        let (name, range) = config.name.unwrap();
+        prop_assert_eq!(name, "forest");
+        prop_assert_eq!(src.get(range), Some(r"f\u006frest"));
+        prop_assert_eq!(config.variables, vec![(key.clone(), first), (key, last)]);
+        prop_assert_eq!(config.unread.len(), 1);
+        prop_assert_eq!(src.get(config.unread[0].clone()), Some(malformed));
     }
 }

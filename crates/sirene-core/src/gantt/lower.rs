@@ -113,16 +113,6 @@ pub(crate) fn lower_statements(
     (g, diagnostics, statements)
 }
 
-fn unquote(s: &str) -> String {
-    let s = s.trim();
-    for q in ['"', '\''] {
-        if s.len() >= 2 && s.starts_with(q) && s.ends_with(q) {
-            return s[1..s.len() - 1].to_owned();
-        }
-    }
-    s.to_owned()
-}
-
 /// The `key: value` lines under `config:` `gantt:` in a frontmatter block (MGANTT-2).
 fn frontmatter_config(block: &str) -> Vec<(String, String)> {
     text::frontmatter_config(block, "gantt")
@@ -130,23 +120,18 @@ fn frontmatter_config(block: &str) -> Vec<(String, String)> {
 
 /// The `key: value` pairs of the `gantt` object in an `%%{init: ...}%%` directive (MGANTT-2).
 fn directive_config(directive: &str) -> Vec<(String, String)> {
-    let Some(at) = directive.find("gantt") else {
-        return Vec::new();
-    };
-    let rest = &directive[at..];
-    let (Some(open), Some(close)) = (rest.find('{'), rest.find('}')) else {
-        return Vec::new();
-    };
-    if close < open {
-        return Vec::new();
-    }
-    rest[open + 1..close]
-        .split(',')
-        .filter_map(|pair| {
-            let (k, v) = pair.split_once(':')?;
-            Some((unquote(k), unquote(v)))
-        })
-        .collect()
+    use crate::directive::Part::Key;
+
+    let mut entries = Vec::new();
+    crate::directive::read(directive, |path, value, _| {
+        if let [Key(init), Key(section), Key(key)] = path
+            && crate::directive::is_init(init)
+            && section == "gantt"
+        {
+            entries.push((key.to_string(), value.to_owned()));
+        }
+    })
+    .map_or_else(Vec::new, |()| entries)
 }
 
 fn apply_config(
@@ -157,8 +142,16 @@ fn apply_config(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     match key {
-        "dateFormat" => g.date_format = value.to_owned(),
-        "axisFormat" => g.axis_format = value.to_owned(),
+        "dateFormat" | "axisFormat" => {
+            let target = if key == "dateFormat" {
+                &mut g.date_format
+            } else {
+                &mut g.axis_format
+            };
+            if let Err(message) = set_format(target, value) {
+                diagnostics.push(Diagnostic::new(tok.text_range(), message));
+            }
+        }
         "tickInterval" => match Interval::parse(value) {
             Some(i) => g.tick_interval = Some(i),
             None => diagnostics.push(Diagnostic::new(tok.text_range(), bad_interval(value))),
@@ -174,11 +167,28 @@ fn apply_config(
 }
 
 fn bad_interval(v: &str) -> String {
-    format!("`{v}` is not an interval; expected a number and a unit, such as `1day` or `2week`")
+    format!(
+        "`{}` is not an interval; expected a number and a unit, such as `1day` or `2week`",
+        v.escape_debug()
+    )
 }
 
 fn bad_weekday(v: &str) -> String {
-    format!("`{v}` is not a weekday; expected one such as `monday`")
+    format!(
+        "`{}` is not a weekday; expected one such as `monday`",
+        v.escape_debug()
+    )
+}
+
+fn set_format(target: &mut String, value: &str) -> Result<(), String> {
+    if value.chars().any(char::is_control) {
+        return Err(format!(
+            "`{}` contains a control character",
+            value.escape_debug()
+        ));
+    }
+    *target = value.to_owned();
+    Ok(())
 }
 
 fn setting(g: &mut Gantt, stmt: &SyntaxNode, diagnostics: &mut Vec<Diagnostic>) {
@@ -196,9 +206,18 @@ fn setting(g: &mut Gantt, stmt: &SyntaxNode, diagnostics: &mut Vec<Diagnostic>) 
             .map(str::to_owned)
             .collect()
     };
-    match kw.to_ascii_lowercase().as_str() {
-        "dateformat" => g.date_format = value,
-        "axisformat" => g.axis_format = value,
+    let kw = kw.to_ascii_lowercase();
+    match kw.as_str() {
+        "dateformat" | "axisformat" => {
+            let target = if kw == "dateformat" {
+                &mut g.date_format
+            } else {
+                &mut g.axis_format
+            };
+            if let Err(message) = set_format(target, &value) {
+                error(diagnostics, message);
+            }
+        }
         "tickinterval" => match Interval::parse(&value) {
             Some(i) => g.tick_interval = Some(i),
             None => error(diagnostics, bad_interval(&value)),
@@ -543,6 +562,12 @@ mod tests {
             ]
         );
         assert!(frontmatter_config("---\ntitle: x\n---").is_empty());
+        assert_eq!(
+            frontmatter_config(
+                "---\nconfig:\n  gantt:\n    topAxis: true\n    other:\n      axisFormat: '%Y'\n  other:\n    gantt:\n      weekday: friday\n---"
+            ),
+            [("topAxis".into(), "true".into())]
+        );
         let d = "%%{init: {'gantt': {'tickInterval': '1week', \"displayMode\": compact}}}%%";
         assert_eq!(
             directive_config(d),
@@ -553,5 +578,12 @@ mod tests {
         );
         assert!(directive_config("%%{init: {}}%%").is_empty());
         assert!(directive_config("%%{init: {'theme': 'x'}} gantt %%").is_empty());
+        assert!(directive_config("%%{wrap: {gantt: {topAxis: true}}}%%").is_empty());
+        assert!(directive_config("%%{init: {note: 'gantt: {topAxis: true}'}}%%").is_empty());
+        assert!(directive_config("%%{init: {gantt: {topAxis: true}, list: [}}%%").is_empty());
+        assert_eq!(
+            directive_config("%%{initialize: {gantt: {axisFormat: '%, }'}}}%%"),
+            [("axisFormat".into(), "%, }".into())]
+        );
     }
 }

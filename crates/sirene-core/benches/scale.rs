@@ -311,12 +311,42 @@ fn railroad_measurement(c: &mut Criterion) {
     group.finish();
 }
 
+/// Compare syntax parsing, theme-only reads, and full lowering on the same large documents.
+fn theme_reading(c: &mut Criterion) {
+    let mut group = c.benchmark_group("theme_reading");
+    group
+        .sample_size(10)
+        .warm_up_time(Duration::from_millis(500))
+        .measurement_time(Duration::from_secs(2));
+    for directives in [false, true] {
+        let mut src = String::from("flowchart TD\n");
+        for i in 0..5_000 {
+            if directives && i % 10 == 0 {
+                src.push_str("%%{init: {'theme':'dark'}}%%\n");
+            }
+            let _ = writeln!(src, "node{i}");
+        }
+        let suffix = if directives { "directives" } else { "plain" };
+        group.bench_with_input(BenchmarkId::new("parse", suffix), &src, |b, s| {
+            b.iter(|| sirene_core::flowchart::parse(black_box(s)))
+        });
+        group.bench_with_input(BenchmarkId::new("theme", suffix), &src, |b, s| {
+            b.iter(|| sirene_core::theme::ThemeConfig::read(black_box(s)))
+        });
+        group.bench_with_input(BenchmarkId::new("lower", suffix), &src, |b, s| {
+            b.iter(|| diagram::lower(black_box(s)))
+        });
+    }
+    group.finish();
+}
+
 criterion_group!(
     benches,
     scale,
     layout_scale,
     route_scale,
     treemap_text,
-    railroad_measurement
+    railroad_measurement,
+    theme_reading
 );
 criterion_main!(benches);

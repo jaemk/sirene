@@ -9,9 +9,11 @@ and `diagram_themes` in `crates/sirene/tests/cli.rs`.
 `theme` and `themeVariables` are read from the frontmatter's `config:` map and from every
 `%%{init: ...}%%` or `%%{initialize: ...}%%` directive, in any diagram type. Directives take
 precedence over the frontmatter, and a later directive over an earlier one. Directive bodies are
-JSON or the lenient form Mermaid accepts (single quotes, bare keys). An `init` directive that
-cannot be read, malformed or nested more than 64 deep (LANGS-8), is a warning, and its settings
-are ignored.
+JSON or a lenient form with single quotes and bare words. Quote values that contain spaces.
+Quoted keys and values use JSON escapes. Single-quoted strings also accept an escaped apostrophe.
+A bad escape makes the directive unreadable. Diagnostic spans refer to the original source.
+A malformed `init` directive or one nested more than 64 levels deep produces a warning.
+The parser ignores its settings (LANGS-8).
 
 ## MTHEME-2 Themes
 
@@ -39,3 +41,19 @@ the others are the `default` theme's. Other charts (git graphs, gantt charts, jo
 diagrams, XY charts, Venn diagrams) keep sirene's series colors, and other diagram-specific
 variables are not applied. Text output is not themed. Tests: `chart_colors` in
 `crates/sirene-core/src/theme.rs`, `diagram_themes`.
+
+## MTHEME-5 Directive boundaries
+
+Theme extraction reads only directive spans recognized by the Mermaid parser. Directive-shaped
+text inside labels and comments does not change theme settings or produce theme warnings.
+
+## MTHEME-6 Accepted configuration spans
+
+Theme settings come only from frontmatter and directive spans accepted by the parser; rejected
+frontmatter has no effect. The public theme reader uses the same line-ending preparation as
+lowering and reads syntax without constructing a semantic diagram model.
+
+An `init` or `initialize` directive applies its settings only after its entire body parses.
+Settings are read from their enclosing objects and frontmatter mappings. Quoted delimiters in arrays are literal,
+and arrays and objects both count toward the nesting limit. Theme ranges cover the source value
+on UTF-8 character boundaries.

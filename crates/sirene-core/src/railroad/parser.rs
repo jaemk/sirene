@@ -10,7 +10,7 @@ use rowan::GreenNode;
 
 use super::Notation;
 use crate::diagnostic::Diagnostic;
-use crate::lines::{Base, MAX_DEPTH, too_deep};
+use crate::lines::{Base, MAX_DEPTH, line_len, too_deep};
 use crate::syntax::SyntaxKind::*;
 
 pub(crate) const HEADERS: &[&str] = &[
@@ -32,16 +32,18 @@ pub(crate) const CONSTRUCTORS: &[&str] = &[
     "oneOrMore",
 ];
 
-pub(crate) fn parse(src: &str, notation: Notation) -> (GreenNode, Vec<Diagnostic>) {
+pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>, Notation) {
     let mut p = Parser {
         base: Base::new(src),
-        notation,
+        notation: Notation::default(),
         failed: false,
         depth: 0,
     };
     p.start(ROOT);
-    p.header(HEADERS, "railroad-beta", header_len);
-    if !p.diagnostics.is_empty() {
+    let (keyword, valid) = p.header_keyword(HEADERS, "railroad-beta", header_len);
+    let notation = keyword.and_then(Notation::of_header).unwrap_or_default();
+    p.notation = notation;
+    if !valid {
         // Without the header, the rest is not read.
         let len = p.rest().len();
         p.start(ERROR);
@@ -56,7 +58,8 @@ pub(crate) fn parse(src: &str, notation: Notation) -> (GreenNode, Vec<Diagnostic
         p.statement();
     }
     p.finish();
-    p.base.finish_tree()
+    let (green, diagnostics) = p.base.finish_tree();
+    (green, diagnostics, notation)
 }
 
 fn header_len(s: &str) -> usize {
@@ -174,21 +177,13 @@ impl<'a> Parser<'a> {
             let ws = r
                 .find(|c: char| !matches!(c, ' ' | '\t' | '\r' | '\n'))
                 .unwrap_or(r.len());
-            let line = crate::lines::line_len(r);
             if ws > 0 {
                 let nl = r[..ws].contains('\n');
                 self.token(if nl { NEWLINE } else { WHITESPACE }, ws);
-            } else if let Some(body) = r.strip_prefix("%%{") {
-                match body.find("}%%") {
-                    Some(i) => self.token(DIRECTIVE, i + 6),
-                    None => {
-                        let start = self.pos;
-                        self.token(DIRECTIVE, line);
-                        self.error(start, start + 3, "unclosed directive: expected `}%%`");
-                    }
-                }
+            } else if r.starts_with("%%{") {
+                self.directive();
             } else if r.starts_with("%%") {
-                self.token(COMMENT, line);
+                self.token(COMMENT, line_len(r));
             } else if let Some(n) = self.comment_len(r, rule_start) {
                 self.token(COMMENT, n);
             } else {
@@ -199,7 +194,6 @@ impl<'a> Parser<'a> {
 
     /// The length of a comment in this notation at the start of `r`.
     fn comment_len(&mut self, r: &str, rule_start: bool) -> Option<usize> {
-        let line = crate::lines::line_len(r);
         let block = |open: &str, close: &str| -> Option<Result<usize, ()>> {
             let body = r.strip_prefix(open)?;
             Some(
@@ -211,13 +205,15 @@ impl<'a> Parser<'a> {
         let found = match self.notation {
             Notation::Ir => block("/*", "*/"),
             Notation::Ebnf => block("/*", "*/").or_else(|| block("(*", "*)")),
-            Notation::Peg => r.starts_with('#').then_some(Ok(line)),
-            Notation::Abnf => {
+            Notation::Peg => r.starts_with('#').then(|| Ok(line_len(r))),
+            Notation::Abnf if r.starts_with(';') => {
+                let line = line_len(r);
                 // A `;` with text after it on its line starts a comment, as does any `;` where
                 // a rule may start; otherwise it ends a rule.
                 let text_after = r.get(1..line).is_some_and(|t| !t.trim().is_empty());
-                (r.starts_with(';') && (rule_start || text_after)).then_some(Ok(line))
+                (rule_start || text_after).then_some(Ok(line))
             }
+            Notation::Abnf => None,
         };
         match found? {
             Ok(n) => Some(n),
@@ -236,12 +232,16 @@ impl<'a> Parser<'a> {
 
     fn statement(&mut self) {
         let r = self.rest();
-        let line = &r[..crate::lines::line_len(r)];
-        if line == "title" || line.starts_with("title ") || line.starts_with("title\t") {
+        if r.strip_prefix("title").is_some_and(|after| {
+            after.is_empty() || after.starts_with([' ', '\t', '\n']) || after.starts_with("\r\n")
+        }) {
             self.title();
             return;
         }
-        let after = |kw: &str| line.strip_prefix(kw).map(str::trim_start);
+        let after = |kw: &str| {
+            r.strip_prefix(kw)
+                .map(|tail| &tail[crate::lines::ws_len(tail)..])
+        };
         if after("accTitle").is_some_and(|t| t.starts_with(':'))
             || after("accDescr").is_some_and(|t| t.starts_with([':', '{']))
         {
@@ -441,7 +441,7 @@ impl<'a> Parser<'a> {
             };
             let r = &self.src[before..];
             // Look past trivia without consuming it unless an operator follows.
-            let skip = self.trivia_len(r);
+            let skip = self.trivia_len(before);
             let after = &r[skip..];
             let op = match self.notation {
                 Notation::Ebnf => {
@@ -493,7 +493,9 @@ impl<'a> Parser<'a> {
     }
 
     /// The length of the trivia at the start of `r`, without consuming it.
-    fn trivia_len(&self, r: &str) -> usize {
+    fn trivia_len(&mut self, start: usize) -> usize {
+        let src = self.src;
+        let r = &src[start..];
         let mut n = 0;
         loop {
             let s = &r[n..];
@@ -504,26 +506,27 @@ impl<'a> Parser<'a> {
                 n += ws;
                 continue;
             }
-            let line = crate::lines::line_len(s);
             let close = |open: &str, close: &str| {
                 s.strip_prefix(open).map(|b| {
                     b.find(close)
                         .map_or(s.len(), |i| open.len() + i + close.len())
                 })
             };
-            let more = if let Some(b) = s.strip_prefix("%%{") {
-                Some(b.find("}%%").map_or(line, |i| i + 6))
+            let more = if s.starts_with("%%{") {
+                Some(self.base.directives.len(src, start + n).0)
             } else if s.starts_with("%%") {
-                Some(line)
+                Some(line_len(s))
             } else {
                 match self.notation {
                     Notation::Ir => close("/*", "*/"),
                     Notation::Ebnf => close("/*", "*/").or_else(|| close("(*", "*)")),
-                    Notation::Peg => s.starts_with('#').then_some(line),
-                    Notation::Abnf => {
+                    Notation::Peg => s.starts_with('#').then(|| line_len(s)),
+                    Notation::Abnf if s.starts_with(';') => {
+                        let line = line_len(s);
                         let text_after = s.get(1..line).is_some_and(|t| !t.trim().is_empty());
-                        (s.starts_with(';') && text_after).then_some(line)
+                        text_after.then_some(line)
                     }
+                    Notation::Abnf => None,
                 }
             };
             match more {
@@ -681,7 +684,8 @@ mod tests {
     use crate::syntax::SyntaxNode;
 
     fn tree(src: &str, notation: Notation) -> (String, Vec<String>) {
-        let (green, d) = parse(src, notation);
+        let (green, d, parsed_notation) = parse(src);
+        assert_eq!(parsed_notation, notation);
         let root = SyntaxNode::new_root(green);
         assert_eq!(root.to_string(), src);
         (

@@ -19,6 +19,7 @@ pub mod class;
 pub mod cynefin;
 pub mod diagnostic;
 pub mod diagram;
+mod directive;
 pub mod dot;
 mod edits;
 pub mod er;

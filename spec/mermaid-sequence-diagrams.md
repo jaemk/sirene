@@ -7,10 +7,11 @@ PlantUML sequence diagrams lower to the same model (PUML-3). Reference:
 ## MSEQ-1 Syntax
 
 - Participants: `participant A`, `actor A`, `participant A as Alice`, and the typed forms
-  (`A@{ "type": "database" }`: boundary, control, entity, database, collections, queue);
-  `create participant` and `destroy A`; `box Color Title ... end`, which holds only
-  declarations (anything else is an error, as in Mermaid); a participant stays in the first
-  `box` that declares it, and a declaration in another is an error. Test: `box_contents`.
+  (`A@{ "type": "database" }`: boundary, control, entity, database, collections, queue).
+  Braces in quoted metadata values are literal. The parser also accepts `create participant`
+  and `destroy A`. A `box Color Title ... end` block holds only declarations. A participant
+  stays in the first `box` that declares it, and a declaration in another is an error.
+  Tests include `box_contents` and `quoted_participant_metadata_delimiters`.
 - Messages `A->>B: text` with arrows `->`, `-->`, `->>`, `-->>`, `-x`, `--x`, `-)`, `--)`,
   `<<->>`, `<<-->>`; `+` and `-` after the arrow activate and deactivate the target.
 - `activate A`, `deactivate A`; `autonumber`, `autonumber START`, `autonumber START STEP`,

@@ -1,0 +1,5 @@
+wardley-beta
+size [400, 300]
+anchor User [90, 50]
+component "App" [80, 30] label [5, -5] (buy) (inertia)
+User -> App

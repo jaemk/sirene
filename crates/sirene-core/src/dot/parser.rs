@@ -132,8 +132,8 @@ impl Iterator for Lexer<'_> {
             (NUMBER, numeral_len(r))
         } else if is_name_start(c) {
             let n = r.find(|c: char| !is_name_char(c)).unwrap_or(r.len());
-            let word = r[..n].to_ascii_lowercase();
-            let kind = if KEYWORDS.contains(&word.as_str()) {
+            let word = &r[..n];
+            let kind = if KEYWORDS.iter().any(|kw| word.eq_ignore_ascii_case(kw)) {
                 DOT_KW
             } else {
                 IDENT
@@ -225,38 +225,29 @@ fn error(d: &mut Vec<Diagnostic>, start: usize, end: usize, message: impl Into<S
 /// `strict`, `graph` or `digraph`, an optional ID, and `{` (LANGS-1).
 pub(crate) fn is_dot(src: &str) -> bool {
     // Only the first few tokens are read: this runs on whole documents of any language.
-    let mut it = Lexer::new(src)
-        .filter(|t| !t.kind.is_trivia())
-        .map(|t| (t.kind, src[t.start..t.end].to_ascii_lowercase()));
+    let keyword =
+        |t: Tok, kw: &str| t.kind == DOT_KW && src[t.start..t.end].eq_ignore_ascii_case(kw);
+    let mut it = Lexer::new(src).filter(|t| !t.kind.is_trivia());
     let mut next = it.next();
-    if next
-        .as_ref()
-        .is_some_and(|(k, w)| *k == DOT_KW && w == "strict")
-    {
+    if next.is_some_and(|t| keyword(t, "strict")) {
         next = it.next();
     }
-    if !next
-        .as_ref()
-        .is_some_and(|(k, w)| *k == DOT_KW && (w == "graph" || w == "digraph"))
-    {
+    if !next.is_some_and(|t| keyword(t, "graph") || keyword(t, "digraph")) {
         return false;
     }
     next = it.next();
-    if let Some((k, _)) = next
-        .as_ref()
-        .filter(|(k, _)| matches!(k, IDENT | NUMBER | STRING | HTML_STRING))
-    {
-        let quoted = *k == STRING;
+    if let Some(t) = next.filter(|t| matches!(t.kind, IDENT | NUMBER | STRING | HTML_STRING)) {
+        let quoted = t.kind == STRING;
         next = it.next();
         // A quoted ID may continue as `"a" + "b"`.
-        while quoted && next.as_ref().is_some_and(|(k, _)| *k == PLUS) {
-            if !it.next().is_some_and(|(k, _)| k == STRING) {
+        while quoted && next.is_some_and(|t| t.kind == PLUS) {
+            if !it.next().is_some_and(|t| t.kind == STRING) {
                 return false;
             }
             next = it.next();
         }
     }
-    next.is_some_and(|(k, _)| k == L_BRACE)
+    next.is_some_and(|t| t.kind == L_BRACE)
 }
 
 pub(crate) fn parse(src: &str) -> (GreenNode, Vec<Diagnostic>) {
