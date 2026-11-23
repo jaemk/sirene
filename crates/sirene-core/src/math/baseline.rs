@@ -321,6 +321,16 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             "type": "leftright", "mode": mode, "left": left, "right": right,
             "body": body.iter().map(katex_json).collect::<Vec<_>>(),
         }),
+        NodeKind::Accent {
+            label,
+            stretchy,
+            shifty,
+            base,
+        } => json!({"type": "accent", "mode": mode, "label": label, "isStretchy": stretchy,
+            "isShifty": shifty, "base": katex_json(base)}),
+        NodeKind::AccentUnder { label, base } => {
+            json!({"type": "accentUnder", "mode": mode, "label": label, "base": katex_json(base)})
+        }
         NodeKind::Middle { delim } => json!({"type": "middle", "mode": mode, "delim": delim}),
         NodeKind::SupSub { base, sup, sub } => {
             let mut fields = serde_json::Map::new();
@@ -404,7 +414,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (183, 432));
+    assert_eq!((same, unsupported), (215, 400));
 }
 
 #[test]
