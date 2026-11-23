@@ -83,6 +83,52 @@ pub(crate) enum NodeKind<'a> {
     Underline {
         body: Box<Node<'a>>,
     },
+    /// A delimiter of a fixed size: `\big(`, `\Bigr]`. The size is 1 to 4, the class says how it
+    /// is spaced, and the delimiter is as the source writes it (`(`, `\langle`).
+    DelimSizing {
+        size: u8,
+        class: MathClass,
+        delim: String,
+    },
+    /// `\left ... \right` with the delimiters, which grow to fit the body.
+    LeftRight {
+        body: Vec<Node<'a>>,
+        left: String,
+        right: String,
+    },
+    /// `\middle|` inside `\left ... \right`.
+    Middle {
+        delim: String,
+    },
+}
+
+impl NodeKind<'_> {
+    /// The name KaTeX gives the node's type, which its error messages use.
+    pub(crate) fn type_name(&self) -> &'static str {
+        match self {
+            NodeKind::Symbol { group, .. } => match group {
+                AtomGroup::MathOrd => "mathord",
+                AtomGroup::TextOrd => "textord",
+                AtomGroup::Spacing => "spacing",
+                AtomGroup::Op => "op-token",
+                AtomGroup::Accent => "accent-token",
+                _ => "atom",
+            },
+            NodeKind::Group { .. } => "ordgroup",
+            NodeKind::SupSub { .. } => "supsub",
+            NodeKind::Frac { .. } => "genfrac",
+            NodeKind::Sqrt { .. } => "sqrt",
+            NodeKind::Styling { .. } => "styling",
+            NodeKind::Text { .. } => "text",
+            NodeKind::Font { .. } => "font",
+            NodeKind::MClass { .. } => "mclass",
+            NodeKind::Overline { .. } => "overline",
+            NodeKind::Underline { .. } => "underline",
+            NodeKind::DelimSizing { .. } => "delimsizing",
+            NodeKind::LeftRight { .. } => "leftright",
+            NodeKind::Middle { .. } => "middle",
+        }
+    }
 }
 
 /// The atom classes `\mathbin` and the like set (TeX's `\mathord` through `\mathinner`).

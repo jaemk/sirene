@@ -26,6 +26,8 @@ pub(crate) fn parse(src: &str) -> Result<Vec<Node<'_>>, MathError> {
         expander: Expander::new(src, Mode::Math)?,
         next: None,
         mode: Mode::Math,
+        depth: 0,
+        leftright_depth: 0,
     };
     let body = parser.parse_expression(false)?;
     parser.expect_end()?;
@@ -38,6 +40,10 @@ struct Parser<'a> {
     /// The token ahead, already expanded; `None` once it has been consumed.
     next: Option<Token<'a>>,
     mode: Mode,
+    /// How many functions are open, bounded by `limits::MAX_DEPTH` as groups are.
+    depth: usize,
+    /// How many `\left` are open, which `\middle` needs.
+    leftright_depth: usize,
 }
 
 /// Whether `token` ends an expression: a closing brace, `\end`, `\right`, `\endgroup`, `&`, or
@@ -468,6 +474,12 @@ mod tests {
                 let inner: Vec<_> = body.iter().map(show).collect();
                 format!("{class:?}[{}]", inner.join(" "))
             }
+            NodeKind::DelimSizing { size, delim, .. } => format!("big{size}{delim}"),
+            NodeKind::LeftRight { body, left, right } => {
+                let inner: Vec<_> = body.iter().map(show).collect();
+                format!("left{left}[{}]right{right}", inner.join(" "))
+            }
+            NodeKind::Middle { delim } => format!("mid{delim}"),
             NodeKind::Overline { body } => format!("over<{}>", show(body)),
             NodeKind::Underline { body } => format!("under<{}>", show(body)),
         }
@@ -673,6 +685,47 @@ mod tests {
     fn lines() {
         assert_eq!(shown("\\overline{x}"), "over<{x}>");
         assert_eq!(shown("\\underline x"), "under<{x}>");
+    }
+
+    #[test]
+    fn delimiters() {
+        assert_eq!(shown("\\left( x \\right)"), "left([x]right)");
+        assert_eq!(shown("\\left. x \\right\\rangle"), "left.[x]right\\rangle");
+        assert_eq!(
+            shown("\\left( a \\middle| b \\right)"),
+            "left([a mid| b]right)"
+        );
+        assert_eq!(
+            shown("\\left( \\left[ x \\right] \\right)"),
+            "left([left[[x]right]]right)"
+        );
+        assert_eq!(shown("\\big( \\Bigr] \\biggm|"), "big1( big2] big3|");
+        assert_eq!(shown("\\bigl{(}"), "big1(");
+        assert_eq!(error("\\left( x"), "Expected '\\right', got 'EOF'");
+        assert_eq!(error("\\left( x }"), "Expected '\\right', got '}'");
+        assert_eq!(error("x \\right)"), "Expected 'EOF', got '\\right'");
+        assert_eq!(error("\\middle|"), "\\middle without preceding \\left");
+        assert_eq!(
+            error("\\left a x \\right)"),
+            "Invalid delimiter 'a' after '\\left'"
+        );
+        assert_eq!(error("\\big{ab}"), "Invalid delimiter type 'ordgroup'");
+        assert_eq!(error("\\left"), "Expected group as argument to '\\left'");
+    }
+
+    #[test]
+    fn function_nesting_is_bounded() {
+        let source = "\\left(".repeat(5_000);
+        assert!(error(&source).starts_with("groups nested more than"));
+        let source = "\\displaystyle".repeat(5_000);
+        assert!(error(&source).starts_with("groups nested more than"));
+        let source = "\\bf".repeat(20_000);
+        assert!(error(&source).starts_with("groups nested more than"));
+        // A function that cannot be an argument stops the chain at once.
+        assert_eq!(
+            error(&"\\mathbin".repeat(5_000)),
+            "Got function '\\mathbin' with no arguments as argument to '\\mathbin'"
+        );
     }
 
     #[test]

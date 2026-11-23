@@ -6,11 +6,13 @@
 //! its arguments are read. The commands here: fractions and binomials, `\sqrt`, the style
 //! commands, and `\text` with its font variants.
 
-use super::{MathError, Mode, Node, NodeKind, Parser, TokenKind, unsupported, written};
+use super::{MathError, Mode, Name, Node, NodeKind, Parser, TokenKind, unsupported, written};
 use crate::math::{
     ast::{MathClass, StyleName},
+    expander::token_text,
     functions::{self, Function},
     lexer::Token,
+    limits,
 };
 
 /// What a function builds, and the details that tell the commands of one kind apart.
@@ -42,6 +44,12 @@ enum Build {
     Binrel,
     Overline,
     Underline,
+    /// `\big` and the other fixed-size delimiters.
+    DelimSizing(u8, MathClass),
+    /// `\left ... \right`.
+    Left,
+    /// `\middle`.
+    Middle,
 }
 
 impl Build {
@@ -97,6 +105,24 @@ impl Build {
             "\\@binrel" => Build::Binrel,
             "\\overline" => Build::Overline,
             "\\underline" => Build::Underline,
+            "\\big" => Build::DelimSizing(1, MathClass::Ord),
+            "\\Big" => Build::DelimSizing(2, MathClass::Ord),
+            "\\bigg" => Build::DelimSizing(3, MathClass::Ord),
+            "\\Bigg" => Build::DelimSizing(4, MathClass::Ord),
+            "\\bigl" => Build::DelimSizing(1, MathClass::Open),
+            "\\Bigl" => Build::DelimSizing(2, MathClass::Open),
+            "\\biggl" => Build::DelimSizing(3, MathClass::Open),
+            "\\Biggl" => Build::DelimSizing(4, MathClass::Open),
+            "\\bigr" => Build::DelimSizing(1, MathClass::Close),
+            "\\Bigr" => Build::DelimSizing(2, MathClass::Close),
+            "\\biggr" => Build::DelimSizing(3, MathClass::Close),
+            "\\Biggr" => Build::DelimSizing(4, MathClass::Close),
+            "\\bigm" => Build::DelimSizing(1, MathClass::Rel),
+            "\\Bigm" => Build::DelimSizing(2, MathClass::Rel),
+            "\\biggm" => Build::DelimSizing(3, MathClass::Rel),
+            "\\Biggm" => Build::DelimSizing(4, MathClass::Rel),
+            "\\left" => Build::Left,
+            "\\middle" => Build::Middle,
             _ => return None,
         })
     }
@@ -143,8 +169,18 @@ impl<'a> Parser<'a> {
                 token.span.clone(),
             ));
         }
-        let args = self.parse_arguments(&name, &function)?;
-        self.build(build, &name, token, args).map(Some)
+        if self.depth >= limits::MAX_DEPTH {
+            return Err(MathError::new(
+                format!("groups nested more than {} deep", limits::MAX_DEPTH),
+                token.span.clone(),
+            ));
+        }
+        self.depth += 1;
+        let built = self
+            .parse_arguments(&name, &function)
+            .and_then(|args| self.build(build, &name, token, args));
+        self.depth -= 1;
+        built.map(Some)
     }
 
     fn parse_arguments(
@@ -433,6 +469,66 @@ impl<'a> Parser<'a> {
                     span,
                 })
             }
+            Build::DelimSizing(size, class) => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                let delim = check_delimiter(&arg.normalized(), name)?;
+                Ok(Node {
+                    kind: NodeKind::DelimSizing { size, class, delim },
+                    mode,
+                    span,
+                })
+            }
+            Build::Middle => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                let delim = check_delimiter(&arg, name)?;
+                if self.leftright_depth == 0 {
+                    return Err(MathError::new(
+                        "\\middle without preceding \\left",
+                        token.span.clone(),
+                    ));
+                }
+                Ok(Node {
+                    kind: NodeKind::Middle { delim },
+                    mode,
+                    span,
+                })
+            }
+            Build::Left => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let left = check_delimiter(&arg, name)?;
+                // The body runs to the matching `\right`, which ends an expression.
+                self.leftright_depth += 1;
+                let body = self.parse_expression(false);
+                self.leftright_depth -= 1;
+                let body = body?;
+                // The `\right` is read here, as the `\left` reads it, not by the expression.
+                let close = self.fetch()?;
+                if token_text(&close.kind) != "\\right" {
+                    return Err(MathError::new(
+                        format!("Expected '\\right', got '{}'", token_text(&close.kind)),
+                        close.span,
+                    ));
+                }
+                self.consume();
+                let right_arg = self.parse_argument("\\right", b'p', false)?;
+                let Some(right_arg) = right_arg else {
+                    return Err(missing("\\right"));
+                };
+                let right = check_delimiter(&right_arg, "\\right")?;
+                Ok(Node {
+                    kind: NodeKind::LeftRight { body, left, right },
+                    mode,
+                    span: start..right_arg.span.end,
+                })
+            }
             Build::Overline | Build::Underline => {
                 let Some(arg) = args.required.pop() else {
                     return Err(missing(name));
@@ -450,6 +546,85 @@ impl<'a> Parser<'a> {
                 })
             }
         }
+    }
+}
+
+/// The commands and characters a delimiter command takes.
+const DELIMITERS: &[&str] = &[
+    "(",
+    "\\lparen",
+    ")",
+    "\\rparen",
+    "[",
+    "\\lbrack",
+    "]",
+    "\\rbrack",
+    "\\{",
+    "\\lbrace",
+    "\\}",
+    "\\rbrace",
+    "\\lfloor",
+    "\\rfloor",
+    "\u{230a}",
+    "\u{230b}",
+    "\\lceil",
+    "\\rceil",
+    "\u{2308}",
+    "\u{2309}",
+    "<",
+    ">",
+    "\\langle",
+    "\u{27e8}",
+    "\\rangle",
+    "\u{27e9}",
+    "\\lt",
+    "\\gt",
+    "\\lvert",
+    "\\rvert",
+    "\\lVert",
+    "\\rVert",
+    "\\lgroup",
+    "\\rgroup",
+    "\u{27ee}",
+    "\u{27ef}",
+    "\\lmoustache",
+    "\\rmoustache",
+    "\u{23b0}",
+    "\u{23b1}",
+    "/",
+    "\\backslash",
+    "|",
+    "\\vert",
+    "\\|",
+    "\\Vert",
+    "\\uparrow",
+    "\\Uparrow",
+    "\\downarrow",
+    "\\Downarrow",
+    "\\updownarrow",
+    "\\Updownarrow",
+    ".",
+];
+
+/// The delimiter a node stands for, as the source writes it, if it is one `name` accepts.
+fn check_delimiter(node: &Node<'_>, name: &str) -> Result<String, MathError> {
+    let NodeKind::Symbol { name: symbol, .. } = &node.kind else {
+        return Err(MathError::new(
+            format!("Invalid delimiter type '{}'", node.kind.type_name()),
+            node.span.clone(),
+        ));
+    };
+    let text = match symbol {
+        Name::Char(text) => (*text).to_string(),
+        Name::Control(control) => format!("\\{control}"),
+    };
+    if DELIMITERS.contains(&text.as_str()) {
+        Ok(text)
+    } else {
+        Err(MathError::new(
+            format!("Invalid delimiter '{text}' after '{name}'"),
+            node.span.clone(),
+        ))
     }
 }
 
