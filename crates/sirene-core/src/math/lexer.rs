@@ -75,8 +75,9 @@ impl<'a> Lexer<'a> {
         Ok(Self { src, at: 0 })
     }
 
-    /// The next token, with `Eof` forever at the end of the source. An error leaves the lexer
-    /// where it was, so a caller that reports it and stops has no further state to reason about.
+    /// The next token, with `Eof` forever at the end of the source. An error leaves the lexer at
+    /// the offending character (after any comment before it), so asking again gives the same
+    /// error, and a caller that reports it and stops has no further state to reason about.
     pub(crate) fn next_token(&mut self) -> Result<Token<'a>, MathError> {
         loop {
             let start = self.at;
@@ -433,8 +434,8 @@ mod tests {
 
         proptest! {
             /// Whatever the input, the lexer returns tokens or an error and never panics, its
-            /// spans are in order, on character boundaries, and inside the source, and the
-            /// text of a character or control word token is in its span.
+            /// spans are in order, non-empty (but for `Eof`), on character boundaries, and
+            /// inside the source, and `Eof` ends at the end of the source.
             #[test]
             fn spans_are_ordered_and_valid(src in "[ -~\\n\\t\\r\\\\%\u{300}-\u{302}\u{e9}\u{1d6fc}]{0,80}") {
                 let mut lexer = Lexer::new(&src).unwrap();
