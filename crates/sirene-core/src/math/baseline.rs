@@ -199,6 +199,137 @@ fn the_expander_fails_where_katex_fails_in_expansion() {
     assert_eq!(checked, 22);
 }
 
+/// A parse tree as KaTeX's JSON writes it, so the two can be compared (`loc` is left out of the
+/// oracle).
+fn katex_json(node: &super::ast::Node<'_>) -> Value {
+    use super::ast::NodeKind;
+    use super::symbols::{AtomGroup, Mode, Name};
+    use serde_json::json;
+
+    let mode = match node.mode {
+        Mode::Math => "math",
+        Mode::Text => "text",
+    };
+    match &node.kind {
+        NodeKind::Symbol { group, name } => {
+            let text = match name {
+                Name::Char(text) => (*text).to_string(),
+                Name::Control(name) => format!("\\{name}"),
+            };
+            let family = |f: &str| json!({"type": "atom", "mode": mode, "family": f, "text": text});
+            let plain = |t: &str| json!({"type": t, "mode": mode, "text": text});
+            match group {
+                AtomGroup::Bin => family("bin"),
+                AtomGroup::Close => family("close"),
+                AtomGroup::Inner => family("inner"),
+                AtomGroup::Open => family("open"),
+                AtomGroup::Punct => family("punct"),
+                AtomGroup::Rel => family("rel"),
+                AtomGroup::MathOrd => plain("mathord"),
+                AtomGroup::TextOrd => plain("textord"),
+                AtomGroup::Spacing => plain("spacing"),
+                AtomGroup::Op => plain("op-token"),
+                AtomGroup::Accent => plain("accent-token"),
+            }
+        }
+        NodeKind::Group { body, semisimple } => {
+            let mut fields = serde_json::Map::new();
+            fields.insert("type".into(), "ordgroup".into());
+            fields.insert("mode".into(), mode.into());
+            fields.insert(
+                "body".into(),
+                body.iter().map(katex_json).collect::<Vec<_>>().into(),
+            );
+            if *semisimple {
+                fields.insert("semisimple".into(), true.into());
+            }
+            Value::Object(fields)
+        }
+        NodeKind::SupSub { base, sup, sub } => {
+            let mut fields = serde_json::Map::new();
+            fields.insert("type".into(), "supsub".into());
+            fields.insert("mode".into(), mode.into());
+            fields.insert(
+                "base".into(),
+                base.as_deref().map_or(Value::Null, katex_json),
+            );
+            if let Some(sup) = sup {
+                fields.insert("sup".into(), katex_json(sup));
+            }
+            if let Some(sub) = sub {
+                fields.insert("sub".into(), katex_json(sub));
+            }
+            Value::Object(fields)
+        }
+    }
+}
+
+/// The inputs of the oracle that need no macro settings, with KaTeX's answer for each.
+fn plain_oracle() -> Vec<(String, Value)> {
+    let data: serde_json::Map<String, Value> =
+        serde_json::from_str(include_str!("../../tests/fixtures/math/katex-oracle.json")).unwrap();
+    data.into_iter()
+        .filter_map(|(key, entry)| {
+            let (input, _display, macros): (String, bool, Value) =
+                serde_json::from_str(&key).unwrap();
+            macros.is_null().then_some((input, entry))
+        })
+        .collect()
+}
+
+/// The parser builds the tree KaTeX builds, for every baseline input it supports, and fails with
+/// KaTeX's message where KaTeX fails. An input that reaches a command the parser lacks is counted
+/// as not yet supported; the count falls as the parser grows.
+#[test]
+fn the_parser_agrees_with_katex() {
+    use super::parser::parse;
+
+    let (mut same, mut unsupported) = (0, 0);
+    let mut differences = Vec::new();
+    // Inputs where the design differs on purpose (the deviations table in spec/latex-math.md):
+    // KaTeX runs `\def` as a function of the parser, so it rejects a `\def` as the argument of a
+    // script ("Got function '\def' with no arguments as superscript"); here a definition is a
+    // macro the expander runs, and the script reads what follows it.
+    const DEVIATIONS: &[&str] = &["2^\\def\\foo{1}2"];
+    for (input, entry) in plain_oracle() {
+        if DEVIATIONS.contains(&input.as_str()) {
+            continue;
+        }
+        let parsed = parse(&input);
+        match (&parsed, entry.get("tree"), entry.get("parse_error")) {
+            (Err(e), _, _) if e.message.ends_with("supported yet") => unsupported += 1,
+            (Ok(nodes), Some(tree), _) => {
+                let ours = Value::Array(nodes.iter().map(katex_json).collect());
+                if ours == *tree {
+                    same += 1;
+                } else {
+                    differences.push(format!("tree differs  <-  {input:?}"));
+                }
+            }
+            (Err(e), None, Some(Value::String(expected))) => {
+                // The size of the expansion limit is not KaTeX's, and the message says so.
+                let same_message = e.message == *expected
+                    || (e.message.starts_with("Too many expansions")
+                        && expected.starts_with("Too many expansions"));
+                if same_message {
+                    same += 1;
+                } else {
+                    differences.push(format!(
+                        "{:?} vs KaTeX's {expected:?}  <-  {input:?}",
+                        e.message
+                    ));
+                }
+            }
+            (Ok(_), None, _) => differences.push(format!("accepted what KaTeX rejects: {input:?}")),
+            (Err(e), Some(_), _) => differences.push(format!("{:?}  <-  {input:?}", e.message)),
+            (Err(_), None, _) => differences.push(format!("no oracle answer: {input:?}")),
+        }
+    }
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+    // This count falls as the parser gains the functions.
+    assert_eq!((same, unsupported), (101, 514));
+}
+
 #[test]
 fn the_oracle_is_present() {
     let oracle = oracle();

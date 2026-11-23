@@ -9,16 +9,23 @@
 //! Rust's: values and `Result`s with byte ranges in the source, no global registries, no panics.
 #![allow(dead_code)]
 
+mod ast;
 #[cfg(test)]
 mod baseline;
 mod error;
 mod expander;
+mod functions;
+#[rustfmt::skip]
+mod functions_data;
 mod lexer;
 mod limits;
 #[rustfmt::skip]
 mod macros_data;
+mod parser;
 mod symbols;
 #[rustfmt::skip]
 mod symbols_data;
+#[rustfmt::skip]
+mod unicode_data;
 
 pub(crate) use error::MathError;

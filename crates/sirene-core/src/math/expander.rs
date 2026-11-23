@@ -13,7 +13,7 @@
 use std::{collections::HashMap, ops::Range, rc::Rc};
 
 use super::{
-    MathError,
+    MathError, functions,
     lexer::{Lexer, Token, TokenKind},
     limits, macros_data,
     symbols::{self, Mode, Name},
@@ -679,7 +679,7 @@ impl<'a> Expander<'a> {
     /// Whether `key` already means something: a macro, a symbol, or a command the parser reads.
     /// (The parser's own functions join this when they exist.)
     pub(crate) fn is_defined(&self, key: &Key<'a>) -> bool {
-        if self.macros.contains_key(key) {
+        if self.macros.contains_key(key) || functions::is_function(key) {
             return true;
         }
         let word = match key {
