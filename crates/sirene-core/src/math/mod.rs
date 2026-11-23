@@ -1,0 +1,18 @@
+//! The LaTeX math typesetter (LMATH, `spec/latex-math.md`).
+//!
+//! Source text goes through the lexer, a macro expander, and a parser to a tree, then through
+//! layout to a box tree that every output reads (LMATH-2). This module holds the stages built so
+//! far; the rest follow the order of LMATH-9. Nothing here is public until the typesetter draws
+//! a formula, so the items are used by tests only for now.
+//!
+//! Behavior follows KaTeX (LMATH-11), whose test cases are the baseline (LMATH-13). The design is
+//! Rust's: values and `Result`s with byte ranges in the source, no global registries, no panics.
+#![allow(dead_code)]
+
+#[cfg(test)]
+mod baseline;
+mod error;
+mod lexer;
+mod limits;
+
+pub(crate) use error::MathError;

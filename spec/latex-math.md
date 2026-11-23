@@ -223,6 +223,37 @@ KaTeX is a decision on record.
 Per LMATH-6, the lexer, expander, and parser each carry their bound from the start, and
 `sirene-fuzz` gets a `math` target with them (LANGS-11).
 
+## LMATH-14 Built so far: lexer, errors, limits
+
+`sirene_core::math` (crate-private until the typesetter draws a formula) has:
+
+- `MathError { message, span }`: KaTeX's wording without its `KaTeX parse error:` prefix, and a
+  byte range in the formula (LEMB-5).
+- `limits`: `MAX_SOURCE` (64 KiB), `MAX_DEPTH`, `MAX_EXPANSIONS`, `MAX_EXPANDED` (LMATH-6), and
+  `check_source`, which `Lexer::new` applies. The expansion and depth bounds are consumed by the
+  expander and parser, which do not exist yet.
+- `Lexer` and `Token { kind, span }` with typed kinds `Space`, `ControlWord(&str)`,
+  `ControlSymbol(char)`, `Char(&str)`, `Verb { star, delimiter, body }`, and `Eof`, borrowing
+  the source. It reads what KaTeX's lexer reads (its token regular expression, `src/Lexer.ts`)
+  and agrees with KaTeX on every input of the baseline (`math::baseline`, from
+  `katex-oracle.json`); it has unit tests per token class and a property test that spans are
+  ordered and valid for any input.
+
+Deviations from KaTeX (LMATH-T9):
+
+| Where | KaTeX | Here | Why |
+|---|---|---|---|
+| Token type | text strings, `\frac` as `"\\frac"` | typed kinds | match on a kind and a name, not on text with a backslash |
+| Catcodes | `%` and `~` are table entries a macro can change | `%` always starts a comment; `~` is a plain character the expander treats as the non-breaking space | `\catcode` is out of scope (LPA-2) |
+| `%` with no newline after it | a strict-mode warning | silent: the comment ends the formula | no strictness setting (LMATH-12) |
+| `\` before a character outside the BMP | "Unexpected character: '\\'" | same | KaTeX parity |
+| Source length | unbounded | 64 KiB | LMATH-6 |
+
+Not yet built, in order (LMATH-9): the symbol table (LRES-3), the macro expander, the parser and
+parse nodes, `Options` and `Style`, boxes, and layout. The fuzz target for the lexer waits for a
+public entry point, since `fuzz/` reaches only public items; until then the property test
+covers it.
+
 ## LMATH-T Tasks
 
 The work is split over four specs: this one (the engine), `latex-embedding.md` (Mermaid,
@@ -237,7 +268,9 @@ tracker; this one holds what is left for the engine itself.
 - [x] LMATH-T4 Decide in-tree or an existing crate: in-tree (LMATH-11).
 - [ ] LMATH-T5 Build in the order of LMATH-9, to the design of LMATH-13.
 - [ ] LMATH-T6 Read the KaTeX behavior for the first subset, then write the Rust types for
-  tokens, parse nodes, options, and boxes (LMATH-13) before any logic, and review them.
+  tokens, parse nodes, options, and boxes (LMATH-13) before any logic, and review them. Done:
+  errors, limits, tokens, and the lexer (LMATH-14). Next: parse nodes, `Options` and `Style`,
+  boxes.
 - [ ] LMATH-T8 Port the baseline tests as data (LMATH-13). Done so far:
   `scripts/katex-fixtures.mjs` (needs node, KaTeX 0.19.1, and the `yaml` package; setup in its
   header) extracts the `expect`...`` cases of `katex-spec.ts` and the `ss_data.yaml` inputs, runs
@@ -249,9 +282,10 @@ tracker; this one holds what is left for the engine itself.
   and depth in em for the 449 that build, or the error message for the 168 that do not). Not
   done: the cases written without the tagged-template form (the `expect(expression)` loops and
   the `getParsed` and `parseTree` helpers), `errors-spec.ts`, `unicode-spec.ts`,
-  `symgroups.ts`, box widths (KaTeX's DOM nodes carry none for spans), and the Rust reader and
-  tests, which arrive with the types of LMATH-T6.
-- [ ] LMATH-T9 Start the deviations table (LMATH-13) as cases are ported.
+  `symgroups.ts`, and box widths (KaTeX's DOM nodes carry none for spans). The Rust reader is
+  `math::baseline` (LMATH-14); it checks the lexer so far, and the parse and layout checks join
+  it as those stages land.
+- [ ] LMATH-T9 Keep the deviations table (LMATH-13) as cases are ported; started in LMATH-14.
 - [ ] LMATH-T7 Dropped: the RaTeX spike. RaTeX stays a comparison target for the layout tests
   (LPA-3), not a dependency.
 
