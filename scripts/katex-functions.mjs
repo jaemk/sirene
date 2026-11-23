@@ -19,6 +19,9 @@ register("./katex-ts-loader.mjs", import.meta.url);
 await import(new URL("../local/katex/src/functions.ts", import.meta.url));
 const { _functions } = await import(new URL("../local/katex/src/defineFunction.ts", import.meta.url));
 
+// One letter per argument: how the parser reads it (`original` is the default).
+const TYPE_CODES = { original: "o", math: "m", text: "t", primitive: "p", color: "c", size: "s", url: "u", hbox: "h", raw: "r" };
+
 const rows = [];
 for (const [name, spec] of Object.entries(_functions)) {
   rows.push({
@@ -31,6 +34,7 @@ for (const [name, spec] of Object.entries(_functions)) {
     argument: !!spec.allowedInArgument,
     primitive: !!spec.primitive,
     infix: !!spec.infix,
+    types: Array.from({ length: spec.numArgs + (spec.numOptionalArgs ?? 0) }, (_, i) => TYPE_CODES[spec.argTypes?.[i] ?? "original"]).join(""),
   });
 }
 rows.sort((a, b) => Buffer.compare(Buffer.from(a.name), Buffer.from(b.name)));
@@ -58,7 +62,7 @@ use super::functions::Row;
 pub(super) const FUNCTIONS: &[Row] = &[
 `;
 for (const r of rows) {
-  out += `    (${q(r.name)}, ${q(r.kind)}, ${r.args}, ${r.optional}, ${r.text}, ${r.math}, ${r.argument}, ${r.primitive}, ${r.infix}),\n`;
+  out += `    (${q(r.name)}, ${q(r.kind)}, ${r.args}, ${r.optional}, ${r.text}, ${r.math}, ${r.argument}, ${r.primitive}, ${r.infix}, ${q(r.types)}),\n`;
 }
 out += "];\n";
 writeFileSync(new URL("../crates/sirene-core/src/math/functions_data.rs", import.meta.url), out);
