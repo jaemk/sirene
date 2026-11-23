@@ -19,6 +19,10 @@ pub(crate) const MAX_EXPANDED: usize = 1024 * 1024;
 /// bounds that work at the size of the argument times this.
 pub(crate) const MAX_DELIMITERS: usize = 256;
 
+/// The text of a size argument written without braces (`\\kern1em`) is read up to this many
+/// bytes; a longer run is not a size.
+pub(crate) const MAX_SIZE_TEXT: usize = 64;
+
 /// The error for a source past `MAX_SOURCE`; the span is the first byte over the limit.
 pub(crate) fn check_source(src: &str) -> Result<(), MathError> {
     if src.len() <= MAX_SOURCE {

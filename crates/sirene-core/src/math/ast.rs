@@ -56,6 +56,8 @@ pub(crate) enum NodeKind<'a> {
     Styling {
         style: StyleName,
         body: Vec<Node<'a>>,
+        /// The font is reset too: the body of `\raisebox` and the box commands is text.
+        reset_font: bool,
     },
     /// Text set in text mode: `\text{...}` and the font variants. `font` is the command's name
     /// without its backslash.
@@ -125,6 +127,61 @@ pub(crate) enum NodeKind<'a> {
         always_handle_supsub: bool,
         limits: bool,
     },
+    /// A kern: `\kern1em`, `\mskip3mu`, `\hskip`.
+    Kern {
+        dimension: Measurement,
+    },
+    /// A rule: `\rule[shift]{width}{height}`.
+    Rule {
+        shift: Option<Measurement>,
+        width: Measurement,
+        height: Measurement,
+    },
+    /// Nodes in a color: `\textcolor{red}{x}`, and `\color{red}` for the rest of the group.
+    Color {
+        color: String,
+        body: Vec<Node<'a>>,
+    },
+    /// `\phantom{x}`: takes the space of the body and draws nothing.
+    Phantom {
+        body: Vec<Node<'a>>,
+    },
+    /// `\vphantom{x}`: takes the height and depth of the body only.
+    VPhantom {
+        body: Box<Node<'a>>,
+    },
+    /// `\smash[tb]{x}`: the body, with its height or depth (or both) set to nothing.
+    Smash {
+        body: Box<Node<'a>>,
+        height: bool,
+        depth: bool,
+    },
+    /// `\mathllap`, `\mathrlap`, `\mathclap`: the body takes no width. `alignment` is
+    /// `llap`, `rlap`, or `clap`.
+    Lap {
+        alignment: &'a str,
+        body: Box<Node<'a>>,
+    },
+    /// `\raisebox{dy}{x}`.
+    RaiseBox {
+        dy: Measurement,
+        body: Box<Node<'a>>,
+    },
+    /// A size command (`\Huge`, `\small`) and the rest of the group. `size` is 1 (`\tiny`)
+    /// to 11 (`\Huge`).
+    Sizing {
+        size: u8,
+        body: Vec<Node<'a>>,
+    },
+    /// A size argument as read, before the function that wanted it takes it apart.
+    Size {
+        value: Measurement,
+        is_blank: bool,
+    },
+    /// A color argument as read.
+    ColorToken(String),
+    /// Nothing: `\relax`. It is not kept in an expression, and a script after it has no base.
+    Internal,
     /// `\middle|` inside `\left ... \right`.
     Middle {
         delim: String,
@@ -156,6 +213,18 @@ impl NodeKind<'_> {
             NodeKind::DelimSizing { .. } => "delimsizing",
             NodeKind::LeftRight { .. } => "leftright",
             NodeKind::Middle { .. } => "middle",
+            NodeKind::Kern { .. } => "kern",
+            NodeKind::Rule { .. } => "rule",
+            NodeKind::Color { .. } => "color",
+            NodeKind::Phantom { .. } => "phantom",
+            NodeKind::VPhantom { .. } => "vphantom",
+            NodeKind::Smash { .. } => "smash",
+            NodeKind::Lap { .. } => "lap",
+            NodeKind::RaiseBox { .. } => "raisebox",
+            NodeKind::Sizing { .. } => "sizing",
+            NodeKind::Size { .. } => "size",
+            NodeKind::ColorToken(_) => "color-token",
+            NodeKind::Internal => "internal",
             NodeKind::Op { .. } => "op",
             NodeKind::OperatorName { .. } => "operatorname",
             NodeKind::Accent { .. } => "accent",
@@ -253,6 +322,14 @@ impl<'a> Node<'a> {
             _ => MathClass::Ord,
         }
     }
+}
+
+/// A length: a number and a unit (`1.5em`).
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Measurement {
+    pub number: f64,
+    /// Two lowercase letters, one of KaTeX's units.
+    pub unit: String,
 }
 
 /// What an operator shows.

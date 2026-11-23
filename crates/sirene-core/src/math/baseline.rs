@@ -262,7 +262,11 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             "type": "sqrt", "mode": mode, "body": katex_json(body),
             "index": index.as_deref().map(katex_json),
         }),
-        NodeKind::Styling { style, body } => {
+        NodeKind::Styling {
+            style,
+            body,
+            reset_font,
+        } => {
             use super::ast::StyleName;
             let style = match style {
                 StyleName::Display => "display",
@@ -270,8 +274,12 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
                 StyleName::Script => "script",
                 StyleName::ScriptScript => "scriptscript",
             };
-            json!({"type": "styling", "mode": mode, "style": style,
-                "body": body.iter().map(katex_json).collect::<Vec<_>>()})
+            let mut value = json!({"type": "styling", "mode": mode, "style": style,
+                "body": body.iter().map(katex_json).collect::<Vec<_>>()});
+            if *reset_font {
+                value["resetFont"] = true.into();
+            }
+            value
         }
         NodeKind::Text { body, font } => json!({
             "type": "text", "mode": mode, "font": format!("\\{font}"),
@@ -364,6 +372,40 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             "body": body.iter().map(katex_json).collect::<Vec<_>>(),
             "alwaysHandleSupSub": always_handle_supsub, "limits": limits,
             "parentIsSupSub": false}),
+        NodeKind::Kern { dimension } => {
+            json!({"type": "kern", "mode": mode, "dimension": measurement_json(dimension)})
+        }
+        NodeKind::Rule {
+            shift,
+            width,
+            height,
+        } => json!({"type": "rule", "mode": mode,
+            "shift": shift.as_ref().map(measurement_json),
+            "width": measurement_json(width), "height": measurement_json(height)}),
+        NodeKind::Color { color, body } => json!({"type": "color", "mode": mode, "color": color,
+            "body": body.iter().map(katex_json).collect::<Vec<_>>()}),
+        NodeKind::Phantom { body } => json!({"type": "phantom", "mode": mode,
+            "body": body.iter().map(katex_json).collect::<Vec<_>>()}),
+        NodeKind::VPhantom { body } => {
+            json!({"type": "vphantom", "mode": mode, "body": katex_json(body)})
+        }
+        NodeKind::Smash {
+            body,
+            height,
+            depth,
+        } => json!({"type": "smash", "mode": mode, "body": katex_json(body),
+            "smashHeight": height, "smashDepth": depth}),
+        NodeKind::Lap { alignment, body } => {
+            json!({"type": "lap", "mode": mode, "alignment": alignment, "body": katex_json(body)})
+        }
+        NodeKind::RaiseBox { dy, body } => json!({"type": "raisebox", "mode": mode,
+            "dy": measurement_json(dy), "body": katex_json(body)}),
+        NodeKind::Sizing { size, body } => json!({"type": "sizing", "mode": mode, "size": size,
+            "body": body.iter().map(katex_json).collect::<Vec<_>>()}),
+        NodeKind::Size { value, is_blank } => json!({"type": "size", "mode": mode,
+            "value": measurement_json(value), "isBlank": is_blank}),
+        NodeKind::ColorToken(color) => json!({"type": "color-token", "mode": mode, "color": color}),
+        NodeKind::Internal => json!({"type": "internal", "mode": mode}),
         NodeKind::Middle { delim } => json!({"type": "middle", "mode": mode, "delim": delim}),
         NodeKind::SupSub { base, sup, sub } => {
             let mut fields = serde_json::Map::new();
@@ -382,6 +424,16 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             Value::Object(fields)
         }
     }
+}
+
+/// A length as KaTeX's JSON writes it: a whole number has no decimal point.
+fn measurement_json(m: &super::ast::Measurement) -> Value {
+    let number = if m.number.fract() == 0.0 && m.number.abs() < 1e15 {
+        Value::from(m.number as i64)
+    } else {
+        Value::from(m.number)
+    };
+    serde_json::json!({"number": number, "unit": m.unit})
 }
 
 /// The inputs of the oracle that need no macro settings, with KaTeX's answer for each.
@@ -447,7 +499,28 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (250, 365));
+    assert_eq!((same, unsupported), (328, 287));
+}
+
+/// A development aid, not a check: which unsupported commands stop the most baseline inputs, to
+/// pick the next ones to build. Run with `cargo test -p sirene-core --lib unsupported_commands --
+/// --ignored --nocapture`.
+#[test]
+#[ignore]
+fn unsupported_commands_by_inputs_stopped() {
+    let mut counts = std::collections::BTreeMap::<String, usize>::new();
+    for (input, _) in plain_oracle() {
+        if let Err(e) = super::parser::parse(&input)
+            && e.message.ends_with("supported yet")
+        {
+            *counts.entry(e.message).or_default() += 1;
+        }
+    }
+    let mut rows: Vec<_> = counts.into_iter().collect();
+    rows.sort_by_key(|row| std::cmp::Reverse(row.1));
+    for (message, count) in rows.iter().take(50) {
+        println!("{count:4} {message}");
+    }
 }
 
 #[test]

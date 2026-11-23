@@ -5,6 +5,7 @@
 //! through the expander, one ahead, so macros are expanded as the parser reaches them. Commands
 //! that the function table lists but the parser does not build yet fail with "not supported yet".
 
+mod arguments;
 mod handlers;
 
 use std::ops::Range;
@@ -15,6 +16,7 @@ use super::{
     expander::{Expander, token_text},
     functions,
     lexer::{Token, TokenKind},
+    limits,
     symbols::{self, AtomGroup, Mode, Name},
     unicode_data,
 };
@@ -40,7 +42,7 @@ struct Parser<'a> {
     /// The token ahead, already expanded; `None` once it has been consumed.
     next: Option<Token<'a>>,
     mode: Mode,
-    /// How many functions are open, bounded by `limits::MAX_DEPTH` as groups are.
+    /// How many brace groups and functions are open, bounded by `limits::MAX_DEPTH`.
     depth: usize,
     /// How many `\left` are open, which `\middle` needs.
     leftright_depth: usize,
@@ -174,6 +176,21 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    /// Opens one level of nesting, a brace group or a function, which the parser reads by
+    /// recursion: braces and functions share the budget of `limits::MAX_DEPTH`, so the stack
+    /// they use is bounded. A level is closed with `self.depth -= 1`; an error ends the parse, so
+    /// the paths that fail need not close it.
+    fn enter(&mut self, at: &Range<usize>) -> Result<(), MathError> {
+        if self.depth >= limits::MAX_DEPTH {
+            return Err(MathError::new(
+                format!("groups nested more than {} deep", limits::MAX_DEPTH),
+                at.clone(),
+            ));
+        }
+        self.depth += 1;
+        Ok(())
+    }
+
     /// Switches between math and text mode, for the parser and the macros that read the mode.
     fn switch_mode(&mut self, mode: Mode) {
         self.mode = mode;
@@ -193,6 +210,11 @@ impl<'a> Parser<'a> {
                 break;
             }
             match self.parse_atom()? {
+                // Nothing (`\relax`) does not appear in the tree.
+                Some(Node {
+                    kind: NodeKind::Internal,
+                    ..
+                }) => {}
                 Some(atom) => body.push(atom),
                 None => break,
             }
@@ -206,6 +228,16 @@ impl<'a> Parser<'a> {
     /// A base and the scripts that follow it.
     fn parse_atom(&mut self) -> Result<Option<Node<'a>>, MathError> {
         let mut base = self.parse_group("atom")?;
+        // Nothing cannot take scripts; they find a base of their own next time.
+        if matches!(
+            base,
+            Some(Node {
+                kind: NodeKind::Internal,
+                ..
+            })
+        ) {
+            return Ok(base);
+        }
         // Text mode has no scripts.
         if self.mode == Mode::Text {
             return Ok(base);
@@ -369,7 +401,9 @@ impl<'a> Parser<'a> {
         };
         self.consume();
         self.expander.begin_group(&token.span)?;
+        self.enter(&token.span)?;
         let body = self.parse_expression(false)?;
+        self.depth -= 1;
         // The closer is consumed, but the token after it is not read until the group's
         // definitions have ended.
         let close = self.expect(closer)?;
@@ -541,7 +575,7 @@ mod tests {
                 Some(index) => format!("sqrt[{}]{}", show(index), show(body)),
                 None => format!("sqrt{}", show(body)),
             },
-            NodeKind::Styling { style, body } => {
+            NodeKind::Styling { style, body, .. } => {
                 let inner: Vec<_> = body.iter().map(show).collect();
                 format!("{style:?}[{}]", inner.join(" "))
             }
@@ -560,6 +594,41 @@ mod tests {
                 format!("left{left}[{}]right{right}", inner.join(" "))
             }
             NodeKind::Middle { delim } => format!("mid{delim}"),
+            NodeKind::Kern { dimension } => format!("kern{}{}", dimension.number, dimension.unit),
+            NodeKind::Rule { width, height, .. } => format!(
+                "rule{}{}x{}{}",
+                width.number, width.unit, height.number, height.unit
+            ),
+            NodeKind::Color { color, body } => {
+                let inner: Vec<_> = body.iter().map(show).collect();
+                format!("{color}[{}]", inner.join(" "))
+            }
+            NodeKind::Phantom { body } => {
+                let inner: Vec<_> = body.iter().map(show).collect();
+                format!("phantom[{}]", inner.join(" "))
+            }
+            NodeKind::VPhantom { body } => format!("vphantom<{}>", show(body)),
+            NodeKind::Smash {
+                body,
+                height,
+                depth,
+            } => format!(
+                "smash{}{}<{}>",
+                if *height { "t" } else { "" },
+                if *depth { "b" } else { "" },
+                show(body)
+            ),
+            NodeKind::Lap { alignment, body } => format!("{alignment}<{}>", show(body)),
+            NodeKind::RaiseBox { dy, body } => {
+                format!("raise{}{}<{}>", dy.number, dy.unit, show(body))
+            }
+            NodeKind::Sizing { size, body } => {
+                let inner: Vec<_> = body.iter().map(show).collect();
+                format!("size{size}[{}]", inner.join(" "))
+            }
+            NodeKind::Size { value, .. } => format!("{}{}", value.number, value.unit),
+            NodeKind::ColorToken(color) => color.clone(),
+            NodeKind::Internal => "internal".to_string(),
             NodeKind::Op {
                 limits, content, ..
             } => {
@@ -815,6 +884,38 @@ mod tests {
         assert_eq!(error("\\left"), "Expected group as argument to '\\left'");
     }
 
+    /// The deepest nesting the limits allow, braces and functions together, fits in the 2 MiB of a
+    /// test thread in a debug build (an optimized build needs a fraction of that, so a 1 MiB
+    /// WebAssembly stack is enough).
+    #[test]
+    fn the_deepest_allowed_nesting_fits_a_small_stack() {
+        let run = |source: String| {
+            std::thread::Builder::new()
+                .stack_size(2 * 1024 * 1024)
+                .spawn(move || {
+                    parse(&source)
+                        .map(|nodes| nodes.len())
+                        .map_err(|e| e.message)
+                })
+                .map(|handle| handle.join())
+        };
+        // Braces and `\left` together reach both limits.
+        let mixed = format!("{}x{}", "\\left({".repeat(60), "}\\right)".repeat(60));
+        assert!(matches!(run(mixed), Ok(Ok(_))));
+        for source in [
+            "{".repeat(100),
+            "\\left(".repeat(100),
+            "\\displaystyle ".repeat(100),
+            "\\bf ".repeat(100),
+            "\\color{red}".repeat(100),
+            "\\mathbf{".repeat(100),
+            "\\frac{".repeat(100),
+            "x^{".repeat(100),
+        ] {
+            assert!(matches!(run(source), Ok(Ok(_))));
+        }
+    }
+
     #[test]
     fn function_nesting_is_bounded() {
         let source = "\\left(".repeat(5_000);
@@ -887,6 +988,56 @@ mod tests {
         // A plain `\operatorname` ignores the control; the starred one takes it.
         assert_eq!(shown("\\operatorname{f}\\limits"), "opname[f]");
         assert_eq!(shown("\\operatorname*{f}\\limits"), "opnameL[f]");
+    }
+
+    #[test]
+    fn kerns_and_rules_read_sizes() {
+        assert_eq!(shown("\\kern1em"), "kern1em");
+        assert_eq!(shown("\\kern -0.5 em x"), "kern-0.5em x");
+        assert_eq!(shown("\\mkern{3mu}"), "kern3mu");
+        assert_eq!(shown("\\hskip 2pt"), "kern2pt");
+        assert_eq!(shown("\\rule{1em}{2pt}"), "rule1emx2pt");
+        assert_eq!(shown("\\rule[3pt]{1em}{2pt}"), "rule1emx2pt");
+        assert_eq!(error("\\kern x"), "Invalid size: 'x'");
+        assert_eq!(error("\\kern{3}"), "Invalid size: '3'");
+        assert_eq!(error("\\kern{3zz}"), "Invalid unit: 'zz'");
+        assert_eq!(error("\\kern"), "Invalid size: 'EOF'");
+        // A run of digits too long to be a size is not read to its end.
+        let long = format!("\\kern{}1em", "0".repeat(100));
+        assert!(parse(&long).is_err());
+    }
+
+    #[test]
+    fn colors_take_names_and_hex() {
+        assert_eq!(shown("\\textcolor{red}{x y}"), "red[x y]");
+        assert_eq!(shown("\\textcolor{ff0000}{x}"), "#ff0000[x]");
+        assert_eq!(shown("a\\color{#00f}b c"), "a #00f[b c]");
+        assert_eq!(shown("{\\color{blue}b}c"), "{blue[b]} c");
+        assert_eq!(error("\\color{no way}"), "Invalid color: 'no way'");
+        assert_eq!(error("\\textcolor{1}{x}"), "Invalid color: '1'");
+    }
+
+    #[test]
+    fn phantoms_laps_and_boxes() {
+        assert_eq!(shown("\\phantom{ab}"), "phantom[a b]");
+        assert_eq!(shown("\\vphantom{a}"), "vphantom<{a}>");
+        assert_eq!(shown("\\smash{a}"), "smashtb<{a}>");
+        assert_eq!(shown("\\smash[t]{a}"), "smasht<{a}>");
+        assert_eq!(shown("\\smash[b]{a}"), "smashb<{a}>");
+        assert_eq!(shown("\\smash[tb]{a}"), "smashtb<{a}>");
+        assert_eq!(shown("\\smash[x]{a}"), "smash<{a}>");
+        assert_eq!(shown("\\mathrlap{a}"), "rlap<{a}>");
+        assert_eq!(shown("\\mathclap{a}"), "clap<{a}>");
+        assert_eq!(shown("\\raisebox{2pt}{ab}"), "raise2pt<Text[{a b}]>");
+    }
+
+    #[test]
+    fn sizing_and_relax() {
+        assert_eq!(shown("a\\Huge b c"), "a size11[b c]");
+        assert_eq!(shown("\\tiny x"), "size1[x]");
+        // `\relax` is not in the tree, and a script after it has no base.
+        assert_eq!(shown("a\\relax b"), "a b");
+        assert_eq!(shown("\\relax^2"), "( ^2)");
     }
 
     #[test]
