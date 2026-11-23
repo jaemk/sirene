@@ -1,0 +1,3749 @@
+[
+ {
+  "src": "katex-spec.ts:36",
+  "input": "",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:40",
+  "input": "    x    y    ",
+  "expect": "parse_like",
+  "like": "xy",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:44",
+  "input": "    x   ^ y    ",
+  "expect": "parse_like",
+  "like": "x^y",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:119",
+  "input": "\\mathinner{\\langle{\\psi}\\rangle}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:120",
+  "input": "\\frac 1 {\\mathinner{\\langle{\\psi}\\rangle}}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:186",
+  "input": "\\KaTeX",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:192",
+  "input": "x^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:196",
+  "input": "x_3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:200",
+  "input": "x^2_3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:202",
+  "input": "x_2^3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:206",
+  "input": "^3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:207",
+  "input": "^3+",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:208",
+  "input": "_2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:209",
+  "input": "^3_2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:210",
+  "input": "_2^3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:254",
+  "input": "x^x^x",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:256",
+  "input": "x_x_x",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:258",
+  "input": "x_x^x_x",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:260",
+  "input": "x_x^x^x",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:262",
+  "input": "x^x_x_x",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:264",
+  "input": "x^x_x^x",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:268",
+  "input": "x^{2+3}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:270",
+  "input": "x_{3-2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:272",
+  "input": "x^{2+3}_3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:274",
+  "input": "x^2_{3-2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:276",
+  "input": "x^{2+3}_{3-2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:278",
+  "input": "x_{3-2}^{2+3}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:280",
+  "input": "x_3^{2+3}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:282",
+  "input": "x_{3-2}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:286",
+  "input": "x^{x^x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:287",
+  "input": "x^{x_x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:288",
+  "input": "x_{x^x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:289",
+  "input": "x_{x_x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:297",
+  "input": "\\hskip1em\\relax^2",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:308",
+  "input": "^3",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:309",
+  "input": "_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:310",
+  "input": "^3_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:311",
+  "input": "_2^3",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:317",
+  "input": "3\\nolimits_2^2",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:318",
+  "input": "\\sqrt\\limits_2^2",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:319",
+  "input": "45 +\\nolimits 45",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:323",
+  "input": "\\int\\limits_2^2 3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:324",
+  "input": "\\sum\\nolimits_3^4 4",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:328",
+  "input": "\\int_2^2\\limits",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:329",
+  "input": "\\int^2\\nolimits_2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:330",
+  "input": "\\int_2\\limits^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:334",
+  "input": "\\int_2\\nolimits^2\\limits 3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:335",
+  "input": "\\int\\nolimits\\limits_2^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:336",
+  "input": "\\int\\limits\\limits\\limits_2^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:352",
+  "input": "{xy}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:369",
+  "input": "\\begingroup xy \\endgroup",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:373",
+  "input": "\\begingroup xy",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:374",
+  "input": "\\begingroup xy }",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:396",
+  "input": "\\Large x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:397",
+  "input": "abc {abc \\Large xyz} abc",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:458",
+  "input": "\\div",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:462",
+  "input": "\\blue x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:466",
+  "input": "\\frac 1 2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:470",
+  "input": "\\blue",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:474",
+  "input": "\\frac",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:476",
+  "input": "\\frac 1",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:480",
+  "input": "\\redx",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:484",
+  "input": "\\frac12",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:488",
+  "input": "\\;x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:691",
+  "input": "\\frac{x}{y}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:692",
+  "input": "\\dfrac{x}{y}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:693",
+  "input": "\\tfrac{x}{y}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:694",
+  "input": "\\cfrac{x}{y}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:695",
+  "input": "\\genfrac ( ] {0.06em}{0}{a}{b+c}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:696",
+  "input": "\\genfrac ( ] {0.8pt}{}{a}{b+c}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:697",
+  "input": "\\genfrac {} {} {0.8pt}{}{a}{b+c}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:698",
+  "input": "\\genfrac [ {} {0.8pt}{}{a}{b+c}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:729",
+  "input": "a \\over b",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:730",
+  "input": "a \\atop b",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:731",
+  "input": "a \\choose b",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:732",
+  "input": "a \\brace b",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:733",
+  "input": "a \\brack b",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:825",
+  "input": "\\text{graph: $y = mx + b$}",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:826",
+  "input": "\\text{graph: \\(y = mx + b\\)}",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:830",
+  "input": "\\text{hello $x + \\text{world $y$} + z$}",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:831",
+  "input": "\\text{hello \\(x + \\text{world $y$} + z\\)}",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:832",
+  "input": "\\text{hello $x + \\text{world \\(y\\)} + z$}",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:833",
+  "input": "\\text{hello \\(x + \\text{world \\(y\\)} + z\\)}",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:837",
+  "input": "\\(",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:838",
+  "input": "\\text{$\\(x\\)$}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:842",
+  "input": "$x$",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:843",
+  "input": "\\text{\\($x$\\)}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:847",
+  "input": "\\)",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:848",
+  "input": "\\text{\\)}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:852",
+  "input": "$",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:853",
+  "input": "\\text{$}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:857",
+  "input": "\\text{$x\\)}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:858",
+  "input": "\\text{\\(x$}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:862",
+  "input": "a b\\, \\; \\! \\: \\> ~ \\thinspace \\medspace \\quad \\ ",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:863",
+  "input": "\\enspace \\thickspace \\qquad \\space \\nobreakspace",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:871",
+  "input": "\\text{a \\vdots b ⋮ d}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:877",
+  "input": "\\lang\\N\\darr\\R\\dArr\\Z\\Darr\\alef\\rang",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:878",
+  "input": "\\alefsym\\uarr\\Alpha\\uArr\\Beta\\Uarr\\Chi",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:879",
+  "input": "\\clubs\\diamonds\\hearts\\spades\\cnums\\Complex",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:880",
+  "input": "\\Dagger\\empty\\harr\\Epsilon\\hArr\\Eta\\Harr\\exist",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:881",
+  "input": "\\image\\larr\\infin\\lArr\\Iota\\Larr\\isin\\Kappa",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:882",
+  "input": "\\Mu\\lrarr\\natnums\\lrArr\\Nu\\Lrarr\\Omicron",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:883",
+  "input": "\\real\\rarr\\plusmn\\rArr\\reals\\Rarr\\Reals\\Rho",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:884",
+  "input": "\\text{\\sect}\\sdot\\sub\\sube\\supe",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:885",
+  "input": "\\Tau\\thetasym\\weierp\\Zeta",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1093",
+  "input": "\\rlap{\\,/}{=}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1094",
+  "input": "\\mathrlap{\\,/}{=}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1095",
+  "input": "{=}\\llap{/\\,}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1096",
+  "input": "{=}\\mathllap{/\\,}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1097",
+  "input": "\\sum_{\\clap{ABCDEFG}}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1098",
+  "input": "\\sum_{\\mathclap{ABCDEFG}}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1102",
+  "input": "\\mathrlap{\\frac{a}{b}}{=}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1103",
+  "input": "{=}\\mathllap{\\frac{a}{b}}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1104",
+  "input": "\\sum_{\\mathclap{\\frac{a}{b}}}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1108",
+  "input": "\\rlap{\\frac{a}{b}}{=}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1109",
+  "input": "{=}\\llap{\\frac{a}{b}}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1110",
+  "input": "\\sum_{\\clap{\\frac{a}{b}}}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1364",
+  "input": "\\begin{matrix}a&b\\\\c&d\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1368",
+  "input": "\\begin{array}{cc}a&b\\\\c&d\\end{array}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1372",
+  "input": "\\begin{aligned}\\end{aligned}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1373",
+  "input": "\\begin{matrix}\\end{matrix}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1377",
+  "input": "\\begin{matrix}\\hline a&b\\\\ \\hline c&d\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1378",
+  "input": "\\begin{matrix}\\hline a&b\\cr \\hline c&d\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1379",
+  "input": "\\begin{matrix}\\hdashline a&b\\\\ \\hdashline c&d\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1390",
+  "input": "\\hline",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1394",
+  "input": "\\begin{matrix}a&b\\\\c&d\\end{pmatrix}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1398",
+  "input": "\\begin{matrix}a&b\\\\c&d\\right{pmatrix}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1402",
+  "input": "\\begin{matrix}a&b\\\\c&d",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1406",
+  "input": "{\\begin{matrix}a&b\\\\c&d}\\end{matrix}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1410",
+  "input": "\\begin{matrix}0&1\\over2&3\\\\4&5&6\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1420",
+  "input": "\\begin{matrix}a&b\\cr c&d\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1421",
+  "input": "\\begin{matrix}a&b\\\\c&d\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1425",
+  "input": "\\begin{matrix}a&b\\cr[c]&d\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1429",
+  "input": "\\begin{matrix}a&b\\\\ [c]&d\\end{matrix}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1430",
+  "input": "a\\\\ [b]",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1444",
+  "input": "\\begin{matrix*}[r] a & -1 \\\\ -1 & d \\end{matrix*}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1445",
+  "input": "\\begin{pmatrix*}[r] a & -1 \\\\ -1 & d \\end{pmatrix*}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1446",
+  "input": "\\begin{bmatrix*}[r] a & -1 \\\\ -1 & d \\end{bmatrix*}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1447",
+  "input": "\\begin{Bmatrix*}[r] a & -1 \\\\ -1 & d \\end{Bmatrix*}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1448",
+  "input": "\\begin{vmatrix*}[r] a & -1 \\\\ -1 & d \\end{vmatrix*}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1449",
+  "input": "\\begin{Vmatrix*}[r] a & -1 \\\\ -1 & d \\end{Vmatrix*}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1450",
+  "input": "\\begin{matrix*} a & -1 \\\\ -1 & d \\end{matrix*}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1451",
+  "input": "\\begin{matrix*}[] a & -1 \\\\ -1 & d \\end{matrix*}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1481",
+  "input": "\\Large\\sqrt[3]{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1485",
+  "input": "\\sqrt\\foo",
+  "expect": "parse_like",
+  "like": "\\\\sqrt123",
+  "settings_raw": "new Settings({macros: {\"\\\\foo\": \"123\"}})"
+ },
+ {
+  "src": "katex-spec.ts:1490",
+  "input": "\\sqrt[2]\\foo",
+  "expect": "parse_like",
+  "like": "\\\\sqrt[2]{123}",
+  "settings_raw": "new Settings({macros: {\"\\\\foo\": \"123\"}})"
+ },
+ {
+  "src": "katex-spec.ts:1497",
+  "input": "\\frac 2 3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1516",
+  "input": "x^",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1517",
+  "input": "x_",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1592",
+  "input": "x''''",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1593",
+  "input": "x_2''",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1594",
+  "input": "x''_2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1598",
+  "input": "\\sqrt^23",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1599",
+  "input": "\\frac^234",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1600",
+  "input": "\\frac2^34",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1604",
+  "input": "\\sqrt2^3",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1605",
+  "input": "\\frac23^4",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1609",
+  "input": "\\sqrt \\frac x y",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1610",
+  "input": "\\sqrt \\text x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1611",
+  "input": "x^\\frac x y",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1612",
+  "input": "x_\\text x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1646",
+  "input": "\\int_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1647",
+  "input": "\\iint_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1648",
+  "input": "\\iiint_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1649",
+  "input": "\\int\\nolimits_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1650",
+  "input": "\\iint\\nolimits_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1651",
+  "input": "\\iiint\\nolimits_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1652",
+  "input": "\\oint_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1653",
+  "input": "\\oiint_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1654",
+  "input": "\\oiiint_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1655",
+  "input": "\\oint\\nolimits_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1656",
+  "input": "\\oiint\\nolimits_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1657",
+  "input": "\\oiiint\\nolimits_i^n",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1658",
+  "input": "\\mathop{\\int}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1659",
+  "input": "\\mathop \\int",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1665",
+  "input": "\\displaystyle x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1666",
+  "input": "\\textstyle x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1667",
+  "input": "\\scriptstyle x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1668",
+  "input": "\\scriptscriptstyle x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1780",
+  "input": "\\mathrm x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1781",
+  "input": "\\mathbb x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1782",
+  "input": "\\mathit x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1783",
+  "input": "\\mathnormal x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1784",
+  "input": "\\mathrm {x + 1}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1785",
+  "input": "\\mathbb {x + 1}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1786",
+  "input": "\\mathit {x + 1}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1787",
+  "input": "\\mathnormal {x + 1}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1791",
+  "input": "\\mathcal{ABC123}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1792",
+  "input": "\\mathfrak{abcABC123}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1845",
+  "input": "\\mathbb \\mathrm R",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:1860",
+  "input": "e^\\mathbf{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:1880",
+  "input": "\\pmb{\\mu}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1881",
+  "input": "\\pmb{=}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1882",
+  "input": "\\pmb{+}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1883",
+  "input": "\\pmb{\\frac{x^2}{x_1}}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1884",
+  "input": "\\pmb{}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:1891",
+  "input": "\\raisebox{5pt}{text}",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1892",
+  "input": "\\raisebox{-5pt}{text}",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1896",
+  "input": "\\vcenter{\\frac a b}",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1900",
+  "input": "\\raisebox{5pt}{\\frac a b}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1901",
+  "input": "\\raisebox{-5pt}{\\frac a b}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1905",
+  "input": "\\hbox{\\frac a b}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1909",
+  "input": "\\raisebox5pt{text}",
+  "expect": "no_build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1910",
+  "input": "\\raisebox-5pt{text}",
+  "expect": "no_build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1963",
+  "input": "x%y",
+  "expect": "no_parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:1964",
+  "input": "x%y",
+  "expect": "parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:2570",
+  "input": "\\vec{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2571",
+  "input": "\\vec{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2572",
+  "input": "\\vec{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2573",
+  "input": "\\vec x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2574",
+  "input": "\\underbar{X}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2590",
+  "input": "\\widehat{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2591",
+  "input": "\\widecheck{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2595",
+  "input": "\\overrightarrow{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2601",
+  "input": "\\vec{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2602",
+  "input": "\\vec{x}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2603",
+  "input": "\\vec{x}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2604",
+  "input": "\\vec{x}_2^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2632",
+  "input": "\\widehat{AB}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2633",
+  "input": "\\widecheck{AB}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2634",
+  "input": "\\widehat{AB}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2635",
+  "input": "\\widehat{AB}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2636",
+  "input": "\\widehat{AB}_2^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2650",
+  "input": "\\overrightarrow{AB}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2651",
+  "input": "\\overrightarrow{AB}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2652",
+  "input": "\\overrightarrow{AB}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2653",
+  "input": "\\overrightarrow{AB}_2^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2676",
+  "input": "\\underrightarrow{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2677",
+  "input": "\\underrightarrow{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2678",
+  "input": "\\underrightarrow{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2679",
+  "input": "\\underrightarrow x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2697",
+  "input": "\\underrightarrow{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2698",
+  "input": "\\underrightarrow{x}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2699",
+  "input": "\\underrightarrow{x}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2700",
+  "input": "\\underrightarrow{x}_2^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2715",
+  "input": "\\xrightarrow{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2716",
+  "input": "\\xrightarrow{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2717",
+  "input": "\\xrightarrow{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2718",
+  "input": "\\xrightarrow x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2719",
+  "input": "\\xrightarrow[under]{over}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2737",
+  "input": "\\xrightarrow{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2738",
+  "input": "\\xrightarrow{x}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2739",
+  "input": "\\xrightarrow{x}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2740",
+  "input": "\\xrightarrow{x}_2^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2741",
+  "input": "\\xrightarrow[under]{over}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2756",
+  "input": "\\overbrace{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2757",
+  "input": "\\overbrace{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2758",
+  "input": "\\overbrace{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2759",
+  "input": "\\overbrace x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2760",
+  "input": "\\underbrace{x}_2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2761",
+  "input": "\\underbrace{x}_2^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2779",
+  "input": "\\overbrace{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2780",
+  "input": "\\overbrace{x}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2781",
+  "input": "\\underbrace{x}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2782",
+  "input": "\\underbrace{x}_2^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2797",
+  "input": "\\overbracket{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2798",
+  "input": "\\underbracket{x}_2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2824",
+  "input": "\\overbracket{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2825",
+  "input": "\\underbracket{x}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2836",
+  "input": "\\boxed{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2837",
+  "input": "\\boxed{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2838",
+  "input": "\\boxed{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2839",
+  "input": "\\boxed x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2851",
+  "input": "\\boxed{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2852",
+  "input": "\\boxed{x}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2853",
+  "input": "\\boxed{x}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2854",
+  "input": "\\boxed{x}_2^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2868",
+  "input": "\\fbox{\\frac a b}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:2874",
+  "input": "\\colorbox{red}{a b}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2875",
+  "input": "\\colorbox{red}{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2876",
+  "input": "\\colorbox{red} x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2880",
+  "input": "\\colorbox{red}{\\alpha}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:2881",
+  "input": "\\colorbox{red}{\\frac{a}{b}}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:2885",
+  "input": "\\colorbox{red}{a b}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2886",
+  "input": "\\colorbox{#197}{a b}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2887",
+  "input": "\\colorbox{#1a9b7c}{a b}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2898",
+  "input": "\\colorbox{red}{a b}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2899",
+  "input": "\\colorbox{red}{a b}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2900",
+  "input": "\\colorbox{red} x",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2910",
+  "input": "\\fcolorbox{blue}{yellow}{a b}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2911",
+  "input": "\\fcolorbox{blue}{yellow}{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2912",
+  "input": "\\fcolorbox{blue}{yellow} x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2916",
+  "input": "\\fcolorbox{blue}{yellow}{\\alpha}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:2917",
+  "input": "\\fcolorbox{blue}{yellow}{\\frac{a}{b}}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:2921",
+  "input": "\\fcolorbox{blue}{yellow}{a b}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2922",
+  "input": "\\fcolorbox{blue}{#197}{a b}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2923",
+  "input": "\\fcolorbox{blue}{#1a9b7c}{a b}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2934",
+  "input": "\\fcolorbox{blue}{yellow}{a b}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2935",
+  "input": "\\fcolorbox{blue}{yellow}{a b}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2936",
+  "input": "\\fcolorbox{blue}{yellow} x",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2946",
+  "input": "\\cancel{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2947",
+  "input": "\\cancel{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2948",
+  "input": "\\cancel{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2949",
+  "input": "\\cancel x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2967",
+  "input": "\\cancel{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2968",
+  "input": "\\cancel{x}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2969",
+  "input": "\\cancel{x}_2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2970",
+  "input": "\\cancel{x}_2^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2971",
+  "input": "\\sout{x}",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:2972",
+  "input": "\\sout{x}^2",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:2973",
+  "input": "\\sout{x}_2",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:2974",
+  "input": "\\sout{x}_2^2",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:2975",
+  "input": "\\text{\\sout{abc}}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:2989",
+  "input": "\\text{\\sout{abc}}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:2993",
+  "input": "\\sout{x}",
+  "expect": "no_parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:2999",
+  "input": "a_{\\angl{n}}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3002",
+  "input": "\\text{a_{\\angl{n}}}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3008",
+  "input": "a_{\\angl{n}}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3009",
+  "input": "a_{\\angl{n}i}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3010",
+  "input": "a_{\\angl n}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3011",
+  "input": "a_\\angln",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3017",
+  "input": "\\text{\\phase{-78.2^\\circ}}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3020",
+  "input": "\\phase{-78.2^\\circ}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3026",
+  "input": "\\phantom{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3027",
+  "input": "\\phantom{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3028",
+  "input": "\\phantom{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3029",
+  "input": "\\phantom x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3030",
+  "input": "\\hphantom{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3031",
+  "input": "\\hphantom{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3032",
+  "input": "\\hphantom{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3033",
+  "input": "\\hphantom x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3046",
+  "input": "\\phantom{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3047",
+  "input": "\\phantom{x^2}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3048",
+  "input": "\\phantom{x}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3049",
+  "input": "\\phantom x",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3052",
+  "input": "\\hphantom{x}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3053",
+  "input": "\\hphantom{x^2}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3054",
+  "input": "\\hphantom{x}^2",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3055",
+  "input": "\\hphantom x",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3075",
+  "input": "\\smash{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3076",
+  "input": "\\smash{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3077",
+  "input": "\\smash{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3078",
+  "input": "\\smash x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3080",
+  "input": "\\smash[b]{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3081",
+  "input": "\\smash[b]{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3082",
+  "input": "\\smash[b]{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3083",
+  "input": "\\smash[b] x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3085",
+  "input": "\\smash[]{x}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3086",
+  "input": "\\smash[]{x^2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3087",
+  "input": "\\smash[]{x}^2",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3088",
+  "input": "\\smash[] x",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3100",
+  "input": "\\smash{x}",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3101",
+  "input": "\\smash{x^2}",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3102",
+  "input": "\\smash{x}^2",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3103",
+  "input": "\\smash x",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3105",
+  "input": "\\smash[b]{x}",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3106",
+  "input": "\\smash[b]{x^2}",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3107",
+  "input": "\\smash[b]{x}^2",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3108",
+  "input": "\\smash[b] x",
+  "expect": "build",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3126",
+  "input": "\\frac[1]{2}{3}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3128",
+  "input": "\\rule[0.2em]{1em}{1em}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3132",
+  "input": "\\sqrt[3]{2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3136",
+  "input": "\\sqrt{2}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3137",
+  "input": "\\rule{1em}{2em}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3141",
+  "input": "\\rule[1]{2em}{3em}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3145",
+  "input": "\\sqrt[",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3185",
+  "input": "\\begin{subarray}{cc}a \\\\ b\\end{subarray}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3186",
+  "input": "\\begin{subarray}{c}a & b \\\\ c & d\\end{subarray}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3187",
+  "input": "\\begin{subarray}{c}a \\\\ b\\end{subarray}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3195",
+  "input": "\\sum_{\\substack{ 0<i<m \\\\ 0<j<n }}  P(i,j)",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3198",
+  "input": "\\sum_{\\substack{ 0<i<m \\\\ 0<j<n }}  P(i,j)",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3201",
+  "input": "\\sum_{\\substack{ 0<i<\\varPi \\\\ 0<j<\\pi }}  P(i,j)",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3204",
+  "input": "\\sum_{\\substack{}}  P(i,j)",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3212",
+  "input": "\\begin{smallmatrix} a & b \\\\ c & d \\end{smallmatrix}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3238",
+  "input": "\\begin{aligned}a&=b&c&=d\\\\e&=f\\end{aligned}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3242",
+  "input": "\\begin{aligned}[a]&[b]\\\\ [c]&[d]\\end{aligned}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3246",
+  "input": "\\begin{aligned}[a]&[b]\\\\[c]&[d]\\end{aligned}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3278",
+  "input": "\\begin{gather}a+b\\\\c+d\\end{gather}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3279",
+  "input": "\\begin{gather*}a+b\\\\c+d\\end{gather*}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3280",
+  "input": "\\begin{align}a&=b+c\\\\d+e&=f\\end{align}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3281",
+  "input": "\\begin{align*}a&=b+c\\\\d+e&=f\\end{align*}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3282",
+  "input": "\\begin{alignat}{2}10&x+ &3&y = 2\\\\3&x+&13&y = 4\\end{alignat}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3283",
+  "input": "\\begin{alignat*}{2}10&x+ &3&y = 2\\\\3&x+&13&y = 4\\end{alignat*}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3284",
+  "input": "\\begin{equation}a=b+c\\end{equation}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3285",
+  "input": "\\begin{split}a &=b+c\\\\&=e+f\\end{split}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3286",
+  "input": "\\begin{CD}A @>a>> B \\\\@VbVV @AAcA\\\\C @= D\\end{CD}",
+  "expect": "no_parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:3291",
+  "input": "\\begin{gather}a+b\\\\c+d\\end{gather}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3292",
+  "input": "\\begin{gather*}a+b\\\\c+d\\end{gather*}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3293",
+  "input": "\\begin{align}a&=b+c\\\\d+e&=f\\end{align}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3294",
+  "input": "\\begin{align*}a&=b+c\\\\d+e&=f\\end{align*}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3295",
+  "input": "\\begin{alignat}{2}10&x+ &3&y = 2\\\\3&x+&13&y = 4\\end{alignat}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3296",
+  "input": "\\begin{alignat*}{2}10&x+ &3&y = 2\\\\3&x+&13&y = 4\\end{alignat*}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3297",
+  "input": "\\begin{equation}a=b+c\\end{equation}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3298",
+  "input": "\\begin{equation}\\begin{split}a &=b+c\\\\&=e+f\\end{split}\\end{equation}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3299",
+  "input": "\\begin{split}a &=b+c\\\\&=e+f\\end{split}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3300",
+  "input": "\\begin{CD}A @<a<< B @>>b> C @>>> D\\\\@. @| @AcAA @VVdV \\\\@. E @= F @>>> G\\end{CD}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3304",
+  "input": "\\begin{gather}\\end{gather}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3305",
+  "input": "\\begin{gather*}\\end{gather*}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3306",
+  "input": "\\begin{align}\\end{align}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3307",
+  "input": "\\begin{align*}\\end{align*}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3308",
+  "input": "\\begin{alignat}{2}\\end{alignat}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3309",
+  "input": "\\begin{alignat*}{2}\\end{alignat*}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3310",
+  "input": "\\begin{equation}\\end{equation}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3311",
+  "input": "\\begin{split}\\end{split}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3312",
+  "input": "\\begin{CD}\\end{CD}",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3316",
+  "input": "\\begin{equation}a=\\cr b+c\\end{equation}",
+  "expect": "no_parse",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3319",
+  "input": "\\begin{equation}a &=b+c\\end{equation}",
+  "expect": "no_build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3322",
+  "input": "\\begin{equation}\\begin{split}a &=b &+c\\\\&=e &+f\\end{split}\\end{equation}",
+  "expect": "no_build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3325",
+  "input": "\\begin{array}{2}a & b & c\\\\d & e  f\\end{array}",
+  "expect": "no_build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:3354",
+  "input": "\\operatorname{x*Π∑\\Pi\\sum\\frac a b}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3355",
+  "input": "\\operatorname*{x*Π∑\\Pi\\sum\\frac a b}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3356",
+  "input": "\\operatorname*{x*Π∑\\Pi\\sum\\frac a b}_y x",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3357",
+  "input": "\\operatorname*{x*Π∑\\Pi\\sum\\frac a b}\\limits_y x",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3359",
+  "input": "\\operatorname{sn}\\limits_{b>c}(b+c)",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3365",
+  "input": "\\href{http://example.com/}{\\sin}",
+  "expect": "build",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3366",
+  "input": "\\url{http://example.com/}",
+  "expect": "build",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3370",
+  "input": "\\href{}{example here}",
+  "expect": "build",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3371",
+  "input": "\\url{}",
+  "expect": "build",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3375",
+  "input": "\\href%end",
+  "expect": "parse_like",
+  "like": "\\\\href{%}end",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3376",
+  "input": "\\url%end",
+  "expect": "parse_like",
+  "like": "\\\\url{%}end",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3378",
+  "input": "\\url end",
+  "expect": "parse_like",
+  "like": "\\\\url{e}nd",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3379",
+  "input": "\\url%end",
+  "expect": "parse_like",
+  "like": "\\\\url {%}end",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3383",
+  "input": "\\href %end",
+  "expect": "parse_like",
+  "like": "\\\\href{%}end",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3384",
+  "input": "\\url %end",
+  "expect": "parse_like",
+  "like": "\\\\url{%}end",
+  "settings_raw": "trustSettings"
+ },
+ {
+  "src": "katex-spec.ts:3404",
+  "input": "\\href{http://example.com/{a}{bar}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3405",
+  "input": "\\href{http://example.com/}a}{bar}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3406",
+  "input": "\\url{http://example.com/{a}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3407",
+  "input": "\\url{http://example.com/}a}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3501",
+  "input": "\\includegraphics{https://cdn.kastatic.org/images/apple-touch-icon-57x57-precomposed.new.png}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3516",
+  "input": "\\error",
+  "expect": "parse",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3521",
+  "input": "2_\\error",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3522",
+  "input": "3^{\\error}_\\error",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3523",
+  "input": "\\int\\nolimits^\\error_\\error",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3527",
+  "input": "\\frac{345}{\\error}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3528",
+  "input": "\\frac\\error{\\error}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3532",
+  "input": "\\sqrt\\error",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3533",
+  "input": "\\sqrt{234\\error}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3537",
+  "input": "\\text{\\error}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3541",
+  "input": "\\begin{\\pmatrix}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3542",
+  "input": "\\begin{\\error}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3543",
+  "input": "\\begin{\\error}x\\end{\\error}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3544",
+  "input": "\\begin{matrix}a\\end{\\pmatrix}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3553",
+  "input": "\\@char{\\error}",
+  "expect": "build",
+  "settings_raw": "noThrowSettings"
+ },
+ {
+  "src": "katex-spec.ts:3641",
+  "input": "e^\\foo",
+  "expect": "parse_like",
+  "like": "e^1 23",
+  "settings_raw": "new Settings({macros: {\"\\\\foo\": \"123\"}})"
+ },
+ {
+  "src": "katex-spec.ts:3646",
+  "input": "\\text{\\foo}",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3651",
+  "input": "\\text{\\foo{ x}}",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3656",
+  "input": "\\foo",
+  "expect": "parse_like",
+  "like": "x",
+  "settings_raw": "new Settings({macros: {\"\\\\foo\": \" x\"}})"
+ },
+ {
+  "src": "katex-spec.ts:3660",
+  "input": "\\text{\\foo }",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3665",
+  "input": "\\text{\\foo }",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3670",
+  "input": "\\text{\\\\ }",
+  "expect": "parse_like"
+ },
+ {
+  "src": "katex-spec.ts:3683",
+  "input": "\\text{\\% y}",
+  "expect": "parse_like"
+ },
+ {
+  "src": "katex-spec.ts:3688",
+  "input": "\\text{\\' }",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3692",
+  "input": "\\text{\\foo 1 2}",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3694",
+  "input": "\\text{\\foo {1} {2}}",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3699",
+  "input": "1\\foo2",
+  "expect": "parse_like",
+  "like": "1aa2",
+  "settings_raw": "new Settings({macros: {\n            \"\\\\foo\": \"\\\\bar\\\\bar\",\n            \"\\\\bar\": \"a\",\n        }})"
+ },
+ {
+  "src": "katex-spec.ts:3706",
+  "input": "1\\foo2",
+  "expect": "parse_like",
+  "like": "12222",
+  "settings_raw": "new Settings({macros: {\n            \"\\\\foo\": \"\\\\bar{#1}\\\\bar{#1}\",\n            \"\\\\bar\": \"#1#1\",\n        }})"
+ },
+ {
+  "src": "katex-spec.ts:3713",
+  "input": "\\foo\\bar",
+  "expect": "parse_like",
+  "like": "(xyz)",
+  "settings_raw": "new Settings({macros: {\n            \"\\\\foo\": \"(#1)\",\n            \"\\\\bar\": \"xyz\",\n        }})"
+ },
+ {
+  "src": "katex-spec.ts:3720",
+  "input": "\\foo{e^{x_{12}+3}}",
+  "expect": "parse_like",
+  "like": "(e^{x_{12}+3})",
+  "settings_raw": "new Settings({macros: {\"\\\\foo\": \"(#1)\"}})"
+ },
+ {
+  "src": "katex-spec.ts:3725",
+  "input": "\\expandafter\\foo\\bar",
+  "expect": "parse_like",
+  "like": "x+y",
+  "settings_raw": "new Settings({macros: {\n            \"\\\\foo\": \"#1+#2\",\n            \"\\\\bar\": \"xy\",\n        }})"
+ },
+ {
+  "src": "katex-spec.ts:3731",
+  "input": "\\expandafter\\foo\\def\\foo{x}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3736",
+  "input": "\\noexpand\\foo y",
+  "expect": "parse_like",
+  "like": "y",
+  "settings_raw": "new Settings({macros: {\"\\\\foo\": \"x\"}})"
+ },
+ {
+  "src": "katex-spec.ts:3739",
+  "input": "\\expandafter\\foo\\noexpand\\foo",
+  "expect": "parse_like",
+  "like": "x",
+  "settings_raw": "new Settings({macros: {\"\\\\foo\": \"x\"}})"
+ },
+ {
+  "src": "katex-spec.ts:3748",
+  "input": "\\text{\\foo\\bar}",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3755",
+  "input": "\\foo\\bar",
+  "expect": "parse_like",
+  "like": "()",
+  "settings_raw": "new Settings({macros: {\n            \"\\\\foo\": \"(#1)\",\n            \"\\\\bar\": \" \",\n        }})"
+ },
+ {
+  "src": "katex-spec.ts:3762",
+  "input": "\\text{\\foo\\bar\\bar}",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3769",
+  "input": "\\text{\\foo\\relax x}",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3775",
+  "input": "\\foo\\bar\\bar",
+  "expect": "parse_like",
+  "like": "(,)",
+  "settings_raw": "new Settings({macros: {\n            \"\\\\foo\": \"(#1,#2)\",\n            \"\\\\bar\": \" \",\n        }})"
+ },
+ {
+  "src": "katex-spec.ts:3782",
+  "input": "\\foo\\bar",
+  "expect": "parse_like",
+  "like": "()",
+  "settings_raw": "new Settings({macros: {\n            \"\\\\foo\": \"(#1)\",\n            \"\\\\bar\": \"\",\n        }})"
+ },
+ {
+  "src": "katex-spec.ts:3789",
+  "input": "\\frac\\bar\\bar",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3795",
+  "input": "\\overset{f}{\\rightarrow} Y",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3796",
+  "input": "\\underset{f}{\\rightarrow} Y",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3800",
+  "input": "X \\iff Y",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3801",
+  "input": "X \\implies Y",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3802",
+  "input": "X \\impliedby Y",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3806",
+  "input": "x’=c",
+  "expect": "parse_like",
+  "like": "x'=c",
+  "settings_raw": "new Settings({macros: {\n            \"’\": \"'\",\n        }})"
+ },
+ {
+  "src": "katex-spec.ts:3878",
+  "input": "\\text\\mode",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3887",
+  "input": "\\char",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3889",
+  "input": "\\char'",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3890",
+  "input": "\\char\"",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3891",
+  "input": "\\char'a",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3892",
+  "input": "\\char\"g",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3893",
+  "input": "\\char\"g",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3897",
+  "input": "\\@char{\\text{2}}",
+  "expect": "fail",
+  "settings_raw": "\"\\\\@char has non-numeric argument at position 7:\" +\n               \" \\\\@char{̲\\\\̲t̲e̲x̲t̲{̲2̲}̲}̲\""
+ },
+ {
+  "src": "katex-spec.ts:3902",
+  "input": "\\text{\\@char{6 5}}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3928",
+  "input": "\\char\"110000",
+  "expect": "fail"
+ },
+ {
+  "src": "katex-spec.ts:3932",
+  "input": "\\gvertneqq\\lvertneqq\\ngeqq\\ngeqslant\\nleqq",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3933",
+  "input": "\\nleqslant\\nshortmid\\nshortparallel\\varsubsetneq",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3934",
+  "input": "\\varsubsetneqq\\varsupsetneq\\varsupsetneqq",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:3938",
+  "input": "\\text\\mode",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:3948",
+  "input": "\\gdef\\foo#2{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3949",
+  "input": "\\gdef\\foo#a{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3950",
+  "input": "\\gdef\\foo#1#3{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3951",
+  "input": "\\gdef\\foo#1#2#3#4#5#6#7#8#9{}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:3952",
+  "input": "\\gdef\\foo#1#2#3#4#5#6#7#8#9#10{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3953",
+  "input": "\\gdef\\foo1",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3954",
+  "input": "\\gdef{\\foo}{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3955",
+  "input": "\\gdef\\foo\\bar",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3956",
+  "input": "\\gdef{\\foo\\bar}{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3957",
+  "input": "\\gdef{}{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3964",
+  "input": "\\gdef\\foo|{}\\foo",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3965",
+  "input": "\\gdef\\foo#1|{#1}\\foo1",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3966",
+  "input": "\\gdef\\foo#1|{#1}\\foo1}|",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3976",
+  "input": "\\xdef\\bar{\\foo}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:3980",
+  "input": "\\gdef\\foo{1}",
+  "expect": "parse",
+  "settings_raw": "new Settings({maxExpand: 0})"
+ },
+ {
+  "src": "katex-spec.ts:3981",
+  "input": "2^\\def\\foo{1}2",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4006",
+  "input": "\\global\\foo",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4007",
+  "input": "\\global\\bar x",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4014",
+  "input": "\\long\\foo",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4040",
+  "input": "\\gdef\\foo{1}",
+  "expect": "parse",
+  "settings_raw": "new Settings({macros})"
+ },
+ {
+  "src": "katex-spec.ts:4046",
+  "input": "\\def\\foo{1}",
+  "expect": "parse",
+  "settings_raw": "new Settings({macros})"
+ },
+ {
+  "src": "katex-spec.ts:4052",
+  "input": "\\def\\foo{c^}\\foo",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({macros})"
+ },
+ {
+  "src": "katex-spec.ts:4058",
+  "input": "\\def\\foo{1}",
+  "expect": "parse",
+  "settings_raw": "new Settings({macros, globalGroup: true})"
+ },
+ {
+  "src": "katex-spec.ts:4087",
+  "input": "\\int",
+  "expect": "parse_like",
+  "like": "\\\\int\\\\limits",
+  "settings_raw": "{macros: {\n            \"\\\\Oldint\": {\n                tokens: [{text: \"\\\\int\", noexpand: true}],\n                numArgs: 0,\n                unexpandable: true,\n            },\n            \"\\\\int\": {\n                tokens: [{text: \"\\\\limits\"}, {text: \"\\\\Oldint\"}],\n                numArgs: 0,\n            },\n        }}"
+ },
+ {
+  "src": "katex-spec.ts:4101",
+  "input": "\\t x",
+  "expect": "parse_like",
+  "like": "\\\\text{x}",
+  "settings_raw": "{macros: {\n            \"\\\\t\": {\n                tokens: [\n                    {text: \"}\"}, {text: \"1\"}, {text: \"#\"}, {text: \"{\"},\n                    {text: \"\\\\text\"},\n                ],\n                numArgs: 1,\n            },\n        }}"
+ },
+ {
+  "src": "katex-spec.ts:4114",
+  "input": "\\newcommand\\foo{x^2}\\foo+\\foo",
+  "expect": "parse",
+  "settings_raw": "new Settings({macros})"
+ },
+ {
+  "src": "katex-spec.ts:4120",
+  "input": "\\newcommand\\foo{x^2}\\foo+\\foo",
+  "expect": "parse",
+  "settings_raw": "new Settings({macros, globalGroup: true})"
+ },
+ {
+  "src": "katex-spec.ts:4129",
+  "input": "\\newcommand\\bar{x^2}\\bar+\\bar",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4130",
+  "input": "\\newcommand{\\bar}{x^2}\\bar+\\bar",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4132",
+  "input": "\\newcommand\\lambda{x^2}\\lambda",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4133",
+  "input": "\\newcommand\\textdollar{x^2}\\textdollar",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4135",
+  "input": "\\newcommand{\\foo}{1}\\foo\\newcommand{\\foo}{2}\\foo",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4137",
+  "input": "\\newcommand\\limits{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4141",
+  "input": "\\renewcommand\\foo{x^2}\\foo+\\foo",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4142",
+  "input": "\\renewcommand{\\foo}{x^2}\\foo+\\foo",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4167",
+  "input": "\\newcommand\\foo[x]{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4168",
+  "input": "\\newcommand\\foo[1.5]{}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4253",
+  "input": "\\tag{hi}x+y",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4257",
+  "input": "\\tag{1}\\tag{2}x+y",
+  "expect": "no_parse",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:4261",
+  "input": "\\begin{align}\\tag{1}x+y\\tag{2}\\end{align}",
+  "expect": "no_parse",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:4265",
+  "input": "\\begin{align}\\tag{1}x\\\\&+y\\tag{2}\\end{align}",
+  "expect": "parse",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:4296",
+  "input": "\\tag{hi}x+y",
+  "expect": "build",
+  "settings_raw": "displayMode"
+ },
+ {
+  "src": "katex-spec.ts:4300",
+  "input": "\\tag{hi}x+y",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:4304",
+  "input": "\\tag{hi}x+y",
+  "expect": "parse_like",
+  "disagrees": true
+ },
+ {
+  "src": "katex-spec.ts:4402",
+  "input": "\\text{\\aa\\AA}",
+  "expect": "parse_like"
+ },
+ {
+  "src": "katex-spec.ts:4403",
+  "input": "\\aa",
+  "expect": "no_parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4404",
+  "input": "\\Aa",
+  "expect": "no_parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4413",
+  "input": "ấā́ắ\\text{ấā́ắ}",
+  "expect": "parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4419",
+  "input": "íȷ́",
+  "expect": "parse_like"
+ },
+ {
+  "src": "katex-spec.ts:4420",
+  "input": "ấā́ắ\\text{ấā́ắ}",
+  "expect": "parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4426",
+  "input": "∉∤∦≁≆≠≨≩≮≯≰≱⊀⊁⊈⊉⊊⊋⊬⊭⊮⊯⋠⋡⋦⋧⋨⋩⋬⋭⪇⪈⪉⪊⪵⪶⪹⪺⫋⫌",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4430",
+  "input": "∈∋∝∼∽≂≃≅≈≊≍≎≏≐≑≒≓≖≗≜≡≤≥≦≧≪≫≬≳≷≺≻≼≽≾≿∴∵∣≔≕⩴⋘⋙⟂⊨∌",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4435",
+  "input": "⊶⊷",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:4439",
+  "input": "∏∐∑∫∬∭∮⋀⋁⋂⋃⨀⨁⨂⨄⨆",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4443",
+  "input": "⊂⊃⊆⊇⊏⊐⊑⊒⊢⊣⊩⊪⊸⋈⋍⋐⋑⋔⋛⋞⋟⌢⌣⩾⪆⪌⪕⪖⪯⪰⪷⪸⫅⫆≘≙≚≛≝≞≟≲⩽⪅≶⋚⪋",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4467",
+  "input": "←↑→↓↔↕↖↗↘↙↚↛↞↠↢↣↦↩↪↫↬↭↮↰↱↶↷↼↽↾↾↿⇀⇁⇂⇃⇄⇆⇇⇈⇉",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4471",
+  "input": "⇊⇋⇌⇍⇎⇏⇐⇑⇒⇓⇔⇕⇚⇛⇝⟵⟶⟷⟸⟹⟺⟼",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4488",
+  "input": "┌x┐ └x┘",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:4557",
+  "input": "\\gdef\\foo{1}\\foo",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:4558",
+  "input": "\\gdef\\foo{1}\\foo",
+  "expect": "parse",
+  "settings_raw": "new Settings({maxExpand: 1})"
+ },
+ {
+  "src": "katex-spec.ts:4559",
+  "input": "\\gdef\\foo{1}\\foo",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({maxExpand: 0})"
+ },
+ {
+  "src": "katex-spec.ts:4563",
+  "input": "\\gdef\\foo{\\foo}\\foo",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({maxExpand: 10})"
+ },
+ {
+  "src": "katex-spec.ts:4568",
+  "input": "\\edef0{x}\\edef0{00}\\edef0{00}\\edef0{00}\\edef0{00}",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({maxExpand: 10})"
+ },
+ {
+  "src": "katex-spec.ts:4623",
+  "input": "hello \\newline[w]orld",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:4627",
+  "input": "hello \\cr world",
+  "expect": "no_build"
+ },
+ {
+  "src": "katex-spec.ts:4663",
+  "input": "\\text{\\i\\j}",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4667",
+  "input": "A\\;B\\,C\\nobreakspace \\text{A\\;B\\,C\\nobreakspace}",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4671",
+  "input": "\\\\minuso",
+  "expect": "build",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4675",
+  "input": "\\text{\\ae\\AE\\oe\\OE\\o\\O\\ss}",
+  "expect": "build_like"
+ },
+ {
+  "src": "katex-spec.ts:4681",
+  "input": "é",
+  "expect": "parse",
+  "settings_raw": "new Settings(nonstrictSettings)"
+ },
+ {
+  "src": "katex-spec.ts:4682",
+  "input": "試",
+  "expect": "parse",
+  "settings_raw": "new Settings(nonstrictSettings)"
+ },
+ {
+  "src": "katex-spec.ts:4683",
+  "input": "é",
+  "expect": "parse",
+  "settings_raw": "new Settings({strict: \"ignore\"})"
+ },
+ {
+  "src": "katex-spec.ts:4684",
+  "input": "試",
+  "expect": "parse",
+  "settings_raw": "new Settings({strict: \"ignore\"})"
+ },
+ {
+  "src": "katex-spec.ts:4685",
+  "input": "é",
+  "expect": "parse",
+  "settings_raw": "new Settings({strict: () => false})"
+ },
+ {
+  "src": "katex-spec.ts:4686",
+  "input": "試",
+  "expect": "parse",
+  "settings_raw": "new Settings({strict: () => false})"
+ },
+ {
+  "src": "katex-spec.ts:4687",
+  "input": "é",
+  "expect": "parse",
+  "settings_raw": "new Settings({strict: () => \"ignore\"})"
+ },
+ {
+  "src": "katex-spec.ts:4688",
+  "input": "試",
+  "expect": "parse",
+  "settings_raw": "new Settings({strict: () => \"ignore\"})"
+ },
+ {
+  "src": "katex-spec.ts:4692",
+  "input": "é",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({strict: true})"
+ },
+ {
+  "src": "katex-spec.ts:4693",
+  "input": "試",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({strict: true})"
+ },
+ {
+  "src": "katex-spec.ts:4694",
+  "input": "é",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({strict: \"error\"})"
+ },
+ {
+  "src": "katex-spec.ts:4695",
+  "input": "試",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({strict: \"error\"})"
+ },
+ {
+  "src": "katex-spec.ts:4696",
+  "input": "é",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({strict: () => true})"
+ },
+ {
+  "src": "katex-spec.ts:4697",
+  "input": "試",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({strict: () => true})"
+ },
+ {
+  "src": "katex-spec.ts:4698",
+  "input": "é",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({strict: () => \"error\"})"
+ },
+ {
+  "src": "katex-spec.ts:4699",
+  "input": "試",
+  "expect": "no_parse",
+  "settings_raw": "new Settings({strict: () => \"error\"})"
+ },
+ {
+  "src": "katex-spec.ts:4708",
+  "input": "\\text{é試}",
+  "expect": "parse",
+  "settings_raw": "nonstrictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4709",
+  "input": "\\text{é試}",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4710",
+  "input": "\\text{é試}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:4715",
+  "input": "x\\\\y",
+  "expect": "parse",
+  "settings_raw": "new Settings({displayMode: false})"
+ },
+ {
+  "src": "katex-spec.ts:4784",
+  "input": "\\origof",
+  "expect": "parse",
+  "settings_raw": "strictSettings"
+ },
+ {
+  "src": "katex-spec.ts:4785",
+  "input": "\\origof",
+  "expect": "build",
+  "settings_raw": "new Settings({strict: \"ignore\"})"
+ },
+ {
+  "src": "katex-spec.ts:4787",
+  "input": "\\origof",
+  "expect": "no_build",
+  "settings_raw": "new Settings({strict: \"error\"})"
+ },
+ {
+  "src": "katex-spec.ts:4871",
+  "input": "۹۹^{۱۱}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:4882",
+  "input": "\\message{Hello, world}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:4891",
+  "input": "\\errmessage{Hello, world}",
+  "expect": "parse"
+ },
+ {
+  "src": "katex-spec.ts:4900",
+  "input": "\\kern2\\relax em",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4924",
+  "input": "\\reflectbox{abc}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:4925",
+  "input": "\\reflectbox{$x^2$}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:4934",
+  "input": "\\reflectbox{x^2}",
+  "expect": "no_parse"
+ },
+ {
+  "src": "katex-spec.ts:4935",
+  "input": "\\mathreflectbox{x^2}",
+  "expect": "build"
+ },
+ {
+  "src": "katex-spec.ts:4936",
+  "input": "\\text{\\reflectbox{abc}}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Accents",
+  "input": "\\vec{A}\\vec{x}\\vec x^2\\vec{x}_2^2\\vec{A}^2\\vec{xA}^2\\; \\underbar{X}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:AccentsText",
+  "input": "\\begin{array}{lccccc}\n\\text{\\'\\i} & \\text{\\.\\i} & \\text{\\`\\i} & \\text{\\\"\\i} & \\text{\\H\\i} & \\text{\\r\\i} \\\\\n\\text{\\'\\j} & \\text{\\.\\j} & \\text{\\`\\j} & \\text{\\\"\\j} & \\text{\\H\\j} & \\text{\\r\\j} \\\\\n\\text{\\'a} & \\text{\\.a} & \\text{\\`a} & \\text{\\\"a} & \\text{\\H{a}} & \\text{\\r{a}} \\\\\n\\text{\\'A} & \\text{\\.A} & \\text{\\`A} & \\text{\\\"A} & \\text{\\H{A}} & \\text{\\r{A}} \\\\\n\\text{\\.I İ} & \\text{\\H e e̋} & \\text{\\i ı}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Align",
+  "input": "\\begin{align}\n  a &= 1 & b &= 2 \\\\\n  3a &= 3 & 17b &= 34 \\\\\n  \\tag{$\\ast$} a &\\neq b \\\\\n  \\nonumber a &={}? & b &={}? \\\\\n\\end{align}\n",
+  "expect": "build",
+  "display": true
+ },
+ {
+  "src": "ss_data.yaml:Aligned",
+  "input": "\\begin{aligned}\n    a &= 1 & b &= 2 \\\\\n    3a &= 3 & 17b &= 34\n\\end{aligned}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Alignedat",
+  "input": "\\begin{alignedat}{3}\n    a &= 1 & b &= 2 &\\quad c &= 3\\\\\n    3a &= 3 & 17b &= 34 &\\quad 400c &= 1200\n\\end{alignedat}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Arrays",
+  "input": "\\left(\\begin{array}{|rl:c||}\n    1&2&3\\\\ \\hline\n    1+1&2+1&3+1\\cr1\\over2&\\scriptstyle 1/2&\\frac12\\\\[1ex] \\hline \\hdashline\n    \\begin{pmatrix}x\\\\y\\end{pmatrix}&0&\\begin{vmatrix}a&b\\\\c&d\\end{vmatrix}\n\\end{array}\\right] \\\\\n\\begin{smallmatrix} a & b \\\\ c & d \\end{smallmatrix} \\;\\;\n\\begin{subarray}{c}a \\\\ b\\end{subarray}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:ArrayMode",
+  "input": "\\begin{matrix}\n    \\frac{\\partial^2 f}{\\partial x_1^2} & \\frac{\\partial^2 f}{\\partial x_1\\,\\partial x_2} & \\cdots & \\frac{\\partial^2 f}{\\partial x_1\\,\\partial x_n} \\\\\n    \\frac{\\partial^2 f}{\\partial x_2\\,\\partial x_1} & \\frac{\\partial^2 f}{\\partial x_2^2} & \\cdots & \\frac{\\partial^2 f}{\\partial x_2\\,\\partial x_n} \\\\\n    \\vdots & \\vdots & \\ddots & \\vdots \\\\\n    \\frac{\\partial^2 f}{\\partial x_n\\,\\partial x_1} & \\frac{\\partial^2 f}{\\partial x_n\\,\\partial x_2} & \\cdots & \\frac{\\partial^2 f}{\\partial x_n^2}\n\\end{matrix}\n",
+  "expect": "build",
+  "display": true
+ },
+ {
+  "src": "ss_data.yaml:ArrayType",
+  "input": "1\\begin{array}{c}2\\\\3\\end{array}4",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:ArrayRemoveEmptyLine",
+  "input": "\\begin{pmatrix}\n    1 \\\\\n    2 \\\\\n\\end{pmatrix}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Baseline",
+  "input": "a+b-c\\cdot d/e",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:BasicTest",
+  "input": "a",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:BinCancellation",
+  "input": "\\begin{array}{cccc}\n    +1 & 1+ & 1+1 & (,) \\\\\n    1++1 & 3\\times) & 1+, & \\left(,\\right)\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:BinomTest",
+  "input": "\\dbinom{a}{b}\\tbinom{a}{b}^{\\binom{a}{b}+17}{\\scriptscriptstyle \\binom a b}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:BoldSpacing",
+  "input": "\\mathbf{A}^2+\\mathbf{B}_3*\\mathscr{C}'",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:BoldSymbol",
+  "input": "\\sum_{\\boldsymbol{\\alpha}}^{\\boldsymbol{\\beta}} \\boldsymbol{\\omega}+ \\boldsymbol{\\int_\\alpha^\\beta} \\boldsymbol{\\Omega + {}} \\\\\n\\boldsymbol{\\lim_{x \\to \\infty} \\log Ax2k\\omega\\Omega\\imath+} \\\\\nx \\boldsymbol{+} y \\boldsymbol{=} z\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Boxed",
+  "input": "\\begin{array}{l}\n  \\boxed{F=ma} \\quad \\boxed{ac}\\color{magenta}{\\boxed{F}}\\boxed{F=mg} \\\\[2em]\n  A_{\\angl n} + B_{\\angl g} + C_\\angln\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Cases",
+  "input": "f(a,b)=\\begin{cases}\n    a+1&\\text{if }b\\text{ is odd} \\\\\n    a&\\text{if }b=0 \\\\\n    a-1&\\text{otherwise}\n\\end{cases} \\\\\n\\begin{rcases}\n    a &\\text{if } b \\\\\n    c &\\text{if } d\n\\end{rcases}⇒…\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:CD",
+  "input": "\\begin{CD} A @<a<< B @>>b> C \\\\ @| @AcAA @VVdV \\\\ D @= E @>>> F \\end{CD}",
+  "expect": "build",
+  "display": true
+ },
+ {
+  "src": "ss_data.yaml:Colors",
+  "input": "\\blue{a}\\textcolor{#0f0}{b}\\textcolor{red}{c}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:ColorImplicit",
+  "input": "\\begin{array}{l} bl{ack\\color{red}red\\textcolor{green}{green}red\\color{blue}blue}black \\\\ black\\left(black\\color{red}red\\right)black \\end{array}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:ColorSpacing",
+  "input": "\\textcolor{red}{\\displaystyle \\int x} + 1",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Colorbox",
+  "input": "a \\colorbox{teal} B \\fcolorbox{blue}{red}{C} e+\\colorbox{teal}x",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:DashesAndQuotes",
+  "input": "\\begin{array}{l}\n    \\text{``a'' b---c -- d----`e'-{-}-f} -- \\\\\n    \\text{\\it ``a'' b---c -- d----`e'-{-}-f} ``x'' \\\\\n    \\text{\\tt ``a''---} \\texttt{``a''---} \\mathtt{--} \\\\\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:DeepFontSizing",
+  "input": "a^{\\big| x^{\\big(}}_{\\Big\\uparrow} +\ni^{i^{\\Huge x}_y}_{\\Huge z} +\n\\dfrac{\\Huge x}{y}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:DelimiterSizing",
+  "input": "\\bigl\\uparrow\\Bigl\\downarrow\\biggl\\updownarrow\n\\Biggl\\Uparrow\\Biggr\\Downarrow\\biggr\\langle\\Bigr\\}\\bigr\\rfloor\\; \\Set{ x | x<\\frac 1 2 } \\\\\n\\begin{pmatrix}\n    a & b & c\\\\\n    a & b & c\\\\\n    a & b & c\\\\\n\\end{pmatrix}\\; \\begin{bmatrix}\n    a & b & c\\\\\n    a & b & c\\\\\n    a & b & c\\\\\n\\end{bmatrix} \\\\\n\\Braket{ ϕ | \\frac{∂^2}{∂ t^2} | ψ } \\\\\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:DisplayMode",
+  "input": "\\sum_{i=0}^\\infty \\frac{1}{i}",
+  "expect": "build",
+  "display": true
+ },
+ {
+  "src": "ss_data.yaml:DisplayStyle",
+  "input": "{\\displaystyle\\sqrt{x}}{\\sqrt{x}}\n{\\displaystyle \\frac12}{\\frac12}{\\displaystyle x^1_2}{x^1_2}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Dots",
+  "input": "\\begin{array}{l}\n  \\cdots;\\dots+\\dots\\int\\dots,\\dots \\\\\n  \\cdots{};\\ldots+\\ldots\\int\\ldots,\\ldots\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Equation",
+  "input": "\\begin{equation}\\begin{split}a& =b+c-d \\\\ & \\quad +e-f \\\\ & =g+h \\\\ & =i \\end{split}\\end{equation}",
+  "expect": "build",
+  "display": true
+ },
+ {
+  "src": "ss_data.yaml:Exponents",
+  "input": "a^{a^a_a}_{a^a_a}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:ExtensibleArrows",
+  "input": "\\begin{array}{l}\n    \\xrightarrow[ab]{ABC} + \\xRightarrow{ABC} \\\\\n    \\xrightleftharpoons[ab]{ABC} + \\xhookrightarrow[ab]{ABC} \\\\\n    \\xtwoheadrightarrow{ABC} + \\frac{\\xrightarrow[ab]{ABC}}{\\xrightarrow[ab]{ABC}} + \\left\\lvert\\xrightarrow[ab]{ABC}\\right\\rvert\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:FractionTest",
+  "input": "\\begin{array}{l}\n    \\dfrac{a}{b}\\frac{a}{b}\\tfrac{a}{b}\\;-\\dfrac12\\;1\\tfrac12\\;{1 \\atop 2} \n    \\; {a \\brace b} \\; {a \\brack b} \\\\[1em]\n    \\genfrac \\{ ]{0.8pt}{0}{a}{b} \\; {a \\above1.0pt b} \\; \\cfrac{1}{1+\\cfrac{1}{x}} \n     \\xrightarrow[\\dfrac g h]{\\displaystyle\\frac g h} \\; \\xrightarrow [2.\\, \\dfrac c d] {1.\\, \\displaystyle\\frac c d}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Functions",
+  "input": "\\sin\\cos\\tan\\ln\\log",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Gather",
+  "input": "\\begin{gather} a=\\frac 1 2 \\\\ e=b+c \\end{gather}",
+  "expect": "build",
+  "display": true
+ },
+ {
+  "src": "ss_data.yaml:Gathered",
+  "input": "\\begin{gathered}\n  x = \\frac{1}{2} \\\\\n  y = \\sum_{i=1}^n i\n\\end{gathered} \\approx\n\\begin{array}{c}\n  x = \\frac{1}{2} \\\\\n  y = \\sum_{i=1}^n i\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:GreekLetters",
+  "input": "\\alpha\\beta\\gamma\\omega",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:GreekUnicode",
+  "input": "\\frac{αβγδεϵζηθϑικλμνξοπϖρϱςστυφϕχψω}{ΓΔΘΞΠΣΦΨΩϝ\\mathbf{Ω}\\mathbf{\\Omega}}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:GroupMacros",
+  "input": "\\startExp a+b\\endExp",
+  "expect": "build",
+  "macros": {
+   "\\startExp": "e^\\bgroup",
+   "\\endExp": "\\egroup"
+  }
+ },
+ {
+  "src": "ss_data.yaml:HorizontalBraces",
+  "input": "\\overbrace{\\displaystyle{\\oint_S{\\vec E\\cdot\\hat n\\,\\mathrm d a}}}^\\text{emf} = \\underbrace{\\frac{q_{\\text{enc}}}{\\varepsilon_0}}_{\\text{charge}}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:HorizontalBrackets",
+  "input": "\\overbracket{\\displaystyle{a+b+c}}^{\\text{note}} = \\underbracket{x+y+z}_{\\text{label}}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:HTML",
+  "input": "\\htmlId{a}{a+}b\\htmlStyle{color:red;}{+c}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Includegraphics",
+  "input": "\\def\\logo{\\includegraphics[height=0.8em, totalheight=0.9em, width=0.9em, alt=KA logo]{../../website/static/img/khan-academy.png}}\n\\def\\logoB{\\includegraphics[height=0.4em, totalheight=0.9em, width=0.9em, alt=KA logo]{../../website/static/img/khan-academy.png}}\n\\begin{array}{l}\n    \\underline{A\\logo} + \\sqrt{\\logo} + \\tfrac{A\\logo}{\\logo}\\\\[1em]\n    \\underline{A\\logoB} + \\sqrt{x\\logoB} + \\tfrac{A\\logoB}{\\logoB}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Integrands",
+  "input": "\\begin{array}{l}\n    \\displaystyle \\int + \\oint + \\iint + \\oiint_i^n \\\\[0.6em]\n    \\displaystyle \\iiint + \\oiiint + \\textstyle \\int + \\oint_i^n \\\\[0.6em]\n    \\iint + \\oiint + \\iiint + \\oiiint \\\\[0.6em]\n    \\int\\limits^x_{y + 4 - a} \\int\\limits^x_{y + 4 - a}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:KaTeX",
+  "input": "\\KaTeX, \\large \\KaTeX",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Kern",
+  "input": "\\frac{a\\kern{1em}b}{c}a\\kern{1em}b\\kern{1ex}c\\kern{-0.25em}d",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Lap",
+  "input": "\\begin{array}{l}\n    ab\\mathllap{f}cd\\mathrlap{g}hij\\mathclap{k}lm \\; ab\\llap{f}cd\\rlap{g}hij\\clap{k}lm \\\\\n    \\mathrlap{\\frac a b} \\frac a b \\\\\n    \\mathrlap{\\overbrace{\\phantom{a_0+a_1+a_2}}^m}a_0+a_1+a_2\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LargeRuleNumerator",
+  "input": "\\frac{\\textcolor{blue}{\\rule{1em}{2em}}}{x}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LaTeX",
+  "input": "\\text{\\LaTeX}, \\text{\\TeX}, \\large \\text{\\LaTeX}, \\text{\\TeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LeftRight",
+  "input": "\\left( x^2 \\right) \\left\\{ x^{x^{x^{x^x}}} \\right.",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LeftRightListStyling",
+  "input": "a+\\left(x+y\\right)-x",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LeftRightMiddle",
+  "input": "\\left( x^2 \\middle/ \\right) \\left\\{ x^{x^{x^{x^x}}} \\middle/ y \\right.\\left(x\\middle|y\\,\\middle|\\,z\\right)",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LeftRightStyleSizing",
+  "input": "+\\left\\{\\rule{0.1em}{1em}\\right.\nx^{+\\left\\{\\rule{0.1em}{1em}\\right.\nx^{+\\left\\{\\rule{0.1em}{1em}\\right.}}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LimitControls",
+  "input": "\\displaystyle\\int\\limits_2^3 3x^2\\,dx + \\sum\\nolimits^n_{i=1}i +\n\\textstyle\\int\\limits_x^y z\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LineBreak",
+  "input": "\\frac{x^2}{y^2} + z^2 =\nz^2 + \\frac{x^2}{y^2} =\n\\frac{x^2}{y^2} +\\nobreak z^2 =\nz^2 + \\frac{x^2}{y^2} =\n\\frac{x^2}{y^2} + ~ z^2 =\nz^2 + \\frac{x^2}{y^2} =\n\\frac{x^2}{y^2} + \\hspace{1em} z^2 =\nz^2 + \\frac{x^2}{y^2} =\n\\frac{x^2}{y^2} + z^2 = \\hspace*{1em}\nz^2 + \\frac{x^2}{y^2} =\n\\frac{x^2}{y^2} + z^2 =\nhi \\allowbreak there =\nhi \\allowbreak there\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:LowerAccent",
+  "input": "\\begin{matrix}\n    \\underleftarrow{AB} \\quad \\underrightarrow{AB} \\quad \\underleftrightarrow{AB} \\quad \\undergroup{AB} \\\\\n    \\underlinesegment{AB} \\quad \\utilde{AB}  \\quad \\color{green}{\\underrightarrow{AB}} \\\\\n    \\underrightarrow{F} + \\underrightarrow{AB} + \\underrightarrow{AB}^2 + \\underrightarrow{AB}_2 \\\\\n    \\frac{\\underrightarrow{AB}}{\\underrightarrow{AB}} + \\sqrt{\\underrightarrow{AB}} + \\left\\lvert\\underrightarrow{AB}\\right\\rvert \\\\\n    \\text{\\underline{text}}\n\\end{matrix}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Mapsfrom",
+  "input": "\\begin{gathered}\n    a \\mapsfrom b \\quad c ↤ d \\quad \\mapsfrom -x \\\\\n    x_{a \\mapsfrom b} \\quad x_{y_{a \\mapsfrom b}}\n\\end{gathered}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathAtom",
+  "input": "a\\mathrel{\\mathop{=}\\limits^{\\blue ?}}b",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathAtom2",
+  "input": "\\mathop{\\overline{\\mathrm{lim}}}\\limits_{x\\to\\infty}f(x)",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathChoice",
+  "input": "{\\displaystyle\\mathchoice{D}{T}{S}{SS}} {\\textstyle\\mathchoice{D}{T}{S}{SS}} {\\scriptstyle \\mathchoice{D}{T}{S}{SS}} {\\scriptscriptstyle\\mathchoice{D}{T}{S}{SS}} \\displaystyle X_{\\mathchoice{D}{T}{S}{SS}_{\\mathchoice{D}{T}{S}{SS}}}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathDefaultFonts",
+  "input": "Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathBb",
+  "input": "\\mathbb{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathBf",
+  "input": "\\mathbf{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathCal",
+  "input": "\\mathcal{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathFrak",
+  "input": "\\mathfrak{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathIt",
+  "input": "\\mathit{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathNormal",
+  "input": "\\mathnormal{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathOp",
+  "input": "a\\mathop+b\\mathop:c\\mathop{\\delta}e\\mathop{\\textrm{and}}f\\mathrel{\\mathop{:}}=g\\sin h",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathRm",
+  "input": "\\mathrm{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathSf",
+  "input": "\\mathsf{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathSfIt",
+  "input": "\\mathsfit{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathScr",
+  "input": "\\mathscr{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathtoolsMatrix",
+  "input": "\\begin{matrix*}[l] a & -1 \\\\ -1 & d \\end{matrix*} \\; \\begin{pmatrix*}[r] a & -1 \\\\ -1 & d \\end{pmatrix*}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:MathTt",
+  "input": "\\mathtt{Ax2k\\breve{a}\\omega\\Omega\\imath+\\KaTeX}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Mod",
+  "input": "\\begin{array}{cc}\n    a \\bmod 2 & b \\pod 3 \\\\\n    c \\pmod{4} & d \\mod{56} \\\\\n    \\displaystyle a\\bmod 2 & \\displaystyle b \\pod 3 \\\\\n    \\displaystyle c\\pmod{4} & \\displaystyle d \\mod{56}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:ModScript",
+  "input": "\\begin{array}{cc}\n    \\scriptstyle a\\bmod 2 & \\scriptstyle b \\pod 3 \\\\\n    \\scriptstyle c\\pmod{4} & \\scriptstyle d \\mod{56}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:ModSpacing",
+  "input": "\\begin{array}{l}\n    (a \\cdot b) \\bmod 257 \\\\\n    (a \\cdot b) \\mkern1mu\\mathbin{\\mathrm{mod}}\\mkern1mu 257 \\\\\n    (a \\cdot b) \\mathbin{\\mathrm{mod}} 257\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:NegativeSpaceBetweenRel",
+  "input": "A =\\!= B",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:NegativeSpace",
+  "input": "\\boxed{\\$1,\\!000,\\!000}\\KaTeX",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:NestedFractions",
+  "input": "\\dfrac{\\frac{a}{b}}{\\frac{c}{d}}\\dfrac{\\dfrac{a}{b}}\n{\\dfrac{c}{d}}\\frac{\\frac{a}{b}}{\\frac{c}{d}}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:NewLine",
+  "input": "\\frac{a^2+b^2}{c^2} \\newline\n\\frac{a^2+b^2}{c^2} \\\\[1ex]\n\\begin{pmatrix}\n    a & b \\\\\n    c & d \\cr\n\\end{pmatrix} \\\\\na+b+c+{d+\\\\e}+f+g\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Not",
+  "input": "\\begin{array}{l}\n    \\not=\\not>\\not\\geq\\not\\in\\not<\\not\\leq\\not{abc} \\\\\n    \\not xy + ab \\not xy \\\\\n    a \\neq b \\notin c\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:NullDelimiterInteraction",
+  "input": "a \\bigl. + 2 \\quad \\left. + a \\right)",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:OldFont",
+  "input": "\\begin{matrix}\n  \\rm rm & it & \\it it & \\bf bf & \\sf sf & \\tt tt \\\\\n  \\text{\\rm rm} & \\text{rm} & \\text{\\it it} & \\text{\\bf bf} & \\text{\\sf sf} & \\text{\\tt tt} \\\\\n  i\\rm r\\it i & \\text{r\\it i\\rm r}\n\\end{matrix}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:OperatorName",
+  "input": "\\begin{matrix}\n    \\operatorname g (z) + 5\\operatorname{g}z + \\operatorname{Gam-ma}(z) \\\\\n    \\operatorname{Gam ma}(z) + \\operatorname{\\Gamma}(z) + \\operatorname{}x \\\\\n    \\operatorname*{asin} x + \\operatorname*{asin}_y x + \\operatorname*{asin}\\limits_y x \\\\[0.3em]\n    {\\displaystyle \\operatorname*{asin}_y x}\n\\end{matrix}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:OpLimits",
+  "input": "\\begin{matrix}\n    {\\sin_2^2 \\lim_2^2 \\int_2^2 \\sum_2^2}\n    {\\displaystyle \\lim_2^2 \\int_2^2 \\intop_2^2 \\sum_2^2} \\\\\n    \\limsup_{x \\rightarrow \\infty} x \\stackrel{?}= \\liminf_{x \\rightarrow \\infty} x \\\\\n    {\\displaystyle \\limsup_{x \\rightarrow \\infty} x\\:\\: \\sum_{\\substack{0<i<m\\\\0<j<n}}}\n\\end{matrix}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:OverUnderline",
+  "input": "x\\underline{x}\\underline{\\underline{x}}\\underline{x_{x_{x_x}}}\\underline{x^{x^{x^x}}}\\overline{x}\\overline{x}\\overline{x^{x^{x^x}}} \\blue{\\overline{\\underline{x}}\\underline{\\overline{x}}}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:OverUnderset",
+  "input": "\\begin{array}{l}\nx\\overset?=1 \\quad \\underset{*}{x}^2 \\quad \\overset{a}{b}b\\underset{a}{b}b \\\\\n{\\displaystyle\\lim_{t\\underset{>0}\\to0}}\\\\\na+b+c+d\\overset{b+c=0}\\longrightarrow a+d\\\\\n\\overset { x = y } { \\sqrt { a b } }\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Phantom",
+  "input": "\\begin{array}{l} \\dfrac{1+\\phantom{x^{\\blue{2}}} = x}{1+x^{\\blue{2}} = x} \\left(\\vphantom{\\int_t} zzz \\right) \\left( X \\hphantom{\\frac{\\frac X X}{X}} \\right)\\\\ \\text{a \\phantom{123}} b \\hphantom{\\frac{1}{2}}=c \\vphantom{101112} d \\\\ \\sqrt{\\mathstrut a} + \\sqrt{\\mathstrut d} \\end{array}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Phase",
+  "input": "120\\text{V}\\phase{-78.2^\\circ}\\;\\Large\\phase{78.2^\\circ}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Pmb",
+  "input": "\\mu\\pmb{\\mu}\\pmb{=}\\mu\\pmb{+}\\mu",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:PrimeSpacing",
+  "input": "f'+f_2'+f^{f'}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:PrimeSuper",
+  "input": "x'^2+x'''^2+x'^2_3+x_3'^2",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Raisebox",
+  "input": "\\begin{matrix} \\frac{a}{a\\raisebox{0.5em}{b}} \\cdot \\frac{a\\raisebox{-0.5em}{b}}{a} \\cdot \\sqrt{a\\raisebox{0.5em}{b}} \\cdot \\sqrt{a\\raisebox{-0.5em}{b}} \\cdot \\sqrt{a\\raisebox{0.5em}{b}\\raisebox{-0.5em}{b}} \\\\[2em] a + \\left(\\vcenter{\\hbox{$\\frac{a+b}{\\dfrac{c}{d}}$}}\\right) \\end {matrix}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:ReactionArrows",
+  "input": "\\begin{matrix}\n    A \\xrightleftarrows{} B \\xrightequilibrium{} C \\xleftequilibrium{} D \\\\\n    A \\xrightleftarrows{over} B \\xrightequilibrium{over} C \\xleftequilibrium{over} D\n\\end{matrix}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Reflectbox",
+  "input": "\\begin{gathered}\n    a + \\reflectbox{abc} = b \\\\\n    \\reflectbox{$x^2 + \\frac{a}{b}$}\n    \\quad \\mathreflectbox{x^2 + \\frac{a}{b}} \\\\\n    x_{\\mathreflectbox{\\frac{a}{b}}} \\quad x_{\\frac{a}{b}}\n\\end{gathered}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:RelativeUnits",
+  "input": "\\begin{array}{ll}\n    a\\kern1emb^{a\\kern1emb^{a\\kern1emb}} &\n    {\\footnotesize a\\kern1emb^{a\\kern1emb^{a\\kern1emb}}} \\\\\n    a\\mkern18mub^{a\\mkern18mub^{a\\mkern18mub}} &\n    {\\footnotesize a\\mkern18mub^{a\\mkern18mub^{a\\mkern18mub}}} \\\\\n    \\rule{1em}{1em}^{\\rule{1em}{1em}}\\rule{18mu}{18mu}^{\\rule{18mu}{18mu}} &\n    {\\footnotesize\\rule{1em}{1em}^{\\rule{1em}{1em}}\\rule{18mu}{18mu}^{\\rule{18mu}{18mu}}}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:RlapBug",
+  "input": "\\frac{\\mathrlap{x}}{2}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Rule",
+  "input": "\\rule{1em}{0.5em}\\rule{1ex}{2ex}\\rule{1em}{1ex}\\rule{1em}{0.431ex}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:SizingBaseline",
+  "input": "{\\tiny a+b}a+b{\\Huge a+b}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Sizing",
+  "input": "{\\Huge x}{\\LARGE y}{\\normalsize z}{\\scriptsize w}\\sqrt[\\small 3]{x+1}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Smash",
+  "input": "\\left( X^{\\smash 2} \\right) \\sqrt{\\smash[b]{y=}}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Spacing",
+  "input": "\\begin{matrix}\n    ^3+[-1][1-1]1=1(=1)\\lvert a\\rvert~b \\\\\n    \\scriptstyle{^3+[-1][1-1]1=1(=1)\\lvert a\\rvert~b} \\\\\n    \\scriptscriptstyle{^3+[-1][1-1]1=1(=1)\\lvert a\\rvert~b} \\\\\n    a : a \\colon a \\\\\n\\end{matrix}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Sqrt",
+  "input": "\\sqrt{\\sqrt{\\sqrt{x}}}_{\\sqrt{\\sqrt{x}}}^{\\sqrt{\\sqrt{\\sqrt{x}}}\n^{\\sqrt{\\sqrt{\\sqrt{x}}}}} \\\\\n\\sqrt{\\frac{\\frac{A}{B}}{\\frac{A}{B}}} \\;\n\\sqrt{\\frac{\\frac{\\frac{A}{B}}{\\frac{A}{B}}}{\\frac{\\frac{A}{B}}{\\frac{A}{B}}}}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:SqrtRoot",
+  "input": "\\begin{array}{l}\n    1+\\sqrt[3]{2}+\\sqrt[1923^234]{2^{2^{2^{2^{2^{2^{2^{2^{2^{2^{2^2}}}}}}}}}}} \\\\\n    \\Huge \\sqrt[3]{M} + x^{\\sqrt[3] a}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:StackRel",
+  "input": "a \\stackrel{?}{=} b \\stackrel{\\text{def}}{=} c",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:StretchyAccent",
+  "input": "\\begin{array}{l}\n    \\overrightarrow{AB} \\quad \\overleftarrow{AB} \\quad \\Overrightarrow{AB} \\quad \\overleftrightarrow{AB} \\quad \\overgroup{AB} \\\\\n    \\overlinesegment{AB} \\quad \\overleftharpoon{AB} \\quad \\overrightharpoon{AB} \\quad \\left(\\underleftarrow{\\frac{value}{j}}\\right)  \\\\\n    \\widecheck{AB} \\quad \\widehat{ABC} \\quad \\widetilde{AB} \\quad \\widetilde{ABC} \\\\\n    \\overrightarrow{F} + \\overrightarrow{AB} + \\overrightarrow{F}^2 + \\overrightarrow{F}_2 + \\overrightarrow{F}_1^2 \\\\\n    \\overrightarrow{AB}^2+\\frac{\\overrightarrow{AB}}{\\overrightarrow{AB}} + \\sqrt{\\overrightarrow{AB}} + \\left\\lvert\\overrightarrow{AB}\\right\\rvert\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:StretchyAccentColor",
+  "input": "\\red{\\overrightarrow{AB}} \\quad \\color{blue}{\\overleftarrow{AB}} \\quad \\color{blue}{\\green{\\Overrightarrow{AB}}} \\quad \\widehat{\\theta} \\widetilde{A}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:StrikeThrough",
+  "input": "\\begin{array}{l}\n    \\cancel x \\quad \\cancel{2B} + \\bcancel 5 +\\bcancel{5ay} \\\\\n    \\text{\\sout{5ab}} + \\text{\\sout{5ABC}} + \\xcancel{\\oint_S{\\vec E\\cdot\\hat n\\,\\mathrm d a}} \\\\[0.3em]\n    \\frac{x+\\cancel B}{x+\\cancel x} + \\frac{x+\\cancel y}{x} + \\cancel{B}_1^2 + \\cancel{B^2} \\\\[0.2em]\n    \\left\\lvert\\cancel{ac}\\right\\rvert\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:StrikeThroughColor",
+  "input": "\\begin{array}{l}\n    \\red{\\cancel x \\quad \\cancel{2B} + \\bcancel 5 +\\bcancel{5ay}} \\\\\n    \\color{green}{\\text{\\sout{5ab}} + \\text{\\sout{5ABC}} + \\xcancel{\\oint_S{\\vec E\\cdot\\hat n\\,\\mathrm d a}}}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:StyleSpacing",
+  "input": "\\scriptstyle ab\\;cd",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:StyleSwitching",
+  "input": "a\\cdot b\\scriptstyle a\\cdot ba\\textstyle\\cdot ba\\scriptstyle\\cdot b",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:SupSubCharacterBox",
+  "input": "a_2f_2{f}_2{aa}_2{af}_2\\mathbf{y}_Ay_A",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:SupSubHorizSpacing",
+  "input": "x^{x^{x}}\\Big|x_{x_{x_{x_{x}}}}\\bigg|x^{x^{x_{x_{x_{x_{x}}}}}}\\bigg|\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:SupSubLeftAlignReset",
+  "input": "\\omega^8_{888} \\quad \\frac{1}{\\hat{\\omega}^{8}_{888}} \\quad \\displaystyle\\sum_{\\omega^{8}_{888}}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:SupSubOffsets",
+  "input": "\\displaystyle \\int_{2+3}x f^{2+3}+3\\lim_{2+3+4+5}f",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:SurrogatePairs",
+  "input": "\\begin{array}{l}\n    𝐀𝐚𝟎𝐴𝑎𝑨𝒂𝔅𝔞𝔸𝒜 \\\\\n    𝖠𝖺𝟢𝗔𝗮𝟬𝘈𝘢𝙰𝚊𝟶 \\\\\n    \\text{𝐀𝐚𝟎𝐴𝑎𝑨𝒂𝔅𝔞𝔸𝒜} \\\\\n    \\text{𝖠𝖺𝟢𝗔𝗮𝟬𝘈𝘢𝙰𝚊𝟶} \\\\\n    \\mathrm{𝐀𝐚𝑨𝒂𝔅𝔞𝔸𝒜} \\\\\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:SvgReset",
+  "input": "\\underbrace{\\sqrt{\\vec{x}} + \\sqrt{\\vec{\\color{#f00}y}}}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Symbols1",
+  "input": "\\maltese\\degree\\pounds\\$\\minuso\n\\text{\\maltese\\degree\\pounds\\textdollar}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Tag",
+  "input": "\\tag{$+$hi} \\frac{x^2}{y}+x^{2^y}",
+  "expect": "build",
+  "display": true
+ },
+ {
+  "src": "ss_data.yaml:Text",
+  "input": "\\frac{a}{b}\\text{c~ {ab} \\ e}+fg",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:TextSpace",
+  "input": "\\begin{array}{l} \\texttt{12345678901234} \\\\ \\texttt{A test  1~~2\\ \\ 3} \\\\ \\verb|A test 1  2  3| \\end{array}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:TextStacked",
+  "input": "\\begin{matrix} \\textsf{abc123 \\textbf{abc123} \\textit{abc123}}\\\\ \\text{abc123 \\textbf{abc123} \\textit{abc123}}\\\\ \\textrm{abc123 \\textbf{abc123} \\textit{abc123}}\\\\ \\textsf{\\textrm{\\textbf{abc123}} \\textbf{abc123} \\textit{abc123}}\\\\ \\textit{abc123 \\textbf{abc123} \\textsf{abc123}}\\\\ \\end{matrix}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:TextWithMath",
+  "input": "\\begin{matrix} \\text{for $a < b$ and $ c < d $}. \\\\ \\textsf{for $a < b$ and $ c < d $}. \\\\ \\textsf{for $a < b \\textbf{ and } c < d $} \\\\ \\text{\\sf for $a < b$ and $c < d$.} \\end{matrix}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Unicode",
+  "input": "\\begin{matrix}\\text{ÀàÇçÉéÏïÖöÛû} \\\\ \\text{БГДЖЗЙЛФЦШЫЮЯ} \\\\ \\text{여보세요} \\\\ \\text{私はバナナです} \\end{matrix}",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:Units",
+  "input": "\\begin{array}{ll}\n  \\mathrm H\\kern 1em\\mathrm H \\text{\\tiny (1em)}\n  & \\mathrm H\\kern 1ex\\mathrm H \\text{\\tiny (1ex)} \\\\\n  \\mathrm H{\\scriptstyle \\kern 1em}\\mathrm H \\text{\\tiny (ss 1em)}\n  & \\mathrm H{\\scriptstyle \\kern 1ex}\\mathrm H \\text{\\tiny (ss 1ex)} \\\\\n  \\mathrm H{\\small \\kern 1em}\\mathrm H \\text{\\tiny (sm 1em)}\n  & \\mathrm H{\\small \\kern 1ex}\\mathrm H \\text{\\tiny (sm 1ex)} \\\\\n  \\mathrm H\\mkern 18mu\\mathrm H \\text{\\tiny (18mu)}\n  & \\mathrm H\\kern 1cm\\mathrm H \\text{\\tiny (1cm)} \\\\\n  \\mathrm H{\\scriptstyle \\mkern 18mu}\\mathrm H \\text{\\tiny (ss 18mu)}\n  & \\mathrm H{\\scriptstyle \\kern 1cm}\\mathrm H \\text{\\tiny (ss 1cm)} \\\\\n  \\mathrm H{\\small \\mkern 18mu}\\mathrm H \\text{\\tiny (sm 18mu)}\n  & \\mathrm H{\\small \\kern 1cm}\\mathrm H \\text{\\tiny (sm 1cm)}\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:UnsupportedCmds",
+  "input": "\\err\\,\\frac\\fracerr3\\,2^\\superr_\\suberr\\,\\sqrt\\sqrterr",
+  "expect": "no_build"
+ },
+ {
+  "src": "ss_data.yaml:Verb",
+  "input": "\\begin{array}{ll}\n  \\verb \\verb ,   & \\verb|\\verb  |, \\\\\n  \\verb* \\verb* , & \\verb*|\\verb* |, \\\\\n  \\verb!<x> & </y>! & \\scriptstyle\\verb|ss verb| \\\\\n  \\verb*!<x> & </y>! & \\small\\verb|sm verb| \\\\\n  \\verb|``---''~|\n\\end{array}\n",
+  "expect": "build"
+ },
+ {
+  "src": "ss_data.yaml:VerticalSpacing",
+  "input": "x^{\\Huge y}z",
+  "expect": "build"
+ }
+]

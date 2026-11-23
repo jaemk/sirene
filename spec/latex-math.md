@@ -238,10 +238,19 @@ tracker; this one holds what is left for the engine itself.
 - [ ] LMATH-T5 Build in the order of LMATH-9, to the design of LMATH-13.
 - [ ] LMATH-T6 Read the KaTeX behavior for the first subset, then write the Rust types for
   tokens, parse nodes, options, and boxes (LMATH-13) before any logic, and review them.
-- [ ] LMATH-T8 Port the baseline tests as data (LMATH-13): extract the cases from
-  `katex-spec.ts`, `errors-spec.ts`, `ss_data.yaml`, `unicode-spec.ts`, and `symgroups.ts` into
-  fixtures, and write the script that dumps KaTeX's box metrics (needs node) with the
-  generated fixture checked in.
+- [ ] LMATH-T8 Port the baseline tests as data (LMATH-13). Done so far:
+  `scripts/katex-fixtures.mjs` (needs node, KaTeX 0.19.1, and the `yaml` package; setup in its
+  header) extracts the `expect`...`` cases of `katex-spec.ts` and the `ss_data.yaml` inputs, runs
+  KaTeX over them, and writes `crates/sirene-core/tests/fixtures/math/katex-cases.json` (708
+  cases: 537 usable as they are, 157 that pass `Settings` the script records as
+  `settings_raw` for a person to convert, and 14 flagged `disagrees` because KaTeX's own answer
+  differs from the test's expectation without those settings) and `katex-oracle.json` (617
+  distinct inputs: KaTeX's parse tree, with locations dropped, and the `katex-html` box height
+  and depth in em for the 449 that build, or the error message for the 168 that do not). Not
+  done: the cases written without the tagged-template form (the `expect(expression)` loops and
+  the `getParsed` and `parseTree` helpers), `errors-spec.ts`, `unicode-spec.ts`,
+  `symgroups.ts`, box widths (KaTeX's DOM nodes carry none for spans), and the Rust reader and
+  tests, which arrive with the types of LMATH-T6.
 - [ ] LMATH-T9 Start the deviations table (LMATH-13) as cases are ported.
 - [ ] LMATH-T7 Dropped: the RaTeX spike. RaTeX stays a comparison target for the layout tests
   (LPA-3), not a dependency.
