@@ -342,8 +342,14 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   ..."), and `\middle`. A delimiter must be on KaTeX's list of 56. Function nesting is bounded by
   `MAX_DEPTH` as group nesting is (LMATH-6), since `\left(\left(...` and `\displaystyle\displaystyle...`
   recurse without a brace.
+  Accents: `\hat` and the 21 other accents over a base (`Accent`, stretchy or not as KaTeX's
+  list says), the text accents (`\'`, `\"`, `\c`, ...; the node is text even in math), and the
+  accents under a base (`AccentUnder`). A combining mark in the source, or a precomposed letter
+  the symbol table lacks (`é`, split by `DECOMPOSED`, 344 letters), becomes the same
+  `Accent` node around the base letter, with `\i` and `\j` undotted; a mark with no command is
+  "Unknown accent". `unicode_data.rs` holds the decompositions and the 12 accent commands.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 183 give exactly KaTeX's tree or KaTeX's error, 432 stop at a function not
+  macro settings, 215 give exactly KaTeX's tree or KaTeX's error, 400 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 

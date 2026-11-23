@@ -379,21 +379,11 @@ impl<'a> Parser<'a> {
             TokenKind::Space if self.mode == Mode::Text => Name::Char(" "),
             TokenKind::Space | TokenKind::Eof => return Ok(None),
         };
-        // An accented letter is a base and an accent, and a combining mark makes one.
-        if let Name::Char(text) = name {
-            let first = text.chars().next();
-            let listed = |c: char| {
-                symbols::lookup(self.mode, Name::Char(c.encode_utf8(&mut [0; 4]))).is_some()
-            };
-            if first.is_some_and(|c| unicode_data::ACCENTED.binary_search(&c).is_ok() && !listed(c))
-                || (text.chars().count() > 1 && symbols::lookup(self.mode, name).is_none())
-            {
-                return Err(MathError::new(
-                    "accented characters are not supported yet",
-                    token.span,
-                ));
-            }
-        }
+        // A letter with accents is the letter wrapped in accent nodes.
+        let (name, marks) = match name {
+            Name::Char(text) => self.split_accents(text),
+            control => (control, Vec::new()),
+        };
         let (group, mode) = match (symbols::lookup(self.mode, name), name) {
             (Some(symbol), _) => (symbol.group, self.mode),
             // A character the table does not list is an ordinary symbol set as text, if it is
@@ -411,13 +401,81 @@ impl<'a> Parser<'a> {
         if matches!(group, AtomGroup::Op | AtomGroup::Accent) {
             return Err(unsupported(&token_text(&token.kind), &token));
         }
-        self.consume();
-        Ok(Some(Node {
+        let mut node = Node {
             kind: NodeKind::Symbol { group, name },
             mode,
-            span: token.span,
-        }))
+            span: token.span.clone(),
+        };
+        for mark in marks {
+            let Ok(at) = unicode_data::ACCENT_COMMANDS.binary_search_by_key(&mark, |e| e.0) else {
+                return Err(MathError::new(
+                    format!("Unknown accent ' {mark}'"),
+                    token.span,
+                ));
+            };
+            let (_, text, math) = unicode_data::ACCENT_COMMANDS[at];
+            let label = if self.mode == Mode::Math && !math.is_empty() {
+                math
+            } else {
+                text
+            };
+            node = Node {
+                kind: NodeKind::Accent {
+                    label: label.to_string(),
+                    stretchy: false,
+                    shifty: true,
+                    base: Box::new(node),
+                },
+                mode: self.mode,
+                span: token.span.clone(),
+            };
+        }
+        self.consume();
+        Ok(Some(node))
     }
+
+    /// The base of a character and the combining accents on it, in order. A precomposed letter
+    /// (`é`) that the symbol table lacks is split by its decomposition first, and a plain `i`
+    /// or `j` under an accent loses its dot.
+    fn split_accents(&self, text: &'a str) -> (Name<'a>, Vec<char>) {
+        let first = text.chars().next();
+        let decomposed = first.and_then(|c| {
+            let listed = symbols::lookup(self.mode, Name::Char(c.encode_utf8(&mut [0; 4])));
+            let at = unicode_data::DECOMPOSED
+                .binary_search_by_key(&c, |e| e.0)
+                .ok()?;
+            listed
+                .is_none()
+                .then(|| (unicode_data::DECOMPOSED[at].1, c.len_utf8()))
+        });
+        let (base, marks): (&str, Vec<char>) = match decomposed {
+            Some((expanded, skip)) => {
+                let (base, marks) = split_marks(expanded);
+                let mut marks: Vec<char> = marks.chars().collect();
+                marks.extend(text[skip..].chars());
+                (base, marks)
+            }
+            None => {
+                let (base, marks) = split_marks(text);
+                (base, marks.chars().collect())
+            }
+        };
+        if marks.is_empty() {
+            return (Name::Char(base), marks);
+        }
+        let base = match base {
+            "i" => "ı",
+            "j" => "ȷ",
+            other => other,
+        };
+        (Name::Char(base), marks)
+    }
+}
+
+/// A string without its trailing combining diacritical marks, and those marks.
+fn split_marks(text: &str) -> (&str, &str) {
+    let base = text.trim_end_matches(|c| ('\u{300}'..='\u{36f}').contains(&c));
+    text.split_at(base.len())
 }
 
 fn unsupported(name: &str, token: &Token<'_>) -> MathError {
@@ -480,6 +538,8 @@ mod tests {
                 format!("left{left}[{}]right{right}", inner.join(" "))
             }
             NodeKind::Middle { delim } => format!("mid{delim}"),
+            NodeKind::Accent { label, base, .. } => format!("{label}<{}>", show(base)),
+            NodeKind::AccentUnder { label, base } => format!("{label}<{}>", show(base)),
             NodeKind::Overline { body } => format!("over<{}>", show(body)),
             NodeKind::Underline { body } => format!("under<{}>", show(body)),
         }
@@ -729,11 +789,38 @@ mod tests {
     }
 
     #[test]
+    fn accents() {
+        assert_eq!(shown("\\hat x"), "\\hat<x>");
+        assert_eq!(shown("\\widehat{xy}"), "\\widehat<{x y}>");
+        assert_eq!(shown("\\underrightarrow x"), "\\underrightarrow<{x}>");
+        // A text accent keeps its argument as read, and is text even in math.
+        assert_eq!(shown("\\'e"), "\\'<e>");
+        assert_eq!(parse("\\'e").unwrap()[0].mode, Mode::Text);
+    }
+
+    #[test]
+    fn combining_marks_and_precomposed_letters_become_accents() {
+        assert_eq!(shown("e\u{301}"), "\\acute<e>");
+        assert_eq!(shown("\u{e9}"), "\\acute<e>");
+        assert_eq!(shown("e\u{301}\u{302}"), "\\hat<\\acute<e>>");
+        // A dotted i loses its dot under an accent.
+        assert_eq!(shown("i\u{301}"), "\\acute<\u{131}>");
+        // In text, the text-mode command is the label.
+        assert_eq!(shown("\\text{\u{e9}}"), "\\text[\\'<e>]");
+        // A mark with no command is an error.
+        assert_eq!(
+            error("e\u{300}\u{334}"),
+            "Expected 'EOF', got '\u{334}'"
+                .replace("Expected 'EOF', got ", "Unknown accent ' ")
+                .replace("'\u{334}'", "\u{334}'")
+        );
+    }
+
+    #[test]
     fn what_the_parser_lacks_is_said_so() {
         assert_eq!(error("\\overbrace{x}"), "\\overbrace is not supported yet");
         assert_eq!(error("\\sum"), "\\sum is not supported yet");
         assert_eq!(error("\\verb|x|"), "\\verb is not supported yet");
-        assert!(error("\u{e9}").ends_with("supported yet"));
         assert!(error("x\u{2082}").ends_with("supported yet"));
     }
 

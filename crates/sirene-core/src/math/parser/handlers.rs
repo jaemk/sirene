@@ -48,6 +48,12 @@ enum Build {
     DelimSizing(u8, MathClass),
     /// `\left ... \right`.
     Left,
+    /// `\hat`, `\widehat`, `\overrightarrow`, and the other accents over a base.
+    Accent,
+    /// `\'`, `\"` and the other text accents.
+    TextAccent,
+    /// `\underrightarrow` and the other accents under a base.
+    AccentUnder,
     /// `\middle`.
     Middle,
 }
@@ -121,6 +127,36 @@ impl Build {
             "\\Bigm" => Build::DelimSizing(2, MathClass::Rel),
             "\\biggm" => Build::DelimSizing(3, MathClass::Rel),
             "\\Biggm" => Build::DelimSizing(4, MathClass::Rel),
+            "\\acute"
+            | "\\grave"
+            | "\\ddot"
+            | "\\tilde"
+            | "\\bar"
+            | "\\breve"
+            | "\\check"
+            | "\\hat"
+            | "\\vec"
+            | "\\dot"
+            | "\\mathring"
+            | "\\widecheck"
+            | "\\widehat"
+            | "\\widetilde"
+            | "\\overrightarrow"
+            | "\\overleftarrow"
+            | "\\Overrightarrow"
+            | "\\overleftrightarrow"
+            | "\\overgroup"
+            | "\\overlinesegment"
+            | "\\overleftharpoon"
+            | "\\overrightharpoon" => Build::Accent,
+            "\\'" | "\\`" | "\\^" | "\\~" | "\\=" | "\\u" | "\\." | "\\\"" | "\\c" | "\\r"
+            | "\\H" | "\\v" | "\\textcircled" => Build::TextAccent,
+            "\\underleftarrow"
+            | "\\underrightarrow"
+            | "\\underleftrightarrow"
+            | "\\undergroup"
+            | "\\underlinesegment"
+            | "\\utilde" => Build::AccentUnder,
             "\\left" => Build::Left,
             "\\middle" => Build::Middle,
             _ => return None,
@@ -527,6 +563,70 @@ impl<'a> Parser<'a> {
                     kind: NodeKind::LeftRight { body, left, right },
                     mode,
                     span: start..right_arg.span.end,
+                })
+            }
+            Build::Accent => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                // These stretch to the base, except the ones that are one fixed glyph.
+                let fixed = matches!(
+                    name,
+                    "\\acute"
+                        | "\\grave"
+                        | "\\ddot"
+                        | "\\tilde"
+                        | "\\bar"
+                        | "\\breve"
+                        | "\\check"
+                        | "\\hat"
+                        | "\\vec"
+                        | "\\dot"
+                        | "\\mathring"
+                );
+                let shifty =
+                    !(!fixed) || matches!(name, "\\widehat" | "\\widetilde" | "\\widecheck");
+                Ok(Node {
+                    kind: NodeKind::Accent {
+                        label: name.to_string(),
+                        stretchy: !fixed,
+                        shifty,
+                        base: Box::new(arg.normalized()),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::TextAccent => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                // A text accent is text even where it stands in math.
+                Ok(Node {
+                    kind: NodeKind::Accent {
+                        label: name.to_string(),
+                        stretchy: false,
+                        shifty: true,
+                        base: Box::new(arg),
+                    },
+                    mode: Mode::Text,
+                    span,
+                })
+            }
+            Build::AccentUnder => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::AccentUnder {
+                        label: name.to_string(),
+                        base: Box::new(arg),
+                    },
+                    mode,
+                    span,
                 })
             }
             Build::Overline | Build::Underline => {

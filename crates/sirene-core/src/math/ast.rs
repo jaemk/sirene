@@ -96,6 +96,19 @@ pub(crate) enum NodeKind<'a> {
         left: String,
         right: String,
     },
+    /// A base with an accent over it: `\hat{x}`, `\widehat`, a text accent (`\'e`), or a
+    /// combining mark in the source. `label` is the command, with its backslash.
+    Accent {
+        label: String,
+        stretchy: bool,
+        shifty: bool,
+        base: Box<Node<'a>>,
+    },
+    /// A base with an accent under it: `\underrightarrow{x}`.
+    AccentUnder {
+        label: String,
+        base: Box<Node<'a>>,
+    },
     /// `\middle|` inside `\left ... \right`.
     Middle {
         delim: String,
@@ -127,6 +140,8 @@ impl NodeKind<'_> {
             NodeKind::DelimSizing { .. } => "delimsizing",
             NodeKind::LeftRight { .. } => "leftright",
             NodeKind::Middle { .. } => "middle",
+            NodeKind::Accent { .. } => "accent",
+            NodeKind::AccentUnder { .. } => "accentUnder",
         }
     }
 }
