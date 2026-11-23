@@ -333,9 +333,12 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   commands (`Styling`, which takes the rest of the group), and `\text` with its nine font
   variants (`Text`, read in text mode, where spaces are symbols and `--`, `---`, ```` `` ````,
   and `''` join into one). A function after `^` or `_` must be allowed there, and a function not
-  allowed in the current mode fails with KaTeX's message.
+  allowed in the current mode fails with KaTeX's message. Also built: the math fonts
+  (`\mathbf`, `\mathbb`, aliases resolved, and the old `\bf` family, which set the rest of the
+  group) as `Font`; `\mathbin` and the other class commands, `\@binrel`, and `\boldsymbol` as
+  `MClass` (a class and whether the body is one character); and `\overline` and `\underline`.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 154 give exactly KaTeX's tree or KaTeX's error, 461 stop at a function not
+  macro settings, 180 give exactly KaTeX's tree or KaTeX's error, 435 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 

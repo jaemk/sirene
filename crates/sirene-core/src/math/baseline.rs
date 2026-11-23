@@ -277,6 +277,34 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             "type": "text", "mode": mode, "font": format!("\\{font}"),
             "body": body.iter().map(katex_json).collect::<Vec<_>>(),
         }),
+        NodeKind::Font { font, body } => {
+            json!({"type": "font", "mode": mode, "font": font, "body": katex_json(body)})
+        }
+        NodeKind::MClass {
+            class,
+            body,
+            character_box,
+        } => {
+            use super::ast::MathClass;
+            let class = match class {
+                MathClass::Ord => "mord",
+                MathClass::Bin => "mbin",
+                MathClass::Rel => "mrel",
+                MathClass::Open => "mopen",
+                MathClass::Close => "mclose",
+                MathClass::Punct => "mpunct",
+                MathClass::Inner => "minner",
+            };
+            json!({"type": "mclass", "mode": mode, "mclass": class,
+                "body": body.iter().map(katex_json).collect::<Vec<_>>(),
+                "isCharacterBox": character_box})
+        }
+        NodeKind::Overline { body } => {
+            json!({"type": "overline", "mode": mode, "body": katex_json(body)})
+        }
+        NodeKind::Underline { body } => {
+            json!({"type": "underline", "mode": mode, "body": katex_json(body)})
+        }
         NodeKind::SupSub { base, sup, sub } => {
             let mut fields = serde_json::Map::new();
             fields.insert("type".into(), "supsub".into());
@@ -359,7 +387,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (154, 461));
+    assert_eq!((same, unsupported), (180, 435));
 }
 
 #[test]

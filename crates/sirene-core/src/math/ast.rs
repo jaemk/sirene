@@ -20,7 +20,10 @@ pub(crate) struct Node<'a> {
 pub(crate) enum NodeKind<'a> {
     /// One symbol: a letter, digit, operator, relation, delimiter, or space command. The group
     /// says how TeX spaces it; the name is as the source writes it.
-    Symbol { group: AtomGroup, name: Name<'a> },
+    Symbol {
+        group: AtomGroup,
+        name: Name<'a>,
+    },
     /// Nodes read in order, from `{...}`. A `\begingroup ... \endgroup` group is the same but
     /// `semisimple`.
     Group {
@@ -56,7 +59,121 @@ pub(crate) enum NodeKind<'a> {
     },
     /// Text set in text mode: `\text{...}` and the font variants. `font` is the command's name
     /// without its backslash.
-    Text { body: Vec<Node<'a>>, font: &'a str },
+    Text {
+        body: Vec<Node<'a>>,
+        font: &'a str,
+    },
+    /// A math font for its body: `\mathbf{x}`, `\mathbb`, and the old `\bf` (which is
+    /// `mathbf`). `font` is the name without the backslash, with aliases resolved (`\Bbb` is
+    /// `mathbb`).
+    Font {
+        font: &'a str,
+        body: Box<Node<'a>>,
+    },
+    /// The body spaced as an atom of the given class: `\mathbin{...}`, and `\boldsymbol`, which
+    /// takes the class of its argument. `character_box` says the body is one character.
+    MClass {
+        class: MathClass,
+        body: Vec<Node<'a>>,
+        character_box: bool,
+    },
+    Overline {
+        body: Box<Node<'a>>,
+    },
+    Underline {
+        body: Box<Node<'a>>,
+    },
+}
+
+/// The atom classes `\mathbin` and the like set (TeX's `\mathord` through `\mathinner`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MathClass {
+    Ord,
+    Bin,
+    Rel,
+    Open,
+    Close,
+    Punct,
+    Inner,
+}
+
+impl<'a> Node<'a> {
+    /// A group of one node stands for that node.
+    pub(crate) fn normalized(self) -> Node<'a> {
+        match self.kind {
+            NodeKind::Group {
+                mut body,
+                semisimple,
+            } => {
+                if body.len() == 1
+                    && let Some(only) = body.pop()
+                {
+                    return only;
+                }
+                Node {
+                    kind: NodeKind::Group { body, semisimple },
+                    mode: self.mode,
+                    span: self.span,
+                }
+            }
+            _ => self,
+        }
+    }
+
+    /// The nodes of a group, or the node alone.
+    pub(crate) fn into_body(self) -> Vec<Node<'a>> {
+        match self.kind {
+            NodeKind::Group { body, .. } => body,
+            _ => vec![self],
+        }
+    }
+
+    /// The node inside any groups of one node and fonts around it.
+    fn base(&self) -> &Node<'a> {
+        match &self.kind {
+            NodeKind::Group { body, .. } if body.len() == 1 => body[0].base(),
+            NodeKind::Font { body, .. } => body.base(),
+            _ => self,
+        }
+    }
+
+    /// Whether the node is one character, as TeX's rules ask of a "character box".
+    pub(crate) fn is_character_box(&self) -> bool {
+        matches!(
+            self.base().kind,
+            NodeKind::Symbol {
+                group: AtomGroup::MathOrd
+                    | AtomGroup::TextOrd
+                    | AtomGroup::Bin
+                    | AtomGroup::Close
+                    | AtomGroup::Inner
+                    | AtomGroup::Open
+                    | AtomGroup::Punct
+                    | AtomGroup::Rel,
+                ..
+            }
+        )
+    }
+
+    /// The class `\boldsymbol` and `\@binrel` take from an argument: a binary operator or
+    /// relation keeps its class, anything else is ordinary.
+    pub(crate) fn binrel_class(&self) -> MathClass {
+        let atom = match &self.kind {
+            NodeKind::Group { body, .. } if !body.is_empty() => &body[0],
+            _ => self,
+        };
+        match atom.kind {
+            NodeKind::Symbol {
+                group: AtomGroup::Bin,
+                ..
+            } => MathClass::Bin,
+            NodeKind::Symbol {
+                group: AtomGroup::Rel,
+                ..
+            } => MathClass::Rel,
+            _ => MathClass::Ord,
+        }
+    }
 }
 
 /// The four math styles of TeX.
