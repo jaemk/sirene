@@ -6,7 +6,9 @@
 //! its arguments are read. The commands here: fractions and binomials, `\sqrt`, the style
 //! commands, and `\text` with its font variants.
 
-use super::{MathError, Mode, Name, Node, NodeKind, Parser, TokenKind, unsupported, written};
+use super::{
+    MathError, Mode, Name, Node, NodeKind, Parser, TokenKind, environments, unsupported, written,
+};
 use crate::math::{
     ast::{MathClass, Measurement, OpContent, StyleName},
     expander::token_text,
@@ -64,6 +66,14 @@ enum Build {
     Sizing(u8),
     /// `\relax`.
     Relax,
+    /// `\begin{name}`: the whole environment.
+    Begin,
+    /// `\end{name}`, read by the `\begin` it closes.
+    End,
+    /// `\\` outside a table.
+    Cr,
+    /// `\hline` and `\hdashline`, which only a table may use.
+    Hline,
     /// `\sum`, `\int`, `\lim`, `\sin`: a named operator.
     Op {
         limits: bool,
@@ -234,6 +244,10 @@ impl Build {
             "\\huge" => Build::Sizing(10),
             "\\Huge" => Build::Sizing(11),
             "\\relax" => Build::Relax,
+            "\\begin" => Build::Begin,
+            "\\end" => Build::End,
+            "\\\\" => Build::Cr,
+            "\\hline" | "\\hdashline" => Build::Hline,
             "\\mathop" => Build::MathOp,
             "\\operatorname@" => Build::OperatorName { with_limits: false },
             "\\operatornamewithlimits" => Build::OperatorName { with_limits: true },
@@ -246,9 +260,9 @@ impl Build {
 
 /// The arguments of a function: the required ones in order, and the optional ones, each of which
 /// may be absent.
-struct Arguments<'a> {
-    required: Vec<Node<'a>>,
-    optional: Vec<Option<Node<'a>>>,
+pub(super) struct Arguments<'a> {
+    pub(super) required: Vec<Node<'a>>,
+    pub(super) optional: Vec<Option<Node<'a>>>,
 }
 
 impl<'a> Parser<'a> {
@@ -397,10 +411,12 @@ impl<'a> Parser<'a> {
             self.switch_mode(mode);
         }
         self.expander.begin_group(&arg.span)?;
+        let outer_color = self.current_color.clone();
         let body = self.parse_expression(false)?;
         // The argument ends at the `Eof` that `scan_argument` put after it.
         self.expect("EOF")?;
         self.expander.end_group(&arg.end)?;
+        self.current_color = outer_color;
         let node = Node {
             kind: NodeKind::Group {
                 body,
@@ -427,7 +443,8 @@ impl<'a> Parser<'a> {
             | Build::OldFont(_)
             | Build::Color
             | Build::Sizing(_)
-            | Build::Left => self.build_open(build, name, token, args),
+            | Build::Left
+            | Build::Begin => self.build_open(build, name, token, args),
             _ => self.build(build, name, token, args),
         }
     }
@@ -446,7 +463,7 @@ impl<'a> Parser<'a> {
         match build {
             Build::Styling(style) => {
                 // The body is the rest of the group; an infix command ends it.
-                let body = self.parse_expression(true)?;
+                let body = self.parse_expression_until(true, self.break_on)?;
                 let end = body.last().map_or(token.span.end, |n| n.span.end);
                 Ok(Node {
                     kind: NodeKind::Styling {
@@ -460,7 +477,7 @@ impl<'a> Parser<'a> {
             }
             Build::OldFont(font) => {
                 // The rest of the group is set in the font.
-                let body = self.parse_expression(true)?;
+                let body = self.parse_expression_until(true, self.break_on)?;
                 let span = body
                     .first()
                     .zip(body.last())
@@ -489,8 +506,10 @@ impl<'a> Parser<'a> {
                     return Err(missing(name));
                 };
                 let color = color_token(color, name)?;
+                // A `\right` after this reads the color; it lasts to the end of the group.
+                self.current_color = Some(color.clone());
                 // The rest of the group is in the color; an infix command ends it.
-                let body = self.parse_expression(true)?;
+                let body = self.parse_expression_until(true, self.break_on)?;
                 let end = body.last().map_or(token.span.end, |n| n.span.end);
                 Ok(Node {
                     kind: NodeKind::Color { color, body },
@@ -499,7 +518,7 @@ impl<'a> Parser<'a> {
                 })
             }
             Build::Sizing(size) => {
-                let body = self.parse_expression(false)?;
+                let body = self.parse_expression_until(false, self.break_on)?;
                 let end = body.last().map_or(token.span.end, |n| n.span.end);
                 Ok(Node {
                     kind: NodeKind::Sizing { size, body },
@@ -532,10 +551,59 @@ impl<'a> Parser<'a> {
                 };
                 let right = check_delimiter(&right_arg, "\\right")?;
                 Ok(Node {
-                    kind: NodeKind::LeftRight { body, left, right },
+                    kind: NodeKind::LeftRight {
+                        body,
+                        left,
+                        right,
+                        right_color: self.current_color.clone(),
+                    },
                     mode,
                     span: start..right_arg.span.end,
                 })
+            }
+            Build::Begin => {
+                let Some(name_group) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let message = "Environment name should contain only text characters and spaces";
+                let env_name = environments::character_group(&name_group, message, true)?;
+                let name_span = name_group.span.clone();
+                let Some(count) = environments::environment_args(&env_name) else {
+                    return Err(MathError::new(
+                        format!("No such environment: {env_name}"),
+                        name_span,
+                    ));
+                };
+                let function = environments::environment_function(count);
+                let env_args =
+                    self.parse_arguments(&format!("\\begin{{{env_name}}}"), &function)?;
+                let mut result = self.build_environment(&env_name, &name_span, env_args)?;
+                result.span.start = start;
+                // The table stops at its `\end`, which is read here, as `\left` reads `\right`.
+                let close = self.fetch()?;
+                if token_text(&close.kind) != "\\end" {
+                    return Err(MathError::new(
+                        format!("Expected '\\end', got '{}'", token_text(&close.kind)),
+                        close.span,
+                    ));
+                }
+                let ended = self.parse_function(&close, "atom")?;
+                let Some(Node {
+                    kind: NodeKind::Environment { name: end_name },
+                    span: end_span,
+                    ..
+                }) = ended
+                else {
+                    return Err(missing("\\end"));
+                };
+                if end_name != env_name {
+                    return Err(MathError::new(
+                        format!("Mismatch: \\begin{{{env_name}}} matched by \\end{{{end_name}}}"),
+                        close.span,
+                    ));
+                }
+                set_end(&mut result, end_span.end);
+                Ok(result)
             }
             _ => Err(missing(name)),
         }
@@ -989,8 +1057,52 @@ impl<'a> Parser<'a> {
             | Build::OldFont(_)
             | Build::Color
             | Build::Sizing(_)
-            | Build::Left => Err(missing(name)),
+            | Build::Left
+            | Build::Begin => Err(missing(name)),
+            Build::End => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let message = "Environment name should contain only text characters and spaces";
+                let env = environments::character_group(&arg, message, true)?;
+                Ok(Node {
+                    kind: NodeKind::Environment { name: env },
+                    mode,
+                    span: start..arg.span.end,
+                })
+            }
+            Build::Cr => {
+                let size = if token_text(&self.expander.future()?.kind) == "[" {
+                    self.parse_size_group(true)?
+                } else {
+                    None
+                };
+                let end = size.as_ref().map_or(token.span.end, |n| n.span.end);
+                Ok(Node {
+                    kind: NodeKind::Cr {
+                        // Display mode makes no difference in KaTeX's default strict setting.
+                        new_line: true,
+                        size: environments::size_value(size),
+                    },
+                    mode,
+                    span: start..end,
+                })
+            }
+            Build::Hline => Err(MathError::new(
+                format!("{name} valid only within array environment"),
+                token.span.clone(),
+            )),
         }
+    }
+}
+
+/// Sets where a node, and the table inside it, end.
+fn set_end(node: &mut Node<'_>, end: usize) {
+    node.span.end = end;
+    if let NodeKind::LeftRight { body, .. } = &mut node.kind
+        && let Some(inner) = body.first_mut()
+    {
+        inner.span.end = end;
     }
 }
 

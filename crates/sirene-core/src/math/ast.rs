@@ -97,6 +97,8 @@ pub(crate) enum NodeKind<'a> {
         body: Vec<Node<'a>>,
         left: String,
         right: String,
+        /// The color the `\right` delimiter takes, if a `\color` before it set one.
+        right_color: Option<String>,
     },
     /// A base with an accent over it: `\hat{x}`, `\widehat`, a text accent (`\'e`), or a
     /// combining mark in the source. `label` is the command, with its backslash.
@@ -182,6 +184,23 @@ pub(crate) enum NodeKind<'a> {
     ColorToken(String),
     /// Nothing: `\relax`. It is not kept in an expression, and a script after it has no base.
     Internal,
+    /// A table: `array`, the matrices, `cases`, and the aligned environments. `body` is rows of
+    /// cells, each cell a group (in a styling node for the environments that fix a style).
+    Array(Box<Array<'a>>),
+    /// `\\` outside a table, or `\\[1em]`: a line break.
+    Cr {
+        new_line: bool,
+        size: Option<Measurement>,
+    },
+    /// `\end{name}`, read by the `\begin` that it closes.
+    Environment {
+        name: String,
+    },
+    /// A formula with an equation tag (`\tag{1}`), which only display mode allows.
+    Tag {
+        body: Vec<Node<'a>>,
+        tag: Vec<Node<'a>>,
+    },
     /// `\middle|` inside `\left ... \right`.
     Middle {
         delim: String,
@@ -213,6 +232,10 @@ impl NodeKind<'_> {
             NodeKind::DelimSizing { .. } => "delimsizing",
             NodeKind::LeftRight { .. } => "leftright",
             NodeKind::Middle { .. } => "middle",
+            NodeKind::Array(_) => "array",
+            NodeKind::Cr { .. } => "cr",
+            NodeKind::Environment { .. } => "environment",
+            NodeKind::Tag { .. } => "tag",
             NodeKind::Kern { .. } => "kern",
             NodeKind::Rule { .. } => "rule",
             NodeKind::Color { .. } => "color",
@@ -322,6 +345,50 @@ impl<'a> Node<'a> {
             _ => MathClass::Ord,
         }
     }
+}
+
+/// What a column of a table looks like.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum AlignSpec {
+    /// A column aligned `l`, `c`, or `r`, with optional gaps (in em) before and after.
+    Align {
+        align: char,
+        pregap: Option<f64>,
+        postgap: Option<f64>,
+    },
+    /// A rule between columns: `|` or `:`.
+    Separator(char),
+}
+
+/// How the columns of a table are spaced, for the aligned environments and `smallmatrix`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ColSeparation {
+    Align,
+    Alignat,
+    Gather,
+    Small,
+}
+
+/// A row's equation tag: whether it is numbered automatically, or the nodes of its `\tag`.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum RowTag<'a> {
+    Numbered(bool),
+    Custom(Vec<Node<'a>>),
+}
+
+/// A table of nodes.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Array<'a> {
+    pub add_jot: bool,
+    pub arraystretch: f64,
+    pub body: Vec<Vec<Node<'a>>>,
+    pub cols: Option<Vec<AlignSpec>>,
+    pub row_gaps: Vec<Option<Measurement>>,
+    pub hskip_before_and_after: Option<bool>,
+    pub hlines_before_row: Vec<Vec<bool>>,
+    pub col_separation: Option<ColSeparation>,
+    pub tags: Option<Vec<RowTag<'a>>>,
+    pub leqno: Option<bool>,
 }
 
 /// A length: a number and a unit (`1.5em`).

@@ -82,6 +82,8 @@ enum Builtin {
     SecondOfTwo,
     IfNextChar,
     TextOrMath,
+    /// `\\tag@literal{x}`: records the equation tag as `\\text{x}` in `\\df@tag`.
+    TagLiteral,
 }
 
 impl Builtin {
@@ -96,6 +98,7 @@ impl Builtin {
             "@secondoftwo" => Builtin::SecondOfTwo,
             "@ifnextchar" => Builtin::IfNextChar,
             "TextOrMath" => Builtin::TextOrMath,
+            "tag@literal" => Builtin::TagLiteral,
             _ => return None,
         })
     }
@@ -116,7 +119,6 @@ const UNIMPLEMENTED: &[&str] = &[
     "message",
     "noexpand",
     "show",
-    "tag@literal",
 ];
 
 /// Commands the parser handles that are not macros, so a definition may not take their name.
@@ -336,7 +338,7 @@ impl<'a> Expander<'a> {
     }
 
     /// Puts `tokens`, in reading order, back in front of the rest.
-    fn push_tokens(&mut self, tokens: Vec<Token<'a>>) {
+    pub(crate) fn push_tokens(&mut self, tokens: Vec<Token<'a>>) {
         self.stack.extend(tokens.into_iter().rev());
     }
 
@@ -669,10 +671,91 @@ impl<'a> Expander<'a> {
                 let same = args[0].len() == 1 && args[0][0].kind == next;
                 Ok(args.swap_remove(if same { 1 } else { 2 }))
             }
+            Builtin::TagLiteral => {
+                // The tag is kept in a global macro, which the parser reads at the end of the row
+                // (or of the formula); a second `\\tag` in the same place is an error.
+                if self.macros.contains_key(&Key::Word("df@tag")) {
+                    return Err(MathError::new("Multiple \\tag", call.span.clone()));
+                }
+                let arg = self.consume_args(1, None)?.swap_remove(0);
+                let at = &call.span;
+                let word = |w: &'static str| Token {
+                    kind: TokenKind::ControlWord(w),
+                    span: at.clone(),
+                };
+                let brace = |c: &'static str| Token {
+                    kind: TokenKind::Char(c),
+                    span: at.clone(),
+                };
+                let mut tokens = vec![
+                    word("gdef"),
+                    word("df@tag"),
+                    brace("{"),
+                    word("text"),
+                    brace("{"),
+                ];
+                tokens.extend(arg);
+                tokens.push(brace("}"));
+                tokens.push(brace("}"));
+                Ok(tokens)
+            }
             Builtin::TextOrMath => {
                 let mut args = self.consume_args(2, None)?;
                 Ok(args.swap_remove(if self.mode == Mode::Text { 0 } else { 1 }))
             }
+        }
+    }
+
+    /// Defines a macro with no arguments whose body is `text`, for the parser's own use
+    /// (`\\cr` in an array, the equation-number switch).
+    pub(crate) fn set_text_macro(
+        &mut self,
+        name: &'static str,
+        text: &'static str,
+        global: bool,
+    ) -> Result<(), MathError> {
+        let mut lexer = Lexer::new(text)?;
+        let mut body = Vec::new();
+        loop {
+            let mut token = lexer.next_token()?;
+            if token.kind == TokenKind::Eof {
+                break;
+            }
+            token.span = 0..0;
+            body.push(token);
+        }
+        let definition = Macro {
+            body,
+            num_args: 0,
+            delimiters: None,
+        };
+        self.set(Key::Word(name), definition, global);
+        Ok(())
+    }
+
+    /// The text of a macro with no arguments, without expanding it, if one is defined.
+    pub(crate) fn macro_text(&self, name: &'static str) -> Option<String> {
+        let definition = self.macros.get(&Key::Word(name))?;
+        Some(
+            definition
+                .body
+                .iter()
+                .map(|t| token_text(&t.kind))
+                .collect(),
+        )
+    }
+
+    /// Whether a macro of this name was defined in the formula.
+    pub(crate) fn has_macro(&self, name: &'static str) -> bool {
+        self.macros.contains_key(&Key::Word(name))
+    }
+
+    /// Removes a macro from every group, as a global assignment of nothing does.
+    pub(crate) fn clear_macro(&mut self, name: &'static str) {
+        let key = Key::Word(name);
+        self.macros.remove(&key);
+        for undo in &mut self.undo {
+            undo.retain(|(k, _)| *k != key);
         }
     }
 
