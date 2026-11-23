@@ -23,6 +23,10 @@ pub(crate) const MAX_DELIMITERS: usize = 256;
 /// bytes; a longer run is not a size.
 pub(crate) const MAX_SIZE_TEXT: usize = 64;
 
+/// The number of column pairs `alignat` may be told to expect: it makes a column spec for each, even
+/// for columns no row has.
+pub(crate) const MAX_COLUMNS: usize = 256;
+
 /// The error for a source past `MAX_SOURCE`; the span is the first byte over the limit.
 pub(crate) fn check_source(src: &str) -> Result<(), MathError> {
     if src.len() <= MAX_SOURCE {

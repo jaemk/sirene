@@ -6,6 +6,7 @@
 //! that the function table lists but the parser does not build yet fail with "not supported yet".
 
 mod arguments;
+mod environments;
 mod handlers;
 
 use std::ops::Range;
@@ -21,8 +22,20 @@ use super::{
     unicode_data,
 };
 
-/// Parses a formula in math mode.
+/// What the caller chooses about a formula.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Settings {
+    /// Display mode: the aligned environments and `\tag` need it.
+    pub display_mode: bool,
+}
+
+/// Parses a formula in math mode, in inline mode.
 pub(crate) fn parse(src: &str) -> Result<Vec<Node<'_>>, MathError> {
+    parse_with(src, Settings::default())
+}
+
+/// Parses a formula in math mode.
+pub(crate) fn parse_with(src: &str, settings: Settings) -> Result<Vec<Node<'_>>, MathError> {
     let mut parser = Parser {
         src,
         expander: Expander::new(src, Mode::Math)?,
@@ -30,9 +43,34 @@ pub(crate) fn parse(src: &str) -> Result<Vec<Node<'_>>, MathError> {
         mode: Mode::Math,
         depth: 0,
         leftright_depth: 0,
+        break_on: None,
+        display_mode: settings.display_mode,
+        current_color: None,
     };
     let body = parser.parse_expression(false)?;
     parser.expect_end()?;
+    // An equation tag wraps the formula.
+    if parser.expander.has_macro("df@tag") {
+        if !settings.display_mode {
+            return Err(MathError::new(
+                "\\tag works only in display equations",
+                src.len()..src.len(),
+            ));
+        }
+        let tag = parser.subparse(vec![Token {
+            kind: TokenKind::ControlWord("df@tag"),
+            span: 0..0,
+        }])?;
+        let span = body
+            .first()
+            .zip(body.last())
+            .map_or(0..0, |(a, b)| a.span.start..b.span.end);
+        return Ok(vec![Node {
+            kind: NodeKind::Tag { body, tag },
+            mode: Mode::Text,
+            span,
+        }]);
+    }
     Ok(body)
 }
 
@@ -46,6 +84,12 @@ struct Parser<'a> {
     depth: usize,
     /// How many `\left` are open, which `\middle` needs.
     leftright_depth: usize,
+    /// The token that ends the expression being read, besides the usual ones: `\\` in a table
+    /// cell. Functions that read the rest of the group stop at it too.
+    break_on: Option<&'static str>,
+    display_mode: bool,
+    /// The color of the last `\color` in the open groups, which a `\right` after it takes.
+    current_color: Option<String>,
 }
 
 /// Whether `token` ends an expression: a closing brace, `\end`, `\right`, `\endgroup`, `&`, or
@@ -91,39 +135,40 @@ fn form_ligatures(body: &mut Vec<Node<'_>>) {
             _ => None,
         }
     }
+    // One pass into a new list: a splice per run would move the rest of the list each time.
+    let mut input: Vec<Option<Node<'_>>> = std::mem::take(body).into_iter().map(Some).collect();
+    fn text_at<'n>(input: &[Option<Node<'n>>], i: usize) -> Option<&'n str> {
+        input.get(i)?.as_ref().and_then(text_of)
+    }
     let mut i = 0;
-    while i + 1 < body.len() {
-        let (Some(a), Some(b)) = (text_of(&body[i]), text_of(&body[i + 1])) else {
-            i += 1;
-            continue;
-        };
-        let run = if a == "-" && b == "-" {
+    while i < input.len() {
+        let run = match (text_at(&input, i), text_at(&input, i + 1)) {
             // `---` if another dash follows, else `--`.
-            if body.get(i + 2).and_then(text_of) == Some("-") {
-                Some(("---", 3))
-            } else {
-                Some(("--", 2))
-            }
-        } else if (a == "'" || a == "`") && a == b {
-            Some((if a == "'" { "''" } else { "``" }, 2))
-        } else {
-            None
+            (Some("-"), Some("-")) if text_at(&input, i + 2) == Some("-") => Some(("---", 3)),
+            (Some("-"), Some("-")) => Some(("--", 2)),
+            (Some("'"), Some("'")) => Some(("''", 2)),
+            (Some("`"), Some("`")) => Some(("``", 2)),
+            _ => None,
         };
-        if let Some((text, count)) = run {
-            let span = body[i].span.start..body[i + count - 1].span.end;
-            body.splice(
-                i..i + count,
-                [Node {
+        match run {
+            Some((text, count)) => {
+                let start = input[i].as_ref().map_or(0, |n| n.span.start);
+                let end = input[i + count - 1].as_ref().map_or(start, |n| n.span.end);
+                body.push(Node {
                     kind: NodeKind::Symbol {
                         group: AtomGroup::TextOrd,
                         name: Name::Char(text),
                     },
                     mode: Mode::Text,
-                    span,
-                }],
-            );
+                    span: start..end,
+                });
+                i += count;
+            }
+            None => {
+                body.extend(input[i].take());
+                i += 1;
+            }
         }
-        i += 1;
     }
 }
 
@@ -176,6 +221,22 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    /// Parses `tokens` as a formula of their own at this point, as a tag or a cell is, and
+    /// returns its nodes. The token ahead is kept for after.
+    fn subparse(&mut self, tokens: Vec<Token<'a>>) -> Result<Vec<Node<'a>>, MathError> {
+        let saved = self.next.take();
+        // The formula ends at an extra closing brace.
+        self.expander.push_token(Token {
+            kind: TokenKind::Char("}"),
+            span: 0..0,
+        });
+        self.expander.push_tokens(tokens);
+        let body = self.parse_expression(false)?;
+        self.expect("}")?;
+        self.next = saved;
+        Ok(body)
+    }
+
     /// Opens one level of nesting, a brace group or a function, which the parser reads by
     /// recursion: braces and functions share the budget of `limits::MAX_DEPTH`, so the stack
     /// they use is bounded. A level is closed with `self.depth -= 1`; an error ends the parse, so
@@ -200,13 +261,32 @@ impl<'a> Parser<'a> {
     /// Atoms up to whatever ends the expression, which is left unread. With `break_on_infix` an
     /// infix command (`\over`) ends it too, as it does for the body of `\displaystyle`.
     fn parse_expression(&mut self, break_on_infix: bool) -> Result<Vec<Node<'a>>, MathError> {
+        self.parse_expression_until(break_on_infix, None)
+    }
+
+    /// Like `parse_expression`, ending also at the token written `until`.
+    fn parse_expression_until(
+        &mut self,
+        break_on_infix: bool,
+        until: Option<&'static str>,
+    ) -> Result<Vec<Node<'a>>, MathError> {
+        let saved = std::mem::replace(&mut self.break_on, until);
+        let body = self.expression_body(break_on_infix);
+        self.break_on = saved;
+        body
+    }
+
+    fn expression_body(&mut self, break_on_infix: bool) -> Result<Vec<Node<'a>>, MathError> {
         let mut body = Vec::new();
         loop {
             if self.mode == Mode::Math {
                 self.consume_spaces()?;
             }
             let token = self.fetch()?;
-            if ends_expression(&token) || (break_on_infix && is_infix(&token)) {
+            if ends_expression(&token)
+                || (break_on_infix && is_infix(&token))
+                || self.break_on.is_some_and(|b| token_text(&token.kind) == b)
+            {
                 break;
             }
             match self.parse_atom()? {
@@ -402,7 +482,9 @@ impl<'a> Parser<'a> {
         self.consume();
         self.expander.begin_group(&token.span)?;
         self.enter(&token.span)?;
+        let outer_color = self.current_color.clone();
         let body = self.parse_expression(false)?;
+        self.current_color = outer_color;
         self.depth -= 1;
         // The closer is consumed, but the token after it is not read until the group's
         // definitions have ended.
@@ -589,11 +671,33 @@ mod tests {
                 format!("{class:?}[{}]", inner.join(" "))
             }
             NodeKind::DelimSizing { size, delim, .. } => format!("big{size}{delim}"),
-            NodeKind::LeftRight { body, left, right } => {
+            NodeKind::LeftRight {
+                body, left, right, ..
+            } => {
                 let inner: Vec<_> = body.iter().map(show).collect();
                 format!("left{left}[{}]right{right}", inner.join(" "))
             }
             NodeKind::Middle { delim } => format!("mid{delim}"),
+            NodeKind::Array(array) => {
+                let rows: Vec<String> = array
+                    .body
+                    .iter()
+                    .map(|row| row.iter().map(show).collect::<Vec<_>>().join(" & "))
+                    .collect();
+                format!("array[{}]", rows.join(" \\\\ "))
+            }
+            NodeKind::Cr { size, .. } => match size {
+                Some(size) => format!("cr{}{}", size.number, size.unit),
+                None => "cr".to_string(),
+            },
+            NodeKind::Environment { name } => format!("end{name}"),
+            NodeKind::Tag { body, tag } => {
+                let (b, t): (Vec<_>, Vec<_>) = (
+                    body.iter().map(show).collect(),
+                    tag.iter().map(show).collect(),
+                );
+                format!("tag[{}]({})", t.join(" "), b.join(" "))
+            }
             NodeKind::Kern { dimension } => format!("kern{}{}", dimension.number, dimension.unit),
             NodeKind::Rule { width, height, .. } => format!(
                 "rule{}{}x{}{}",
@@ -1038,6 +1142,209 @@ mod tests {
         // `\relax` is not in the tree, and a script after it has no base.
         assert_eq!(shown("a\\relax b"), "a b");
         assert_eq!(shown("\\relax^2"), "( ^2)");
+    }
+
+    fn shown_in_display(src: &str) -> String {
+        parse_with(src, Settings { display_mode: true })
+            .unwrap()
+            .iter()
+            .map(show)
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn display_error(src: &str) -> String {
+        parse_with(src, Settings { display_mode: true })
+            .unwrap_err()
+            .message
+    }
+
+    #[test]
+    fn tables() {
+        assert_eq!(
+            shown("\\begin{array}{cc} a & b \\\\ c & d \\end{array}"),
+            "array[Text[{a}] & Text[{b}] \\\\ Text[{c}] & Text[{d}]]"
+        );
+        // A last empty row, from a `\\` before `\end`, is dropped.
+        assert_eq!(
+            shown("\\begin{matrix} a \\\\ \\end{matrix}"),
+            "array[Text[{a}]]"
+        );
+        assert_eq!(shown("\\begin{matrix}\\end{matrix}"), "array[]");
+        assert_eq!(
+            shown("\\begin{pmatrix} a & b \\end{pmatrix}"),
+            "left([array[Text[{a}] & Text[{b}]]]right)"
+        );
+        assert_eq!(
+            shown("\\begin{cases} a & b \\\\ c & d \\end{cases}"),
+            "left\\{[array[Text[{a}] & Text[{b}] \\\\ Text[{c}] & Text[{d}]]]right."
+        );
+        assert_eq!(
+            shown("\\begin{rcases} a \\end{rcases}"),
+            "left.[array[Text[{a}]]]right\\}"
+        );
+        assert_eq!(
+            shown("\\begin{smallmatrix} a \\end{smallmatrix}"),
+            "array[Script[{a}]]"
+        );
+        assert_eq!(
+            shown("\\begin{dcases} a \\end{dcases}"),
+            "left\\{[array[Display[{a}]]]right."
+        );
+    }
+
+    #[test]
+    fn table_rows_take_gaps_rules_and_the_cr_macro() {
+        let src = "\\begin{array}{c} \\hline a \\\\[2pt] \\hdashline b \\cr c \\end{array}";
+        let nodes = parse(src).unwrap();
+        let NodeKind::Array(array) = &nodes[0].kind else {
+            unreachable!("a table");
+        };
+        assert_eq!(array.body.len(), 3);
+        assert_eq!(
+            array.hlines_before_row,
+            [vec![false], vec![true], vec![], vec![]]
+        );
+        let gap = |i: usize| {
+            array.row_gaps[i]
+                .as_ref()
+                .map(|m| (m.number, m.unit.as_str()))
+        };
+        assert_eq!(array.row_gaps.len(), 2);
+        assert_eq!(gap(0), Some((2.0, "pt")));
+        assert_eq!(gap(1), None);
+        assert_eq!(array.arraystretch, 1.0);
+    }
+
+    #[test]
+    fn the_array_stretch_comes_from_the_macro() {
+        let nodes =
+            parse("\\newcommand{\\arraystretch}{1.5}\\begin{array}{c}a\\end{array}").unwrap();
+        let NodeKind::Array(array) = &nodes[0].kind else {
+            unreachable!("a table");
+        };
+        assert_eq!(array.arraystretch, 1.5);
+        assert_eq!(
+            error("\\newcommand{\\arraystretch}{x}\\begin{array}{c}a\\end{array}"),
+            "Invalid \\arraystretch: x"
+        );
+    }
+
+    #[test]
+    fn aligned_environments() {
+        assert_eq!(
+            shown("\\begin{aligned} a &= b \\\\ c &= d \\end{aligned}"),
+            "array[Display[{a}] & Display[{{} = b}] \\\\ Display[{c}] & Display[{{} = d}]]"
+        );
+        assert_eq!(
+            error("\\begin{align} a \\end{align}"),
+            "{align} can be used only in display mode."
+        );
+        assert!(shown_in_display("\\begin{align} a \\end{align}").starts_with("array["));
+        // The pairs of cells are counted as halves, as KaTeX counts them.
+        assert_eq!(
+            error("\\begin{alignedat}{1} a & b & c & d & e \\end{alignedat}"),
+            "Too many math in a row: expected 1, but got 2.5"
+        );
+        assert_eq!(
+            error("\\begin{alignedat}{x} a \\end{alignedat}"),
+            "Number of columns should be a positive integer"
+        );
+        // A column count too large to build the columns for is refused, not allocated.
+        assert_eq!(
+            error("\\begin{alignedat}{99999999999999999999} a \\end{alignedat}"),
+            "Number of columns should be a positive integer"
+        );
+        assert_eq!(
+            error("\\begin{alignedat}{1000000} a \\end{alignedat}"),
+            "Number of columns should be at most 256"
+        );
+        assert_eq!(
+            error("\\begin{split} a \\end{split}"),
+            "{split} can be used only in display mode."
+        );
+        assert_eq!(
+            display_error("\\begin{split} a & b & c \\end{split}"),
+            "Too many tab characters: &"
+        );
+    }
+
+    #[test]
+    fn equation_tags() {
+        assert_eq!(shown_in_display("x \\tag{1}"), "tag[\\text[( {1} )]](x)");
+        assert_eq!(error("x \\tag{1}"), "\\tag works only in display equations");
+        assert_eq!(display_error("x \\tag{1} \\tag{2}"), "Multiple \\tag");
+        let nodes = parse_with(
+            "\\begin{align} a \\tag{x} \\\\ b \\nonumber \\\\ c \\end{align}",
+            Settings { display_mode: true },
+        )
+        .unwrap();
+        let NodeKind::Array(array) = &nodes[0].kind else {
+            unreachable!("a table");
+        };
+        let tags: Vec<_> = array
+            .tags
+            .iter()
+            .flatten()
+            .map(|tag| match tag {
+                crate::math::ast::RowTag::Numbered(numbered) => numbered.to_string(),
+                crate::math::ast::RowTag::Custom(_) => "custom".to_string(),
+            })
+            .collect();
+        assert_eq!(tags, ["custom", "false", "true"]);
+    }
+
+    /// Long inputs of the shapes that could cost more than their size (each is under the source
+    /// limit) are read in one pass.
+    #[test]
+    fn long_runs_are_read_in_linear_time() {
+        // Twenty thousand `---` ligatures in one text.
+        let dashes = format!("\\text{{{}}}", "-".repeat(60_000));
+        let nodes = parse(&dashes).unwrap();
+        let NodeKind::Text { body, .. } = &nodes[0].kind else {
+            unreachable!("text");
+        };
+        assert_eq!(body.len(), 20_000);
+        // Many cells and many rows.
+        let cells = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a&".repeat(15_000));
+        assert!(parse(&cells).is_ok());
+        let rows = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a\\\\".repeat(15_000));
+        assert!(parse(&rows).is_ok());
+        // A long run of scripts and of groups.
+        assert!(parse(&"x^a_b".repeat(10_000)).is_ok());
+        assert!(parse(&"{}".repeat(30_000)).is_ok());
+    }
+
+    #[test]
+    fn line_breaks_outside_tables() {
+        assert_eq!(shown("a \\\\ b"), "a cr b");
+        assert_eq!(shown("a \\\\[1em] b"), "a cr1em b");
+    }
+
+    #[test]
+    fn environments_read_their_names_and_ends() {
+        assert_eq!(error("\\begin{foo}x\\end{foo}"), "No such environment: foo");
+        assert_eq!(
+            error("\\begin{matrix} a \\end{pmatrix}"),
+            "Mismatch: \\begin{matrix} matched by \\end{pmatrix}"
+        );
+        assert_eq!(
+            error("\\begin{matrix} a"),
+            "Expected & or \\\\ or \\cr or \\end"
+        );
+        assert_eq!(error("\\end{matrix}"), "Expected 'EOF', got '\\end'");
+        assert_eq!(
+            error("\\hline"),
+            "\\hline valid only within array environment"
+        );
+        assert_eq!(
+            error("\\begin{array}{x} a \\end{array}"),
+            "Unknown column alignment: x"
+        );
+        assert_eq!(
+            error("\\begin{matrix*}[x] a \\end{matrix*}"),
+            "Expected l or c or r"
+        );
     }
 
     #[test]

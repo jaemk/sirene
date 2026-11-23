@@ -301,6 +301,7 @@ More deviations (LMATH-T9):
 | A braced group argument | the outer braces of `{a}{b}` are removed, leaving `a}{b` | removed only when one group is the whole argument | TeX's rule; KaTeX's check looks only at the first and last token |
 | `\def` and `\newcommand` | `\def` is a parser function; `\newcommand` a macro | both run in the expander | one place for definitions and their scope |
 | Macro lookup | strings keyed by text | `Key` enum, borrowed | no allocation per lookup |
+| `\arraystretch` | the macro is expanded to text | the macro's body text is read without expanding it | a table's stretch is a plain number in practice |
 | `\def` as a script argument | "Got function '\def' with no arguments as superscript" | the script reads what follows the definition (`2^\def\foo{1}2` is `2^2`) | definitions are macros (the row above) |
 | Parse nodes | JS objects with a `type` string | `Node { kind: NodeKind, mode, span }`, one enum | LMATH-13 |
 | Bare size text | the longest run of tokens that fits a size, without limit | at most 64 bytes (`MAX_SIZE_TEXT`) | each token is tested against the text so far; LMATH-6 |
@@ -367,8 +368,24 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   recursion), and the functions that read the rest of the group are built in a function of their
   own so the frames of that recursion stay small. A test runs the deepest allowed mixes on a
   2 MiB thread.
+  Environments (`parser/environments.rs`): `\begin{name} ... \end{name}` reads the name as text,
+  the environment's arguments, and its body, then reads its own `\end` and checks the names
+  ("Mismatch: \begin{x} matched by \end{y}"). Tables are `Array` nodes (`parse_array`): cells
+  split by `&`, rows by `\\` (with an optional `[size]`) or the `\cr` macro the table defines,
+  `\hline` and `\hdashline` before rows, a group per cell, and a style per environment.
+  Built: `array`, `darray`, the six matrices and their starred forms, `smallmatrix`,
+  `subarray`, `cases` and its three variants, `align`, `aligned`, `alignat`, `alignedat`,
+  `split`, `gather`, `gathered`, and `equation`. The aligned ones prepend the empty group that
+  makes a leading operator binary, count column pairs as KaTeX does (an odd cell is half a
+  pair), and need display mode when they are not `...ed`. Row tags (`\tag`, `\nonumber`, and
+  automatic numbering) are `RowTag`s; `\tag` records its text in a global `\df@tag`, which a row
+  or the whole formula reads (a formula outside a table becomes a `Tag` node; `\tag` outside
+  display mode is an error). `\\` outside a table is a `Cr` node, `\hline` outside one an error,
+  and `\color` is remembered for the `\right` after it (`right_color`). `{CD}` is not built.
+  `parse_with` takes the display-mode setting. Functions that read the rest of a table cell
+  (`\displaystyle`, `\color`, the size commands) stop at the cell's `\\` as KaTeX's do.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 328 give exactly KaTeX's tree or KaTeX's error, 287 stop at a function not
+  macro settings, 422 give exactly KaTeX's tree or KaTeX's error, 193 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 

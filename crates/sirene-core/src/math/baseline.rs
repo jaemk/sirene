@@ -141,7 +141,7 @@ fn the_expander_reads_what_katex_parses() {
         "{}",
         failures.join("\n")
     );
-    assert_eq!((read, failures.len()), (436, 13));
+    assert_eq!((read, failures.len()), (437, 12));
 }
 
 /// The errors KaTeX's expander raises are the expander's errors too: for each input KaTeX
@@ -325,10 +325,21 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             json!({"type": "delimsizing", "mode": mode, "size": size, "mclass": class,
                 "delim": delim})
         }
-        NodeKind::LeftRight { body, left, right } => json!({
-            "type": "leftright", "mode": mode, "left": left, "right": right,
-            "body": body.iter().map(katex_json).collect::<Vec<_>>(),
-        }),
+        NodeKind::LeftRight {
+            body,
+            left,
+            right,
+            right_color,
+        } => {
+            let mut value = json!({
+                "type": "leftright", "mode": mode, "left": left, "right": right,
+                "body": body.iter().map(katex_json).collect::<Vec<_>>(),
+            });
+            if let Some(color) = right_color {
+                value["rightColor"] = color.as_str().into();
+            }
+            value
+        }
         NodeKind::Accent {
             label,
             stretchy,
@@ -406,6 +417,96 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             "value": measurement_json(value), "isBlank": is_blank}),
         NodeKind::ColorToken(color) => json!({"type": "color-token", "mode": mode, "color": color}),
         NodeKind::Internal => json!({"type": "internal", "mode": mode}),
+        NodeKind::Array(array) => {
+            use super::ast::{AlignSpec, ColSeparation, RowTag};
+            let nodes =
+                |body: &[super::ast::Node<'_>]| body.iter().map(katex_json).collect::<Vec<_>>();
+            let mut fields = serde_json::Map::new();
+            fields.insert("type".into(), "array".into());
+            fields.insert("mode".into(), mode.into());
+            fields.insert("arraystretch".into(), number_json(array.arraystretch));
+            fields.insert(
+                "body".into(),
+                array
+                    .body
+                    .iter()
+                    .map(|row| nodes(row))
+                    .collect::<Vec<_>>()
+                    .into(),
+            );
+            fields.insert(
+                "rowGaps".into(),
+                array
+                    .row_gaps
+                    .iter()
+                    .map(|gap| gap.as_ref().map_or(Value::Null, measurement_json))
+                    .collect::<Vec<_>>()
+                    .into(),
+            );
+            fields.insert("hLinesBeforeRow".into(), json!(array.hlines_before_row));
+            if array.add_jot {
+                fields.insert("addJot".into(), true.into());
+            }
+            if let Some(cols) = &array.cols {
+                let cols: Vec<Value> = cols
+                    .iter()
+                    .map(|col| match col {
+                        AlignSpec::Align {
+                            align,
+                            pregap,
+                            postgap,
+                        } => {
+                            let mut c = json!({"type": "align", "align": align.to_string()});
+                            if let Some(gap) = pregap {
+                                c["pregap"] = number_json(*gap);
+                            }
+                            if let Some(gap) = postgap {
+                                c["postgap"] = number_json(*gap);
+                            }
+                            c
+                        }
+                        AlignSpec::Separator(c) => {
+                            json!({"type": "separator", "separator": c.to_string()})
+                        }
+                    })
+                    .collect();
+                fields.insert("cols".into(), cols.into());
+            }
+            if let Some(hskip) = array.hskip_before_and_after {
+                fields.insert("hskipBeforeAndAfter".into(), hskip.into());
+            }
+            if let Some(kind) = array.col_separation {
+                let kind = match kind {
+                    ColSeparation::Align => "align",
+                    ColSeparation::Alignat => "alignat",
+                    ColSeparation::Gather => "gather",
+                    ColSeparation::Small => "small",
+                };
+                fields.insert("colSeparationType".into(), kind.into());
+            }
+            if let Some(tags) = &array.tags {
+                let tags: Vec<Value> = tags
+                    .iter()
+                    .map(|tag| match tag {
+                        RowTag::Numbered(numbered) => Value::from(*numbered),
+                        RowTag::Custom(body) => nodes(body).into(),
+                    })
+                    .collect();
+                fields.insert("tags".into(), tags.into());
+            }
+            if let Some(leqno) = array.leqno {
+                fields.insert("leqno".into(), leqno.into());
+            }
+            Value::Object(fields)
+        }
+        NodeKind::Cr { new_line, size } => json!({"type": "cr", "mode": mode,
+            "newLine": new_line, "size": size.as_ref().map(measurement_json)}),
+        NodeKind::Environment { name } => {
+            json!({"type": "environment", "mode": mode, "name": name})
+        }
+        NodeKind::Tag { body, tag } => json!({"type": "tag", "mode": mode,
+            "body": body.iter().map(katex_json).collect::<Vec<_>>(),
+            "tag": tag.iter().map(katex_json).collect::<Vec<_>>()}),
         NodeKind::Middle { delim } => json!({"type": "middle", "mode": mode, "delim": delim}),
         NodeKind::SupSub { base, sup, sub } => {
             let mut fields = serde_json::Map::new();
@@ -426,25 +527,30 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
     }
 }
 
-/// A length as KaTeX's JSON writes it: a whole number has no decimal point.
-fn measurement_json(m: &super::ast::Measurement) -> Value {
-    let number = if m.number.fract() == 0.0 && m.number.abs() < 1e15 {
-        Value::from(m.number as i64)
+/// A number as KaTeX's JSON writes it: a whole number has no decimal point.
+fn number_json(number: f64) -> Value {
+    if number.fract() == 0.0 && number.abs() < 1e15 {
+        Value::from(number as i64)
     } else {
-        Value::from(m.number)
-    };
-    serde_json::json!({"number": number, "unit": m.unit})
+        Value::from(number)
+    }
 }
 
-/// The inputs of the oracle that need no macro settings, with KaTeX's answer for each.
-fn plain_oracle() -> Vec<(String, Value)> {
+/// A length as KaTeX's JSON writes it.
+fn measurement_json(m: &super::ast::Measurement) -> Value {
+    serde_json::json!({"number": number_json(m.number), "unit": m.unit})
+}
+
+/// The inputs of the oracle that need no macro settings, with whether they were read in display
+/// mode and KaTeX's answer for each.
+fn plain_oracle() -> Vec<(String, bool, Value)> {
     let data: serde_json::Map<String, Value> =
         serde_json::from_str(include_str!("../../tests/fixtures/math/katex-oracle.json")).unwrap();
     data.into_iter()
         .filter_map(|(key, entry)| {
-            let (input, _display, macros): (String, bool, Value) =
+            let (input, display, macros): (String, bool, Value) =
                 serde_json::from_str(&key).unwrap();
-            macros.is_null().then_some((input, entry))
+            macros.is_null().then_some((input, display, entry))
         })
         .collect()
 }
@@ -454,7 +560,7 @@ fn plain_oracle() -> Vec<(String, Value)> {
 /// as not yet supported; the count falls as the parser grows.
 #[test]
 fn the_parser_agrees_with_katex() {
-    use super::parser::parse;
+    use super::parser::{Settings, parse_with};
 
     let (mut same, mut unsupported) = (0, 0);
     let mut differences = Vec::new();
@@ -463,11 +569,16 @@ fn the_parser_agrees_with_katex() {
     // script ("Got function '\def' with no arguments as superscript"); here a definition is a
     // macro the expander runs, and the script reads what follows it.
     const DEVIATIONS: &[&str] = &["2^\\def\\foo{1}2"];
-    for (input, entry) in plain_oracle() {
+    for (input, display, entry) in plain_oracle() {
         if DEVIATIONS.contains(&input.as_str()) {
             continue;
         }
-        let parsed = parse(&input);
+        let parsed = parse_with(
+            &input,
+            Settings {
+                display_mode: display,
+            },
+        );
         match (&parsed, entry.get("tree"), entry.get("parse_error")) {
             (Err(e), _, _) if e.message.ends_with("supported yet") => unsupported += 1,
             (Ok(nodes), Some(tree), _) => {
@@ -499,7 +610,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (328, 287));
+    assert_eq!((same, unsupported), (422, 193));
 }
 
 /// A development aid, not a check: which unsupported commands stop the most baseline inputs, to
@@ -509,7 +620,7 @@ fn the_parser_agrees_with_katex() {
 #[ignore]
 fn unsupported_commands_by_inputs_stopped() {
     let mut counts = std::collections::BTreeMap::<String, usize>::new();
-    for (input, _) in plain_oracle() {
+    for (input, _, _) in plain_oracle() {
         if let Err(e) = super::parser::parse(&input)
             && e.message.ends_with("supported yet")
         {
