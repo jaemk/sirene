@@ -348,8 +348,13 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   the symbol table lacks (`é`, split by `DECOMPOSED`, 344 letters), becomes the same
   `Accent` node around the base letter, with `\i` and `\j` undotted; a mark with no command is
   "Unknown accent". `unicode_data.rs` holds the decompositions and the 12 accent commands.
+  Operators: the large operators (`\sum`, `\int`, ... and their Unicode characters, which read
+  as the command), the named ones (`\sin`, `\lim`), and `\mathop` build `Op`; `\operatorname`
+  (a macro that reaches `\operatorname@` or `\operatornamewithlimits`) builds `OperatorName`.
+  `\limits` and `\nolimits` set the limit choice of an `Op` (and of the starred operator name)
+  and fail anywhere else with "Limit controls must follow a math operator".
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 215 give exactly KaTeX's tree or KaTeX's error, 400 stop at a function not
+  macro settings, 250 give exactly KaTeX's tree or KaTeX's error, 365 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 
