@@ -12,7 +12,7 @@ site on 2026-11-22 and are marked unverified where a source was not read.
 
 | Project | Lang | License | Input | Output | Tests | Take |
 |---|---|---|---|---|---|---|
-| KaTeX | JS | MIT (Khan Academy) | LaTeX | HTML and MathML | `test/`: `katex-spec.ts`, `errors-spec.ts`, `unicode-spec.ts`, `mathml-spec.ts`, `symgroups.ts`, and `screenshotter/ss_data.yaml` (about 190 named inputs) | the syntax target (LMATH-5), the command families, the fixture format |
+| KaTeX | TS | MIT (Khan Academy) | LaTeX | HTML and MathML | `test/`: `katex-spec.ts` (4,990 lines, 772 `it` and `describe` blocks, with a DOM snapshot), `errors-spec.ts` (355 lines), `unicode-spec.ts` (183), `mathml-spec.ts` (283, with a snapshot), `symgroups.ts` (159), and `screenshotter/ss_data.yaml` (507 lines, 128 named inputs) | the syntax target (LMATH-5), the command families, the fixture format |
 | Temml | JS | MIT | LaTeX | MathML Core | rendered examples; inputs drawn from Mozilla, Wikipedia, mhchem, and LaTeXML | KaTeX's parser and macro expander with the HTML half removed; extra commands (`\prescript`, `\label`, `\ref`, `\definecolor`) |
 | MathJax | TS | Apache-2.0 | TeX, MathML, AsciiMath | HTML, SVG | `testsuite/` (format unread) | TeX input extensions model; error behavior (unverified) |
 | RaTeX | Rust | MIT | LaTeX (KaTeX syntax) | display list, SVG, PNG, PDF | `cargo test --all`, `tests/golden`, a per-formula support table against KaTeX | crate split (lexer, parser, layout, font); the display-list shape; claims over 99.5% of KaTeX syntax |
@@ -115,6 +115,10 @@ Plan:
 Every input taken from a project is listed in THIRD-PARTY-NOTICES with its source and license
 (KaTeX: MIT, Khan Academy and other contributors, 2013-2020; Temml: MIT; MathJax: Apache-2.0).
 
+The baseline is KaTeX's test data ported as data, not as code, per LMATH-13: inputs with
+expected parse shapes and errors, and box metrics dumped from KaTeX itself as the layout
+oracle. The implementation is a Rust design checked against these, not a translation.
+
 ## LPA-4 Layout rules
 
 Two written algorithms exist, and the layout reads the font's OpenType MATH table either way:
@@ -137,13 +141,14 @@ classes, and style changes).
 
 - [x] LPA-T1a Survey KaTeX, Temml, MathJax, RaTeX, formulary, formel (LPA-1).
 - [ ] LPA-T1b Survey noad, ReX, pulldown-latex, latex2mathml, Typst math, MiTeX, JLaTeXMath.
-- [ ] LPA-T1c Read the unread test formats: MathJax `testsuite/`, formel `tests/`, RaTeX
+- [x] LPA-T1c1 Count KaTeX's suites (LPA-1): clone at `local/katex` (gitignored).
+- [ ] LPA-T1c2 Read the unread test formats: MathJax `testsuite/`, formel `tests/`, RaTeX
   `tests/golden`, and count each suite.
 - [x] LPA-T2a Draft the command table by family (LPA-2) from KaTeX's list.
 - [ ] LPA-T2b Complete it with per-library support, from Temml's support table and MathJax's
   extension list, and record each library's unknown-command behavior.
-- [ ] LPA-T3 Harvest test inputs per LPA-3 into the fixture format, recording each source and
-  license.
+- [ ] LPA-T3 Harvest test inputs per LPA-3 and LMATH-13 into the fixture format, recording each
+  source and license (tracked with LMATH-T8).
 - [ ] LPA-T4 Read MathML Core's layout sections and TeXbook Appendix G in full; write the
   rules reference and the TeX-to-MATH parameter table; decide between them (LPA-4).
 - [x] LPA-T5a Read RaTeX's repository for maintenance, license, dependencies, limits, and

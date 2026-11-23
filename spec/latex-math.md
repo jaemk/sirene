@@ -121,9 +121,12 @@ ours. KaTeX is the target in three ways, in this order of confidence:
    MATH-table path (LPA-4) stays possible behind the same box tree, for a user-chosen font or
    for AsciiMath-heavy PlantUML documents, if there is demand.
 
-The parser and layout are written in-tree in `sirene_core::math`, ported module by module from
-KaTeX's TypeScript with a header on each file naming the KaTeX file it follows and its license
-(LMATH-12). RaTeX (LPA-5) and Temml are references to compare against, not dependencies:
+The parser and layout are written in-tree in `sirene_core::math` as an idiomatic Rust design,
+not a one-for-one port (LMATH-13). KaTeX's source is the reference for behavior and for
+the data it holds (symbols, metrics, stretchy paths), and its test cases are the baseline the
+implementation must satisfy (LPA-3). A file that adapts KaTeX code or data carries a header
+naming the KaTeX file and its license (LMATH-12). RaTeX (LPA-5) and Temml are references to
+compare against, not dependencies:
 RaTeX is a 0.1.x project that releases monthly with a 262 KB layout file, and depending on it
 would tie sirene's drawing, limits, and release timing to it. The box tree and `Formula`
 interface (LEMB-4) are sirene's own, so the engine behind them can still change.
@@ -135,13 +138,19 @@ Where PlantUML differs: it renders with JLaTeXMath, not KaTeX, so a `<latex>` fo
 slightly from PlantUML's own output. KaTeX's behavior is the target for both, since there is
 one typesetter (LMATH-7).
 
-## LMATH-12 Module plan and KaTeX source map
+## LMATH-12 Module plan and KaTeX reference map
 
-Sizes are the TypeScript files in `KaTeX/KaTeX` `src/` on 2026-11-22. A Rust port is expected
-to be of the same order in lines; the whole core below is about 400 KB of TypeScript, so the
-first subset (LMATH-1) ports roughly half, and the data files are generated.
+Sizes are the TypeScript files in `KaTeX/KaTeX` `src/` on 2026-11-22. Measured lines: the
+modules of `src/` itself are 10,762 lines (of which the DOM and MathML builders, `Settings`,
+and the data are not ported), `functions/` and `environments/` 6,750 lines, and the generated
+`fontMetricsData.js` 2,077. The parse path (lexer 126, expander 470, `macros.ts` 1,038,
+`Parser.ts` 1,072, `symbols.ts` 879) is about 3,600 lines and the layout path
+(`buildCommon.ts` 783, `buildHTML.ts` 411, `delimiter.ts` 833, `stretchy.ts` 358,
+`svgGeometry.ts` 561) about 2,950. A Rust port is expected to be of the same order, so the
+first subset (LMATH-1) is about 6,000 to 7,000 lines and full KaTeX coverage about 11,000 to
+13,000, plus generated data.
 
-| Rust module (`sirene_core::math`) | Follows KaTeX | Size | Notes |
+| Rust module (`sirene_core::math`) | KaTeX reference (behavior and data, not structure) | Size | Notes |
 |---|---|---|---|
 | `lexer` | `Lexer.ts`, `Token.ts`, `SourceLocation.ts` | 5 KB | Tokens carry byte ranges in the source, for LEMB-5. |
 | `macros`, `expand` | `MacroExpander.ts`, `macros.ts`, `Namespace.ts`, `defineMacro.ts` | 16 KB, 42 KB | Expansion budget and depth bound (LMATH-6). `\gdef`, `\edef`, `\xdef`, `\let`, `\futurelet` are out of scope (LPA-2). |
@@ -155,9 +164,61 @@ first subset (LMATH-1) ports roughly half, and the data files are generated.
 | `layout` | `buildCommon.ts`, `buildHTML.ts`, `delimiter.ts`, `stretchy.ts`, `svgGeometry.ts` | 26, 15, 30, 14, 30 KB | Produces the box tree of LMATH-2 instead of KaTeX's DOM tree (`domTree.ts`, `tree.ts` are not ported). `buildMathML.ts` and `mathMLTree.ts` are not ported. |
 | `font_data` | `fonts/` | 514 KB TTF | Subset per LRES-T7c. |
 
-Not ported: `Settings` options that load resources or follow links, `trust`, the DOM and MathML
-builders, `\tag` numbering beyond the single formula, and the `contrib/` extensions
-(`mhchem`, `copy-tex`, `auto-render`).
+Not reproduced: `Settings` options that load resources or follow links, `trust`, the DOM and
+MathML builders, `\tag` numbering beyond the single formula, and the `contrib/` extensions
+(`mhchem`, `copy-tex`, `auto-render`). The module split above is a starting point; the Rust
+design of LMATH-13 may merge or split modules where KaTeX's file boundaries are artifacts of
+its JavaScript registry pattern.
+
+## LMATH-13 Design: Rust idioms, tests as the baseline
+
+The typesetter is designed for Rust, with KaTeX's behavior as the specification and its test
+cases as the oracle, not its code structure as the template.
+
+- Types, not registries. KaTeX registers functions, environments, macros, and symbols in
+  global maps filled by `defineFunction` calls with string keys. Here a command is an enum
+  variant or a static table entry resolved at compile time, a function's parse rule and box
+  builder sit together in one match arm or one small type, and there is no mutable global
+  state. Parse nodes are an enum (a sum type) with a byte span on each node, not an object with
+  a string `type` field.
+- Errors are values. Every stage returns `Result<_, MathError>` with a span and a message
+  naming the command; nothing panics, as the `production_panics` test requires of production
+  sources (`xtask/tests/production_panics.rs`). Limits are one `Budget` value passed down,
+  checked at each expansion and nesting step (LMATH-6).
+- Ownership, not mutation. The lexer is an iterator of tokens over a `&str` with byte offsets;
+  the macro expander is a stack of token sources behind the same iterator interface; the parser
+  consumes tokens and returns a tree. Layout is a pure function from a node and an immutable
+  `Options` (style, size, font, color) to a box; changing style or size builds a new `Options`.
+  No DOM-style class lists, no CSS: a box is a struct with width, height, depth, and children,
+  in typed units (`Em` as a newtype, not a bare float).
+- One box tree for every output. SVG, PNG, and ASCII read the same tree through the display
+  list (LMATH-4); KaTeX's HTML and MathML builders are not reproduced.
+- Data is data. The symbol table, metrics, and stretchy paths are generated static arrays
+  (LRES-3, LRES-T7b), with the generator in the repo and a staleness test; they are not
+  code.
+- Dependencies stay small: the crate needs no new dependency beyond what `sirene-core` already
+  uses, and `#![forbid(unsafe_code)]` holds as in the rest of the workspace.
+
+Baseline tests. KaTeX's suites are behavioral specifications to port as data, not as code
+(LPA-3): each case is a TeX input plus an expected outcome in sirene's terms.
+
+1. Parse expectations from `katex-spec.ts` (4,990 lines, 772 cases): the input and the shape of
+   the resulting tree (atom classes, groups, scripts, fractions), expressed against sirene's
+   node enum, and the inputs that must fail with the error KaTeX gives, from `errors-spec.ts`.
+2. Layout expectations: KaTeX's rendered DOM carries each box's height, depth, and margins
+   in em (`katex-spec.ts.snap`, and a node run of KaTeX over the fixtures to dump a metrics
+   file, kept as a checked-in fixture with its generator script). The Rust layout is held to
+   those numbers within a stated tolerance, which pins the algorithm without copying it.
+3. Screenshot inputs from `ss_data.yaml` (128 named inputs) as drawing fixtures: SVG output
+   must be non-empty, within its box, and match a snapshot reviewed once against KaTeX's own
+   image.
+4. Unicode and symbol cases from `unicode-spec.ts` and `symgroups.ts`.
+5. Sirene's own cases on top: limits, diagnostics' spans, the display-list contract, ASCII
+   output, and fuzz seeds.
+
+A ported case that the Rust design deliberately changes (a different error text, a limit KaTeX
+lacks) is listed in a deviations table in this spec, with the reason, so every difference from
+KaTeX is a decision on record.
 
 Per LMATH-6, the lexer, expander, and parser each carry their bound from the start, and
 `sirene-fuzz` gets a `math` target with them (LANGS-11).
@@ -174,9 +235,14 @@ tracker; this one holds what is left for the engine itself.
 - [ ] LMATH-T3 Write the box tree and `Formula` types, and the TeX-to-MATH parameter table
   (LPA-T4).
 - [x] LMATH-T4 Decide in-tree or an existing crate: in-tree (LMATH-11).
-- [ ] LMATH-T5 Build in the order of LMATH-9, module by module from LMATH-12.
-- [ ] LMATH-T6 Read the KaTeX files of LMATH-12 for the first subset, and write the Rust
-  types for tokens, parse nodes, options, and boxes before porting logic.
+- [ ] LMATH-T5 Build in the order of LMATH-9, to the design of LMATH-13.
+- [ ] LMATH-T6 Read the KaTeX behavior for the first subset, then write the Rust types for
+  tokens, parse nodes, options, and boxes (LMATH-13) before any logic, and review them.
+- [ ] LMATH-T8 Port the baseline tests as data (LMATH-13): extract the cases from
+  `katex-spec.ts`, `errors-spec.ts`, `ss_data.yaml`, `unicode-spec.ts`, and `symgroups.ts` into
+  fixtures, and write the script that dumps KaTeX's box metrics (needs node) with the
+  generated fixture checked in.
+- [ ] LMATH-T9 Start the deviations table (LMATH-13) as cases are ported.
 - [ ] LMATH-T7 Dropped: the RaTeX spike. RaTeX stays a comparison target for the layout tests
   (LPA-3), not a dependency.
 
