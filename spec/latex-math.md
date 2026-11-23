@@ -303,6 +303,8 @@ More deviations (LMATH-T9):
 | Macro lookup | strings keyed by text | `Key` enum, borrowed | no allocation per lookup |
 | `\def` as a script argument | "Got function '\def' with no arguments as superscript" | the script reads what follows the definition (`2^\def\foo{1}2` is `2^2`) | definitions are macros (the row above) |
 | Parse nodes | JS objects with a `type` string | `Node { kind: NodeKind, mode, span }`, one enum | LMATH-13 |
+| Bare size text | the longest run of tokens that fits a size, without limit | at most 64 bytes (`MAX_SIZE_TEXT`) | each token is tested against the text so far; LMATH-6 |
+| Nesting depth | none | braces and functions together at most `MAX_DEPTH` (64) | the parser recurses; LMATH-6 |
 
 Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of its stages:
 
@@ -353,8 +355,20 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   (a macro that reaches `\operatorname@` or `\operatornamewithlimits`) builds `OperatorName`.
   `\limits` and `\nolimits` set the limit choice of an `Op` (and of the starred operator name)
   and fail anywhere else with "Limit controls must follow a math operator".
+  Sizes and colors (`parser/arguments.rs`): a size argument is read as text and checked as KaTeX
+  does (a number and one of 15 units; braced or bare, as in `\kern1em`), a color as a name or a
+  hex code (a bare six-digit code gets its `#`). Built on them: `\kern`, `\mkern`, `\hskip`,
+  `\mskip` (`Kern`), `\rule`, `\textcolor` and `\color` (`Color`), `\phantom`, `\vphantom`,
+  `\smash` with its `[tb]` (`Phantom`, `VPhantom`, `Smash`), `\mathllap`, `\mathrlap`,
+  `\mathclap` (`Lap`), `\raisebox` (`RaiseBox`, with a text-style box argument), the eleven
+  size commands (`Sizing`, which take the rest of the group), and `\relax` (`Internal`, kept out
+  of the tree).
+  Stack: braces and functions share one nesting budget of `MAX_DEPTH` (the parser reads both by
+  recursion), and the functions that read the rest of the group are built in a function of their
+  own so the frames of that recursion stay small. A test runs the deepest allowed mixes on a
+  2 MiB thread.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 250 give exactly KaTeX's tree or KaTeX's error, 365 stop at a function not
+  macro settings, 328 give exactly KaTeX's tree or KaTeX's error, 287 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 

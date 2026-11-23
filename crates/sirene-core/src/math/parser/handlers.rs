@@ -8,11 +8,10 @@
 
 use super::{MathError, Mode, Name, Node, NodeKind, Parser, TokenKind, unsupported, written};
 use crate::math::{
-    ast::{MathClass, OpContent, StyleName},
+    ast::{MathClass, Measurement, OpContent, StyleName},
     expander::token_text,
     functions::{self, Function},
     lexer::Token,
-    limits,
 };
 
 /// What a function builds, and the details that tell the commands of one kind apart.
@@ -48,6 +47,23 @@ enum Build {
     DelimSizing(u8, MathClass),
     /// `\left ... \right`.
     Left,
+    /// `\kern`, `\mkern`, `\hskip`, `\mskip`.
+    Kern,
+    Rule,
+    /// `\textcolor{c}{x}`.
+    TextColor,
+    /// `\color{c}`: the rest of the group.
+    Color,
+    Phantom,
+    VPhantom,
+    Smash,
+    /// `\mathllap` and the others, with the alignment.
+    Lap(&'static str),
+    RaiseBox,
+    /// A size command, with its number (1 to 11).
+    Sizing(u8),
+    /// `\relax`.
+    Relax,
     /// `\sum`, `\int`, `\lim`, `\sin`: a named operator.
     Op {
         limits: bool,
@@ -195,6 +211,29 @@ impl Build {
                 limits: false,
                 symbol: true,
             },
+            "\\kern" | "\\mkern" | "\\hskip" | "\\mskip" => Build::Kern,
+            "\\rule" => Build::Rule,
+            "\\textcolor" => Build::TextColor,
+            "\\color" => Build::Color,
+            "\\phantom" => Build::Phantom,
+            "\\vphantom" => Build::VPhantom,
+            "\\smash" => Build::Smash,
+            "\\mathllap" => Build::Lap("llap"),
+            "\\mathrlap" => Build::Lap("rlap"),
+            "\\mathclap" => Build::Lap("clap"),
+            "\\raisebox" => Build::RaiseBox,
+            "\\tiny" => Build::Sizing(1),
+            "\\sixptsize" => Build::Sizing(2),
+            "\\scriptsize" => Build::Sizing(3),
+            "\\footnotesize" => Build::Sizing(4),
+            "\\small" => Build::Sizing(5),
+            "\\normalsize" => Build::Sizing(6),
+            "\\large" => Build::Sizing(7),
+            "\\Large" => Build::Sizing(8),
+            "\\LARGE" => Build::Sizing(9),
+            "\\huge" => Build::Sizing(10),
+            "\\Huge" => Build::Sizing(11),
+            "\\relax" => Build::Relax,
             "\\mathop" => Build::MathOp,
             "\\operatorname@" => Build::OperatorName { with_limits: false },
             "\\operatornamewithlimits" => Build::OperatorName { with_limits: true },
@@ -246,16 +285,10 @@ impl<'a> Parser<'a> {
                 token.span.clone(),
             ));
         }
-        if self.depth >= limits::MAX_DEPTH {
-            return Err(MathError::new(
-                format!("groups nested more than {} deep", limits::MAX_DEPTH),
-                token.span.clone(),
-            ));
-        }
-        self.depth += 1;
+        self.enter(&token.span)?;
         let built = self
             .parse_arguments(&name, &function)
-            .and_then(|args| self.build(build, &name, token, args));
+            .and_then(|args| self.dispatch(build, &name, token, args));
         self.depth -= 1;
         built.map(Some)
     }
@@ -310,6 +343,24 @@ impl<'a> Parser<'a> {
             b'o' => self.parse_argument_group(optional, None),
             b'm' => self.parse_argument_group(optional, Some(Mode::Math)),
             b't' => self.parse_argument_group(optional, Some(Mode::Text)),
+            b's' => self.parse_size_group(optional),
+            b'c' => self.parse_color_group(optional),
+            b'h' => {
+                // A box argument is text, set in the text style with the font reset.
+                let Some(group) = self.parse_argument_group(optional, Some(Mode::Text))? else {
+                    return Ok(None);
+                };
+                let (mode, span) = (group.mode, group.span.clone());
+                Ok(Some(Node {
+                    kind: NodeKind::Styling {
+                        style: StyleName::Text,
+                        body: vec![group],
+                        reset_font: true,
+                    },
+                    mode,
+                    span,
+                }))
+            }
             b'p' => {
                 if optional {
                     return Err(MathError::new(
@@ -364,6 +415,132 @@ impl<'a> Parser<'a> {
         Ok(Some(node))
     }
 
+    fn dispatch(
+        &mut self,
+        build: Build,
+        name: &str,
+        token: &Token<'a>,
+        args: Arguments<'a>,
+    ) -> Result<Node<'a>, MathError> {
+        match build {
+            Build::Styling(_)
+            | Build::OldFont(_)
+            | Build::Color
+            | Build::Sizing(_)
+            | Build::Left => self.build_open(build, name, token, args),
+            _ => self.build(build, name, token, args),
+        }
+    }
+
+    /// The functions that read the rest of the group, and so recurse: kept in a function of
+    /// their own so the frames of that recursion stay small.
+    fn build_open(
+        &mut self,
+        build: Build,
+        name: &str,
+        token: &Token<'a>,
+        mut args: Arguments<'a>,
+    ) -> Result<Node<'a>, MathError> {
+        let start = token.span.start;
+        let mode = self.mode;
+        match build {
+            Build::Styling(style) => {
+                // The body is the rest of the group; an infix command ends it.
+                let body = self.parse_expression(true)?;
+                let end = body.last().map_or(token.span.end, |n| n.span.end);
+                Ok(Node {
+                    kind: NodeKind::Styling {
+                        style,
+                        body,
+                        reset_font: false,
+                    },
+                    mode,
+                    span: start..end,
+                })
+            }
+            Build::OldFont(font) => {
+                // The rest of the group is set in the font.
+                let body = self.parse_expression(true)?;
+                let span = body
+                    .first()
+                    .zip(body.last())
+                    .map_or(token.span.end..token.span.end, |(first, last)| {
+                        first.span.start..last.span.end
+                    });
+                let group = Node {
+                    kind: NodeKind::Group {
+                        body,
+                        semisimple: false,
+                    },
+                    mode: self.mode,
+                    span: span.clone(),
+                };
+                Ok(Node {
+                    kind: NodeKind::Font {
+                        font,
+                        body: Box::new(group),
+                    },
+                    mode,
+                    span: start..span.end,
+                })
+            }
+            Build::Color => {
+                let Some(color) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let color = color_token(color, name)?;
+                // The rest of the group is in the color; an infix command ends it.
+                let body = self.parse_expression(true)?;
+                let end = body.last().map_or(token.span.end, |n| n.span.end);
+                Ok(Node {
+                    kind: NodeKind::Color { color, body },
+                    mode,
+                    span: start..end,
+                })
+            }
+            Build::Sizing(size) => {
+                let body = self.parse_expression(false)?;
+                let end = body.last().map_or(token.span.end, |n| n.span.end);
+                Ok(Node {
+                    kind: NodeKind::Sizing { size, body },
+                    mode,
+                    span: start..end,
+                })
+            }
+            Build::Left => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let left = check_delimiter(&arg, name)?;
+                // The body runs to the matching `\right`, which ends an expression.
+                self.leftright_depth += 1;
+                let body = self.parse_expression(false);
+                self.leftright_depth -= 1;
+                let body = body?;
+                // The `\right` is read here, as the `\left` reads it, not by the expression.
+                let close = self.fetch()?;
+                if token_text(&close.kind) != "\\right" {
+                    return Err(MathError::new(
+                        format!("Expected '\\right', got '{}'", token_text(&close.kind)),
+                        close.span,
+                    ));
+                }
+                self.consume();
+                let right_arg = self.parse_argument("\\right", b'p', false)?;
+                let Some(right_arg) = right_arg else {
+                    return Err(missing("\\right"));
+                };
+                let right = check_delimiter(&right_arg, "\\right")?;
+                Ok(Node {
+                    kind: NodeKind::LeftRight { body, left, right },
+                    mode,
+                    span: start..right_arg.span.end,
+                })
+            }
+            _ => Err(missing(name)),
+        }
+    }
+
     fn build(
         &mut self,
         build: Build,
@@ -402,6 +579,7 @@ impl<'a> Parser<'a> {
                         kind: NodeKind::Styling {
                             style,
                             body: vec![frac],
+                            reset_font: false,
                         },
                         mode,
                         span,
@@ -421,16 +599,6 @@ impl<'a> Parser<'a> {
                         index: index.map(Box::new),
                     },
                     mode,
-                })
-            }
-            Build::Styling(style) => {
-                // The body is the rest of the group; an infix command ends it.
-                let body = self.parse_expression(true)?;
-                let end = body.last().map_or(token.span.end, |n| n.span.end);
-                Ok(Node {
-                    kind: NodeKind::Styling { style, body },
-                    mode,
-                    span: start..end,
                 })
             }
             Build::Text => {
@@ -464,32 +632,6 @@ impl<'a> Parser<'a> {
                         body: Box::new(arg.normalized()),
                     },
                     mode,
-                })
-            }
-            Build::OldFont(font) => {
-                // The rest of the group is set in the font.
-                let body = self.parse_expression(true)?;
-                let span = body
-                    .first()
-                    .zip(body.last())
-                    .map_or(token.span.end..token.span.end, |(first, last)| {
-                        first.span.start..last.span.end
-                    });
-                let group = Node {
-                    kind: NodeKind::Group {
-                        body,
-                        semisimple: false,
-                    },
-                    mode: self.mode,
-                    span: span.clone(),
-                };
-                Ok(Node {
-                    kind: NodeKind::Font {
-                        font,
-                        body: Box::new(group),
-                    },
-                    mode,
-                    span: start..span.end,
                 })
             }
             Build::BoldSymbol => {
@@ -576,36 +718,6 @@ impl<'a> Parser<'a> {
                     span,
                 })
             }
-            Build::Left => {
-                let Some(arg) = args.required.pop() else {
-                    return Err(missing(name));
-                };
-                let left = check_delimiter(&arg, name)?;
-                // The body runs to the matching `\right`, which ends an expression.
-                self.leftright_depth += 1;
-                let body = self.parse_expression(false);
-                self.leftright_depth -= 1;
-                let body = body?;
-                // The `\right` is read here, as the `\left` reads it, not by the expression.
-                let close = self.fetch()?;
-                if token_text(&close.kind) != "\\right" {
-                    return Err(MathError::new(
-                        format!("Expected '\\right', got '{}'", token_text(&close.kind)),
-                        close.span,
-                    ));
-                }
-                self.consume();
-                let right_arg = self.parse_argument("\\right", b'p', false)?;
-                let Some(right_arg) = right_arg else {
-                    return Err(missing("\\right"));
-                };
-                let right = check_delimiter(&right_arg, "\\right")?;
-                Ok(Node {
-                    kind: NodeKind::LeftRight { body, left, right },
-                    mode,
-                    span: start..right_arg.span.end,
-                })
-            }
             Build::Accent => {
                 let Some(arg) = args.required.pop() else {
                     return Err(missing(name));
@@ -670,6 +782,151 @@ impl<'a> Parser<'a> {
                     span,
                 })
             }
+            Build::Kern => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::Kern {
+                        dimension: measurement(arg, name)?,
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Rule => {
+                let (Some(height), Some(width)) = (args.required.pop(), args.required.pop()) else {
+                    return Err(missing(name));
+                };
+                let span = start..height.span.end;
+                let shift = match args.optional.pop().flatten() {
+                    Some(shift) => Some(measurement(shift, name)?),
+                    None => None,
+                };
+                Ok(Node {
+                    kind: NodeKind::Rule {
+                        shift,
+                        width: measurement(width, name)?,
+                        height: measurement(height, name)?,
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::TextColor => {
+                let (Some(body), Some(color)) = (args.required.pop(), args.required.pop()) else {
+                    return Err(missing(name));
+                };
+                let span = start..body.span.end;
+                Ok(Node {
+                    kind: NodeKind::Color {
+                        color: color_token(color, name)?,
+                        body: body.into_body(),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Phantom => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::Phantom {
+                        body: arg.into_body(),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::VPhantom => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::VPhantom {
+                        body: Box::new(arg),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Smash => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                // `[tb]` picks the side: `t` the height, `b` the depth, and any other letter
+                // none. Without it both are smashed.
+                let (mut height, mut depth) = (true, true);
+                if let Some(Some(letters)) = args.optional.pop() {
+                    (height, depth) = (false, false);
+                    for letter in letters.into_body() {
+                        let NodeKind::Symbol { name: symbol, .. } = &letter.kind else {
+                            return Err(MathError::new(
+                                format!(
+                                    "Expected node of symbol group type, but got node of type {}",
+                                    letter.kind.type_name()
+                                ),
+                                letter.span,
+                            ));
+                        };
+                        match symbol {
+                            Name::Char("t") => height = true,
+                            Name::Char("b") => depth = true,
+                            _ => {
+                                (height, depth) = (false, false);
+                                break;
+                            }
+                        }
+                    }
+                }
+                Ok(Node {
+                    kind: NodeKind::Smash {
+                        body: Box::new(arg),
+                        height,
+                        depth,
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Lap(alignment) => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::Lap {
+                        alignment,
+                        body: Box::new(arg),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::RaiseBox => {
+                let (Some(body), Some(amount)) = (args.required.pop(), args.required.pop()) else {
+                    return Err(missing(name));
+                };
+                let span = start..body.span.end;
+                Ok(Node {
+                    kind: NodeKind::RaiseBox {
+                        dy: measurement(amount, name)?,
+                        body: Box::new(body),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Relax => Ok(Node {
+                kind: NodeKind::Internal,
+                mode,
+                span: token.span.clone(),
+            }),
             Build::Op { limits, symbol } => Ok(Node {
                 kind: NodeKind::Op {
                     limits,
@@ -727,7 +984,29 @@ impl<'a> Parser<'a> {
                     span,
                 })
             }
+            // Read by `build_open`.
+            Build::Styling(_)
+            | Build::OldFont(_)
+            | Build::Color
+            | Build::Sizing(_)
+            | Build::Left => Err(missing(name)),
         }
+    }
+}
+
+/// The measurement a size argument holds.
+fn measurement(node: Node<'_>, name: &str) -> Result<Measurement, MathError> {
+    match node.kind {
+        NodeKind::Size { value, .. } => Ok(value),
+        _ => Err(missing(name)),
+    }
+}
+
+/// The color a color argument holds.
+fn color_token(node: Node<'_>, name: &str) -> Result<String, MathError> {
+    match node.kind {
+        NodeKind::ColorToken(color) => Ok(color),
+        _ => Err(missing(name)),
     }
 }
 
