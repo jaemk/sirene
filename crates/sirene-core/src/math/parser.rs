@@ -135,39 +135,40 @@ fn form_ligatures(body: &mut Vec<Node<'_>>) {
             _ => None,
         }
     }
+    // One pass into a new list: a splice per run would move the rest of the list each time.
+    let mut input: Vec<Option<Node<'_>>> = std::mem::take(body).into_iter().map(Some).collect();
+    fn text_at<'n>(input: &[Option<Node<'n>>], i: usize) -> Option<&'n str> {
+        input.get(i)?.as_ref().and_then(text_of)
+    }
     let mut i = 0;
-    while i + 1 < body.len() {
-        let (Some(a), Some(b)) = (text_of(&body[i]), text_of(&body[i + 1])) else {
-            i += 1;
-            continue;
-        };
-        let run = if a == "-" && b == "-" {
+    while i < input.len() {
+        let run = match (text_at(&input, i), text_at(&input, i + 1)) {
             // `---` if another dash follows, else `--`.
-            if body.get(i + 2).and_then(text_of) == Some("-") {
-                Some(("---", 3))
-            } else {
-                Some(("--", 2))
-            }
-        } else if (a == "'" || a == "`") && a == b {
-            Some((if a == "'" { "''" } else { "``" }, 2))
-        } else {
-            None
+            (Some("-"), Some("-")) if text_at(&input, i + 2) == Some("-") => Some(("---", 3)),
+            (Some("-"), Some("-")) => Some(("--", 2)),
+            (Some("'"), Some("'")) => Some(("''", 2)),
+            (Some("`"), Some("`")) => Some(("``", 2)),
+            _ => None,
         };
-        if let Some((text, count)) = run {
-            let span = body[i].span.start..body[i + count - 1].span.end;
-            body.splice(
-                i..i + count,
-                [Node {
+        match run {
+            Some((text, count)) => {
+                let start = input[i].as_ref().map_or(0, |n| n.span.start);
+                let end = input[i + count - 1].as_ref().map_or(start, |n| n.span.end);
+                body.push(Node {
                     kind: NodeKind::Symbol {
                         group: AtomGroup::TextOrd,
                         name: Name::Char(text),
                     },
                     mode: Mode::Text,
-                    span,
-                }],
-            );
+                    span: start..end,
+                });
+                i += count;
+            }
+            None => {
+                body.extend(input[i].take());
+                i += 1;
+            }
         }
-        i += 1;
     }
 }
 
@@ -1249,6 +1250,15 @@ mod tests {
             error("\\begin{alignedat}{x} a \\end{alignedat}"),
             "Number of columns should be a positive integer"
         );
+        // A column count too large to build the columns for is refused, not allocated.
+        assert_eq!(
+            error("\\begin{alignedat}{99999999999999999999} a \\end{alignedat}"),
+            "Number of columns should be a positive integer"
+        );
+        assert_eq!(
+            error("\\begin{alignedat}{1000000} a \\end{alignedat}"),
+            "Number of columns should be at most 256"
+        );
         assert_eq!(
             error("\\begin{split} a \\end{split}"),
             "{split} can be used only in display mode."
@@ -1282,6 +1292,27 @@ mod tests {
             })
             .collect();
         assert_eq!(tags, ["custom", "false", "true"]);
+    }
+
+    /// Long inputs of the shapes that could cost more than their size (each is under the source
+    /// limit) are read in one pass.
+    #[test]
+    fn long_runs_are_read_in_linear_time() {
+        // Twenty thousand `---` ligatures in one text.
+        let dashes = format!("\\text{{{}}}", "-".repeat(60_000));
+        let nodes = parse(&dashes).unwrap();
+        let NodeKind::Text { body, .. } = &nodes[0].kind else {
+            unreachable!("text");
+        };
+        assert_eq!(body.len(), 20_000);
+        // Many cells and many rows.
+        let cells = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a&".repeat(15_000));
+        assert!(parse(&cells).is_ok());
+        let rows = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a\\\\".repeat(15_000));
+        assert!(parse(&rows).is_ok());
+        // A long run of scripts and of groups.
+        assert!(parse(&"x^a_b".repeat(10_000)).is_ok());
+        assert!(parse(&"{}".repeat(30_000)).is_ok());
     }
 
     #[test]

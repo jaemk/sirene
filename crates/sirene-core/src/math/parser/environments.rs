@@ -12,6 +12,7 @@ use crate::math::{
     ast::{AlignSpec, Array, ColSeparation, Measurement, RowTag, StyleName},
     functions::Function,
     lexer::Token,
+    limits,
 };
 
 /// What `parse_array` is told about the table it reads.
@@ -411,6 +412,15 @@ impl<'a> Parser<'a> {
             let Some(number) = number.filter(|_| text.bytes().all(|b| b.is_ascii_digit())) else {
                 return Err(MathError::new(message, count.span.clone()));
             };
+            if number > limits::MAX_COLUMNS {
+                return Err(MathError::new(
+                    format!(
+                        "Number of columns should be at most {}",
+                        limits::MAX_COLUMNS
+                    ),
+                    count.span.clone(),
+                ));
+            }
             num_maths = number;
             num_cols = number * 2;
         }
