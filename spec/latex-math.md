@@ -57,7 +57,9 @@ silent difference.
 ## LMATH-6 Limits
 
 As LANGS-8: groups nest at most 64 deep, a formula is at most 64 KiB of source, macro expansion
-is at most 10,000 steps and 1 MiB of output, a table has at most 256 cells per side, and a
+is at most 10,000 steps and 1 MiB of output (checked while a body is built, so an argument
+repeated many times in one body is stopped before it is allocated), the tokens a `\def`
+parameter must be followed by are at most 256, a table has at most 256 cells per side, and a
 `\left` ... `\right` stretches to at most 16 times the font size. A formula past a limit reports
 one error and is drawn as text. The fuzz targets cover the parser and the expander (LANGS-11).
 
@@ -294,6 +296,9 @@ More deviations (LMATH-T9):
 | Expansion limit message | names its `maxExpand` setting | "Too many expansions: infinite loop or more than 10000 macro calls" | no setting; the bound is fixed (LMATH-6) |
 | `\newcommand` parameters | any count | at most 9 | TeX's limit, and a bound on argument reading |
 | Output bound | none | 1 MiB of produced tokens | LMATH-6 |
+| Delimiter length | none | at most 256 tokens per `\def` parameter | reading a delimited argument compares at every token; LMATH-6 |
+| Delimiters after a partial match | the token that broke the match is dropped, so `\def\f#1ab{..}\f aab` never matches | restarted from that token, as TeX does | TeX's rule: the shortest run ending in the delimiters |
+| A braced group argument | the outer braces of `{a}{b}` are removed, leaving `a}{b` | removed only when one group is the whole argument | TeX's rule; KaTeX's check looks only at the first and last token |
 | `\def` and `\newcommand` | `\def` is a parser function; `\newcommand` a macro | both run in the expander | one place for definitions and their scope |
 | Macro lookup | strings keyed by text | `Key` enum, borrowed | no allocation per lookup |
 

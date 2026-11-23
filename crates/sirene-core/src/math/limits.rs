@@ -14,6 +14,11 @@ pub(crate) const MAX_EXPANSIONS: usize = 10_000;
 /// Macro expansion produces at most this many bytes of tokens.
 pub(crate) const MAX_EXPANDED: usize = 1024 * 1024;
 
+/// The tokens that must follow one parameter of a `\def` are at most this many. Reading a
+/// delimited argument compares the end of what it has read with them at every token, so this
+/// bounds that work at the size of the argument times this.
+pub(crate) const MAX_DELIMITERS: usize = 256;
+
 /// The error for a source past `MAX_SOURCE`; the span is the first byte over the limit.
 pub(crate) fn check_source(src: &str) -> Result<(), MathError> {
     if src.len() <= MAX_SOURCE {

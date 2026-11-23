@@ -185,6 +185,35 @@ fn is_char(token: &Token<'_>, text: &str) -> bool {
     matches!(token.kind, TokenKind::Char(c) if c == text)
 }
 
+/// Whether the argument read so far ends with the delimiters. Each must sit outside every brace
+/// group, except a delimiter that is itself `{`, which is read one level in (it opens a group).
+fn ends_with(tokens: &[Token<'_>], depths: &[i32], delims: &[Token<'_>]) -> bool {
+    let Some(from) = tokens.len().checked_sub(delims.len()) else {
+        return false;
+    };
+    tokens[from..]
+        .iter()
+        .zip(&depths[from..])
+        .zip(delims)
+        .all(|((token, &depth), want)| {
+            token.kind == want.kind && (depth == 0 || (depth == 1 && is_char(want, "{")))
+        })
+}
+
+/// The delimiter token the argument is waiting for: the one after the longest run of delimiters
+/// the argument so far ends with.
+fn next_delimiter<'d, 'a>(
+    tokens: &[Token<'a>],
+    depths: &[i32],
+    delims: &'d [Token<'a>],
+) -> &'d Token<'a> {
+    let matched = (1..delims.len())
+        .rev()
+        .find(|&k| ends_with(tokens, depths, &delims[..k]))
+        .unwrap_or(0);
+    &delims[matched]
+}
+
 /// How many arguments a string macro takes: the highest `#n` in a row from `#1`, ignoring `##`.
 fn count_args(body: &str) -> usize {
     if !body.contains('#') {
@@ -333,9 +362,13 @@ impl<'a> Expander<'a> {
             self.consume_spaces()?;
         }
         let start = self.future()?.clone();
+        let braced = is_char(&start, "{");
         let mut tokens: Vec<Token<'a>> = Vec::new();
+        // The brace depth after each token, which a delimiter's position is judged by.
+        let mut depths: Vec<i32> = Vec::new();
         let mut depth = 0_i32;
-        let mut matched = 0;
+        // Where the group the argument opens with closes, if it does.
+        let mut group_end: Option<usize> = None;
         let end = loop {
             let token = self.pop_token()?;
             if is_char(&token, "{") {
@@ -346,32 +379,34 @@ impl<'a> Expander<'a> {
                     return Err(MathError::new("Extra }", token.span));
                 }
             } else if token.kind == TokenKind::Eof {
-                let want = delims.map_or_else(|| "}".to_string(), |d| expected(&d[matched]));
+                let want = delims.map_or_else(
+                    || "}".to_string(),
+                    |d| expected(next_delimiter(&tokens, &depths, d)),
+                );
                 return Err(MathError::new(
                     format!("Unexpected end of input in a macro argument, expected '{want}'"),
                     token.span,
                 ));
             }
             tokens.push(token.clone());
-            if let Some(delims) = delims {
-                let want = &delims[matched];
-                if (depth == 0 || (depth == 1 && is_char(want, "{"))) && token.kind == want.kind {
-                    matched += 1;
-                    if matched == delims.len() {
+            depths.push(depth);
+            if braced && depth == 0 && group_end.is_none() {
+                group_end = Some(tokens.len() - 1);
+            }
+            match delims {
+                Some(delims) => {
+                    if ends_with(&tokens, &depths, delims) {
                         // The delimiters are not part of the argument.
-                        tokens.truncate(tokens.len() - matched);
+                        tokens.truncate(tokens.len() - delims.len());
                         break token;
                     }
-                } else {
-                    matched = 0;
                 }
-            }
-            if depth == 0 && delims.is_none() {
-                break token;
+                None if depth == 0 => break token,
+                None => {}
             }
         };
-        // A braced argument loses its outer braces.
-        if is_char(&start, "{") && tokens.last().is_some_and(|t| is_char(t, "}")) {
+        // An argument that is one braced group loses its outer braces; `{a}{b}` keeps them.
+        if group_end.is_some() && group_end == tokens.len().checked_sub(1) {
             tokens.pop();
             tokens.remove(0);
         }
@@ -566,6 +601,9 @@ impl<'a> Expander<'a> {
             return Ok(definition.body.clone());
         }
         let mut out = Vec::with_capacity(definition.body.len());
+        // A body that repeats a long argument can be far larger than either, so the size is
+        // checked as the tokens are added, not after.
+        let mut size = self.produced;
         let mut body = definition.body.iter();
         while let Some(token) = body.next() {
             if !is_char(token, "#") {
@@ -589,7 +627,19 @@ impl<'a> Expander<'a> {
                 _ => None,
             };
             match index.and_then(|i| args.get(i)) {
-                Some(arg) => out.extend(arg.iter().cloned()),
+                Some(arg) => {
+                    size += arg.iter().map(|t| token_len(&t.kind)).sum::<usize>();
+                    if size > limits::MAX_EXPANDED {
+                        return Err(MathError::new(
+                            format!(
+                                "Macro expansion produced more than {} bytes",
+                                limits::MAX_EXPANDED
+                            ),
+                            token.span.clone(),
+                        ));
+                    }
+                    out.extend(arg.iter().cloned());
+                }
                 None => {
                     return Err(MathError::new(
                         "Not a valid argument number",
@@ -785,6 +835,14 @@ impl<'a> Expander<'a> {
                 delimiters.push(Vec::new());
             } else if token.kind == TokenKind::Eof {
                 return Err(MathError::new("Expected a macro definition", token.span));
+            } else if delimiters[num_args].len() >= limits::MAX_DELIMITERS {
+                return Err(MathError::new(
+                    format!(
+                        "Macro parameter text longer than {} tokens",
+                        limits::MAX_DELIMITERS
+                    ),
+                    token.span,
+                ));
             } else {
                 delimiters[num_args].push(token);
             }
@@ -913,6 +971,36 @@ mod tests {
         assert_eq!(error("\\def\\f#a{}"), "Invalid argument number \"a\"");
         assert_eq!(error("\\def{x}"), "Expected a control sequence");
         assert_eq!(error("\\def\\f"), "Expected a macro definition");
+    }
+
+    #[test]
+    fn a_delimited_argument_is_the_shortest_run_before_the_delimiters() {
+        // After a partial match, the token that broke it may start the delimiters again.
+        assert_eq!(expand("\\def\\f#1ab{[#1]}\\f aab").unwrap(), "[a]");
+        assert_eq!(expand("\\def\\f#1aab{[#1]}\\f aaaab").unwrap(), "[aa]");
+        // A delimiter inside braces does not end the argument.
+        assert_eq!(expand("\\def\\f#1.{[#1]}\\f{a.}b.").unwrap(), "[{a.}b]");
+        assert_eq!(expand("\\def\\f#1.{[#1]}\\f a{b.}c.").unwrap(), "[a{b.}c]");
+        // An empty argument is allowed.
+        assert_eq!(expand("\\def\\f#1.{[#1]}\\f .").unwrap(), "[]");
+        // The message names the delimiter the argument is waiting for.
+        assert_eq!(
+            error("\\def\\f#1ab{}\\f xa"),
+            "Unexpected end of input in a macro argument, expected 'b'"
+        );
+        assert_eq!(
+            error("\\def\\f#1ab{}\\f x"),
+            "Unexpected end of input in a macro argument, expected 'a'"
+        );
+    }
+
+    #[test]
+    fn only_a_whole_braced_group_loses_its_braces() {
+        assert_eq!(expand("\\def\\f#1.{[#1]}\\f{a}.").unwrap(), "[a]");
+        assert_eq!(expand("\\def\\f#1.{[#1]}\\f{a}{b}.").unwrap(), "[{a}{b}]");
+        assert_eq!(expand("\\def\\f#1.{[#1]}\\f{{a}}.").unwrap(), "[{a}]");
+        assert_eq!(expand("\\def\\f#1{[#1]}\\f{{a}}").unwrap(), "[{a}]");
+        assert_eq!(expand("\\def\\f#1{[#1]}\\f{}").unwrap(), "[]");
     }
 
     #[test]
@@ -1078,6 +1166,35 @@ mod tests {
         assert!(
             e.starts_with("Macro expansion produced more than 1048576"),
             "{e}"
+        );
+    }
+
+    #[test]
+    fn a_body_that_repeats_a_long_argument_is_stopped_before_it_is_built() {
+        // 2,000 copies of a 2,000 byte argument would be 4 MB; it stops at the limit.
+        let src = format!(
+            "\\newcommand\\f[1]{{{}}}\\f{{{}}}",
+            "#1".repeat(2_000),
+            "x".repeat(2_000)
+        );
+        let e = error(&src);
+        assert!(
+            e.starts_with("Macro expansion produced more than 1048576"),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn delimiters_are_bounded() {
+        let fits = "a".repeat(limits::MAX_DELIMITERS);
+        assert_eq!(
+            expand(&format!("\\def\\f#1{fits}{{[#1]}}\\f x{fits}")).unwrap(),
+            "[x]"
+        );
+        let long = "a".repeat(limits::MAX_DELIMITERS + 1);
+        assert_eq!(
+            error(&format!("\\def\\f#1{long}{{}}")),
+            "Macro parameter text longer than 256 tokens"
         );
     }
 
