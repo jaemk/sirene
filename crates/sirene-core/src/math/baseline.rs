@@ -19,6 +19,94 @@ fn oracle() -> Vec<(String, Value)> {
         .collect()
 }
 
+/// The symbol leaves of a KaTeX parse tree: `(mode, text, group)` for each node that is one
+/// symbol of the table, where `group` is KaTeX's name for its atom group.
+fn symbol_leaves(node: &Value, out: &mut Vec<(String, String, String)>) {
+    match node {
+        Value::Array(items) => items.iter().for_each(|n| symbol_leaves(n, out)),
+        Value::Object(fields) => {
+            let kind = fields.get("type").and_then(Value::as_str);
+            let mode = fields.get("mode").and_then(Value::as_str);
+            let text = fields.get("text").and_then(Value::as_str);
+            if let (Some(kind), Some(mode), Some(text)) = (kind, mode, text) {
+                let group = match kind {
+                    "atom" => fields.get("family").and_then(Value::as_str),
+                    "mathord" | "textord" | "spacing" => Some(kind),
+                    _ => None,
+                };
+                if let Some(group) = group {
+                    out.push((mode.into(), text.into(), group.into()));
+                }
+            }
+            fields.values().for_each(|n| symbol_leaves(n, out));
+        }
+        _ => {}
+    }
+}
+
+/// Every symbol KaTeX's parser read in its own test suite is in the table, with the same atom
+/// group. The one exception is a `textord` KaTeX's parser made without the table: a character of
+/// a script it supports (Cyrillic, CJK, Arabic digits), a character from `\char`, or a
+/// backslash in `\href` text. Those belong to the parser stage, and are counted here so that
+/// the count shows when the table or the parser changes.
+#[test]
+fn the_symbol_table_agrees_with_katex_on_every_baseline_symbol() {
+    use super::symbols::{AtomGroup, Mode, Name, lookup};
+
+    let mut checked = 0;
+    let mut parser_textords = 0;
+    let mut disagreements = Vec::new();
+    for (input, entry) in oracle() {
+        let Some(tree) = entry.get("tree") else {
+            continue;
+        };
+        let mut leaves = Vec::new();
+        symbol_leaves(tree, &mut leaves);
+        for (mode, text, group) in leaves {
+            let mode = if mode == "math" {
+                Mode::Math
+            } else {
+                Mode::Text
+            };
+            let name = match text.strip_prefix('\\') {
+                Some(control) => Name::Control(control),
+                None => Name::Char(&text),
+            };
+            let expected = match group.as_str() {
+                "accent-token" => AtomGroup::Accent,
+                "bin" => AtomGroup::Bin,
+                "close" => AtomGroup::Close,
+                "inner" => AtomGroup::Inner,
+                "mathord" => AtomGroup::MathOrd,
+                "op-token" => AtomGroup::Op,
+                "open" => AtomGroup::Open,
+                "punct" => AtomGroup::Punct,
+                "rel" => AtomGroup::Rel,
+                "spacing" => AtomGroup::Spacing,
+                "textord" => AtomGroup::TextOrd,
+                other => panic!("unknown group {other} in {input:?}"),
+            };
+            checked += 1;
+            match lookup(mode, name) {
+                Some(symbol) if symbol.group == expected => {}
+                _ if expected == AtomGroup::TextOrd => parser_textords += 1,
+                found => disagreements.push(format!("{input:?}: {text:?} {found:?} vs {group}")),
+            }
+        }
+    }
+    assert!(checked > 4000, "{checked}");
+    assert_eq!(
+        parser_textords, 87,
+        "textords the parser makes without the table"
+    );
+    assert!(
+        disagreements.is_empty(),
+        "{} of {checked}:\n{}",
+        disagreements.len(),
+        disagreements.join("\n")
+    );
+}
+
 #[test]
 fn the_oracle_is_present() {
     let oracle = oracle();

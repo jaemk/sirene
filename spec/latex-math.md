@@ -223,7 +223,7 @@ KaTeX is a decision on record.
 Per LMATH-6, the lexer, expander, and parser each carry their bound from the start, and
 `sirene-fuzz` gets a `math` target with them (LANGS-11).
 
-## LMATH-14 Built so far: lexer, errors, limits
+## LMATH-14 Built so far: lexer, errors, limits, symbols
 
 `sirene_core::math` (crate-private until the typesetter draws a formula) has:
 
@@ -249,8 +249,18 @@ Deviations from KaTeX (LMATH-T9):
 | `\` before a character outside the BMP | "Unexpected character: '\\'" | same | KaTeX parity |
 | Source length | unbounded | 64 KiB | LMATH-6 |
 
-Not yet built, in order (LMATH-9): the symbol table (LRES-3), the macro expander, the parser and
-parse nodes, `Options` and `Style`, boxes, and layout. The fuzz target for the lexer waits for a
+- `symbols`: `Mode`, `Font`, `AtomGroup`, `Symbol { font, group, replace }`, and
+  `lookup(mode, Name::Char(_) | Name::Control(_))`, a binary search over four byte-sorted
+  tables (math and text, characters and control sequences) generated from KaTeX's symbol table
+  by `scripts/katex-symbols.mjs` into `symbols_data.rs` (998 and 490 math entries, 682 and 68
+  text entries; KaTeX 0.19.1). Tests: sortedness and size, spot lookups, and a baseline check
+  that every symbol leaf in KaTeX's parse trees for its own test suite (4,415 of them) is in the
+  table with the same atom group. The 87 leaves where KaTeX's parser makes a `textord` without
+  the table (characters of a supported script such as Cyrillic or CJK, `\char` results, the
+  backslash in `\href` text) belong to the parser stage and are counted, not skipped.
+
+Not yet built, in order (LMATH-9): the macro expander, the parser and parse nodes, `Options`
+and `Style`, boxes, and layout. The fuzz target for the lexer waits for a
 public entry point, since `fuzz/` reaches only public items; until then the property test
 covers it.
 
