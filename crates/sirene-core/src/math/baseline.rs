@@ -107,6 +107,98 @@ fn the_symbol_table_agrees_with_katex_on_every_baseline_symbol() {
     );
 }
 
+/// The macro expander reads every input KaTeX parses, to its end. Without a parser the expander
+/// sees no groups or modes, so it can only fail where it lacks a macro, or where an input uses a
+/// definition's scope or a mode; those are the failures listed here, and the list shows what the
+/// parser stage and the remaining macros must cover.
+#[test]
+fn the_expander_reads_what_katex_parses() {
+    use super::expander::Expander;
+    use super::symbols::Mode;
+
+    let mut failures = Vec::new();
+    let mut read = 0;
+    for (input, entry) in oracle() {
+        if entry.get("tree").is_none() {
+            continue;
+        }
+        let mut expander = Expander::new(&input, Mode::Math).unwrap();
+        let outcome = loop {
+            match expander.expand_next_token() {
+                Err(e) => break Err(e.message),
+                Ok(token) if token.kind == TokenKind::Eof => break Ok(()),
+                Ok(_) => {}
+            }
+        };
+        match outcome {
+            Ok(()) => read += 1,
+            Err(message) => failures.push(format!("{message}  <-  {input:?}")),
+        }
+    }
+    // Every failure is a macro that is not implemented yet. This count falls as they are.
+    assert!(
+        failures.iter().all(|f| f.contains("is not supported yet")),
+        "{}",
+        failures.join("\n")
+    );
+    assert_eq!((read, failures.len()), (436, 13));
+}
+
+/// The errors KaTeX's expander raises are the expander's errors too: for each input KaTeX
+/// rejects with one of these messages, reading the input to its end produces the same message.
+#[test]
+fn the_expander_fails_where_katex_fails_in_expansion() {
+    use super::expander::Expander;
+    use super::symbols::Mode;
+
+    // "Unexpected end of input in a macro argument" is not here: KaTeX raises it for a function's
+    // missing argument (`\frac 1`), which the parser reads, so the parser stage checks it.
+    let expansion_errors = [
+        "Extra }",
+        "Use of the macro doesn't match its definition",
+        "Too many expansions",
+        "Expected a control sequence",
+        "Expected a macro definition",
+        "Invalid number of arguments",
+        "Invalid argument number",
+        "Argument number",
+        "Incomplete placeholder at end of macro body",
+        "Not a valid argument number",
+        "\\newcommand",
+        "\\renewcommand",
+    ];
+    let mut checked = 0;
+    let mut mismatches = Vec::new();
+    for (input, entry) in oracle() {
+        let Some(message) = entry.get("parse_error").and_then(Value::as_str) else {
+            continue;
+        };
+        if !expansion_errors.iter().any(|e| message.starts_with(e)) {
+            continue;
+        }
+        checked += 1;
+        let mut expander = Expander::new(&input, Mode::Math).unwrap();
+        let ours = loop {
+            match expander.expand_next_token() {
+                Err(e) => break Some(e.message),
+                Ok(token) if token.kind == TokenKind::Eof => break None,
+                Ok(_) => {}
+            }
+        };
+        // The limit's wording differs on purpose (KaTeX names its `maxExpand` setting).
+        let same = ours.as_deref().is_some_and(|o| {
+            o == message
+                || (message.starts_with("Too many expansions")
+                    && o.starts_with("Too many expansions"))
+        });
+        if !same {
+            mismatches.push(format!("KaTeX: {message:?}, here: {ours:?}  <-  {input:?}"));
+        }
+    }
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
+    assert_eq!(checked, 22);
+}
+
 #[test]
 fn the_oracle_is_present() {
     let oracle = oracle();

@@ -12,8 +12,11 @@
 #[cfg(test)]
 mod baseline;
 mod error;
+mod expander;
 mod lexer;
 mod limits;
+#[rustfmt::skip]
+mod macros_data;
 mod symbols;
 #[rustfmt::skip]
 mod symbols_data;
