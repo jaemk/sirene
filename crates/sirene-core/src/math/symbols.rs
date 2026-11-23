@@ -23,19 +23,31 @@ pub(crate) enum Font {
     Ams,
 }
 
-/// TeX's atom classes, which decide the space around a symbol (spacing is its own class).
+/// TeX's atom classes, which decide the space around a symbol, named as KaTeX's table names them
+/// (`accent-token`, `bin`, ...). Spacing commands are their own class here, as there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AtomGroup {
+    /// A combining accent character (`accent-token`), which the parser attaches to a base.
     Accent,
+    /// A binary operator (`+`, `\pm`), spaced as one between two operands.
     Bin,
+    /// A closing delimiter (`)`, `\rangle`).
     Close,
+    /// An inner atom (`\dots`), spaced on both sides.
     Inner,
+    /// A letter or other ordinary symbol of math mode, set in math italic when it is a letter.
     MathOrd,
+    /// A large operator character (`op-token`: `\sum`, `\int`), which the parser makes limits for.
     Op,
+    /// An opening delimiter (`(`, `\langle`).
     Open,
+    /// Punctuation (`,`, `;`), with a thin space after it.
     Punct,
+    /// A relation (`=`, `\leq`, `\to`), spaced with thick spaces.
     Rel,
+    /// A space command (`\ `, `\nobreakspace`).
     Spacing,
+    /// An ordinary symbol set upright, and every character of text mode.
     TextOrd,
 }
 
