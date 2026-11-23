@@ -252,6 +252,11 @@ pub(crate) enum NodeKind<'a> {
     ReflectBox {
         body: Box<Node<'a>>,
     },
+    /// `\verb|text|`, set in text mode as written.
+    Verb {
+        body: &'a str,
+        star: bool,
+    },
     /// `\html@mathml{html}{mathml}`: the first is drawn, the second is the MathML form, which
     /// sirene does not produce.
     HtmlMathml {
@@ -306,6 +311,7 @@ impl NodeKind<'_> {
             NodeKind::VCenter { .. } => "vcenter",
             NodeKind::MathChoice { .. } => "mathchoice",
             NodeKind::ReflectBox { .. } => "reflectbox",
+            NodeKind::Verb { .. } => "verb",
             NodeKind::HtmlMathml { .. } => "htmlmathml",
             NodeKind::CharCode(_) => "textord",
             NodeKind::Raw { .. } => "raw",
@@ -402,17 +408,18 @@ impl<'a> Node<'a> {
     pub(crate) fn is_character_box(&self) -> bool {
         matches!(
             self.base().kind,
-            NodeKind::Symbol {
-                group: AtomGroup::MathOrd
-                    | AtomGroup::TextOrd
-                    | AtomGroup::Bin
-                    | AtomGroup::Close
-                    | AtomGroup::Inner
-                    | AtomGroup::Open
-                    | AtomGroup::Punct
-                    | AtomGroup::Rel,
-                ..
-            }
+            NodeKind::CharCode(_)
+                | NodeKind::Symbol {
+                    group: AtomGroup::MathOrd
+                        | AtomGroup::TextOrd
+                        | AtomGroup::Bin
+                        | AtomGroup::Close
+                        | AtomGroup::Inner
+                        | AtomGroup::Open
+                        | AtomGroup::Punct
+                        | AtomGroup::Rel,
+                    ..
+                }
         )
     }
 

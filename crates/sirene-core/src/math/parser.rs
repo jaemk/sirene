@@ -511,10 +511,18 @@ impl<'a> Parser<'a> {
                 let end = token.span.end;
                 Name::Control(&self.src[end - c.len_utf8()..end])
             }
-            TokenKind::Verb { .. } => return Err(unsupported("\\verb", &token)),
+            TokenKind::Verb { star, body, .. } => {
+                self.consume();
+                return Ok(Some(Node {
+                    kind: NodeKind::Verb { body, star },
+                    mode: Mode::Text,
+                    span: token.span,
+                }));
+            }
             // A space is a symbol in text mode, and is skipped before here in math mode.
             TokenKind::Space if self.mode == Mode::Text => Name::Char(" "),
-            TokenKind::Space | TokenKind::Eof => return Ok(None),
+            // The expander turns a frozen token into `\relax` before the parser sees it.
+            TokenKind::Space | TokenKind::Frozen(_) | TokenKind::Eof => return Ok(None),
         };
         // A letter with accents is the letter wrapped in accent nodes.
         let (name, marks) = match name {
@@ -685,6 +693,9 @@ mod tests {
                 format!("htmlmathml[{} | {}]", part(html), part(mathml))
             }
             NodeKind::CharCode(c) => format!("char<{c}>"),
+            NodeKind::Verb { body, star } => {
+                format!("verb{}<{body}>", if *star { "*" } else { "" })
+            }
             NodeKind::Raw { string } => format!("raw<{string}>"),
             NodeKind::Url { url } => format!("url<{url}>"),
             NodeKind::Font { font, body } => format!("{font}<{}>", show(body)),
@@ -1012,6 +1023,14 @@ mod tests {
         assert_eq!(error("$x$"), "Can't use function '$' in math mode");
         assert_eq!(error("\\text{x \\)}"), "Mismatched \\)");
         assert_eq!(error("\\]"), "Can't use function '\\]' in math mode");
+    }
+
+    #[test]
+    fn verb_is_text_as_written() {
+        assert_eq!(shown("\\verb|a b|"), "verb<a b>");
+        assert_eq!(shown("\\verb*+x_y+"), "verb*<x_y>");
+        assert_eq!(shown("\\text{\\verb!x!}"), "\\text[verb<x>]");
+        assert_eq!(parse("x\\verb|a|").unwrap()[1].mode, Mode::Text);
     }
 
     #[test]
@@ -1625,7 +1644,7 @@ mod tests {
     #[test]
     fn what_the_parser_lacks_is_said_so() {
         assert!(error("\\begin{CD}a\\end{CD}").ends_with("supported yet"));
-        assert_eq!(error("\\verb|x|"), "\\verb is not supported yet");
+        assert_eq!(error("\\bra@ket"), "\\bra@ket is not supported yet");
         assert!(error("x\u{2082}").ends_with("supported yet"));
     }
 

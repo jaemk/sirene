@@ -28,6 +28,9 @@ pub(crate) enum TokenKind<'a> {
         delimiter: char,
         body: &'a str,
     },
+    /// A control sequence that `\noexpand` kept from expanding: it is not a macro any more, and
+    /// the parser reads it as `\relax`. Only a token that would have expanded is wrapped.
+    Frozen(Box<TokenKind<'a>>),
     /// The end of the source.
     Eof,
 }

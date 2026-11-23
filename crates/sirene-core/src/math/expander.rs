@@ -16,7 +16,7 @@ use super::{
     MathError, functions,
     lexer::{Lexer, Token, TokenKind},
     limits, macros_data,
-    symbols::{self, Mode, Name},
+    symbols::{self, AtomGroup, Mode, Name},
 };
 
 /// What a macro is called: a control word (`\foo`), a control symbol (`\,`), or a character that
@@ -35,7 +35,9 @@ impl<'a> Key<'a> {
             TokenKind::ControlWord(word) => Some(Key::Word(word)),
             TokenKind::ControlSymbol(c) => Some(Key::Symbol(c)),
             TokenKind::Char(text) => Some(Key::Char(text)),
-            TokenKind::Space | TokenKind::Verb { .. } | TokenKind::Eof => None,
+            TokenKind::Space | TokenKind::Verb { .. } | TokenKind::Frozen(_) | TokenKind::Eof => {
+                None
+            }
         }
     }
 
@@ -84,6 +86,121 @@ enum Builtin {
     TextOrMath,
     /// `\\tag@literal{x}`: records the equation tag as `\\text{x}` in `\\df@tag`.
     TagLiteral,
+    /// `\char"41` and its forms: the number, as `\@char{65}`.
+    Char,
+    /// `\dots`: the dots that suit what follows.
+    Dots,
+    /// `\dotso`, `\dotsc`, `\cdots`: dots, with a thin space after them before a closing
+    /// symbol or a punctuation mark. The `bool` is whether a comma counts as one.
+    SpacedDots(Dots),
+    /// `\expandafter\a\b`: expands `\b` once, then reads `\a`.
+    ExpandAfter,
+    /// `\noexpand\a`: `\a` unexpanded.
+    NoExpand,
+    /// `\message`, `\errmessage`: read their argument and write nothing.
+    Message,
+    /// `\show`: reads a token and writes nothing.
+    Show,
+}
+
+const DIGITS: [&str; 10] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+
+/// What follows the dots that makes them want a thin space after them: a closing symbol, or
+/// punctuation (`\rightdelim@`, `\extra@` and `\extrap@` of amsmath).
+const SPACE_AFTER_DOTS: &[&str] = &[
+    ")",
+    "]",
+    "\\rbrack",
+    "\\}",
+    "\\rbrace",
+    "\\rangle",
+    "\\rceil",
+    "\\rfloor",
+    "\\rgroup",
+    "\\rmoustache",
+    "\\right",
+    "\\bigr",
+    "\\biggr",
+    "\\Bigr",
+    "\\Biggr",
+    "$",
+    ";",
+    ".",
+    ",",
+];
+
+/// The dots command `\dots` stands for when `next` follows it (amsmath's `\mdots@@`): between
+/// binary operators and relations, `\dotsb`; after a comma, `\dotsc`; before an integral,
+/// `\dotsi`; otherwise `\dotso`.
+fn dots_for(next: &TokenKind<'_>) -> &'static str {
+    let text = token_text(next);
+    match text.as_str() {
+        "," => "\\dotsc",
+        "\\not"
+        | "+"
+        | "="
+        | "<"
+        | ">"
+        | "-"
+        | "*"
+        | ":"
+        | "\\DOTSB"
+        | "\\coprod"
+        | "\\bigvee"
+        | "\\bigwedge"
+        | "\\biguplus"
+        | "\\bigcap"
+        | "\\bigcup"
+        | "\\prod"
+        | "\\sum"
+        | "\\bigotimes"
+        | "\\bigoplus"
+        | "\\bigodot"
+        | "\\bigsqcup"
+        | "\\And"
+        | "\\longrightarrow"
+        | "\\Longrightarrow"
+        | "\\longleftarrow"
+        | "\\Longleftarrow"
+        | "\\longleftrightarrow"
+        | "\\Longleftrightarrow"
+        | "\\mapsto"
+        | "\\longmapsto"
+        | "\\hookrightarrow"
+        | "\\doteq"
+        | "\\mathbin"
+        | "\\mathrel"
+        | "\\relbar"
+        | "\\Relbar"
+        | "\\xrightarrow"
+        | "\\xleftarrow" => "\\dotsb",
+        "\\DOTSI" | "\\int" | "\\oint" | "\\iint" | "\\iiint" | "\\iiiint" | "\\idotsint" => {
+            "\\dotsi"
+        }
+        "\\DOTSX" => "\\dotsx",
+        _ if text.starts_with("\\not") => "\\dotsb",
+        _ => {
+            let group = Key::of(next).and_then(|key| {
+                key.with_name(|name| symbols::lookup(Mode::Math, name).map(|s| s.group))
+            });
+            if matches!(group, Some(AtomGroup::Bin | AtomGroup::Rel)) {
+                "\\dotsb"
+            } else {
+                "\\dotso"
+            }
+        }
+    }
+}
+
+/// The three dots commands that add a thin space before a closing symbol.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Dots {
+    /// `\dotso`.
+    Other,
+    /// `\dotsc`: not before a comma.
+    Comma,
+    /// `\cdots`.
+    Centered,
 }
 
 impl Builtin {
@@ -99,6 +216,15 @@ impl Builtin {
             "@ifnextchar" => Builtin::IfNextChar,
             "TextOrMath" => Builtin::TextOrMath,
             "tag@literal" => Builtin::TagLiteral,
+            "char" => Builtin::Char,
+            "dots" => Builtin::Dots,
+            "dotso" => Builtin::SpacedDots(Dots::Other),
+            "dotsc" => Builtin::SpacedDots(Dots::Comma),
+            "cdots" => Builtin::SpacedDots(Dots::Centered),
+            "expandafter" => Builtin::ExpandAfter,
+            "noexpand" => Builtin::NoExpand,
+            "message" | "errmessage" => Builtin::Message,
+            "show" => Builtin::Show,
             _ => return None,
         })
     }
@@ -106,20 +232,7 @@ impl Builtin {
 
 /// KaTeX's function-defined macros this expander does not implement yet: they look ahead or
 /// build tokens from numbers, and each needs its own port.
-const UNIMPLEMENTED: &[&str] = &[
-    "bra@ket",
-    "bra@set",
-    "cdots",
-    "char",
-    "dots",
-    "dotsc",
-    "dotso",
-    "errmessage",
-    "expandafter",
-    "message",
-    "noexpand",
-    "show",
-];
+const UNIMPLEMENTED: &[&str] = &["bra@ket", "bra@set"];
 
 /// Commands the parser handles that are not macros, so a definition may not take their name.
 const IMPLICIT: &[&str] = &["limits", "nolimits"];
@@ -165,6 +278,7 @@ pub(crate) fn token_text(kind: &TokenKind<'_>) -> String {
             "\\verb{}{delimiter}{body}{delimiter}",
             if *star { "*" } else { "" }
         ),
+        TokenKind::Frozen(inner) => token_text(inner),
         TokenKind::Eof => "EOF".into(),
     }
 }
@@ -179,6 +293,7 @@ fn token_len(kind: &TokenKind<'_>) -> usize {
         TokenKind::Verb {
             body, delimiter, ..
         } => 6 + body.len() + 2 * delimiter.len_utf8(),
+        TokenKind::Frozen(inner) => token_len(inner),
         TokenKind::Eof => 0,
     }
 }
@@ -521,6 +636,12 @@ impl<'a> Expander<'a> {
     /// Expands the next token once if it is a macro, putting the result back on the stack, and
     /// says whether it did. A token that is not a macro stays where it was.
     pub(crate) fn expand_once(&mut self) -> Result<bool, MathError> {
+        self.expand_once_in(false)
+    }
+
+    /// `expand_once`; with `expandable_only` a control sequence that means nothing at all is an
+    /// error, as it is after `\expandafter`.
+    fn expand_once_in(&mut self, expandable_only: bool) -> Result<bool, MathError> {
         let token = self.pop_token()?;
         let Some(key) = Key::of(&token.kind) else {
             self.push_token(token);
@@ -529,13 +650,26 @@ impl<'a> Expander<'a> {
         let tokens = if let Some(definition) = self.macros.get(&key).cloned() {
             self.count_expansion(&token.span)?;
             self.instantiate(&definition)?
-        } else if let Some(builtin) = self.builtin(&key, &token)? {
+        } else if let Some(builtin) = self.builtin(&key, &token)?
+            // KaTeX's `\def` is a function of the parser, not a macro: `\expandafter` leaves it.
+            && !(expandable_only && matches!(builtin, Builtin::Def | Builtin::GlobalDef))
+        {
             self.count_expansion(&token.span)?;
             self.run(builtin, &token)?
         } else if let Some(definition) = Self::predefined(&key, &token.span)? {
             self.count_expansion(&token.span)?;
             self.instantiate(&definition)?
         } else {
+            let is_control = matches!(
+                token.kind,
+                TokenKind::ControlWord(_) | TokenKind::ControlSymbol(_)
+            );
+            if expandable_only && is_control && !self.is_defined(&key) {
+                return Err(MathError::new(
+                    format!("Undefined control sequence: {}", token_text(&token.kind)),
+                    token.span,
+                ));
+            }
             self.push_token(token);
             return Ok(false);
         };
@@ -544,10 +678,35 @@ impl<'a> Expander<'a> {
         Ok(true)
     }
 
-    /// The next token that is not a macro, with every macro before it expanded.
+    /// The next token that is not a macro, with every macro before it expanded. A token that
+    /// `\noexpand` froze comes out as `\relax`.
     pub(crate) fn expand_next_token(&mut self) -> Result<Token<'a>, MathError> {
         while self.expand_once()? {}
-        self.pop_token()
+        let token = self.pop_token()?;
+        Ok(match token.kind {
+            TokenKind::Frozen(_) => Token {
+                kind: TokenKind::ControlWord("relax"),
+                span: token.span,
+            },
+            _ => token,
+        })
+    }
+
+    /// Whether `\noexpand` would stop `key` from expanding: it is a macro, or a function that
+    /// reads its own arguments.
+    fn is_expandable(&self, key: &Key<'a>) -> bool {
+        self.macros.contains_key(key)
+            || matches!(key, Key::Word(word)
+                if Builtin::named(word).is_some_and(|b| !matches!(b, Builtin::Def | Builtin::GlobalDef))
+                    || UNIMPLEMENTED.contains(word))
+            || key.with_name(|name| {
+                let (table, text) = match name {
+                    Name::Control(k) => (macros_data::CONTROLS, k),
+                    Name::Char(k) => (macros_data::CHARS, k),
+                };
+                table.binary_search_by(|(t, _)| (*t).cmp(text)).is_ok()
+            })
+            || functions::lookup(&key.display()).is_some_and(|f| !f.primitive)
     }
 
     fn builtin(&self, key: &Key<'a>, token: &Token<'a>) -> Result<Option<Builtin>, MathError> {
@@ -709,7 +868,140 @@ impl<'a> Expander<'a> {
                 let mut args = self.consume_args(2, None)?;
                 Ok(args.swap_remove(if self.mode == Mode::Text { 0 } else { 1 }))
             }
+            Builtin::Char => {
+                let number = self.char_number()?;
+                let at = &call.span;
+                let token = |kind| Token {
+                    kind,
+                    span: at.clone(),
+                };
+                let mut tokens = vec![
+                    token(TokenKind::ControlWord("@char")),
+                    token(TokenKind::Char("{")),
+                ];
+                for digit in number.to_string().bytes() {
+                    let text = DIGITS.get(usize::from(digit.wrapping_sub(b'0'))).copied();
+                    tokens.extend(text.map(|text| token(TokenKind::Char(text))));
+                }
+                tokens.push(token(TokenKind::Char("}")));
+                Ok(tokens)
+            }
+            Builtin::Dots => {
+                // The next token, after one expansion, says what the dots go with.
+                self.expand_once_in(false)?;
+                let next = self.future()?.clone();
+                let name = dots_for(&next.kind);
+                self.static_tokens(name, &call.span)
+            }
+            Builtin::SpacedDots(which) => {
+                let next = token_text(&self.future()?.kind);
+                let spaced = SPACE_AFTER_DOTS.contains(&next.as_str())
+                    && !(which == Dots::Comma && next == ",");
+                let text = match (which, spaced) {
+                    (Dots::Centered, true) => "\\@cdots\\,",
+                    (Dots::Centered, false) => "\\@cdots",
+                    (_, true) => "\\ldots\\,",
+                    (_, false) => "\\ldots",
+                };
+                self.static_tokens(text, &call.span)
+            }
+            Builtin::ExpandAfter => {
+                // The token after this one is read as it stands; the one after that is
+                // expanded once, and the first goes back in front of the result.
+                let first = self.pop_token()?;
+                self.expand_once_in(true)?;
+                Ok(vec![first])
+            }
+            Builtin::NoExpand => {
+                let token = self.pop_token()?;
+                let expandable = Key::of(&token.kind).is_some_and(|key| self.is_expandable(&key));
+                Ok(vec![if expandable {
+                    Token {
+                        kind: TokenKind::Frozen(Box::new(token.kind)),
+                        span: token.span,
+                    }
+                } else {
+                    token
+                }])
+            }
+            Builtin::Message => {
+                // Nothing is written anywhere: the argument is read and dropped.
+                self.consume_args(1, None)?;
+                Ok(Vec::new())
+            }
+            Builtin::Show => {
+                self.pop_token()?;
+                Ok(Vec::new())
+            }
         }
+    }
+
+    /// The tokens of `text`, a constant, all placed at `at`.
+    fn static_tokens(
+        &self,
+        text: &'static str,
+        at: &Range<usize>,
+    ) -> Result<Vec<Token<'a>>, MathError> {
+        let mut lexer = Lexer::new(text)?;
+        let mut tokens = Vec::new();
+        loop {
+            let mut token = lexer.next_token()?;
+            if token.kind == TokenKind::Eof {
+                return Ok(tokens);
+            }
+            token.span = at.clone();
+            tokens.push(token);
+        }
+    }
+
+    /// The number after `\char`: decimal, `'` octal, `"` hexadecimal, or `` ` `` and a character.
+    fn char_number(&mut self) -> Result<u64, MathError> {
+        let mut token = self.pop_token()?;
+        let base: u32 = match token_text(&token.kind).as_str() {
+            "'" => {
+                token = self.pop_token()?;
+                8
+            }
+            "\"" => {
+                token = self.pop_token()?;
+                16
+            }
+            "`" => {
+                let quoted = self.pop_token()?;
+                if quoted.kind == TokenKind::Eof {
+                    return Err(MathError::new("\\char` missing argument", quoted.span));
+                }
+                // The code of the character, or of the one after the backslash.
+                let text = token_text(&quoted.kind);
+                let named = text.strip_prefix('\\').unwrap_or(&text);
+                let unit = named.encode_utf16().next().unwrap_or(0);
+                return Ok(u64::from(unit));
+            }
+            _ => 10,
+        };
+        let digit = |token: &Token<'_>| match token.kind {
+            TokenKind::Char(text) => {
+                let mut chars = text.chars();
+                match (chars.next(), chars.next()) {
+                    (Some(c), None) => c.to_digit(16),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+        let Some(mut number) = digit(&token).filter(|d| *d < base).map(u64::from) else {
+            return Err(MathError::new(
+                format!("Invalid base-{base} digit {}", token_text(&token.kind)),
+                token.span,
+            ));
+        };
+        while let Some(next) = digit(self.future()?).filter(|d| *d < base) {
+            self.pop_token()?;
+            number = number
+                .saturating_mul(u64::from(base))
+                .saturating_add(u64::from(next));
+        }
+        Ok(number)
     }
 
     /// Defines a macro with no arguments whose body is `text`, for the parser's own use
@@ -1178,11 +1470,81 @@ mod tests {
 
     #[test]
     fn commands_not_implemented_yet_say_so() {
-        assert_eq!(error("\\dots"), "\\dots is not supported yet");
+        assert_eq!(error("\\bra@ket"), "\\bra@ket is not supported yet");
         assert_eq!(
             error("\\newcommand{\\noexpand}{}"),
             "\\newcommand{\\noexpand} attempting to redefine \\noexpand; use \\renewcommand"
         );
+    }
+
+    #[test]
+    fn char_makes_a_character_command() {
+        assert_eq!(expand("\\char65").unwrap(), "\\@char{65}");
+        assert_eq!(expand("\\char'101").unwrap(), "\\@char{65}");
+        assert_eq!(expand("\\char\"41").unwrap(), "\\@char{65}");
+        assert_eq!(expand("\\char`A").unwrap(), "\\@char{65}");
+        assert_eq!(expand("\\char`\\%").unwrap(), "\\@char{37}");
+        // The digits are read as long as they fit the base.
+        assert_eq!(expand("\\char'18").unwrap(), "\\@char{1}8");
+        assert_eq!(expand("\\char\"1g").unwrap(), "\\@char{1}g");
+        assert_eq!(error("\\char"), "Invalid base-10 digit EOF");
+        assert_eq!(error("\\char'a"), "Invalid base-8 digit a");
+        assert_eq!(error("\\char\"g"), "Invalid base-16 digit g");
+        assert_eq!(error("\\char`"), "\\char` missing argument");
+    }
+
+    #[test]
+    fn dots_suit_what_follows() {
+        // After one expansion of what follows.
+        assert_eq!(expand("\\dots,").unwrap(), "\\ldots,");
+        assert_eq!(expand("\\dots+").unwrap(), "\\@cdots+");
+        assert_eq!(expand("\\dots x").unwrap(), "\\ldotsx");
+        assert_eq!(
+            expand("\\dots\\int").unwrap(),
+            "\\mskip-3mu\\relax\\@cdots\\int"
+        );
+        assert_eq!(expand("\\dots\\le").unwrap(), "\\@cdots\\le");
+        // `\notin` is a macro, so it is `\html@mathml` that follows after its one expansion.
+        assert!(
+            expand("\\dots\\notin")
+                .unwrap()
+                .starts_with("\\ldots\\html@mathml")
+        );
+        assert_eq!(expand("\\dots\\sum").unwrap(), "\\@cdots\\sum");
+        // A thin space goes before a closing symbol or punctuation.
+        assert_eq!(expand("\\dotso)").unwrap(), "\\ldots\\mskip+3mu\\relax)");
+        assert_eq!(expand("\\dotsc,").unwrap(), "\\ldots,");
+        assert_eq!(expand("\\dotsc;").unwrap(), "\\ldots\\mskip+3mu\\relax;");
+        assert_eq!(expand("\\cdots.").unwrap(), "\\@cdots\\mskip+3mu\\relax.");
+        assert_eq!(expand("\\cdots a").unwrap(), "\\@cdotsa");
+    }
+
+    #[test]
+    fn expandafter_and_noexpand() {
+        let defs = "\\def\\a#1{#1#1}\\def\\b{xy}";
+        // `\b` is expanded first, so `\a` takes `x`.
+        assert_eq!(
+            expand(&format!("{defs}\\expandafter\\a\\b")).unwrap(),
+            "xxy"
+        );
+        assert_eq!(expand(&format!("{defs}\\a\\b")).unwrap(), "xyxy");
+        assert_eq!(
+            error("\\expandafter\\a\\nothing"),
+            "Undefined control sequence: \\nothing"
+        );
+        // A macro that is not expanded reads as `\relax`; anything else is unchanged.
+        assert_eq!(expand(&format!("{defs}\\noexpand\\b")).unwrap(), "\\relax");
+        assert_eq!(expand("\\noexpand\\nothing").unwrap(), "\\nothing");
+        assert_eq!(expand("\\noexpand a").unwrap(), "a");
+        // `\def` is not a macro for `\expandafter`, as in KaTeX.
+        assert_eq!(expand("\\expandafter\\a\\def\\a{b}").unwrap(), "\\a");
+    }
+
+    #[test]
+    fn messages_write_nothing() {
+        assert_eq!(expand("\\message{hi}a").unwrap(), "a");
+        assert_eq!(expand("\\errmessage{hi}a").unwrap(), "a");
+        assert_eq!(expand("\\show\\foo a").unwrap(), "a");
     }
 
     #[test]
