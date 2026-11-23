@@ -109,6 +109,22 @@ pub(crate) enum NodeKind<'a> {
         label: String,
         base: Box<Node<'a>>,
     },
+    /// A large operator or a named one: `\sum`, `\int`, `\lim`, `\sin`, and `\mathop{...}`.
+    /// `limits` puts scripts above and below in display style; `always_handle_supsub` says
+    /// `\limits` or `\nolimits` followed it, which fixes that choice. `symbol` means a glyph
+    /// that grows in display style.
+    Op {
+        limits: bool,
+        always_handle_supsub: bool,
+        symbol: bool,
+        content: OpContent<'a>,
+    },
+    /// `\operatorname{...}`, and the starred form that takes limits.
+    OperatorName {
+        body: Vec<Node<'a>>,
+        always_handle_supsub: bool,
+        limits: bool,
+    },
     /// `\middle|` inside `\left ... \right`.
     Middle {
         delim: String,
@@ -140,6 +156,8 @@ impl NodeKind<'_> {
             NodeKind::DelimSizing { .. } => "delimsizing",
             NodeKind::LeftRight { .. } => "leftright",
             NodeKind::Middle { .. } => "middle",
+            NodeKind::Op { .. } => "op",
+            NodeKind::OperatorName { .. } => "operatorname",
             NodeKind::Accent { .. } => "accent",
             NodeKind::AccentUnder { .. } => "accentUnder",
         }
@@ -235,6 +253,16 @@ impl<'a> Node<'a> {
             _ => MathClass::Ord,
         }
     }
+}
+
+/// What an operator shows.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum OpContent<'a> {
+    /// A named operator, with its backslash (`\sum`), also for a Unicode character (`\u{2211}`
+    /// is `\sum`).
+    Name(String),
+    /// The body of `\mathop`.
+    Body(Vec<Node<'a>>),
 }
 
 /// The four math styles of TeX.

@@ -205,7 +205,7 @@ impl<'a> Parser<'a> {
 
     /// A base and the scripts that follow it.
     fn parse_atom(&mut self) -> Result<Option<Node<'a>>, MathError> {
-        let base = self.parse_group("atom")?;
+        let mut base = self.parse_group("atom")?;
         // Text mode has no scripts.
         if self.mode == Mode::Text {
             return Ok(base);
@@ -245,11 +245,32 @@ impl<'a> Parser<'a> {
                         token.span,
                     ));
                 }
-                TokenKind::ControlWord("limits" | "nolimits") => {
-                    return Err(MathError::new(
-                        "Limit controls must follow a math operator",
-                        token.span,
-                    ));
+                TokenKind::ControlWord(control @ ("limits" | "nolimits")) => {
+                    let wanted = control == "limits";
+                    match base.as_mut().map(|b| &mut b.kind) {
+                        Some(NodeKind::Op {
+                            limits,
+                            always_handle_supsub,
+                            ..
+                        }) => {
+                            *limits = wanted;
+                            *always_handle_supsub = true;
+                        }
+                        Some(NodeKind::OperatorName {
+                            limits,
+                            always_handle_supsub: true,
+                            ..
+                        }) => *limits = wanted,
+                        // A plain `\operatorname` takes no limit controls, and ignores them.
+                        Some(NodeKind::OperatorName { .. }) => {}
+                        _ => {
+                            return Err(MathError::new(
+                                "Limit controls must follow a math operator",
+                                token.span,
+                            ));
+                        }
+                    }
+                    self.consume();
                 }
                 _ => break,
             }
@@ -484,6 +505,7 @@ fn unsupported(name: &str, token: &Token<'_>) -> MathError {
 
 #[cfg(test)]
 mod tests {
+    use super::super::ast::OpContent;
     use super::*;
 
     /// A node as a short string: `a` for a symbol, `{..}` for a group, `(base ^sup _sub)`.
@@ -538,6 +560,26 @@ mod tests {
                 format!("left{left}[{}]right{right}", inner.join(" "))
             }
             NodeKind::Middle { delim } => format!("mid{delim}"),
+            NodeKind::Op {
+                limits, content, ..
+            } => {
+                let lim = if *limits { "L" } else { "" };
+                match content {
+                    OpContent::Name(name) => format!("op{lim}{name}"),
+                    OpContent::Body(body) => {
+                        let inner: Vec<_> = body.iter().map(show).collect();
+                        format!("op{lim}[{}]", inner.join(" "))
+                    }
+                }
+            }
+            NodeKind::OperatorName { body, limits, .. } => {
+                let inner: Vec<_> = body.iter().map(show).collect();
+                format!(
+                    "opname{}[{}]",
+                    if *limits { "L" } else { "" },
+                    inner.join(" ")
+                )
+            }
             NodeKind::Accent { label, base, .. } => format!("{label}<{}>", show(base)),
             NodeKind::AccentUnder { label, base } => format!("{label}<{}>", show(base)),
             NodeKind::Overline { body } => format!("over<{}>", show(body)),
@@ -817,9 +859,39 @@ mod tests {
     }
 
     #[test]
+    fn operators() {
+        assert_eq!(shown("\\sum_{i}^n"), "(opL\\sum ^n _{i})");
+        assert_eq!(shown("\\int_0^1"), "(op\\int ^1 _0)");
+        assert_eq!(shown("\\lim_{x}"), "(opL\\lim _{x})");
+        assert_eq!(shown("\\sin x"), "op\\sin x");
+        // The Unicode operator is the command.
+        assert_eq!(shown("\u{2211}"), "opL\\sum");
+        assert_eq!(shown("\\mathop{ab}"), "op[a b]");
+        assert_eq!(shown("\\operatorname{foo}"), "opname[f o o]");
+        assert_eq!(shown("\\operatorname*{foo}"), "opname[f o o]");
+    }
+
+    #[test]
+    fn limit_controls_follow_an_operator() {
+        assert_eq!(shown("\\int\\limits_0^1"), "(opL\\int ^1 _0)");
+        assert_eq!(shown("\\sum\\nolimits_0"), "(op\\sum _0)");
+        assert_eq!(shown("\\mathop{x}\\limits^2"), "(opL[x] ^2)");
+        assert_eq!(
+            error("x\\limits"),
+            "Limit controls must follow a math operator"
+        );
+        assert_eq!(
+            error("\\limits"),
+            "Limit controls must follow a math operator"
+        );
+        // A plain `\operatorname` ignores the control; the starred one takes it.
+        assert_eq!(shown("\\operatorname{f}\\limits"), "opname[f]");
+        assert_eq!(shown("\\operatorname*{f}\\limits"), "opnameL[f]");
+    }
+
+    #[test]
     fn what_the_parser_lacks_is_said_so() {
         assert_eq!(error("\\overbrace{x}"), "\\overbrace is not supported yet");
-        assert_eq!(error("\\sum"), "\\sum is not supported yet");
         assert_eq!(error("\\verb|x|"), "\\verb is not supported yet");
         assert!(error("x\u{2082}").ends_with("supported yet"));
     }

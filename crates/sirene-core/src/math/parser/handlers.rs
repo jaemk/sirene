@@ -8,7 +8,7 @@
 
 use super::{MathError, Mode, Name, Node, NodeKind, Parser, TokenKind, unsupported, written};
 use crate::math::{
-    ast::{MathClass, StyleName},
+    ast::{MathClass, OpContent, StyleName},
     expander::token_text,
     functions::{self, Function},
     lexer::Token,
@@ -48,6 +48,17 @@ enum Build {
     DelimSizing(u8, MathClass),
     /// `\left ... \right`.
     Left,
+    /// `\sum`, `\int`, `\lim`, `\sin`: a named operator.
+    Op {
+        limits: bool,
+        symbol: bool,
+    },
+    /// `\mathop{...}`.
+    MathOp,
+    /// `\operatorname@` and `\operatornamewithlimits`.
+    OperatorName {
+        with_limits: bool,
+    },
     /// `\hat`, `\widehat`, `\overrightarrow`, and the other accents over a base.
     Accent,
     /// `\'`, `\"` and the other text accents.
@@ -157,6 +168,36 @@ impl Build {
             | "\\undergroup"
             | "\\underlinesegment"
             | "\\utilde" => Build::AccentUnder,
+            "\\coprod" | "\\bigvee" | "\\bigwedge" | "\\biguplus" | "\\bigcap" | "\\bigcup"
+            | "\\intop" | "\\prod" | "\\sum" | "\\bigotimes" | "\\bigoplus" | "\\bigodot"
+            | "\\bigsqcup" | "\\smallint" | "\u{220f}" | "\u{2210}" | "\u{2211}" | "\u{22c0}"
+            | "\u{22c1}" | "\u{22c2}" | "\u{22c3}" | "\u{2a00}" | "\u{2a01}" | "\u{2a02}"
+            | "\u{2a04}" | "\u{2a06}" => Build::Op {
+                limits: true,
+                symbol: true,
+            },
+            "\\arcsin" | "\\arccos" | "\\arctan" | "\\arctg" | "\\arcctg" | "\\arg" | "\\ch"
+            | "\\cos" | "\\cosec" | "\\cosh" | "\\cot" | "\\cotg" | "\\coth" | "\\csc"
+            | "\\ctg" | "\\cth" | "\\deg" | "\\dim" | "\\exp" | "\\hom" | "\\ker" | "\\lg"
+            | "\\ln" | "\\log" | "\\sec" | "\\sin" | "\\sinh" | "\\sh" | "\\tan" | "\\tanh"
+            | "\\tg" | "\\th" => Build::Op {
+                limits: false,
+                symbol: false,
+            },
+            "\\det" | "\\gcd" | "\\inf" | "\\lim" | "\\max" | "\\min" | "\\Pr" | "\\sup" => {
+                Build::Op {
+                    limits: true,
+                    symbol: false,
+                }
+            }
+            "\\int" | "\\iint" | "\\iiint" | "\\oint" | "\\oiint" | "\\oiiint" | "\u{222b}"
+            | "\u{222c}" | "\u{222d}" | "\u{222e}" | "\u{222f}" | "\u{2230}" => Build::Op {
+                limits: false,
+                symbol: true,
+            },
+            "\\mathop" => Build::MathOp,
+            "\\operatorname@" => Build::OperatorName { with_limits: false },
+            "\\operatornamewithlimits" => Build::OperatorName { with_limits: true },
             "\\left" => Build::Left,
             "\\middle" => Build::Middle,
             _ => return None,
@@ -629,6 +670,47 @@ impl<'a> Parser<'a> {
                     span,
                 })
             }
+            Build::Op { limits, symbol } => Ok(Node {
+                kind: NodeKind::Op {
+                    limits,
+                    always_handle_supsub: false,
+                    symbol,
+                    content: OpContent::Name(canonical_operator(name)),
+                },
+                mode,
+                span: token.span.clone(),
+            }),
+            Build::MathOp => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::Op {
+                        limits: false,
+                        always_handle_supsub: false,
+                        symbol: false,
+                        content: OpContent::Body(arg.into_body()),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::OperatorName { with_limits } => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::OperatorName {
+                        body: arg.into_body(),
+                        always_handle_supsub: with_limits,
+                        limits: false,
+                    },
+                    mode,
+                    span,
+                })
+            }
             Build::Overline | Build::Underline => {
                 let Some(arg) = args.required.pop() else {
                     return Err(missing(name));
@@ -647,6 +729,32 @@ impl<'a> Parser<'a> {
             }
         }
     }
+}
+
+/// The command an operator is known by: the Unicode operator characters stand for commands.
+fn canonical_operator(name: &str) -> String {
+    let command = match name {
+        "\u{220f}" => "\\prod",
+        "\u{2210}" => "\\coprod",
+        "\u{2211}" => "\\sum",
+        "\u{22c0}" => "\\bigwedge",
+        "\u{22c1}" => "\\bigvee",
+        "\u{22c2}" => "\\bigcap",
+        "\u{22c3}" => "\\bigcup",
+        "\u{2a00}" => "\\bigodot",
+        "\u{2a01}" => "\\bigoplus",
+        "\u{2a02}" => "\\bigotimes",
+        "\u{2a04}" => "\\biguplus",
+        "\u{2a06}" => "\\bigsqcup",
+        "\u{222b}" => "\\int",
+        "\u{222c}" => "\\iint",
+        "\u{222d}" => "\\iiint",
+        "\u{222e}" => "\\oint",
+        "\u{222f}" => "\\oiint",
+        "\u{2230}" => "\\oiiint",
+        other => other,
+    };
+    command.to_string()
 }
 
 /// The commands and characters a delimiter command takes.

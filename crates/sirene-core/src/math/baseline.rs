@@ -331,6 +331,39 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
         NodeKind::AccentUnder { label, base } => {
             json!({"type": "accentUnder", "mode": mode, "label": label, "base": katex_json(base)})
         }
+        NodeKind::Op {
+            limits,
+            always_handle_supsub,
+            symbol,
+            content,
+        } => {
+            use super::ast::OpContent;
+            let mut fields = serde_json::Map::new();
+            fields.insert("type".into(), "op".into());
+            fields.insert("mode".into(), mode.into());
+            fields.insert("limits".into(), (*limits).into());
+            fields.insert("parentIsSupSub".into(), false.into());
+            fields.insert("symbol".into(), (*symbol).into());
+            match content {
+                OpContent::Name(name) => fields.insert("name".into(), name.as_str().into()),
+                OpContent::Body(body) => fields.insert(
+                    "body".into(),
+                    body.iter().map(katex_json).collect::<Vec<_>>().into(),
+                ),
+            };
+            if *always_handle_supsub {
+                fields.insert("alwaysHandleSupSub".into(), true.into());
+            }
+            Value::Object(fields)
+        }
+        NodeKind::OperatorName {
+            body,
+            always_handle_supsub,
+            limits,
+        } => json!({"type": "operatorname", "mode": mode,
+            "body": body.iter().map(katex_json).collect::<Vec<_>>(),
+            "alwaysHandleSupSub": always_handle_supsub, "limits": limits,
+            "parentIsSupSub": false}),
         NodeKind::Middle { delim } => json!({"type": "middle", "mode": mode, "delim": delim}),
         NodeKind::SupSub { base, sup, sub } => {
             let mut fields = serde_json::Map::new();
@@ -414,7 +447,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (215, 400));
+    assert_eq!((same, unsupported), (250, 365));
 }
 
 #[test]
