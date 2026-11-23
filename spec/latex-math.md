@@ -337,8 +337,13 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   (`\mathbf`, `\mathbb`, aliases resolved, and the old `\bf` family, which set the rest of the
   group) as `Font`; `\mathbin` and the other class commands, `\@binrel`, and `\boldsymbol` as
   `MClass` (a class and whether the body is one character); and `\overline` and `\underline`.
+  Delimiters: `\big` through `\Biggm` (`DelimSizing`: size 1 to 4 and a class), `\left ...
+  \right` (`LeftRight`, which reads its own `\right` and fails with "Expected '\right', got
+  ..."), and `\middle`. A delimiter must be on KaTeX's list of 56. Function nesting is bounded by
+  `MAX_DEPTH` as group nesting is (LMATH-6), since `\left(\left(...` and `\displaystyle\displaystyle...`
+  recurse without a brace.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 180 give exactly KaTeX's tree or KaTeX's error, 435 stop at a function not
+  macro settings, 183 give exactly KaTeX's tree or KaTeX's error, 432 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 

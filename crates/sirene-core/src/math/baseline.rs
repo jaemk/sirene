@@ -305,6 +305,23 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
         NodeKind::Underline { body } => {
             json!({"type": "underline", "mode": mode, "body": katex_json(body)})
         }
+        NodeKind::DelimSizing { size, class, delim } => {
+            use super::ast::MathClass;
+            let class = match class {
+                MathClass::Ord => "mord",
+                MathClass::Rel => "mrel",
+                MathClass::Open => "mopen",
+                MathClass::Close => "mclose",
+                _ => "other",
+            };
+            json!({"type": "delimsizing", "mode": mode, "size": size, "mclass": class,
+                "delim": delim})
+        }
+        NodeKind::LeftRight { body, left, right } => json!({
+            "type": "leftright", "mode": mode, "left": left, "right": right,
+            "body": body.iter().map(katex_json).collect::<Vec<_>>(),
+        }),
+        NodeKind::Middle { delim } => json!({"type": "middle", "mode": mode, "delim": delim}),
         NodeKind::SupSub { base, sup, sub } => {
             let mut fields = serde_json::Map::new();
             fields.insert("type".into(), "supsub".into());
@@ -387,7 +404,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (180, 435));
+    assert_eq!((same, unsupported), (183, 432));
 }
 
 #[test]
