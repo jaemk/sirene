@@ -808,6 +808,11 @@ mod tests {
                 )
             }
             NodeKind::ReflectBox { body } => format!("reflect<{}>", show(body)),
+            NodeKind::XArrow { label, body, below } => match below {
+                Some(below) => format!("{label}[{}]<{}>", show(below), show(body)),
+                None => format!("{label}<{}>", show(body)),
+            },
+            NodeKind::HorizBrace { label, base, .. } => format!("{label}<{}>", show(base)),
         }
     }
 
@@ -989,6 +994,24 @@ mod tests {
             "Can't use function '\\angl' in text mode"
         );
         assert_eq!(error("\\colorbox{nope!}{a}"), "Invalid color: 'nope!'");
+    }
+
+    #[test]
+    fn stretchy_arrows_and_braces() {
+        assert_eq!(shown("\\xrightarrow{a}"), "\\xrightarrow<{a}>");
+        assert_eq!(shown("\\xrightarrow[b]{a}"), "\\xrightarrow[{b}]<{a}>");
+        assert_eq!(shown("\\xleftarrow x"), "\\xleftarrow<{x}>");
+        assert_eq!(shown("\\overbrace{x}^2"), "(\\overbrace<{x}> ^2)");
+        assert_eq!(shown("\\underbracket x"), "\\underbracket<{x}>");
+        let nodes = parse("\\underbrace{x}").unwrap();
+        let NodeKind::HorizBrace { is_over, .. } = &nodes[0].kind else {
+            unreachable!("a brace");
+        };
+        assert!(!is_over);
+        assert_eq!(
+            error("\\xrightarrow"),
+            "Unexpected end of input in a macro argument, expected '}'"
+        );
     }
 
     #[test]
@@ -1503,7 +1526,7 @@ mod tests {
 
     #[test]
     fn what_the_parser_lacks_is_said_so() {
-        assert_eq!(error("\\overbrace{x}"), "\\overbrace is not supported yet");
+        assert_eq!(error("\\href{u}{x}"), "\\href is not supported yet");
         assert_eq!(error("\\verb|x|"), "\\verb is not supported yet");
         assert!(error("x\u{2082}").ends_with("supported yet"));
     }

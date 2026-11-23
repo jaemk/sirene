@@ -371,7 +371,9 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   Boxes and lines: `\fbox`, `\colorbox`, `\fcolorbox`, `\cancel`, `\bcancel`, `\xcancel`,
   `\sout`, `\angl`, `\phase` (`Enclose`, with the label and the colors; `\fbox` and the other
   box commands read the body as text), `\pmb` (`Pmb`), `\hbox`, `\vcenter`, `\mathchoice`
-  (the four choices), and `\reflectbox` with `\mathreflectbox`. `\sout` in math mode is a
+  (the four choices), and `\reflectbox` with `\mathreflectbox`. The stretchy arrows
+  (`\xrightarrow[below]{above}` and 21 others; `XArrow`) and the braces `\overbrace`,
+  `\underbrace`, `\overbracket`, `\underbracket` (`HorizBrace`) are built too. `\sout` in math mode is a
   KaTeX strict-mode warning, which the parser does not report.
   Stack: braces and functions share one nesting budget of `MAX_DEPTH` (the parser reads both by
   recursion), and the functions that read the rest of the group are built in a function of their
@@ -394,7 +396,7 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   `parse_with` takes the display-mode setting. Functions that read the rest of a table cell
   (`\displaystyle`, `\color`, the size commands) stop at the cell's `\\` as KaTeX's do.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 488 give exactly KaTeX's tree or KaTeX's error, 127 stop at a function not
+  macro settings, 510 give exactly KaTeX's tree or KaTeX's error, 105 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 
