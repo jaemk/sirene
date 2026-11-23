@@ -463,6 +463,13 @@ mod tests {
                 let inner: Vec<_> = body.iter().map(show).collect();
                 format!("\\{font}[{}]", inner.join(" "))
             }
+            NodeKind::Font { font, body } => format!("{font}<{}>", show(body)),
+            NodeKind::MClass { class, body, .. } => {
+                let inner: Vec<_> = body.iter().map(show).collect();
+                format!("{class:?}[{}]", inner.join(" "))
+            }
+            NodeKind::Overline { body } => format!("over<{}>", show(body)),
+            NodeKind::Underline { body } => format!("under<{}>", show(body)),
         }
     }
 
@@ -628,8 +635,49 @@ mod tests {
     }
 
     #[test]
+    fn fonts() {
+        assert_eq!(shown("\\mathbf{x}"), "mathbf<x>");
+        // A group of two stays a group; a group of one is its node.
+        assert_eq!(shown("\\mathbf{xy}"), "mathbf<{x y}>");
+        assert_eq!(shown("\\Bbb R"), "mathbb<R>");
+        assert_eq!(shown("\\bold x"), "mathbf<x>");
+        // The old switches set the rest of the group.
+        assert_eq!(shown("{\\bf x y}z"), "{mathbf<{x y}>} z");
+        assert_eq!(shown("a\\rm b"), "a mathrm<{b}>");
+    }
+
+    #[test]
+    fn classes() {
+        assert_eq!(shown("\\mathbin{+}"), "Bin[+]");
+        assert_eq!(shown("\\mathrel{ab}"), "Rel[a b]");
+        assert_eq!(shown("\\boldsymbol{+}"), "Bin[boldsymbol<{+}>]");
+        assert_eq!(shown("\\boldsymbol{x}"), "Ord[boldsymbol<{x}>]");
+        assert_eq!(shown("\\bm{=}"), "Rel[boldsymbol<{=}>]");
+        let nodes = parse("\\mathbin{+}\\mathbin{ab}").unwrap();
+        let flags: Vec<_> = nodes
+            .iter()
+            .map(|n| {
+                matches!(
+                    n.kind,
+                    NodeKind::MClass {
+                        character_box: true,
+                        ..
+                    }
+                )
+            })
+            .collect();
+        assert_eq!(flags, [true, false]);
+    }
+
+    #[test]
+    fn lines() {
+        assert_eq!(shown("\\overline{x}"), "over<{x}>");
+        assert_eq!(shown("\\underline x"), "under<{x}>");
+    }
+
+    #[test]
     fn what_the_parser_lacks_is_said_so() {
-        assert_eq!(error("\\overline{x}"), "\\overline is not supported yet");
+        assert_eq!(error("\\overbrace{x}"), "\\overbrace is not supported yet");
         assert_eq!(error("\\sum"), "\\sum is not supported yet");
         assert_eq!(error("\\verb|x|"), "\\verb is not supported yet");
         assert!(error("\u{e9}").ends_with("supported yet"));

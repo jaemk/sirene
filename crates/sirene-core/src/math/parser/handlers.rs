@@ -8,7 +8,7 @@
 
 use super::{MathError, Mode, Node, NodeKind, Parser, TokenKind, unsupported, written};
 use crate::math::{
-    ast::StyleName,
+    ast::{MathClass, StyleName},
     functions::{self, Function},
     lexer::Token,
 };
@@ -30,6 +30,18 @@ enum Build {
     Styling(StyleName),
     /// `\text` and its font variants.
     Text,
+    /// `\mathbf` and the other math fonts, with the font's name.
+    Font(&'static str),
+    /// `\bf` and the other old font switches: they set the rest of the group.
+    OldFont(&'static str),
+    /// `\boldsymbol` and `\bm`.
+    BoldSymbol,
+    /// `\mathbin` and the other class commands.
+    Class(MathClass),
+    /// `\@binrel{x}{y}`: `y` spaced as `x` would be.
+    Binrel,
+    Overline,
+    Underline,
 }
 
 impl Build {
@@ -57,6 +69,34 @@ impl Build {
             "\\scriptscriptstyle" => Build::Styling(StyleName::ScriptScript),
             "\\text" | "\\textrm" | "\\textsf" | "\\texttt" | "\\textnormal" | "\\textbf"
             | "\\textmd" | "\\textit" | "\\textup" | "\\emph" => Build::Text,
+            "\\mathrm" => Build::Font("mathrm"),
+            "\\mathit" => Build::Font("mathit"),
+            "\\mathbf" | "\\bold" => Build::Font("mathbf"),
+            "\\mathnormal" => Build::Font("mathnormal"),
+            "\\mathsfit" => Build::Font("mathsfit"),
+            "\\mathbb" | "\\Bbb" => Build::Font("mathbb"),
+            "\\mathcal" => Build::Font("mathcal"),
+            "\\mathfrak" | "\\frak" => Build::Font("mathfrak"),
+            "\\mathscr" => Build::Font("mathscr"),
+            "\\mathsf" => Build::Font("mathsf"),
+            "\\mathtt" => Build::Font("mathtt"),
+            "\\rm" => Build::OldFont("mathrm"),
+            "\\sf" => Build::OldFont("mathsf"),
+            "\\tt" => Build::OldFont("mathtt"),
+            "\\bf" => Build::OldFont("mathbf"),
+            "\\it" => Build::OldFont("mathit"),
+            "\\cal" => Build::OldFont("mathcal"),
+            "\\boldsymbol" | "\\bm" => Build::BoldSymbol,
+            "\\mathord" => Build::Class(MathClass::Ord),
+            "\\mathbin" => Build::Class(MathClass::Bin),
+            "\\mathrel" => Build::Class(MathClass::Rel),
+            "\\mathopen" => Build::Class(MathClass::Open),
+            "\\mathclose" => Build::Class(MathClass::Close),
+            "\\mathpunct" => Build::Class(MathClass::Punct),
+            "\\mathinner" => Build::Class(MathClass::Inner),
+            "\\@binrel" => Build::Binrel,
+            "\\overline" => Build::Overline,
+            "\\underline" => Build::Underline,
             _ => return None,
         })
     }
@@ -296,6 +336,115 @@ impl<'a> Parser<'a> {
                 };
                 Ok(Node {
                     kind: NodeKind::Text { body, font },
+                    mode,
+                    span,
+                })
+            }
+            Build::Font(font) => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                Ok(Node {
+                    span: start..arg.span.end,
+                    kind: NodeKind::Font {
+                        font,
+                        body: Box::new(arg.normalized()),
+                    },
+                    mode,
+                })
+            }
+            Build::OldFont(font) => {
+                // The rest of the group is set in the font.
+                let body = self.parse_expression(true)?;
+                let span = body
+                    .first()
+                    .zip(body.last())
+                    .map_or(token.span.end..token.span.end, |(first, last)| {
+                        first.span.start..last.span.end
+                    });
+                let group = Node {
+                    kind: NodeKind::Group {
+                        body,
+                        semisimple: false,
+                    },
+                    mode: self.mode,
+                    span: span.clone(),
+                };
+                Ok(Node {
+                    kind: NodeKind::Font {
+                        font,
+                        body: Box::new(group),
+                    },
+                    mode,
+                    span: start..span.end,
+                })
+            }
+            Build::BoldSymbol => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let (class, character_box) = (arg.binrel_class(), arg.is_character_box());
+                let span = start..arg.span.end;
+                let font = Node {
+                    kind: NodeKind::Font {
+                        font: "boldsymbol",
+                        body: Box::new(arg),
+                    },
+                    mode,
+                    span: span.clone(),
+                };
+                Ok(Node {
+                    kind: NodeKind::MClass {
+                        class,
+                        body: vec![font],
+                        character_box,
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Class(class) => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let (span, character_box) = (start..arg.span.end, arg.is_character_box());
+                Ok(Node {
+                    kind: NodeKind::MClass {
+                        class,
+                        body: arg.into_body(),
+                        character_box,
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Binrel => {
+                let (Some(body), Some(kind)) = (args.required.pop(), args.required.pop()) else {
+                    return Err(missing(name));
+                };
+                let (span, character_box) = (start..body.span.end, body.is_character_box());
+                Ok(Node {
+                    kind: NodeKind::MClass {
+                        class: kind.binrel_class(),
+                        body: body.into_body(),
+                        character_box,
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Overline | Build::Underline => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                let body = Box::new(arg);
+                Ok(Node {
+                    kind: if matches!(build, Build::Overline) {
+                        NodeKind::Overline { body }
+                    } else {
+                        NodeKind::Underline { body }
+                    },
                     mode,
                     span,
                 })
