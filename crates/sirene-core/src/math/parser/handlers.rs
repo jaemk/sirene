@@ -14,6 +14,7 @@ use crate::math::{
     expander::token_text,
     functions::{self, Function},
     lexer::Token,
+    symbols::AtomGroup,
 };
 
 /// What a function builds, and the details that tell the commands of one kind apart.
@@ -28,6 +29,11 @@ enum Build {
         /// The style a fraction like `\dfrac` is forced into.
         style: Option<StyleName>,
     },
+    /// `\genfrac{left}{right}{bar}{style}{numer}{denom}`.
+    Genfrac,
+    /// `\over`, `\atop` and the like: they split the expression, and become the fraction
+    /// command named (`\frac`) around the two halves.
+    Infix(&'static str),
     Sqrt,
     /// `\displaystyle` and the other three: they style the rest of the group.
     Styling(StyleName),
@@ -113,6 +119,16 @@ impl Build {
             "\\binom" => frac(false, false, Some("("), Some(")"), None),
             "\\dbinom" => frac(false, false, Some("("), Some(")"), Some(StyleName::Display)),
             "\\tbinom" => frac(false, false, Some("("), Some(")"), Some(StyleName::Text)),
+            "\\\\atopfrac" => frac(false, false, None, None, None),
+            "\\\\bracefrac" => frac(false, false, Some("\\{"), Some("\\}"), None),
+            "\\\\brackfrac" => frac(false, false, Some("["), Some("]"), None),
+            "\\genfrac" => Build::Genfrac,
+            "\\over" => Build::Infix("\\frac"),
+            "\\choose" => Build::Infix("\\binom"),
+            "\\atop" => Build::Infix("\\\\atopfrac"),
+            "\\brace" => Build::Infix("\\\\bracefrac"),
+            "\\brack" => Build::Infix("\\\\brackfrac"),
+            "\\above" => Build::Infix("\\\\abovefrac"),
             "\\sqrt" => Build::Sqrt,
             "\\displaystyle" => Build::Styling(StyleName::Display),
             "\\textstyle" => Build::Styling(StyleName::Text),
@@ -619,40 +635,95 @@ impl<'a> Parser<'a> {
         let start = token.span.start;
         let mode = self.mode;
         match build {
-            Build::Frac {
-                bar,
-                continued,
-                left,
-                right,
-                style,
-            } => {
+            Build::Frac { .. } => {
                 let (Some(denom), Some(numer)) = (args.required.pop(), args.required.pop()) else {
                     return Err(missing(name));
                 };
-                let span = start..denom.span.end;
-                let frac = Node {
-                    kind: NodeKind::Frac {
-                        numer: Box::new(numer),
-                        denom: Box::new(denom),
-                        continued,
-                        bar,
-                        left,
-                        right,
-                    },
-                    mode,
-                    span: span.clone(),
+                frac_node(build, numer, denom, start, mode, name)
+            }
+            Build::Genfrac => {
+                let (Some(denom), Some(numer), Some(style), Some(bar), Some(right), Some(left)) = (
+                    args.required.pop(),
+                    args.required.pop(),
+                    args.required.pop(),
+                    args.required.pop(),
+                    args.required.pop(),
+                    args.required.pop(),
+                ) else {
+                    return Err(missing(name));
                 };
-                Ok(match style {
-                    Some(style) => Node {
-                        kind: NodeKind::Styling {
-                            style,
-                            body: vec![frac],
-                            reset_font: false,
+                // The delimiters count only if they are open and close atoms.
+                let delimiter = |node: Node<'a>, group: AtomGroup| match node.normalized().kind {
+                    NodeKind::Symbol {
+                        group: found,
+                        name: symbol,
+                    } if found == group => Some(match symbol {
+                        Name::Char(text) => text.to_string(),
+                        Name::Control(control) => format!("\\{control}"),
+                    }),
+                    _ => None,
+                };
+                let left = delimiter(left, AtomGroup::Open);
+                let right = delimiter(right, AtomGroup::Close);
+                let NodeKind::Size { value, is_blank } = bar.kind else {
+                    return Err(expected_type("size", &bar));
+                };
+                // An empty size asks for the usual bar; a size of zero for none.
+                let (has_bar, bar_size) = if is_blank {
+                    (true, None)
+                } else {
+                    (value.number > 0.0, Some(value))
+                };
+                // The style is a digit, 0 (display) to 3 (script script); anything else leaves
+                // the fraction in the style it stands in.
+                let style = match style.kind {
+                    NodeKind::Group { body, .. } => match body.first() {
+                        None => None,
+                        Some(Node {
+                            kind:
+                                NodeKind::Symbol {
+                                    group: AtomGroup::TextOrd,
+                                    name: Name::Char(digit),
+                                },
+                            ..
+                        }) => match *digit {
+                            "0" => Some(StyleName::Display),
+                            "1" => Some(StyleName::Text),
+                            "2" => Some(StyleName::Script),
+                            "3" => Some(StyleName::ScriptScript),
+                            _ => None,
+                        },
+                        Some(other) => return Err(expected_type("textord", other)),
+                    },
+                    _ => None,
+                };
+                let span = start..denom.span.end;
+                Ok(wrap_style(
+                    Node {
+                        kind: NodeKind::Frac {
+                            numer: Box::new(numer),
+                            denom: Box::new(denom),
+                            continued: false,
+                            bar: has_bar,
+                            bar_size,
+                            left,
+                            right,
                         },
                         mode,
                         span,
                     },
-                    None => frac,
+                    style,
+                ))
+            }
+            Build::Infix(replace_with) => {
+                let size = match args.required.pop() {
+                    Some(arg) => Some(measurement(arg, name)?),
+                    None => None,
+                };
+                Ok(Node {
+                    kind: NodeKind::Infix { replace_with, size },
+                    mode,
+                    span: token.span.clone(),
                 })
             }
             Build::Sqrt => {
@@ -1224,6 +1295,159 @@ fn check_delimiter(node: &Node<'_>, name: &str) -> Result<String, MathError> {
             format!("Invalid delimiter '{text}' after '{name}'"),
             node.span.clone(),
         ))
+    }
+}
+
+/// A fraction from a `Build::Frac` and its two halves, in the style the command forces.
+fn frac_node<'a>(
+    build: Build,
+    numer: Node<'a>,
+    denom: Node<'a>,
+    start: usize,
+    mode: Mode,
+    name: &str,
+) -> Result<Node<'a>, MathError> {
+    let Build::Frac {
+        bar,
+        continued,
+        left,
+        right,
+        style,
+    } = build
+    else {
+        return Err(missing(name));
+    };
+    let span = start..denom.span.end;
+    Ok(wrap_style(
+        Node {
+            kind: NodeKind::Frac {
+                numer: Box::new(numer),
+                denom: Box::new(denom),
+                continued,
+                bar,
+                bar_size: None,
+                left: left.map(String::from),
+                right: right.map(String::from),
+            },
+            mode,
+            span,
+        },
+        style,
+    ))
+}
+
+/// `node` set in `style`, if there is one.
+fn wrap_style(node: Node<'_>, style: Option<StyleName>) -> Node<'_> {
+    match style {
+        Some(style) => {
+            let (mode, span) = (node.mode, node.span.clone());
+            Node {
+                kind: NodeKind::Styling {
+                    style,
+                    body: vec![node],
+                    reset_font: false,
+                },
+                mode,
+                span,
+            }
+        }
+        None => node,
+    }
+}
+
+/// The error for a node of another type than a function's handler needs.
+fn expected_type(wanted: &str, node: &Node<'_>) -> MathError {
+    MathError::new(
+        format!(
+            "Expected node of type {wanted}, but got node of type {}",
+            node.kind.type_name()
+        ),
+        node.span.clone(),
+    )
+}
+
+impl<'a> Parser<'a> {
+    /// Rewrites the infix command in an expression (`a \over b`) as the fraction it stands for,
+    /// with everything before it as the numerator and everything after as the denominator.
+    /// One infix command to a group: with two the expression is ambiguous.
+    pub(super) fn split_infix(&mut self, body: Vec<Node<'a>>) -> Result<Vec<Node<'a>>, MathError> {
+        let mut found = None;
+        for (i, node) in body.iter().enumerate() {
+            if matches!(node.kind, NodeKind::Infix { .. }) {
+                if found.is_some() {
+                    return Err(MathError::new(
+                        "only one infix operator per group",
+                        node.span.clone(),
+                    ));
+                }
+                found = Some(i);
+            }
+        }
+        let Some(at) = found else {
+            return Ok(body);
+        };
+        let mode = self.mode;
+        let mut numer = body;
+        let mut rest = numer.split_off(at).into_iter();
+        let Some(Node {
+            kind: NodeKind::Infix { replace_with, size },
+            span: infix,
+            ..
+        }) = rest.next()
+        else {
+            return Err(missing("an infix command"));
+        };
+        // Each half is a group, or the one group it already is.
+        let half = |mut nodes: Vec<Node<'a>>, at: usize| {
+            if nodes.len() == 1
+                && nodes
+                    .first()
+                    .is_some_and(|n| matches!(n.kind, NodeKind::Group { .. }))
+                && let Some(only) = nodes.pop()
+            {
+                return only;
+            }
+            let span = nodes
+                .first()
+                .zip(nodes.last())
+                .map_or(at..at, |(first, last)| first.span.start..last.span.end);
+            Node {
+                kind: NodeKind::Group {
+                    body: nodes,
+                    semisimple: false,
+                },
+                mode,
+                span,
+            }
+        };
+        let numer = half(numer, infix.start);
+        let denom = half(rest.collect(), infix.end);
+        let start = numer.span.start.min(infix.start);
+        let frac = if replace_with == "\\\\abovefrac" {
+            let Some(size) = size else {
+                return Err(missing("\\above"));
+            };
+            let span = start..denom.span.end;
+            Node {
+                kind: NodeKind::Frac {
+                    numer: Box::new(numer),
+                    denom: Box::new(denom),
+                    continued: false,
+                    bar: size.number > 0.0,
+                    bar_size: Some(size),
+                    left: None,
+                    right: None,
+                },
+                mode,
+                span,
+            }
+        } else {
+            match Build::of(replace_with) {
+                Some(build) => frac_node(build, numer, denom, start, mode, replace_with)?,
+                None => return Err(missing(replace_with)),
+            }
+        };
+        Ok(vec![frac])
     }
 }
 

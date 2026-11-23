@@ -250,13 +250,19 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             denom,
             continued,
             bar,
+            bar_size,
             left,
             right,
         } => json!({
             "type": "genfrac", "mode": mode,
             "numer": katex_json(numer), "denom": katex_json(denom),
             "continued": continued, "hasBarLine": bar,
-            "leftDelim": left, "rightDelim": right, "barSize": null,
+            "leftDelim": left, "rightDelim": right,
+            "barSize": bar_size.as_ref().map(measurement_json),
+        }),
+        NodeKind::Infix { replace_with, size } => json!({
+            "type": "infix", "mode": mode, "replaceWith": replace_with,
+            "size": size.as_ref().map(measurement_json),
         }),
         NodeKind::Sqrt { body, index } => json!({
             "type": "sqrt", "mode": mode, "body": katex_json(body),
@@ -610,7 +616,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (422, 193));
+    assert_eq!((same, unsupported), (433, 182));
 }
 
 /// A development aid, not a check: which unsupported commands stop the most baseline inputs, to

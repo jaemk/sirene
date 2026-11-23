@@ -302,7 +302,7 @@ impl<'a> Parser<'a> {
         if self.mode == Mode::Text {
             form_ligatures(&mut body);
         }
-        Ok(body)
+        self.split_infix(body)
     }
 
     /// A base and the scripts that follow it.
@@ -646,13 +646,27 @@ mod tests {
                 format!("({base}{}{})", part("^", sup), part("_", sub))
             }
             NodeKind::Frac {
-                numer, denom, bar, ..
+                numer,
+                denom,
+                bar,
+                left,
+                right,
+                ..
             } => format!(
-                "frac{}[{} / {}]",
+                "frac{}{}[{} / {}]",
                 if *bar { "" } else { "0" },
+                match (left, right) {
+                    (None, None) => String::new(),
+                    _ => format!(
+                        "<{} {}>",
+                        left.as_deref().unwrap_or("."),
+                        right.as_deref().unwrap_or(".")
+                    ),
+                },
                 show(numer),
                 show(denom)
             ),
+            NodeKind::Infix { replace_with, .. } => format!("infix{replace_with}"),
             NodeKind::Sqrt { body, index } => match index {
                 Some(index) => format!("sqrt[{}]{}", show(index), show(body)),
                 None => format!("sqrt{}", show(body)),
@@ -864,11 +878,80 @@ mod tests {
         // Each argument is a group, even a single character.
         assert_eq!(shown("\\frac12"), "frac[{1} / {2}]");
         assert_eq!(shown("\\frac{a}{b+c}"), "frac[{a} / {b + c}]");
-        assert_eq!(shown("\\binom ab"), "frac0[{a} / {b}]");
+        assert_eq!(shown("\\binom ab"), "frac0<( )>[{a} / {b}]");
         // A display or text fraction is wrapped in the style.
         assert_eq!(shown("\\dfrac12"), "Display[frac[{1} / {2}]]");
-        assert_eq!(shown("\\tbinom12"), "Text[frac0[{1} / {2}]]");
+        assert_eq!(shown("\\tbinom12"), "Text[frac0<( )>[{1} / {2}]]");
         assert_eq!(shown("\\frac12^3"), "(frac[{1} / {2}] ^3)");
+    }
+
+    #[test]
+    fn infix_commands_split_the_expression() {
+        // Everything before is the numerator, everything after the denominator.
+        assert_eq!(shown("a+b \\over c"), "frac[{a + b} / {c}]");
+        assert_eq!(shown("a \\atop b"), "frac0[{a} / {b}]");
+        assert_eq!(shown("a \\choose b"), "frac0<( )>[{a} / {b}]");
+        assert_eq!(shown("a \\brace b"), "frac0<\\{ \\}>[{a} / {b}]");
+        assert_eq!(shown("a \\brack b"), "frac0<[ ]>[{a} / {b}]");
+        // A half that is one group is kept as it is.
+        assert_eq!(shown("{a}\\over{b}"), "frac[{a} / {b}]");
+        assert_eq!(shown("\\over"), "frac[{} / {}]");
+        // Groups, arguments and environments each split their own.
+        assert_eq!(shown("x {a \\over b} y"), "x {frac[{a} / {b}]} y");
+        assert_eq!(shown("\\sqrt{a \\over b}"), "sqrt{frac[{a} / {b}]}");
+        assert_eq!(
+            shown("\\displaystyle a \\over b"),
+            "frac[{Display[a]} / {b}]"
+        );
+        assert_eq!(
+            error("a \\over b \\over c"),
+            "only one infix operator per group"
+        );
+        assert_eq!(
+            error("x^\\over"),
+            "Got function '\\over' with no arguments as superscript"
+        );
+    }
+
+    #[test]
+    fn above_sets_the_bar() {
+        let nodes = parse("a \\above 2pt b").unwrap();
+        let NodeKind::Frac { bar, bar_size, .. } = &nodes[0].kind else {
+            unreachable!("a fraction");
+        };
+        assert!(bar);
+        assert_eq!(
+            bar_size.as_ref().map(|m| (m.number, m.unit.as_str())),
+            Some((2.0, "pt"))
+        );
+        let nodes = parse("a \\above 0pt b").unwrap();
+        let NodeKind::Frac { bar, .. } = &nodes[0].kind else {
+            unreachable!("a fraction");
+        };
+        assert!(!bar);
+        assert_eq!(error("a \\above b"), "Invalid size: 'b'");
+    }
+
+    #[test]
+    fn genfrac_takes_delimiters_bar_and_style() {
+        assert_eq!(
+            shown("\\genfrac ( ] {0.06em}{0}{a}{b}"),
+            "Display[frac<( ]>[{a} / {b}]]"
+        );
+        // An empty bar size is the usual bar, and 0 is none.
+        assert_eq!(shown("\\genfrac{}{}{}{}{a}{b}"), "frac[{a} / {b}]");
+        assert_eq!(
+            shown("\\genfrac{}{}{0pt}{3}{a}{b}"),
+            "ScriptScript[frac0[{a} / {b}]]"
+        );
+        // Only an open delimiter on the left and a close one on the right count.
+        assert_eq!(shown("\\genfrac ] ( {}{}{a}{b}"), "frac[{a} / {b}]");
+        // A style that is not 0 to 3 leaves the fraction in the style it stands in.
+        assert_eq!(shown("\\genfrac{}{}{}{9}{a}{b}"), "frac[{a} / {b}]");
+        assert_eq!(
+            error("\\genfrac{}{}{}{~}{a}{b}"),
+            "Expected node of type textord, but got node of type spacing"
+        );
     }
 
     #[test]

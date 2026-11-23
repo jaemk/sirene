@@ -332,7 +332,11 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   with an end marker so it parses as a formula of its own. A command is built only if
   `Build::of` names it, so a command not built yet fails before its arguments are read. Built:
   `\frac`, `\dfrac`, `\tfrac`, `\cfrac`, `\binom`, `\dbinom`, `\tbinom` (`Frac`, wrapped in
-  `Styling` when the command forces a style), `\sqrt` with its index (`Sqrt`), the four style
+  `Styling` when the command forces a style), `\genfrac` (delimiters, bar size, and a style
+  digit 0 to 3), the infix commands `\over`, `\atop`, `\choose`, `\brace`, `\brack`, `\above`
+  (an `Infix` node, which the expression holding it splits into a `Frac` of what is before and
+  after it; a second one in the same group is "only one infix operator per group"),
+  `\sqrt` with its index (`Sqrt`), the four style
   commands (`Styling`, which takes the rest of the group), and `\text` with its nine font
   variants (`Text`, read in text mode, where spaces are symbols and `--`, `---`, ```` `` ````,
   and `''` join into one). A function after `^` or `_` must be allowed there, and a function not
@@ -385,7 +389,7 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   `parse_with` takes the display-mode setting. Functions that read the rest of a table cell
   (`\displaystyle`, `\color`, the size commands) stop at the cell's `\\` as KaTeX's do.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 422 give exactly KaTeX's tree or KaTeX's error, 193 stop at a function not
+  macro settings, 433 give exactly KaTeX's tree or KaTeX's error, 182 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 
