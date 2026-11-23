@@ -7135,6 +7135,7 @@ dependencies = [
  "resvg 0.46.0",
  "rowan",
  "roxmltree 0.21.2",
+ "serde_json",
  "ttf-parser",
  "unicode-width",
 ]

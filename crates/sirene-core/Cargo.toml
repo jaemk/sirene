@@ -46,3 +46,4 @@ criterion = { version = "0.8.2", default-features = false, features = ["cargo_be
 insta = "1.49.0"
 proptest = "1.11.0"
 roxmltree = "0.21.2"
+serde_json = "1.0.154"

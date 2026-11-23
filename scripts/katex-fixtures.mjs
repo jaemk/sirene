@@ -95,26 +95,31 @@ function stripLoc(_, v) {
   return _ === "loc" ? undefined : v;
 }
 
+// KaTeX writes `\gdef` definitions back into the `macros` object it is given, so each call gets a
+// fresh copy. Some inputs print with `\message` and `\errmessage`; the output is silenced.
+const settingsFor = (c) => ({
+  throwOnError: true,
+  strict: "ignore",
+  output: "html",
+  displayMode: !!c.display,
+  macros: c.macros ? { ...c.macros } : undefined,
+});
+const { log, error, warn } = console;
+console.log = console.error = console.warn = () => {};
+
 const oracle = {};
 for (const c of cases) {
   const key = JSON.stringify([c.input, c.display ?? false, c.macros ?? null]);
   if (key in oracle) continue;
-  const settings = {
-    throwOnError: true,
-    strict: "ignore",
-    output: "html",
-    displayMode: !!c.display,
-    macros: c.macros ? { ...c.macros } : undefined,
-  };
   const entry = {};
   try {
-    entry.tree = JSON.parse(JSON.stringify(katex.__parse(c.input, { ...settings }), stripLoc));
+    entry.tree = JSON.parse(JSON.stringify(katex.__parse(c.input, settingsFor(c)), stripLoc));
   } catch (e) {
     entry.parse_error = String(e.rawMessage ?? e.message);
   }
   if (entry.tree) {
     try {
-      const dom = katex.__renderToDomTree(c.input, { ...settings });
+      const dom = katex.__renderToDomTree(c.input, settingsFor(c));
       const html = findClass(dom, "katex-html");
       entry.height = html.height;
       entry.depth = html.depth;
@@ -140,4 +145,5 @@ for (const c of cases) {
 }
 writeFileSync(new URL("katex-cases.json", out), JSON.stringify(cases, null, 1) + "\n");
 writeFileSync(new URL("katex-oracle.json", out), JSON.stringify(oracle) + "\n");
+Object.assign(console, { log, error, warn });
 console.log(`${cases.length} cases, ${Object.keys(oracle).length} distinct inputs`);

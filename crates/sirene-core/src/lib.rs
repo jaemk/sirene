@@ -36,6 +36,7 @@ pub mod kanban;
 pub mod layout;
 mod lines;
 pub mod markdown;
+mod math;
 pub mod mindmap;
 pub mod packet;
 pub mod pie;
