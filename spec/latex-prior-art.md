@@ -51,11 +51,10 @@ LMATH-T6).
 - Tests: `crates/ratex-parser/src/tests.rs` (51 KB), `tests/golden`, and a per-formula support
   table against KaTeX.
 
-What a spike must answer: whether `loc` maps to byte ranges, how the display list converts to
-sirene's scene items (glyph runs with fonts, rules, and paths), what the wasm and binary size
-cost is with the KaTeX fonts subset, whether the crates build on Rust 1.92 and offline with
-`mhchem` off, whether fuzzing finds panics or runaway time, and how much of `engine.rs` is
-KaTeX-specific logic worth porting versus depending on.
+Use: sirene does not depend on RaTeX (LMATH-11). It is read for how KaTeX's TypeScript maps to
+Rust (module split, resource limits, the stretchy-shape port in `katex_svg.rs`), and its
+`tests/golden` formulas are candidates for the comparison fixtures of LPA-3, with its MIT
+notice recorded for any input taken.
 
 ## LPA-2 Language and directive support
 
@@ -149,6 +148,6 @@ classes, and style changes).
   rules reference and the TeX-to-MATH parameter table; decide between them (LPA-4).
 - [x] LPA-T5a Read RaTeX's repository for maintenance, license, dependencies, limits, and
   errors (LPA-5).
-- [ ] LPA-T5b Run the RaTeX spike (LMATH-T6) and decide: depend, vendor with attribution, or
-  port selectively; record the decision in LMATH-11.
+- [x] LPA-T5b Decide: in-tree, ported from KaTeX, no dependency on RaTeX (LMATH-11). The
+  spike is dropped.
 - [ ] LPA-T5c Same read for formulary and formel if the MATH-table path (LPA-4) is pursued.

@@ -77,9 +77,9 @@ data are checked in.
 - [ ] LRES-T7c Measure the subset: which of the 20 faces and glyphs the command table needs,
   and the size after subsetting; check the OFL reserved font names for a renamed subset.
 - [ ] LRES-T7d List the SVG path data KaTeX uses for stretchy shapes (braces, arrows, the
-  radical sign, over and under lines) and plan how the display list draws them. The path in
-  KaTeX is not `src/svgGeometry.js` (404); find it in the KaTeX tree. RaTeX ports it as
-  `ratex-layout/src/katex_svg.rs` (69 KB) and has `PathCommand` in `ratex-types`.
+  radical sign, over and under lines) and plan how the display list draws them. It is
+  `src/svgGeometry.ts` (29.5 KB), with `stretchy.ts` (14 KB) and `delimiter.ts` (30 KB) using
+  it. RaTeX ports it as `ratex-layout/src/katex_svg.rs` (69 KB), a comparison for our port.
 - [ ] LRES-T2 Decide the text font inside formulas.
 - [ ] LRES-T3 Compare the symbol data sources and pick the generation input.
 - [ ] LRES-T4 Record each source's license and what attribution it needs.
