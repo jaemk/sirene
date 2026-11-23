@@ -34,6 +34,14 @@ enum Build {
     /// `\over`, `\atop` and the like: they split the expression, and become the fraction
     /// command named (`\frac`) around the two halves.
     Infix(&'static str),
+    /// `\fbox`, `\colorbox`, `\fcolorbox`, `\cancel` and the rest that draw around a body.
+    Enclose,
+    Pmb,
+    HBox,
+    VCenter,
+    MathChoice,
+    /// `\reflectbox` and `\mathreflectbox`.
+    ReflectBox,
     Sqrt,
     /// `\displaystyle` and the other three: they style the rest of the group.
     Styling(StyleName),
@@ -129,6 +137,13 @@ impl Build {
             "\\brace" => Build::Infix("\\\\bracefrac"),
             "\\brack" => Build::Infix("\\\\brackfrac"),
             "\\above" => Build::Infix("\\\\abovefrac"),
+            "\\fbox" | "\\colorbox" | "\\fcolorbox" | "\\cancel" | "\\bcancel" | "\\xcancel"
+            | "\\sout" | "\\angl" | "\\phase" => Build::Enclose,
+            "\\pmb" => Build::Pmb,
+            "\\hbox" => Build::HBox,
+            "\\vcenter" => Build::VCenter,
+            "\\mathchoice" => Build::MathChoice,
+            "\\reflectbox" | "\\mathreflectbox" => Build::ReflectBox,
             "\\sqrt" => Build::Sqrt,
             "\\displaystyle" => Build::Styling(StyleName::Display),
             "\\textstyle" => Build::Styling(StyleName::Text),
@@ -715,6 +730,106 @@ impl<'a> Parser<'a> {
                     style,
                 ))
             }
+            Build::Enclose => {
+                let Some(body) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                // The colors come first, so they are popped last to first:
+                // `\fcolorbox{border}{background}{body}`.
+                let (border_color, background_color) = match name {
+                    "\\colorbox" => (None, Some(pop_color(&mut args, name)?)),
+                    "\\fcolorbox" => {
+                        let background = pop_color(&mut args, name)?;
+                        let border = pop_color(&mut args, name)?;
+                        (Some(border), Some(background))
+                    }
+                    _ => (None, None),
+                };
+                Ok(Node {
+                    span: start..body.span.end,
+                    kind: NodeKind::Enclose {
+                        label: name.to_string(),
+                        background_color,
+                        border_color,
+                        body: Box::new(body),
+                    },
+                    mode,
+                })
+            }
+            Build::Pmb => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let (class, span) = (arg.binrel_class(), start..arg.span.end);
+                Ok(Node {
+                    kind: NodeKind::Pmb {
+                        class,
+                        body: arg.into_body(),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::HBox => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::HBox {
+                        body: arg.into_body(),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::VCenter => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::VCenter {
+                        body: Box::new(arg),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::MathChoice => {
+                let (Some(script_script), Some(script), Some(text), Some(display)) = (
+                    args.required.pop(),
+                    args.required.pop(),
+                    args.required.pop(),
+                    args.required.pop(),
+                ) else {
+                    return Err(missing(name));
+                };
+                let span = start..script_script.span.end;
+                Ok(Node {
+                    kind: NodeKind::MathChoice {
+                        display: display.into_body(),
+                        text: text.into_body(),
+                        script: script.into_body(),
+                        script_script: script_script.into_body(),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::ReflectBox => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let span = start..arg.span.end;
+                Ok(Node {
+                    kind: NodeKind::ReflectBox {
+                        body: Box::new(arg),
+                    },
+                    mode,
+                    span,
+                })
+            }
             Build::Infix(replace_with) => {
                 let size = match args.required.pop() {
                     Some(arg) => Some(measurement(arg, name)?),
@@ -1190,6 +1305,14 @@ fn color_token(node: Node<'_>, name: &str) -> Result<String, MathError> {
     match node.kind {
         NodeKind::ColorToken(color) => Ok(color),
         _ => Err(missing(name)),
+    }
+}
+
+/// The last required argument, a color.
+fn pop_color(args: &mut Arguments<'_>, name: &str) -> Result<String, MathError> {
+    match args.required.pop() {
+        Some(arg) => color_token(arg, name),
+        None => Err(missing(name)),
     }
 }
 

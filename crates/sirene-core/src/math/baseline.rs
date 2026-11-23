@@ -299,19 +299,44 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             body,
             character_box,
         } => {
-            use super::ast::MathClass;
-            let class = match class {
-                MathClass::Ord => "mord",
-                MathClass::Bin => "mbin",
-                MathClass::Rel => "mrel",
-                MathClass::Open => "mopen",
-                MathClass::Close => "mclose",
-                MathClass::Punct => "mpunct",
-                MathClass::Inner => "minner",
-            };
-            json!({"type": "mclass", "mode": mode, "mclass": class,
+            json!({"type": "mclass", "mode": mode, "mclass": class_json(*class),
                 "body": body.iter().map(katex_json).collect::<Vec<_>>(),
                 "isCharacterBox": character_box})
+        }
+        NodeKind::Enclose {
+            label,
+            background_color,
+            border_color,
+            body,
+        } => {
+            let mut value = json!({"type": "enclose", "mode": mode, "label": label,
+                "body": katex_json(body)});
+            if let Some(color) = background_color {
+                value["backgroundColor"] = color.clone().into();
+            }
+            if let Some(color) = border_color {
+                value["borderColor"] = color.clone().into();
+            }
+            value
+        }
+        NodeKind::Pmb { class, body } => json!({"type": "pmb", "mode": mode,
+            "mclass": class_json(*class), "body": nodes_json(body)}),
+        NodeKind::HBox { body } => {
+            json!({"type": "hbox", "mode": mode, "body": nodes_json(body)})
+        }
+        NodeKind::VCenter { body } => {
+            json!({"type": "vcenter", "mode": mode, "body": katex_json(body)})
+        }
+        NodeKind::MathChoice {
+            display,
+            text,
+            script,
+            script_script,
+        } => json!({"type": "mathchoice", "mode": mode, "display": nodes_json(display),
+            "text": nodes_json(text), "script": nodes_json(script),
+            "scriptscript": nodes_json(script_script)}),
+        NodeKind::ReflectBox { body } => {
+            json!({"type": "reflectbox", "mode": mode, "body": katex_json(body)})
         }
         NodeKind::Overline { body } => {
             json!({"type": "overline", "mode": mode, "body": katex_json(body)})
@@ -534,6 +559,23 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
 }
 
 /// A number as KaTeX's JSON writes it: a whole number has no decimal point.
+fn nodes_json(nodes: &[super::ast::Node<'_>]) -> Value {
+    nodes.iter().map(katex_json).collect::<Vec<_>>().into()
+}
+
+fn class_json(class: super::ast::MathClass) -> &'static str {
+    use super::ast::MathClass;
+    match class {
+        MathClass::Ord => "mord",
+        MathClass::Bin => "mbin",
+        MathClass::Rel => "mrel",
+        MathClass::Open => "mopen",
+        MathClass::Close => "mclose",
+        MathClass::Punct => "mpunct",
+        MathClass::Inner => "minner",
+    }
+}
+
 fn number_json(number: f64) -> Value {
     if number.fract() == 0.0 && number.abs() < 1e15 {
         Value::from(number as i64)
@@ -616,7 +658,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (433, 182));
+    assert_eq!((same, unsupported), (488, 127));
 }
 
 /// A development aid, not a check: which unsupported commands stop the most baseline inputs, to
