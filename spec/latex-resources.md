@@ -112,7 +112,12 @@ data are checked in.
   `src/svgGeometry.ts` (29.5 KB), with `stretchy.ts` (14 KB) and `delimiter.ts` (30 KB) using
   it. RaTeX ports it as `ratex-layout/src/katex_svg.rs` (69 KB), a comparison for our port.
 - [ ] LRES-T2 Decide the text font inside formulas.
-- [x] LRES-T3a Pick the generation input: KaTeX `symbols.ts` (LRES-3).
+- [x] LRES-T3a Pick the generation input: KaTeX `symbols.ts` (LRES-3). Built: the generator is
+  `scripts/katex-symbols.mjs` (Node 24 imports the TypeScript directly) and the table is
+  `crates/sirene-core/src/math/symbols_data.rs` (LMATH-14). Not done: the staleness test (a Rust
+  test cannot run node, so the size assertion in `symbols.rs` stands in: regenerating with a
+  changed KaTeX changes the counts) and the glyph-coverage test against the embedded font
+  subset, which waits for the font (LRES-T7c).
 - [ ] LRES-T3b Check `symbols.ts` against the Unicode math class data and `unicode-math` for
   commands KaTeX lacks that Mermaid or PlantUML users write; list the gaps.
 - [ ] LRES-T4 Write the THIRD-PARTY-NOTICES entries: KaTeX (MIT, Khan Academy and other

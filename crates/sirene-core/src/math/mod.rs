@@ -14,5 +14,8 @@ mod baseline;
 mod error;
 mod lexer;
 mod limits;
+mod symbols;
+#[rustfmt::skip]
+mod symbols_data;
 
 pub(crate) use error::MathError;
