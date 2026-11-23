@@ -57,7 +57,9 @@ silent difference.
 ## LMATH-6 Limits
 
 As LANGS-8: groups nest at most 64 deep, a formula is at most 64 KiB of source, macro expansion
-is at most 10,000 steps and 1 MiB of output, a table has at most 256 cells per side, and a
+is at most 10,000 steps and 1 MiB of output (checked while a body is built, so an argument
+repeated many times in one body is stopped before it is allocated), the tokens a `\def`
+parameter must be followed by are at most 256, a table has at most 256 cells per side, and a
 `\left` ... `\right` stretches to at most 16 times the font size. A formula past a limit reports
 one error and is drawn as text. The fuzz targets cover the parser and the expander (LANGS-11).
 
@@ -223,7 +225,7 @@ KaTeX is a decision on record.
 Per LMATH-6, the lexer, expander, and parser each carry their bound from the start, and
 `sirene-fuzz` gets a `math` target with them (LANGS-11).
 
-## LMATH-14 Built so far: lexer, errors, limits, symbols
+## LMATH-14 Built so far: lexer, errors, limits, symbols, expander
 
 `sirene_core::math` (crate-private until the typesetter draws a formula) has:
 
@@ -259,8 +261,49 @@ Deviations from KaTeX (LMATH-T9):
   the table (characters of a supported script such as Cyrillic or CJK, `\char` results, the
   backslash in `\href` text) belong to the parser stage and are counted, not skipped.
 
-Not yet built, in order (LMATH-9): the macro expander, the parser and parse nodes, `Options`
-and `Style`, boxes, and layout. The fuzz target for the lexer waits for a
+- `expander`: TeX's gullet. `Expander::new(src, Mode)`; `future`, `pop_token`, `push_token`,
+  `consume_spaces`, `consume_arg(delimiters)` (an undelimited argument skips spaces and loses its
+  braces; a delimited one is the shortest balanced run ending in the delimiters),
+  `scan_argument(optional)` (the parser's reading of a function argument, ended by an `Eof`
+  marker), `expand_once`, `expand_next_token`, `begin_group`, `end_group`, `end_groups`,
+  `switch_mode`, and `is_defined`. A macro is looked up by a borrowed `Key` (control word,
+  control symbol, or active character) in this order: definitions made in the formula, the
+  commands that read their own arguments, then KaTeX's predefined macros. Definitions are
+  scoped to groups with an undo list per group, and `\gdef` is global.
+- Implemented here: `\newcommand`, `\renewcommand`, `\providecommand` (up to nine parameters),
+  `\def` and `\gdef` (delimited parameters, `#{`), `\@firstoftwo`, `\@secondoftwo`,
+  `\@ifnextchar`, and `\TextOrMath`. The other 277 control-sequence and 42 character macros are
+  KaTeX's table of TeX source, generated into `macros_data.rs` by `scripts/katex-macros.mjs`
+  (Node 24 loads `macros.ts` through the resolver hook `scripts/katex-ts-loader.mjs`).
+- Bounds: `MAX_EXPANSIONS` macro calls and `MAX_EXPANDED` bytes of produced tokens, groups at
+  `MAX_DEPTH`.
+- Not implemented yet, each an error naming the command: `\noexpand`, `\expandafter`, `\char`,
+  `\message`, `\errmessage`, `\show`, `\dots`, `\dotso`, `\dotsc`, `\cdots`, `\tag@literal`,
+  `\bra@ket`, `\bra@set`. A test keeps this list equal to KaTeX's function-defined macros minus
+  the implemented ones. Also out of scope (LPA-2): `\edef`, `\xdef`, `\let`, `\futurelet`,
+  `\global`, `\long`.
+- Baseline tests (`math::baseline`): the expander reads all 449 inputs KaTeX parses; 436 end
+  cleanly and the other 13 stop only at one of the unimplemented commands above, so that count
+  falls as they land. For the 22 inputs KaTeX rejects with an expansion-level error (`Extra }`,
+  a `\def` or `\newcommand` error, too many expansions, and the like) the expander gives the
+  same message. KaTeX's "Unexpected end of input in a macro argument" for a function's missing
+  argument (`\frac 1`) is raised by the parser's `scan_argument` and is checked in that stage.
+
+More deviations (LMATH-T9):
+
+| Where | KaTeX | Here | Why |
+|---|---|---|---|
+| Expansion limit message | names its `maxExpand` setting | "Too many expansions: infinite loop or more than 10000 macro calls" | no setting; the bound is fixed (LMATH-6) |
+| `\newcommand` parameters | any count | at most 9 | TeX's limit, and a bound on argument reading |
+| Output bound | none | 1 MiB of produced tokens | LMATH-6 |
+| Delimiter length | none | at most 256 tokens per `\def` parameter | reading a delimited argument compares at every token; LMATH-6 |
+| Delimiters after a partial match | the token that broke the match is dropped, so `\def\f#1ab{..}\f aab` never matches | restarted from that token, as TeX does | TeX's rule: the shortest run ending in the delimiters |
+| A braced group argument | the outer braces of `{a}{b}` are removed, leaving `a}{b` | removed only when one group is the whole argument | TeX's rule; KaTeX's check looks only at the first and last token |
+| `\def` and `\newcommand` | `\def` is a parser function; `\newcommand` a macro | both run in the expander | one place for definitions and their scope |
+| Macro lookup | strings keyed by text | `Key` enum, borrowed | no allocation per lookup |
+
+Not yet built, in order (LMATH-9): the remaining macros above, the parser and parse nodes,
+`Options` and `Style`, boxes, and layout. The fuzz target for the lexer waits for a
 public entry point, since `fuzz/` reaches only public items; until then the property test
 covers it.
 
