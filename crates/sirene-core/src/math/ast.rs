@@ -72,7 +72,9 @@ pub(crate) enum NodeKind<'a> {
     /// without its backslash.
     Text {
         body: Vec<Node<'a>>,
-        font: &'a str,
+        /// `None` for the name of a command left out (`\href` without trust), which has no font
+        /// of its own.
+        font: Option<&'a str>,
     },
     /// A math font for its body: `\mathbf{x}`, `\mathbb`, and the old `\bf` (which is
     /// `mathbf`). `font` is the name without the backslash, with aliases resolved (`\Bbb` is
@@ -125,11 +127,14 @@ pub(crate) enum NodeKind<'a> {
     /// A large operator or a named one: `\sum`, `\int`, `\lim`, `\sin`, and `\mathop{...}`.
     /// `limits` puts scripts above and below in display style; `always_handle_supsub` says
     /// `\limits` or `\nolimits` followed it, which fixes that choice. `symbol` means a glyph
-    /// that grows in display style.
+    /// that grows in display style. `suppress_base_shift` is set only by `\overset`,
+    /// `\underset` and `\stackrel`, which build an operator of their base: it says whether the
+    /// base keeps its place instead of centering on the axis (`\stackrel` does not keep it).
     Op {
         limits: bool,
         always_handle_supsub: bool,
         symbol: bool,
+        suppress_base_shift: Option<bool>,
         content: OpContent<'a>,
     },
     /// `\operatorname{...}`, and the starred form that takes limits.
@@ -247,6 +252,23 @@ pub(crate) enum NodeKind<'a> {
     ReflectBox {
         body: Box<Node<'a>>,
     },
+    /// `\html@mathml{html}{mathml}`: the first is drawn, the second is the MathML form, which
+    /// sirene does not produce.
+    HtmlMathml {
+        html: Vec<Node<'a>>,
+        mathml: Vec<Node<'a>>,
+    },
+    /// A character made from a number: `\@char{65}`, which `\char"41` expands to.
+    CharCode(char),
+    /// A raw string argument as read (`\htmlId{a}{...}`), before the function that wanted it
+    /// takes it.
+    Raw {
+        string: String,
+    },
+    /// A URL argument as read (`\href{...}{...}`).
+    Url {
+        url: String,
+    },
     /// An arrow that stretches to its label: `\xrightarrow[below]{above}`. `label` is the
     /// command, with its backslash.
     XArrow {
@@ -284,6 +306,10 @@ impl NodeKind<'_> {
             NodeKind::VCenter { .. } => "vcenter",
             NodeKind::MathChoice { .. } => "mathchoice",
             NodeKind::ReflectBox { .. } => "reflectbox",
+            NodeKind::HtmlMathml { .. } => "htmlmathml",
+            NodeKind::CharCode(_) => "textord",
+            NodeKind::Raw { .. } => "raw",
+            NodeKind::Url { .. } => "url",
             NodeKind::XArrow { .. } => "xArrow",
             NodeKind::HorizBrace { .. } => "horizBrace",
             NodeKind::Sqrt { .. } => "sqrt",

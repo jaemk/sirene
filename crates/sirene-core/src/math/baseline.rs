@@ -287,10 +287,20 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             }
             value
         }
-        NodeKind::Text { body, font } => json!({
-            "type": "text", "mode": mode, "font": format!("\\{font}"),
-            "body": body.iter().map(katex_json).collect::<Vec<_>>(),
-        }),
+        NodeKind::Text { body, font } => {
+            let mut value = json!({"type": "text", "mode": mode, "body": nodes_json(body)});
+            if let Some(font) = font {
+                value["font"] = format!("\\{font}").into();
+            }
+            value
+        }
+        NodeKind::HtmlMathml { html, mathml } => json!({"type": "htmlmathml", "mode": mode,
+            "html": nodes_json(html), "mathml": nodes_json(mathml)}),
+        NodeKind::CharCode(c) => {
+            json!({"type": "textord", "mode": mode, "text": c.to_string()})
+        }
+        NodeKind::Raw { string } => json!({"type": "raw", "mode": "text", "string": string}),
+        NodeKind::Url { url } => json!({"type": "url", "mode": mode, "url": url}),
         NodeKind::Font { font, body } => {
             json!({"type": "font", "mode": mode, "font": font, "body": katex_json(body)})
         }
@@ -394,6 +404,7 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             limits,
             always_handle_supsub,
             symbol,
+            suppress_base_shift,
             content,
         } => {
             use super::ast::OpContent;
@@ -412,6 +423,9 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             };
             if *always_handle_supsub {
                 fields.insert("alwaysHandleSupSub".into(), true.into());
+            }
+            if let Some(suppress) = suppress_base_shift {
+                fields.insert("suppressBaseShift".into(), (*suppress).into());
             }
             Value::Object(fields)
         }
@@ -667,7 +681,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (510, 105));
+    assert_eq!((same, unsupported), (582, 33));
 }
 
 /// A development aid, not a check: which unsupported commands stop the most baseline inputs, to
