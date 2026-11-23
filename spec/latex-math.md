@@ -323,8 +323,19 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
 - Errors use KaTeX's messages: `Expected 'EOF', got '}'`, `Expected '}', got 'EOF'`, `Double
   superscript`, `Expected group after '^'`, `Undefined control sequence: \foo`, `Limit controls
   must follow a math operator`.
+- Functions (`parser/handlers.rs`): `parse_function` reads a command's arguments as the table's
+  argument kinds say (a group in the current mode, a group forced to math or text mode, or one
+  primitive group or symbol), through the expander's `scan_argument`, which ends each argument
+  with an end marker so it parses as a formula of its own. A command is built only if
+  `Build::of` names it, so a command not built yet fails before its arguments are read. Built:
+  `\frac`, `\dfrac`, `\tfrac`, `\cfrac`, `\binom`, `\dbinom`, `\tbinom` (`Frac`, wrapped in
+  `Styling` when the command forces a style), `\sqrt` with its index (`Sqrt`), the four style
+  commands (`Styling`, which takes the rest of the group), and `\text` with its nine font
+  variants (`Text`, read in text mode, where spaces are symbols and `--`, `---`, ```` `` ````,
+  and `''` join into one). A function after `^` or `_` must be allowed there, and a function not
+  allowed in the current mode fails with KaTeX's message.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 101 give exactly KaTeX's tree or KaTeX's error, 514 stop at a function not
+  macro settings, 154 give exactly KaTeX's tree or KaTeX's error, 461 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 

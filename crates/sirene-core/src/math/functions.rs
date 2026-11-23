@@ -18,6 +18,7 @@ pub(super) type Row = (
     bool,
     bool,
     bool,
+    &'static str,
 );
 
 /// What the registry says about a command.
@@ -37,12 +38,17 @@ pub(crate) struct Function {
     pub primitive: bool,
     /// An infix command (`\over`) splits the expression around it.
     pub infix: bool,
+    /// How each argument is read, optional ones first: `o` original (a group in the current
+    /// mode), `m` math, `t` text, `p` primitive (one group or symbol), `c` color, `s` size, `u`
+    /// url, `h` hbox, `r` raw.
+    pub arg_types: &'static str,
 }
 
 /// The function written `name`, with its backslash for a control sequence (`\frac`).
 pub(crate) fn lookup(name: &str) -> Option<Function> {
     let at = FUNCTIONS.binary_search_by(|row| row.0.cmp(name)).ok()?;
-    let (_, kind, args, optional, text, math, argument, primitive, infix) = FUNCTIONS[at];
+    let (_, kind, args, optional, text, math, argument, primitive, infix, arg_types) =
+        FUNCTIONS[at];
     Some(Function {
         kind,
         num_args: usize::from(args),
@@ -52,6 +58,7 @@ pub(crate) fn lookup(name: &str) -> Option<Function> {
         allowed_in_argument: argument,
         primitive,
         infix,
+        arg_types,
     })
 }
 

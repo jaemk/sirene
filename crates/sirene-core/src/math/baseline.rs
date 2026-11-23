@@ -245,6 +245,38 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
             }
             Value::Object(fields)
         }
+        NodeKind::Frac {
+            numer,
+            denom,
+            continued,
+            bar,
+            left,
+            right,
+        } => json!({
+            "type": "genfrac", "mode": mode,
+            "numer": katex_json(numer), "denom": katex_json(denom),
+            "continued": continued, "hasBarLine": bar,
+            "leftDelim": left, "rightDelim": right, "barSize": null,
+        }),
+        NodeKind::Sqrt { body, index } => json!({
+            "type": "sqrt", "mode": mode, "body": katex_json(body),
+            "index": index.as_deref().map(katex_json),
+        }),
+        NodeKind::Styling { style, body } => {
+            use super::ast::StyleName;
+            let style = match style {
+                StyleName::Display => "display",
+                StyleName::Text => "text",
+                StyleName::Script => "script",
+                StyleName::ScriptScript => "scriptscript",
+            };
+            json!({"type": "styling", "mode": mode, "style": style,
+                "body": body.iter().map(katex_json).collect::<Vec<_>>()})
+        }
+        NodeKind::Text { body, font } => json!({
+            "type": "text", "mode": mode, "font": format!("\\{font}"),
+            "body": body.iter().map(katex_json).collect::<Vec<_>>(),
+        }),
         NodeKind::SupSub { base, sup, sub } => {
             let mut fields = serde_json::Map::new();
             fields.insert("type".into(), "supsub".into());
@@ -327,7 +359,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (101, 514));
+    assert_eq!((same, unsupported), (154, 461));
 }
 
 #[test]

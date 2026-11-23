@@ -33,4 +33,37 @@ pub(crate) enum NodeKind<'a> {
         sup: Option<Box<Node<'a>>>,
         sub: Option<Box<Node<'a>>>,
     },
+    /// A fraction or binomial: `\frac`, `\binom`, and their display and text forms. The
+    /// delimiters are drawn around it; `\cfrac` is the continued form.
+    Frac {
+        numer: Box<Node<'a>>,
+        denom: Box<Node<'a>>,
+        continued: bool,
+        bar: bool,
+        left: Option<&'static str>,
+        right: Option<&'static str>,
+    },
+    /// A root, with an optional index (`\sqrt[3]{x}`).
+    Sqrt {
+        body: Box<Node<'a>>,
+        index: Option<Box<Node<'a>>>,
+    },
+    /// Nodes set in a given style (`\displaystyle` and the rest, which run to the end of the
+    /// group, and `\dfrac`, which wraps one fraction).
+    Styling {
+        style: StyleName,
+        body: Vec<Node<'a>>,
+    },
+    /// Text set in text mode: `\text{...}` and the font variants. `font` is the command's name
+    /// without its backslash.
+    Text { body: Vec<Node<'a>>, font: &'a str },
+}
+
+/// The four math styles of TeX.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StyleName {
+    Display,
+    Text,
+    Script,
+    ScriptScript,
 }
