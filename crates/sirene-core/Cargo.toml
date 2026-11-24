@@ -15,6 +15,9 @@ categories = ["parser-implementations", "visualization"]
 workspace = true
 
 [features]
+default = ["math"]
+## The embedded KaTeX fonts that formulas are drawn with (`math::fonts`).
+math = ["dep:ttf-parser"]
 ## PNG output (`scene::png`), with an embedded font.
 png = ["dep:resvg", "dep:ttf-parser"]
 
