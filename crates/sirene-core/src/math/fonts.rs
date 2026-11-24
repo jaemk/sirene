@@ -11,12 +11,16 @@ use super::metrics_data::Face;
 pub(crate) type Font = ttf_parser::Face<'static>;
 
 /// The two KaTeX faces that have no entry in `metrics_data` (KaTeX keeps no metrics for them).
+/// Nothing draws them yet (the box tree has no bold calligraphic or Fraktur face), so they are
+/// checked by tests only.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ExtraFace {
     CaligraphicBold,
     FrakturBold,
 }
 
+#[cfg(test)]
 impl ExtraFace {
     pub(crate) const ALL: [ExtraFace; 2] = [ExtraFace::CaligraphicBold, ExtraFace::FrakturBold];
 
@@ -79,6 +83,7 @@ pub(crate) fn font(face: Face) -> Option<&'static Font> {
 }
 
 /// The parsed font of one of the faces without metrics.
+#[cfg(test)]
 pub(crate) fn extra_font(face: ExtraFace) -> Option<&'static Font> {
     static FONTS: [OnceLock<Option<Font>>; 2] = [const { OnceLock::new() }; 2];
     FONTS

@@ -1,0 +1,9 @@
+f(a,b)=\begin{cases}
+    a+1&\text{if }b\text{ is odd} \\
+    a&\text{if }b=0 \\
+    a-1&\text{otherwise}
+\end{cases} \\
+\begin{rcases}
+    a &\text{if } b \\
+    c &\text{if } d
+\end{rcases}⇒…

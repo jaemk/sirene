@@ -61,8 +61,9 @@ decided; a Markdown file's prose is not drawn by sirene today.
 
 ## LEMB-4 One interface
 
-Every consumer calls the same entry point, `math::typeset(source, MathStyle) -> Formula` (the
-`latex-math.md` box tree with a baseline and a size), and treats a `Formula` as an inline item in
+Every consumer calls the same entry point, `math::typeset(source, MathStyle) -> Result<Formula, MathError>`
+(`MathStyle` is `Display` or `Text`; a `Formula` has `width`, `ascent` and `descent` in em and
+`place(origin, size, color)` returns its scene primitives), and treats a `Formula` as an inline item in
 a label: width, ascent, and descent come from it, and the label's line grows to fit. A label
 with several formulas and text is a row of runs. A formula that fails to parse is drawn as its
 source text with one diagnostic on its span, never an empty label.

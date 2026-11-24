@@ -1,0 +1,5 @@
+\begin{matrix}
+  \rm rm & it & \it it & \bf bf & \sf sf & \tt tt \\
+  \text{\rm rm} & \text{rm} & \text{\it it} & \text{\bf bf} & \text{\sf sf} & \text{\tt tt} \\
+  i\rm r\it i & \text{r\it i\rm r}
+\end{matrix}

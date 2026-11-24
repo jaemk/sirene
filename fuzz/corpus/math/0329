@@ -1,0 +1,1 @@
+\newcommand\foo{x^2}\foo+\foo

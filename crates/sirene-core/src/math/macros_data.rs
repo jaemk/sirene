@@ -334,6 +334,7 @@ pub(super) static CHARS: &[(&str, &str)] = &[
 
 /// The macros KaTeX defines with a function, because they look ahead or read arguments. The
 /// expander implements the ones it supports (see `expander.rs`); a test checks the list.
+#[cfg(test)]
 pub(super) static FUNCTIONS: &[&str] = &[
     "@firstoftwo",
     "@ifnextchar",

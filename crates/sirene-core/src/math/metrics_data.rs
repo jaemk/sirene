@@ -54,6 +54,7 @@ impl Face {
     ];
 
     /// KaTeX's name for the face (`Main-Regular`).
+    #[cfg(test)]
     pub(crate) fn name(self) -> &'static str {
         match self {
             Face::AmsRegular => "AMS-Regular",

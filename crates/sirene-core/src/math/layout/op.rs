@@ -26,6 +26,7 @@ use crate::math::{
 
 /// An operator: what `NodeKind::Op` holds, and where it is.
 pub(super) struct Operator<'t, 'n> {
+    #[allow(dead_code, reason = "carried from the node; only the callers read it")]
     pub limits: bool,
     pub symbol: bool,
     pub suppress_base_shift: Option<bool>,

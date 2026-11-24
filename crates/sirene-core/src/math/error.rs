@@ -6,7 +6,7 @@ use std::{fmt, ops::Range};
 /// source it is about, so a diagram can report it at the offending command (LEMB-5). The message
 /// is KaTeX's wording where KaTeX has the same error, without its `KaTeX parse error:` prefix.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct MathError {
+pub struct MathError {
     pub message: String,
     pub span: Range<usize>,
 }

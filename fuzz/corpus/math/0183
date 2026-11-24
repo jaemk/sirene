@@ -1,0 +1,6 @@
+\def\logo{\includegraphics[height=0.8em, totalheight=0.9em, width=0.9em, alt=KA logo]{../../website/static/img/khan-academy.png}}
+\def\logoB{\includegraphics[height=0.4em, totalheight=0.9em, width=0.9em, alt=KA logo]{../../website/static/img/khan-academy.png}}
+\begin{array}{l}
+    \underline{A\logo} + \sqrt{\logo} + \tfrac{A\logo}{\logo}\\[1em]
+    \underline{A\logoB} + \sqrt{x\logoB} + \tfrac{A\logoB}{\logoB}
+\end{array}

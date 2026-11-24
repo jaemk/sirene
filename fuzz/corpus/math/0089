@@ -1,0 +1,5 @@
+\begin{array}{l}
+    ab\mathllap{f}cd\mathrlap{g}hij\mathclap{k}lm \; ab\llap{f}cd\rlap{g}hij\clap{k}lm \\
+    \mathrlap{\frac a b} \frac a b \\
+    \mathrlap{\overbrace{\phantom{a_0+a_1+a_2}}^m}a_0+a_1+a_2
+\end{array}
