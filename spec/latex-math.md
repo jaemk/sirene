@@ -60,7 +60,8 @@ As LANGS-8: groups nest at most 64 deep, a formula is at most 64 KiB of source, 
 is at most 10,000 steps and 1 MiB of output (checked while a body is built, so an argument
 repeated many times in one body is stopped before it is allocated), the tokens a `\def`
 parameter must be followed by are at most 256, a table has at most 256 cells per side, and a
-`\left` ... `\right` stretches to at most 16 times the font size. A formula past a limit reports
+`\left` ... `\right` stretches to at most 16 times the font size, and a length in the source is
+at most 1000 em either way. A formula past a limit reports
 one error and is drawn as text. The fuzz targets cover the parser and the expander (LANGS-11).
 
 ## LMATH-7 Consumers
@@ -414,7 +415,29 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   On a difference the test prints the path of the first differing field.
 - `\verb|x|` (`Verb`, always text mode) is read from the lexer's `Verb` token.
 
-Not yet built, in order (LMATH-9): `\bra@ket`, `\bra@set`, `{CD}`, `Options` and `Style`, boxes,
+Layout state (`style.rs`, `metrics.rs`, `options.rs`), the first of the layout stage:
+
+- `Style`: the eight styles (display, text, script, scriptscript, each plain or cramped) with
+  `sup`, `sub`, `frac_num`, `frac_den`, `cramp`, `text`, `size`, and `is_tight`, matching
+  KaTeX's lookup tables (a test compares all six moves).
+- `metrics::for_size`: the font-wide parameters (sigma 1 to 22 of cmsy10, 7, and 5; xi 8 to 13
+  of cmex10; KaTeX's rule, box, and array constants; a mu) for a size index, as one
+  `FontMetrics` struct per column.
+- `Options`: a `Copy` value of style, size index (1 to 11), text size, color, phantom, math
+  font, and text family, weight, and shape, with `having_style`, `having_cramped_style`,
+  `having_size`, `having_base_style`, `having_base_sizing`, and the `with_*` builders, as
+  KaTeX's `Options.ts`. `Em` is a newtype for lengths. `Options::length` converts a
+  `Measurement` to em as KaTeX's `calculateSize` does: absolute units unscaled by size, `em` and
+  `ex` from the text style, `mu` from the current size.
+
+More deviations (LMATH-T9):
+
+| Where | KaTeX | Here | Why |
+|---|---|---|---|
+| Length cap | `maxSize` setting, no cap by default, from above only | within 1000 em either way (`MAX_LENGTH_EM`) | a kern or rule sets the drawing's size; LMATH-6 |
+| Font fields | strings, `""` for none | enums in an `Option` | match on a kind, not text |
+
+Not yet built, in order (LMATH-9): `\bra@ket`, `\bra@set`, `{CD}`, per-glyph metrics, boxes,
 and layout. The fuzz target for the lexer waits for a
 public entry point, since `fuzz/` reaches only public items; until then the property test
 covers it.
@@ -434,8 +457,8 @@ tracker; this one holds what is left for the engine itself.
 - [ ] LMATH-T5 Build in the order of LMATH-9, to the design of LMATH-13.
 - [ ] LMATH-T6 Read the KaTeX behavior for the first subset, then write the Rust types for
   tokens, parse nodes, options, and boxes (LMATH-13) before any logic, and review them. Done:
-  errors, limits, tokens, the lexer, the expander, and the parser core (LMATH-14). Next: the
-  parser's functions, `Options` and `Style`, boxes.
+  errors, limits, tokens, the lexer, the expander, the parser and its functions, `Style`,
+  `Options`, and the font parameters (LMATH-14). Next: per-glyph metrics, boxes.
 - [ ] LMATH-T8 Port the baseline tests as data (LMATH-13). Done so far:
   `scripts/katex-fixtures.mjs` (needs node, KaTeX 0.19.1, and the `yaml` package; setup in its
   header) extracts the `expect`...`` cases of `katex-spec.ts` and the `ss_data.yaml` inputs, runs

@@ -21,7 +21,10 @@ mod lexer;
 mod limits;
 #[rustfmt::skip]
 mod macros_data;
+mod metrics;
+mod options;
 mod parser;
+mod style;
 mod symbols;
 #[rustfmt::skip]
 mod symbols_data;
