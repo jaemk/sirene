@@ -14,6 +14,8 @@
     allow(dead_code, reason = "the entry point is behind the `math` feature")
 )]
 
+#[cfg(feature = "math")]
+mod ascii;
 mod ast;
 #[cfg(test)]
 mod baseline;
@@ -49,6 +51,8 @@ mod symbols_data;
 #[rustfmt::skip]
 mod unicode_data;
 
+#[cfg(feature = "math")]
+pub use ascii::ascii_formula;
 pub use error::MathError;
 #[cfg(feature = "math")]
 pub use formula::{Formula, MathStyle, typeset};
