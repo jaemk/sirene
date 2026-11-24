@@ -66,6 +66,45 @@ pub(crate) fn draw(items: &[Item<'_>], origin: Pt, size: f32, color: Color) -> V
     out
 }
 
+/// The right edge of the farthest item, in em: a glyph ends after the advances of its characters
+/// (the italic correction is not counted), a rule or path at its box's edge. Items with
+/// non-finite positions are skipped. `None` when there are no items.
+pub(crate) fn right_edge(items: &[Item<'_>]) -> Option<f64> {
+    let mut edge: Option<f64> = None;
+    for item in items {
+        let right = match item {
+            Item::Glyph {
+                x,
+                scale,
+                glyph,
+                mirrored,
+                ..
+            } => {
+                if *mirrored {
+                    *x
+                } else {
+                    let advance: f64 = glyph
+                        .text
+                        .chars()
+                        .filter_map(|ch| {
+                            let (font, id) = lookup(glyph.face, ch)?;
+                            let units = f64::from(font.units_per_em());
+                            let adv = f64::from(font.glyph_hor_advance(id)?);
+                            (units > 0.0).then_some(adv / units * scale)
+                        })
+                        .sum();
+                    *x + advance
+                }
+            }
+            Item::Rule { x, width, .. } | Item::Path { x, width, .. } => *x + *width,
+        };
+        if right.is_finite() {
+            edge = Some(edge.map_or(right, |e| e.max(right)));
+        }
+    }
+    edge
+}
+
 /// The item's own color if it names one that parses, else the default.
 fn pick(own: Option<&str>, default: Color) -> Color {
     own.and_then(parse_color).unwrap_or(default)
@@ -835,13 +874,20 @@ mod tests {
         (bx.width.0, bx.height.0, bx.depth.0, drawn)
     }
 
-    /// Every path lies in the formula's box (or its clip does), to five hundredths of an em. A
-    /// glyph's ink can pass its TeX height (the `1` of `\frac12` does), and the radical sign of
-    /// `\sqrt2` reaches 0.04em above the box layout gives it, as KaTeX's svg does.
+    /// Every path's ink lies in the formula's box, to two hundredths of an em: a glyph's ink can
+    /// pass its TeX height and depth by its overshoot (the `1` of `\frac12` does, by 0.015em).
     fn check_inside(src: &str) -> Vec<Primitive> {
+        check_inside_by(src, 0.02)
+    }
+
+    /// Every path's ink (cut to its clip rectangle) lies in the formula's box, give or take
+    /// `slack_em`. The clip rectangle of a radical is taller than its box by the 0.08em that KaTeX
+    /// leaves empty over the sign's line, which is no ink.
+    fn check_inside_by(src: &str, slack_em: f64) -> Vec<Primitive> {
         let (w, h, d, drawn) = laid_out(src);
         assert!(!drawn.is_empty(), "{src}: nothing drawn");
-        let slack = 0.05 * f64::from(SIZE);
+        // Coordinates are single precision pixels.
+        let slack = slack_em * f64::from(SIZE) + 1e-3;
         let left = f64::from(ORIGIN.x) - slack;
         let right = f64::from(ORIGIN.x) + w * f64::from(SIZE) + slack;
         let top = f64::from(ORIGIN.y) - h * f64::from(SIZE) - slack;
@@ -857,16 +903,16 @@ mod tests {
                 unreachable!("only paths: {primitive:?}")
             };
             assert_eq!((*fill, *stroke), (Some(BLACK), None), "{src}");
-            let shape = match clip {
-                // A clipped path shows only its clip rectangle.
-                Some(r) => (
-                    f64::from(r.x),
-                    f64::from(r.y),
-                    f64::from(r.x + r.w),
-                    f64::from(r.y + r.h),
-                ),
-                None => bounds(segments).expect("a shape"),
-            };
+            // The ink, which a clipped path shows only inside its clip rectangle.
+            let mut shape = bounds(segments).expect("a shape");
+            if let Some(r) = clip {
+                shape = (
+                    shape.0.max(f64::from(r.x)),
+                    shape.1.max(f64::from(r.y)),
+                    shape.2.min(f64::from(r.x + r.w)),
+                    shape.3.min(f64::from(r.y + r.h)),
+                );
+            }
             assert!(
                 shape.0 >= left && shape.1 >= top && shape.2 <= right && shape.3 <= bottom,
                 "{src}: {shape:?} outside ({left}, {top}, {right}, {bottom})"
@@ -879,6 +925,15 @@ mod tests {
     fn a_letter_is_one_path_inside_its_box() {
         let drawn = check_inside("x");
         assert_eq!(drawn.len(), 1);
+    }
+
+    #[test]
+    fn a_radical_draws_inside_its_box_to_the_pixel() {
+        // The vinculum's top is the box's top: the empty 0.08em of the sign's view box above it
+        // is clipped away.
+        for src in ["\\sqrt2", "\\sqrt{\\frac12}", "\\sqrt[3]{2}"] {
+            check_inside_by(src, 0.0);
+        }
     }
 
     #[test]
@@ -944,6 +999,28 @@ mod tests {
         for (got, want) in [(x0, want.0), (y0, want.1), (x1, want.2), (y1, want.3)] {
             assert!((got - want).abs() < tolerance, "{got} vs {want}");
         }
+    }
+
+    #[test]
+    fn the_right_edge_is_the_farthest_item() {
+        assert_eq!(right_edge(&[]), None);
+        let rule = |x, width| Item::Rule {
+            x,
+            y: 0.0,
+            width,
+            height: 1.0,
+            color: None,
+        };
+        assert_eq!(right_edge(&[rule(1.0, 2.0), rule(0.0, 1.0)]), Some(3.0));
+        assert_eq!(
+            right_edge(&[rule(f64::NAN, 1.0), rule(0.5, 1.0)]),
+            Some(1.5)
+        );
+        // A glyph ends after its advance, which is the layout width of a letter.
+        let nodes = parse_with("x", Settings::default()).expect("parses");
+        let bx = layout(&nodes, false).expect("lays out");
+        let edge = right_edge(&bx.items()).expect("an item");
+        assert!((edge - bx.width.0).abs() < 1e-3, "{edge} {}", bx.width.0);
     }
 
     #[test]

@@ -246,6 +246,21 @@ mod tests {
     }
 
     #[test]
+    fn a_label_past_the_last_column_is_inside_the_box() {
+        // The right label of the last column is out of the flow, so layout leaves it out of the
+        // width; the formula's box takes it in.
+        let labeled = typeset(r"\begin{CD}A\\@VVdddV\\B\end{CD}", MathStyle::Display).unwrap();
+        let prims = labeled.place(Pt::new(0.0, 0.0), 100.0, BLACK);
+        let (_, _, right, _) = bounds(&prims).unwrap();
+        // Italic ink may pass its advance by its italic correction.
+        assert!(
+            right <= labeled.width * 100.0 + 2.0,
+            "{right} {}",
+            labeled.width
+        );
+    }
+
+    #[test]
     fn a_letter_has_a_box_and_draws() {
         let f = typeset("x", MathStyle::Text).unwrap();
         assert!(f.width > 0.4 && f.width < 0.8, "{}", f.width);

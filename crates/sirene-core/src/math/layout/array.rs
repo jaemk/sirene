@@ -27,6 +27,7 @@ use crate::math::{
     MathError,
     ast::{AlignSpec, Array, ColSeparation, Measurement, Node, RowTag},
     boxes::{Bx, Part, Position},
+    draw::right_edge,
     options::{Em, Options},
     style::Style,
     symbols::Mode,
@@ -243,6 +244,20 @@ pub(super) fn array<'t>(
     }
 
     let mut table = Bx::hlist(cols);
+
+    // The labels of a diagram's vertical arrows are out of the flow, and the last column's right
+    // labels hang past its edge. KaTeX's box leaves them out (they overflow it); this box takes
+    // them in, so a formula's ink stays inside it. The columns do not move.
+    if array.col_separation == Some(ColSeparation::Cd) {
+        // A glyph's font advance differs from the metrics width in the fourth decimal place, so
+        // only an edge further out than that counts.
+        const SLOP: f64 = 0.01;
+        if let Some(edge) = right_edge(&table.items())
+            && edge > table.width.0 + SLOP
+        {
+            table.width = Em(edge);
+        }
+    }
 
     // The `\hline`s, each a line as wide as the table at its place in the stack.
     if !hlines.is_empty() {
