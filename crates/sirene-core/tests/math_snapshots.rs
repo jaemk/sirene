@@ -32,10 +32,7 @@ const EXPECTED_FAILURES: &[(&str, &str)] = &[
 ];
 
 /// Inputs known to draw outside their box, with the reason. A drawing bug to fix, not a rule.
-const KNOWN_ESCAPES: &[(&str, &str)] = &[(
-    "CD",
-    "a horizontal arrow in the diagram ends 0.1 to 0.2 em past the right edge of the box",
-)];
+const KNOWN_ESCAPES: &[(&str, &str)] = &[];
 
 struct Case {
     name: String,

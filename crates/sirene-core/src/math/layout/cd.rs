@@ -10,6 +10,10 @@
 //! has no width, height, or depth, so the row is as tall as the arrow. This builds that: the
 //! labels are placed against the arrow with no size of their own. A box has no edge but its
 //! baseline and depth, so a label's bottom edge is its depth below its baseline.
+//!
+//! KaTeX's box leaves a label that hangs past the diagram's right edge outside it, as the label
+//! overflows in the browser. `array` widens the diagram's box to take it in (nothing moves), so
+//! that a formula's ink stays inside its box.
 
 use super::{Atom, Built, build, build_in};
 use crate::math::{
@@ -148,7 +152,8 @@ mod tests {
     fn a_vertical_arrow_is_sized_by_the_arrow_alone() {
         let plain = laid_out("\\begin{CD}A\\\\@VVV\\\\B\\end{CD}");
         let labeled = laid_out("\\begin{CD}A\\\\@VabcdVxyzV\\\\B\\end{CD}");
-        assert_eq!(plain.width, labeled.width);
+        // (Only the diagram's right edge grows, to take in a label that overhangs it; see
+        // `a_label_past_the_last_column_widens_the_diagram_but_moves_nothing`.)
         assert_eq!(plain.height, labeled.height);
         assert_eq!(plain.depth, labeled.depth);
     }
@@ -163,12 +168,34 @@ mod tests {
     }
 
     #[test]
+    fn a_label_past_the_last_column_widens_the_diagram_but_moves_nothing() {
+        let plain = laid_out("\\begin{CD}A\\\\@VVV\\\\B\\end{CD}");
+        let labeled = laid_out("\\begin{CD}A\\\\@VVdddV\\\\B\\end{CD}");
+        // The label is 0.3em (script em) right of the arrow's middle and 3 d's wide.
+        let (d, _) = glyph_at(&labeled, "d");
+        let width = laid_out("\\scriptstyle ddd").width.0;
+        assert!(
+            (labeled.width.0 - (d + width)).abs() < 0.01,
+            "{} {d} {width}",
+            labeled.width.0
+        );
+        assert!(labeled.width.0 > plain.width.0 + 0.3);
+        // The glyph of the cell is where it was.
+        assert_eq!(glyph_at(&plain, "A"), glyph_at(&labeled, "A"));
+        // A label inside the column adds nothing: a wide cell holds it.
+        let held = laid_out("\\begin{CD}AAAAAAAA\\\\@VVdV\\\\B\\end{CD}");
+        let bare = laid_out("\\begin{CD}AAAAAAAA\\\\@VVV\\\\B\\end{CD}");
+        assert_eq!(held.width, bare.width);
+    }
+
+    #[test]
     fn labels_sit_either_side_of_the_arrow() {
         let bx = laid_out("\\begin{CD}A\\\\@VlVrV\\\\B\\end{CD}");
         let ((left, _), (right, _)) = (glyph_at(&bx, "l"), glyph_at(&bx, "r"));
         // The arrow is the middle of the one column, and a label is 0.3em of its own (script
         // size) em from it.
-        let middle = bx.width.0 / 2.0;
+        let middle = laid_out("\\begin{CD}A\\\\@VVV\\\\B\\end{CD}").width.0 / 2.0;
+        assert!(bx.width.0 >= middle * 2.0);
         let gap = 0.3 * 0.7;
         assert!(close(right, middle + gap), "{right} {middle}");
         // The left label ends there, on the other side.

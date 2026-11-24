@@ -66,6 +66,45 @@ pub(crate) fn draw(items: &[Item<'_>], origin: Pt, size: f32, color: Color) -> V
     out
 }
 
+/// The right edge of the farthest item, in em: a glyph ends after the advances of its characters
+/// (the italic correction is not counted), a rule or path at its box's edge. Items with
+/// non-finite positions are skipped. `None` when there are no items.
+pub(crate) fn right_edge(items: &[Item<'_>]) -> Option<f64> {
+    let mut edge: Option<f64> = None;
+    for item in items {
+        let right = match item {
+            Item::Glyph {
+                x,
+                scale,
+                glyph,
+                mirrored,
+                ..
+            } => {
+                if *mirrored {
+                    *x
+                } else {
+                    let advance: f64 = glyph
+                        .text
+                        .chars()
+                        .filter_map(|ch| {
+                            let (font, id) = lookup(glyph.face, ch)?;
+                            let units = f64::from(font.units_per_em());
+                            let adv = f64::from(font.glyph_hor_advance(id)?);
+                            (units > 0.0).then_some(adv / units * scale)
+                        })
+                        .sum();
+                    *x + advance
+                }
+            }
+            Item::Rule { x, width, .. } | Item::Path { x, width, .. } => *x + *width,
+        };
+        if right.is_finite() {
+            edge = Some(edge.map_or(right, |e| e.max(right)));
+        }
+    }
+    edge
+}
+
 /// The item's own color if it names one that parses, else the default.
 fn pick(own: Option<&str>, default: Color) -> Color {
     own.and_then(parse_color).unwrap_or(default)
@@ -944,6 +983,28 @@ mod tests {
         for (got, want) in [(x0, want.0), (y0, want.1), (x1, want.2), (y1, want.3)] {
             assert!((got - want).abs() < tolerance, "{got} vs {want}");
         }
+    }
+
+    #[test]
+    fn the_right_edge_is_the_farthest_item() {
+        assert_eq!(right_edge(&[]), None);
+        let rule = |x, width| Item::Rule {
+            x,
+            y: 0.0,
+            width,
+            height: 1.0,
+            color: None,
+        };
+        assert_eq!(right_edge(&[rule(1.0, 2.0), rule(0.0, 1.0)]), Some(3.0));
+        assert_eq!(
+            right_edge(&[rule(f64::NAN, 1.0), rule(0.5, 1.0)]),
+            Some(1.5)
+        );
+        // A glyph ends after its advance, which is the layout width of a letter.
+        let nodes = parse_with("x", Settings::default()).expect("parses");
+        let bx = layout(&nodes, false).expect("lays out");
+        let edge = right_edge(&bx.items()).expect("an item");
+        assert!((edge - bx.width.0).abs() < 1e-3, "{edge} {}", bx.width.0);
     }
 
     #[test]
