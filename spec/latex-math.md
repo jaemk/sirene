@@ -443,7 +443,22 @@ More deviations (LMATH-T9):
 | Length cap | `maxSize` setting, no cap by default, from above only | within 1000 em either way (`MAX_LENGTH_EM`) | a kern or rule sets the drawing's size; LMATH-6 |
 | Font fields | strings, `""` for none | enums in an `Option` | match on a kind, not text |
 
-Not yet built, in order (LMATH-9): `\bra@ket`, `\bra@set`, `{CD}`, boxes, and layout. The fuzz target for the lexer waits for a
+Box tree (`boxes.rs`, LMATH-T3):
+
+- `Bx { width, height, depth, kind }` in em of the font the box was built in, as KaTeX's spans.
+  Kinds: `Glyph` (text, `Face`, italic correction, skew, color), `Rule`, `Space`, `HList`,
+  `VList` (children each with a raise and a horizontal offset), and `Scaled` (a child built at
+  another size, sized in the outer em, where KaTeX rescales at a size change).
+- Builders: `glyph` (KaTeX's `makeSymbol`: metrics of the first character, no italic correction
+  in text mode or `\mathit`, no size without metrics), `rule`, `line` (at least
+  `min_rule_thickness`), `kern`, `space`, `hlist` (height and depth never below zero),
+  `scaled`, `vlist` with KaTeX's `top`, `bottom`, `shift`, and `firstBaseline` positions, and
+  `vlist_shifted` (`individualShift`). A stack's height and depth count its kerns, as
+  `makeVList`'s do.
+- `items` flattens a tree into glyphs and rules at absolute positions in the root's em (y down),
+  the display list of LMATH-4.
+
+Not yet built, in order (LMATH-9): `\bra@ket`, `\bra@set`, `{CD}`, and layout. The fuzz target for the lexer waits for a
 public entry point, since `fuzz/` reaches only public items; until then the property test
 covers it.
 
@@ -463,7 +478,7 @@ tracker; this one holds what is left for the engine itself.
 - [ ] LMATH-T6 Read the KaTeX behavior for the first subset, then write the Rust types for
   tokens, parse nodes, options, and boxes (LMATH-13) before any logic, and review them. Done:
   errors, limits, tokens, the lexer, the expander, the parser and its functions, `Style`,
-  `Options`, the font parameters, and the glyph metrics (LMATH-14). Next: boxes.
+  `Options`, the font parameters, the glyph metrics, and the box tree (LMATH-14). Next: layout.
 - [ ] LMATH-T8 Port the baseline tests as data (LMATH-13). Done so far:
   `scripts/katex-fixtures.mjs` (needs node, KaTeX 0.19.1, and the `yaml` package; setup in its
   header) extracts the `expect`...`` cases of `katex-spec.ts` and the `ss_data.yaml` inputs, runs

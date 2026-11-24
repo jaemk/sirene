@@ -12,6 +12,7 @@
 mod ast;
 #[cfg(test)]
 mod baseline;
+mod boxes;
 mod error;
 mod expander;
 mod functions;
