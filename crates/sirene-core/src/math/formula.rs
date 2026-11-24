@@ -286,19 +286,13 @@ mod tests {
     const BLACK: Color = Color::rgb(0);
 
     fn bounds(primitives: &[Primitive]) -> Option<(f32, f32, f32, f32)> {
-        use crate::scene::Segment;
         let mut b: Option<(f32, f32, f32, f32)> = None;
         for p in primitives {
             let Primitive::Path { segments, .. } = p else {
                 continue;
             };
             for s in segments {
-                let pts: Vec<Pt> = match s {
-                    Segment::Move(a) | Segment::Line(a) => vec![*a],
-                    Segment::Cubic { c1, c2, to } => vec![*c1, *c2, *to],
-                    _ => vec![],
-                };
-                for q in pts {
+                for q in s.points() {
                     b = Some(match b {
                         None => (q.x, q.y, q.x, q.y),
                         Some((x0, y0, x1, y1)) => {

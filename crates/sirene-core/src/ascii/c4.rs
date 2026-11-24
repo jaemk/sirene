@@ -2,7 +2,8 @@
 //! description, boundaries as boxes titled on the top border, placed as in the drawing, and the
 //! relations listed below.
 
-use super::{Cells, Options, clean, draw, width};
+use super::mathtext::Rows;
+use super::{CellsIn, Options, clean, draw_in, width};
 use crate::c4::layout::{self, Sizes};
 use crate::c4::{C4, Rel};
 use crate::flowchart::{Arrow, Edge, Label, Measure};
@@ -51,12 +52,15 @@ pub fn render(c: &C4, options: &Options) -> String {
         }
         s.title = Label::plain(t);
     }
+    // The formulas set to size the layout are the ones drawn.
+    let rows = Rows::default();
+    let cells = CellsIn(&rows);
     let node = |i: usize| {
-        let s = Cells.node(&chart.nodes[i]);
+        let s = cells.node(&chart.nodes[i]);
         (f64::from(s.w), f64::from(s.h))
     };
     let title = |g: usize| {
-        let s = Cells.subgraph_title(&chart.subgraphs[g]);
+        let s = cells.subgraph_title(&chart.subgraphs[g]);
         (f64::from(s.w + 2), 0.0)
     };
     let placed = layout::layout(
@@ -78,7 +82,7 @@ pub fn render(c: &C4, options: &Options) -> String {
     let clusters: Vec<Rect> = placed.boundaries.iter().map(|&r| rect(r)).collect();
     let titles = (0..chart.subgraphs.len())
         .map(|g| {
-            let s = Cells.subgraph_title(&chart.subgraphs[g]);
+            let s = cells.subgraph_title(&chart.subgraphs[g]);
             (s.w > 0).then(|| Rect {
                 x: clusters[g].x + 1,
                 y: clusters[g].y,
@@ -95,7 +99,7 @@ pub fn render(c: &C4, options: &Options) -> String {
         edges: Vec::new(),
         notes: Vec::new(),
     };
-    let mut out = draw(&chart, &layout, options);
+    let mut out = draw_in(&chart, &layout, options, &rows);
     if !c.chart.edges.is_empty() {
         out.push('\n');
         for (e, r) in c.chart.edges.iter().zip(&c.rels) {

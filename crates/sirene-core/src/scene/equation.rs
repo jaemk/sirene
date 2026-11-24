@@ -34,20 +34,17 @@ pub fn equation(equation: &Equation, metrics: &impl TextMetrics, theme: &Theme) 
 /// The left, top, right, and bottom of the paths of `primitives`, control points included.
 #[cfg(feature = "math")]
 fn ink(primitives: &[Primitive]) -> Option<(f32, f32, f32, f32)> {
-    use super::Segment;
     let mut b: Option<(f32, f32, f32, f32)> = None;
     for p in primitives {
         let Primitive::Path { segments, .. } = p else {
             continue;
         };
         for s in segments {
-            let pts = match s {
-                Segment::Move(a) | Segment::Line(a) => vec![*a],
-                Segment::Arc { to, .. } => vec![*to],
-                Segment::Cubic { c1, c2, to } => vec![*c1, *c2, *to],
-                Segment::Close => vec![],
-            };
-            for p in pts.iter().filter(|p| p.x.is_finite() && p.y.is_finite()) {
+            for p in s
+                .points()
+                .iter()
+                .filter(|p| p.x.is_finite() && p.y.is_finite())
+            {
                 b = Some(match b {
                     None => (p.x, p.y, p.x, p.y),
                     Some((l, t, r, d)) => (l.min(p.x), t.min(p.y), r.max(p.x), d.max(p.y)),
@@ -95,7 +92,7 @@ fn formula(_: &Equation, _: &Theme) -> Option<Scene> {
 mod tests {
     use super::*;
     use crate::equation::Flavor;
-    use crate::scene::{Approx, Segment};
+    use crate::scene::Approx;
 
     fn scene(source: &str, flavor: Flavor) -> Scene {
         let e = Equation {
@@ -113,13 +110,7 @@ mod tests {
                 continue;
             };
             for seg in segments {
-                let pts: Vec<Pt> = match seg {
-                    Segment::Move(a) | Segment::Line(a) => vec![*a],
-                    Segment::Arc { to, .. } => vec![*to],
-                    Segment::Cubic { c1, c2, to } => vec![*c1, *c2, *to],
-                    Segment::Close => vec![],
-                };
-                for p in pts {
+                for p in seg.points() {
                     seen += 1;
                     assert!(
                         p.x >= -slack && p.y >= -slack,

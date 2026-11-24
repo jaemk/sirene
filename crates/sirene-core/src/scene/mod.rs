@@ -118,6 +118,20 @@ pub enum Segment {
     Close,
 }
 
+impl Segment {
+    /// The points the segment names: the end of a move, line, or arc, a cubic's two control
+    /// points and end, and none for a close.
+    #[cfg(feature = "math")]
+    pub(crate) fn points(&self) -> Vec<Pt> {
+        match self {
+            Segment::Move(a) | Segment::Line(a) => vec![*a],
+            Segment::Arc { to, .. } => vec![*to],
+            Segment::Cubic { c1, c2, to } => vec![*c1, *c2, *to],
+            Segment::Close => Vec::new(),
+        }
+    }
+}
+
 /// An sRGB color with alpha.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Color {
