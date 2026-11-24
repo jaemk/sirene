@@ -22,6 +22,8 @@ mod limits;
 #[rustfmt::skip]
 mod macros_data;
 mod metrics;
+#[rustfmt::skip]
+mod metrics_data;
 mod options;
 mod parser;
 mod style;
