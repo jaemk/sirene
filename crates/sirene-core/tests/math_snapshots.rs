@@ -2,7 +2,8 @@
 //!
 //! Each input is set in the style KaTeX's screenshotter uses (display only where the yaml says
 //! `display: 1`, text otherwise). It must typeset, draw something, draw every path inside the
-//! formula's box (0.1 em slack), and match its committed snapshot.
+//! formula's box (0.1 em slack), and match its line of the committed snapshot: the number of
+//! paths, the ink's bounds, the formula's box, and a hash of the SVG text.
 
 #![cfg(feature = "math")]
 
@@ -140,6 +141,56 @@ fn escapes(formula: &Formula, origin: Pt, elements: &[Element]) -> Vec<String> {
     out
 }
 
+/// The 64-bit FNV-1a hash of `text`.
+fn fnv1a(text: &str) -> u64 {
+    text.bytes().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
+
+/// One line of the snapshot: the number of paths, the ink's bounds relative to the formula's
+/// origin in em (left, top, right, bottom, rounded to 0.01), the formula's box in em (width,
+/// ascent, descent), and the hash of the SVG, which changes with any change to what is drawn.
+fn summarize(case: &Case, formula: &Formula, origin: Pt, scene: &Scene, svg: &str) -> String {
+    let mut ink: Option<(f32, f32, f32, f32)> = None;
+    for e in &scene.elements {
+        if let Primitive::Path { segments, clip, .. } = &e.primitive
+            && let Some(b) = bounds(segments, *clip)
+        {
+            ink = Some(match ink {
+                None => b,
+                Some(o) => (o.0.min(b.0), o.1.min(b.1), o.2.max(b.2), o.3.max(b.3)),
+            });
+        }
+    }
+    // Pixels from the origin to em, rounded; `+ 0.0` turns a rounded -0 into 0. The box is
+    // already in em.
+    let em = |v: f32, from: f32| ((v - from) / SIZE * 100.0).round() / 100.0 + 0.0;
+    let em_box = |v: f32| (v * 100.0).round() / 100.0 + 0.0;
+    let ink = ink.map_or_else(
+        || "none".to_owned(),
+        |(x0, y0, x1, y1)| {
+            format!(
+                "[{:.2} {:.2} {:.2} {:.2}]",
+                em(x0, origin.x),
+                em(y0, origin.y),
+                em(x1, origin.x),
+                em(y1, origin.y)
+            )
+        },
+    );
+    format!(
+        "{}: paths={} ink={} box=[{:.2} {:.2} {:.2}] svg={:016x}\n",
+        case.name,
+        scene.elements.len(),
+        ink,
+        em_box(formula.width),
+        em_box(formula.ascent),
+        em_box(formula.descent),
+        fnv1a(svg)
+    )
+}
+
 #[test]
 fn there_are_128_screenshot_inputs() {
     assert_eq!(cases().len(), 128);
@@ -149,11 +200,13 @@ fn there_are_128_screenshot_inputs() {
 fn screenshot_inputs_draw_inside_their_box_and_match_snapshots() {
     let mut problems = Vec::new();
     let mut failed = Vec::new();
+    let mut summary = String::new();
     for case in cases() {
         let formula = match typeset(&case.source, case.style) {
             Ok(f) => f,
             Err(e) => {
                 failed.push(case.name.clone());
+                summary.push_str(&format!("{}: does not typeset\n", case.name));
                 if !EXPECTED_FAILURES.iter().any(|(n, _)| *n == case.name) {
                     problems.push(format!("{}: does not typeset: {e}", case.name));
                 }
@@ -181,8 +234,9 @@ fn screenshot_inputs_draw_inside_their_box_and_match_snapshots() {
         if out.is_empty() {
             problems.push(format!("{}: empty svg", case.name));
         }
-        insta::assert_snapshot!(case.name.clone(), out, &case.source);
+        summary.push_str(&summarize(&case, &formula, origin, &scene, &out));
     }
+    insta::assert_snapshot!("summary", summary);
     for (name, _) in EXPECTED_FAILURES {
         if !failed.iter().any(|f| f == name) {
             problems.push(format!(
