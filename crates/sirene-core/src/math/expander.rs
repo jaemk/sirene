@@ -272,6 +272,8 @@ pub(crate) struct Expander<'a> {
     macros: HashMap<Key<'a>, Rc<Macro<'a>>>,
     /// One list per open group of what to restore when it closes, newest last.
     undo: Vec<Vec<(Key<'a>, Option<Rc<Macro<'a>>>)>>,
+    /// How many `expand_once_in` calls are open, bounded by `limits::MAX_DEPTH`.
+    nesting: usize,
     mode: Mode,
     expansions: usize,
     produced: usize,
@@ -370,6 +372,7 @@ impl<'a> Expander<'a> {
             stack: Vec::new(),
             macros: HashMap::new(),
             undo: Vec::new(),
+            nesting: 0,
             mode,
             expansions: 0,
             produced: 0,
@@ -656,6 +659,20 @@ impl<'a> Expander<'a> {
     /// `expand_once`; with `expandable_only` a control sequence that means nothing at all is an
     /// error, as it is after `\expandafter`.
     fn expand_once_in(&mut self, expandable_only: bool) -> Result<bool, MathError> {
+        if self.nesting >= limits::MAX_DEPTH {
+            let at = self.future().map(|t| t.span.clone()).unwrap_or(0..0);
+            return Err(MathError::new(
+                format!("groups nested more than {} deep", limits::MAX_DEPTH),
+                at,
+            ));
+        }
+        self.nesting += 1;
+        let result = self.expand_once_unbounded(expandable_only);
+        self.nesting -= 1;
+        result
+    }
+
+    fn expand_once_unbounded(&mut self, expandable_only: bool) -> Result<bool, MathError> {
         let token = self.pop_token()?;
         let Some(key) = Key::of(&token.kind) else {
             self.push_token(token);
@@ -1254,7 +1271,7 @@ impl<'a> Expander<'a> {
                 .filter(|n| *n <= 9)
                 .ok_or_else(|| {
                     MathError::new(
-                        format!("Invalid number of arguments: {digits}"),
+                        format!("Invalid number of arguments: {}", limits::clip(&digits)),
                         call.span.clone(),
                     )
                 })?;

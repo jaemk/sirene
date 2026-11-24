@@ -558,6 +558,15 @@ impl<'a> Parser<'a> {
             mode,
             span: token.span.clone(),
         };
+        if marks.len() > limits::MAX_DEPTH {
+            return Err(MathError::new(
+                format!(
+                    "Too many combining marks on one character (limit {})",
+                    limits::MAX_DEPTH
+                ),
+                token.span,
+            ));
+        }
         for mark in marks {
             let Ok(at) = unicode_data::ACCENT_COMMANDS.binary_search_by_key(&mark, |e| e.0) else {
                 return Err(MathError::new(
@@ -1618,8 +1627,11 @@ mod tests {
         // Many cells and many rows.
         let cells = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a&".repeat(15_000));
         assert!(parse(&cells).is_ok());
-        let rows = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a\\\\".repeat(15_000));
+        let rows = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a\\\\".repeat(1000));
         assert!(parse(&rows).is_ok());
+        // Past the row cap a table is an error, still in one pass.
+        let rows = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a\\\\".repeat(15_000));
+        assert!(parse(&rows).is_err());
         // A long run of scripts and of groups.
         assert!(parse(&"x^a_b".repeat(10_000)).is_ok());
         assert!(parse(&"{}".repeat(30_000)).is_ok());

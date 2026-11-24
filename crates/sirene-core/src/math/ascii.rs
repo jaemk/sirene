@@ -11,6 +11,7 @@ use super::{
     ast::{AlignSpec, Array, MathClass, Measurement, Node, NodeKind, OpContent, StyleName},
     error::MathError,
     formula::MathStyle,
+    limits,
     parser::{Settings, parse_with},
     symbols::{AtomGroup, Mode, Name, lookup},
 };
@@ -34,12 +35,33 @@ pub fn ascii_formula_rows(
             display_mode: style == MathStyle::Display,
         },
     )?;
+    // Layout rejects what the scene would, so the two outputs agree on what is an error.
+    super::layout::layout(&nodes, style == MathStyle::Display)?;
+    OVERSIZE.with(|flag| flag.set(false));
     let renderer = Renderer {
         source,
         compact: false,
     };
     let block = renderer.list(&nodes, style == MathStyle::Display);
+    if OVERSIZE.with(|flag| flag.replace(false)) {
+        return Err(MathError::new("formula too large to draw as text", 0..0));
+    }
     Ok(block.finish_rows())
+}
+
+thread_local! {
+    /// Set when a block would pass `limits::MAX_ASCII_CELLS`; the block is then empty and the
+    /// render fails once it is done.
+    static OVERSIZE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether a block of `height` rows and `width` columns is past the cap, which it records.
+fn too_big(height: usize, width: usize) -> bool {
+    let over = height.saturating_mul(width) > limits::MAX_ASCII_CELLS;
+    if over {
+        OVERSIZE.with(|flag| flag.set(true));
+    }
+    over
 }
 
 /// How a block's rows sit in a wider space.
@@ -81,6 +103,9 @@ impl Block {
     }
 
     fn filled(ch: char, width: usize, height: usize, base: usize) -> Block {
+        if too_big(height, width) {
+            return Block::default();
+        }
         Block {
             rows: vec![vec![ch; width]; height],
             base,
@@ -121,6 +146,9 @@ impl Block {
         let below = live().map(Block::below).max().unwrap_or(0);
         let height = above + below + 1;
         let width = parts.iter().map(|p| p.width).sum();
+        if too_big(height, width) {
+            return Block::default();
+        }
         let mut rows: Vec<Vec<char>> = vec![Vec::with_capacity(width); height];
         for part in &parts {
             for (r, row) in rows.iter_mut().enumerate() {
@@ -150,6 +178,10 @@ impl Block {
             .map(Block::height)
             .sum::<usize>()
             + parts.get(base_part).map_or(0, |p| p.base);
+        let total: usize = parts.iter().map(Block::height).sum();
+        if too_big(total, width) {
+            return Block::default();
+        }
         let mut rows = Vec::new();
         for part in &parts {
             let spare = width - part.width;

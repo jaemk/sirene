@@ -94,7 +94,10 @@ impl<'a> Parser<'a> {
             is_blank = true;
         }
         let Some((number, unit)) = find_measurement(&text) else {
-            return Err(MathError::new(format!("Invalid size: '{text}'"), span));
+            return Err(MathError::new(
+                format!("Invalid size: '{}'", limits::clip(&text)),
+                span,
+            ));
         };
         if !UNITS.contains(&unit) {
             return Err(MathError::new(format!("Invalid unit: '{unit}'"), span));
@@ -121,7 +124,10 @@ impl<'a> Parser<'a> {
             return Ok(None);
         };
         if !is_color(&text) {
-            return Err(MathError::new(format!("Invalid color: '{text}'"), span));
+            return Err(MathError::new(
+                format!("Invalid color: '{}'", limits::clip(&text)),
+                span,
+            ));
         }
         // A six-digit hex code may leave out the `#`, as in xcolor's HTML model.
         let color = if text.len() == 6 && text.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -145,7 +151,10 @@ pub(super) fn check_graphics_size(text: &str, span: &Range<usize>) -> Result<(),
     }
     let Some((_, unit)) = find_measurement(text) else {
         return Err(MathError::new(
-            format!("Invalid size: '{text}' in \\includegraphics"),
+            format!(
+                "Invalid size: '{}' in \\includegraphics",
+                limits::clip(text)
+            ),
             span.clone(),
         ));
     };
@@ -216,6 +225,10 @@ fn is_size_prefix(text: &str) -> bool {
 
 /// The first number and two-letter unit in `text`: `1.5 em` is `(1.5, "em")`.
 fn find_measurement(text: &str) -> Option<(f64, &str)> {
+    // A longer text is not a size, and searching it for one at every offset is quadratic.
+    if text.len() > limits::MAX_SIZE_TEXT {
+        return None;
+    }
     (0..text.len())
         .filter(|&start| text.is_char_boundary(start))
         .find_map(|start| measurement_at(&text[start..]))
