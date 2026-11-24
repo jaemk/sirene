@@ -111,11 +111,7 @@ pub fn sankey(sankey: &Sankey, metrics: &impl TextMetrics, theme: &Theme) -> Sce
     let at = |x: f32, y: f32| Pt::new(left + x, top + y);
 
     let owner = Owner::Diagram;
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     let text = |p: &mut Painter, s: &str, center: Pt, size: f32| {
         p.elements.push(Element {
             owner,

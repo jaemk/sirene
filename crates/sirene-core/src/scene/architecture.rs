@@ -24,7 +24,7 @@ pub fn architecture(
     metrics: &impl TextMetrics,
     theme: &Theme,
 ) -> crate::Result<Scene> {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let label_size = |l: &Label| {
         px.edge_label(l)
             .map_or((0.0, 0.0), |s| (f64::from(s.w), f64::from(s.h)))

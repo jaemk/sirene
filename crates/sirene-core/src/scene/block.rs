@@ -16,7 +16,7 @@ use crate::layout::{Layout, Point, Rect, Route, Size};
 const HEAD: f32 = 0.6;
 
 pub fn block(b: &Block, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Scene> {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let chart = &b.chart;
     let node = |i: usize| -> (f64, f64) {
         let s = px.node(&chart.nodes[i]);

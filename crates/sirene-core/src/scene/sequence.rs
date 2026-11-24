@@ -1,6 +1,6 @@
 //! Sequence diagram to scene (MSEQ-3, MSEQ-4).
 
-use super::mathtext;
+use super::mathtext::{self, Formulas};
 use super::shapes::{self, BoxF, PAD_X, PAD_Y};
 use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
@@ -62,6 +62,8 @@ struct Painter<'a, M> {
     owner: Owner,
     /// The delimiters of a formula in labels, messages, and notes, if they are read.
     math: Option<crate::flowchart::Delim>,
+    /// The formulas typeset so far in this render.
+    formulas: Formulas,
 }
 
 fn solid(width: f32, color: Color) -> Stroke {
@@ -114,7 +116,7 @@ impl<M: TextMetrics> Painter<'_, M> {
     /// The width and height of `lines`: a line with a tall formula is taller (LEMB-4).
     fn measure(&self, lines: &[String]) -> (f32, f32) {
         if let Some(runs) = self.runs(lines) {
-            return mathtext::block_size(self.metrics, self.theme, &runs);
+            return mathtext::block_size(self.metrics, &self.formulas, self.theme, &runs);
         }
         let w = lines.iter().map(|l| self.width(l)).fold(0.0, f32::max);
         (w, lines.len() as f32 * self.theme.line_height)
@@ -153,9 +155,10 @@ impl<M: TextMetrics> Painter<'_, M> {
         let lh = self.theme.line_height;
         let color = self.theme.text;
         if let Some(runs) = self.runs(lines) {
-            let (_, h) = mathtext::block_size(self.metrics, self.theme, &runs);
+            let (_, h) = mathtext::block_size(self.metrics, &self.formulas, self.theme, &runs);
             let center = Pt::new(cx, top + h / 2.0);
-            for primitive in mathtext::draw_lines(self.metrics, self.theme, &runs, center, color) {
+            let (m, f, t) = (self.metrics, &self.formulas, self.theme);
+            for primitive in mathtext::draw_lines(m, f, t, &runs, center, color) {
                 self.elements.push(Element {
                     owner: self.owner,
                     primitive,
@@ -426,6 +429,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         elements: Vec::new(),
         owner: Owner::Diagram,
         math: seq.math,
+        formulas: Formulas::default(),
     };
     let lh = theme.line_height;
     let title = seq

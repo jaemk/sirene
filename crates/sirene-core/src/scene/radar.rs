@@ -163,11 +163,7 @@ pub fn radar(radar: &Radar, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
     };
 
     let owner = Owner::Diagram;
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     let text = |p: &mut Painter, s: &str, center: Pt, size: f32| {
         p.elements.push(Element {
             owner,

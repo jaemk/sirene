@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::mathtext::{self, style_of};
+use super::mathtext::{self, Formulas, style_of};
 use super::shapes::{self, BoxF, Outline};
 use super::style::{self, Resolved};
 use super::{
@@ -58,6 +58,18 @@ const LEAD: f32 = 4.0;
 pub(super) struct Px<'a, M> {
     pub metrics: &'a M,
     pub theme: &'a Theme,
+    /// The formulas typeset so far in this render.
+    pub formulas: Formulas,
+}
+
+impl<'a, M> Px<'a, M> {
+    pub(super) fn new(metrics: &'a M, theme: &'a Theme) -> Self {
+        Px {
+            metrics,
+            theme,
+            formulas: Formulas::default(),
+        }
+    }
 }
 
 fn cells(v: f32) -> i32 {
@@ -90,7 +102,7 @@ impl<M: TextMetrics> Px<'_, M> {
 
     /// The width of a span: a formula that typesets is its own width, anything else is text.
     fn span_width(&self, s: &Span) -> f32 {
-        mathtext::span_width(self.metrics, self.theme.font_size, s)
+        mathtext::span_width(self.metrics, &self.formulas, self.theme.font_size, s)
     }
 
     fn line_width(&self, line: &[Span]) -> f32 {
@@ -99,7 +111,8 @@ impl<M: TextMetrics> Px<'_, M> {
 
     /// The height of a line: a line height, or more for a line with a tall formula.
     fn line_height(&self, line: &[Span]) -> f32 {
-        mathtext::line_box(self.theme, line).map_or(self.theme.line_height, |(a, d)| a + d)
+        mathtext::line_box(&self.formulas, self.theme, line)
+            .map_or(self.theme.line_height, |(a, d)| a + d)
     }
 
     pub(super) fn text_size(&self, lines: &[Vec<Span>]) -> (f32, f32) {
@@ -366,15 +379,17 @@ pub fn flowchart(
     metrics: &impl TextMetrics,
     theme: &Theme,
 ) -> crate::Result<Scene> {
-    let px = Px { metrics, theme };
+    // The formulas typeset to size the layout are the ones drawn.
+    let px = Px::new(metrics, theme);
+    let formulas = px.formulas.clone();
     let Some(c) = chart.collapsed() else {
         let layout = layout::layout(&chart.layout_graph(&px)?, &CONFIG)?;
-        return Ok(draw(chart, &layout, metrics, theme)?.0);
+        return Ok(draw_with(chart, &layout, metrics, theme, formulas)?.0);
     };
     chart.validate_edge_endpoints()?;
     // Collapsed subgraphs (FLOWMO-15): draw the folded chart, owned by the original's elements.
     let layout = layout::layout(&c.chart.layout_graph(&px)?, &CONFIG)?;
-    let mut scene = draw(&c.chart, &layout, metrics, theme)?.0;
+    let mut scene = draw_with(&c.chart, &layout, metrics, theme, formulas)?.0;
     for e in &mut scene.elements {
         e.owner = match e.owner {
             Owner::Node(i) => match c.nodes[i] {
@@ -398,7 +413,22 @@ pub(super) fn draw(
     metrics: &impl TextMetrics,
     theme: &Theme,
 ) -> crate::Result<(Scene, Pt)> {
-    let px = Px { metrics, theme };
+    draw_with(chart, layout, metrics, theme, Formulas::default())
+}
+
+/// [`draw`] with the formulas already typeset in `formulas` (the layout's measuring).
+fn draw_with(
+    chart: &Flowchart,
+    layout: &Layout,
+    metrics: &impl TextMetrics,
+    theme: &Theme,
+    formulas: Formulas,
+) -> crate::Result<(Scene, Pt)> {
+    let px = Px {
+        metrics,
+        theme,
+        formulas: formulas.clone(),
+    };
     let defs = style::Defs::new(&chart.classes);
     let title = chart
         .title
@@ -429,6 +459,7 @@ pub(super) fn draw(
         theme,
         metrics,
         elements: Vec::new(),
+        formulas,
     };
     // The title is the first element, if any.
     let titled = title.is_some();
@@ -814,6 +845,19 @@ pub(super) struct Painter<'a> {
     pub theme: &'a Theme,
     pub metrics: &'a dyn TextMetrics,
     pub elements: Vec<Element>,
+    /// The formulas typeset so far in this render.
+    pub formulas: Formulas,
+}
+
+impl<'a> Painter<'a> {
+    pub(super) fn new(theme: &'a Theme, metrics: &'a dyn TextMetrics) -> Self {
+        Painter {
+            theme,
+            metrics,
+            elements: Vec::new(),
+            formulas: Formulas::default(),
+        }
+    }
 }
 
 impl Painter<'_> {
@@ -894,7 +938,14 @@ impl Painter<'_> {
     /// tall as `mathtext::line_box` says, and the block is centered on `center`. A line with no
     /// formula that typesets is a line height tall with its text on the line's center.
     fn math_lines(&mut self, owner: Owner, lines: &[Vec<Span>], center: Pt, color: Color) {
-        let out = mathtext::draw_lines(self.metrics, self.theme, lines, center, color);
+        let out = mathtext::draw_lines(
+            self.metrics,
+            &self.formulas,
+            self.theme,
+            lines,
+            center,
+            color,
+        );
         for primitive in out {
             self.push(owner, primitive);
         }

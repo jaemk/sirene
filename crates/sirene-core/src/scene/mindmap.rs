@@ -152,7 +152,7 @@ fn edge_width(depth: usize) -> f32 {
 
 /// Draws `mindmap` (MMIND-3).
 pub fn mindmap(mindmap: &Mindmap, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let nodes = &mindmap.nodes;
     let lines: Vec<Vec<Vec<Span>>> = nodes
         .iter()
@@ -243,11 +243,7 @@ pub fn mindmap(mindmap: &Mindmap, metrics: &impl TextMetrics, theme: &Theme) -> 
         .max(title.map_or(0.0, |t| metrics.width(t, theme.font_size * 1.2)) + 2.0 * MARGIN);
     let height = bottom + MARGIN;
 
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     if let Some(t) = title {
         p.elements.push(Element {
             owner: Owner::Diagram,

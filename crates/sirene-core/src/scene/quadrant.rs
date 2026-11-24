@@ -80,7 +80,7 @@ fn label_lines(px: &Px<'_, impl TextMetrics>, label: &str, max: f32) -> Vec<Vec<
 
 /// Draws `chart` (MQUAD-3).
 pub fn quadrant(chart: &QuadrantChart, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let (fs, lh) = (theme.font_size, theme.line_height);
     let small = fs - 2.0;
     let title = chart
@@ -165,11 +165,7 @@ pub fn quadrant(chart: &QuadrantChart, metrics: &impl TextMetrics, theme: &Theme
     let height = o.y + bottom + MARGIN;
 
     let owner = Owner::Diagram;
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     let text = |p: &mut Painter, s: &str, center: Pt, color: Color, size: f32| {
         p.elements.push(Element {
             owner,
