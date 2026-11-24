@@ -29,6 +29,9 @@ mod metrics_data;
 mod options;
 mod parser;
 mod style;
+#[rustfmt::skip]
+mod svg_data;
+mod svg_paths;
 mod symbols;
 #[rustfmt::skip]
 mod symbols_data;

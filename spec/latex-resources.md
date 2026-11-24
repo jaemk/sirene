@@ -93,7 +93,9 @@ data are checked in.
   confirm the exact terms for `rsfs10`), and port the generator or the checked-in numbers
   with the same header. RaTeX carries the same data as Rust
   (`ratex-font/src/data/metrics_data.rs`, 98 KB) under MIT.
-- [ ] LRES-T7c Measure the subset: which of the 20 faces and glyphs the command table needs,
+- [ ] LRES-T7c Decided 2026-11-23: the KaTeX TTFs ship whole first, under
+  `crates/sirene-core/fonts/katex/` with their OFL; subsetting comes later. To measure then:
+  which of the 20 faces and glyphs the command table needs,
   and the size after subsetting; check the OFL reserved font names for a renamed subset.
 - [x] LRES-T7d List the SVG path data KaTeX uses for stretchy shapes. Read: `svgGeometry.ts`
   (561 lines) holds `path`, a table of 400000-unit-wide stretchy paths (stretched by
@@ -111,7 +113,8 @@ data are checked in.
   `\underbrace`, and the arrows and hats; the rest come with later commands. It is
   `src/svgGeometry.ts` (29.5 KB), with `stretchy.ts` (14 KB) and `delimiter.ts` (30 KB) using
   it. RaTeX ports it as `ratex-layout/src/katex_svg.rs` (69 KB), a comparison for our port.
-- [ ] LRES-T2 Decide the text font inside formulas.
+- [x] LRES-T2 Decide the text font inside formulas: KaTeX's Main faces, as KaTeX does, so a
+  formula's text matches Mermaid's (decided 2026-11-23).
 - [x] LRES-T3a Pick the generation input: KaTeX `symbols.ts` (LRES-3). Built: the generator is
   `scripts/katex-symbols.mjs` (Node 24 imports the TypeScript directly) and the table is
   `crates/sirene-core/src/math/symbols_data.rs` (LMATH-14). Not done: the staleness test (a Rust
@@ -124,5 +127,8 @@ data are checked in.
   contributors, 2013-2020) for code, symbols, metrics, and tests; the KaTeX fonts (OFL 1.1,
   Design Science 2009-2010 and Khan Academy 2014-2018); the TeX font metrics' sources
   (LRES-T7b).
-- [ ] LRES-T5 Set the size budget and the feature flag.
+- [ ] LRES-T5 Set the size budget and the feature flag. Decided 2026-11-23: a `math` cargo
+  feature, on by default, keeps the fonts out of builds that do not draw formulas. Drawing
+  clips each stretchy path to its box through a `clip` rectangle on `Primitive::Path`, which
+  the SVG, PNG, and GUI renderers honor. The size budget is open.
 - [ ] LRES-T6 Write the generation script and the staleness test.

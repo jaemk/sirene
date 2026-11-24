@@ -458,8 +458,23 @@ Box tree (`boxes.rs`, LMATH-T3):
 - `items` flattens a tree into glyphs and rules at absolute positions in the root's em (y down),
   the display list of LMATH-4.
 - A glyph's width includes a positive italic correction, which KaTeX draws as a right margin.
+- `Path` is an SVG path over the whole box (KaTeX's `SvgSpan`), with a view box and a fit:
+  `Crop` scales to the box's height and crops to its width at the left, middle, or right
+  (`preserveAspectRatio` `x{Min,Mid,Max}YMin slice`, how KaTeX stretches its 400,000-unit-wide
+  paths), `Stretch` fills the box both ways (`none`). `Mirrored` draws its child left to right
+  reversed (`\reflectbox`), and `Shadowed` draws an offset copy (0.02em right, 0.01em down)
+  behind its child at the child's size (`\pmb`'s text shadow). `items` yields `Path` items with
+  their rectangle, which outputs clip to, and a `mirrored` flag on glyphs and paths.
 
-Layout (`layout.rs`, KaTeX's `buildHTML.ts` and the HTML builders of `functions/`):
+Layout (`layout/`, KaTeX's `buildHTML.ts` and the HTML builders of `functions/`):
+
+- `layout/mod.rs` holds the list rules below and the dispatch from each `NodeKind` to its
+  module: `symbol`, `scripts`, `frac`, `delimiter`, `sqrt`, `op`, `accent`, `arrow`,
+  `horiz_brace`, `stretchy`, `enclose`, `array`, and `misc`. A base that places its own scripts
+  is laid out by its module (`op::supsub`, `accent::supsub`, `horiz_brace::supsub`, as KaTeX's
+  `htmlBuilderDelegate`), and a fraction's delimiters come from `delimiter::frac_delimiter`. The
+  argument nodes KaTeX has no builder for (`infix`, `size`, `color-token`, `environment`,
+  `raw`, `url`) fail with KaTeX's "Got group of unknown type".
 
 - `layout(nodes, display)` builds the tree in display or text style at `\normalsize`. Each node
   builds to atoms: a box with the class TeX spaces it by (ord, op, bin, rel, open, close, punct,

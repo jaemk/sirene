@@ -40,6 +40,47 @@ pub(crate) enum BoxKind<'a> {
     VList(Vec<Placed<'a>>),
     /// A box built at another font size, `factor` times this one's (`\scriptstyle`, `\large`).
     Scaled { factor: f64, child: Box<Bx<'a>> },
+    /// An SVG path drawn over the whole box (KaTeX's `SvgSpan`): a stretchy arrow, brace, wide
+    /// accent, radical sign, or cancel line.
+    Path(Path<'a>),
+    /// The child mirrored left to right (`\reflectbox`).
+    Mirrored(Box<Bx<'a>>),
+    /// The child drawn twice, the second copy offset right and down by `SHADOW_OFFSET` (`\pmb`,
+    /// KaTeX's text shadow). The copy does not change the size.
+    Shadowed(Box<Bx<'a>>),
+}
+
+/// How far `\pmb`'s second copy is offset, right and down, in em (KaTeX's `0.02em 0.01em`).
+pub(crate) const SHADOW_OFFSET: (Em, Em) = (Em(0.02), Em(0.01));
+
+/// An SVG path in the coordinates of its view box.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Path<'a> {
+    /// SVG path data (`M`, `L`, `H`, `V`, `C`, `Q`, `S`, `T`, `Z` and their relative forms).
+    pub data: Cow<'static, str>,
+    /// `[min_x, min_y, width, height]` of the view box.
+    pub view_box: [f64; 4],
+    pub fit: Fit,
+    pub color: Option<&'a str>,
+}
+
+/// How a path's view box maps onto its box, as SVG's `preserveAspectRatio`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Fit {
+    /// Scaled to the box's height, keeping the aspect ratio, and cropped to the box's width
+    /// (`x{Min,Mid,Max}YMin slice`). KaTeX's stretchy paths are 400,000 units wide and are
+    /// stretched this way.
+    Crop(Align),
+    /// Scaled to fill the box both ways (`none`).
+    Stretch,
+}
+
+/// Which part of a cropped path stays in the box.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Align {
+    Min,
+    Mid,
+    Max,
 }
 
 /// One run of text in one face.
@@ -179,6 +220,47 @@ impl<'a> Bx<'a> {
         }
     }
 
+    /// An SVG path over a box of the given size, in the options' color.
+    pub(crate) fn path(
+        data: impl Into<Cow<'static, str>>,
+        view_box: [f64; 4],
+        fit: Fit,
+        (width, height, depth): (Em, Em, Em),
+        options: &Options<'a>,
+    ) -> Self {
+        Self {
+            width,
+            height,
+            depth,
+            kind: BoxKind::Path(Path {
+                data: data.into(),
+                view_box,
+                fit,
+                color: options.color(),
+            }),
+        }
+    }
+
+    /// The child mirrored left to right, at its size.
+    pub(crate) fn mirrored(child: Bx<'a>) -> Self {
+        Self {
+            width: child.width,
+            height: child.height,
+            depth: child.depth,
+            kind: BoxKind::Mirrored(Box::new(child)),
+        }
+    }
+
+    /// The child with an offset copy behind it, at the child's size.
+    pub(crate) fn shadowed(child: Bx<'a>) -> Self {
+        Self {
+            width: child.width,
+            height: child.height,
+            depth: child.depth,
+            kind: BoxKind::Shadowed(Box::new(child)),
+        }
+    }
+
     /// Boxes side by side: as wide as all of them, as high and deep as the highest and
     /// deepest, and never less than zero either way (KaTeX's `sizeElementFromChildren`).
     pub(crate) fn hlist(children: Vec<Bx<'a>>) -> Self {
@@ -298,6 +380,7 @@ impl<'a> Bx<'a> {
                 y,
                 scale,
                 glyph: glyph.clone(),
+                mirrored: false,
             }),
             BoxKind::Rule { color } => out.push(Item::Rule {
                 x,
@@ -320,12 +403,34 @@ impl<'a> Bx<'a> {
                 }
             }
             BoxKind::Scaled { factor, child } => child.collect(x, y, scale * factor, out),
+            BoxKind::Path(path) => out.push(Item::Path {
+                x,
+                y: y - self.height.0 * scale,
+                width: self.width.0 * scale,
+                height: (self.height.0 + self.depth.0) * scale,
+                path: path.clone(),
+                mirrored: false,
+            }),
+            BoxKind::Mirrored(child) => {
+                let start = out.len();
+                child.collect(x, y, scale, out);
+                // Reflect about the box's vertical center line.
+                let axis = 2.0 * x + self.width.0 * scale;
+                for item in &mut out[start..] {
+                    item.mirror(axis);
+                }
+            }
+            BoxKind::Shadowed(child) => {
+                let (dx, dy) = SHADOW_OFFSET;
+                child.collect(x + dx.0 * scale, y + dy.0 * scale, scale, out);
+                child.collect(x, y, scale, out);
+            }
         }
     }
 }
 
-/// One drawn thing at an absolute position: a glyph run on its baseline, or a rectangle from
-/// its top-left corner.
+/// One drawn thing at an absolute position: a glyph run on its baseline, or a rectangle or a
+/// path from its top-left corner. A path is clipped to its rectangle.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Item<'a> {
     Glyph {
@@ -334,6 +439,8 @@ pub(crate) enum Item<'a> {
         /// The font size, in em of the root's font.
         scale: f64,
         glyph: Glyph<'a>,
+        /// Drawn mirrored about `x`, so it runs leftward from there.
+        mirrored: bool,
     },
     Rule {
         x: f64,
@@ -342,6 +449,34 @@ pub(crate) enum Item<'a> {
         height: f64,
         color: Option<&'a str>,
     },
+    Path {
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        path: Path<'a>,
+        /// Drawn mirrored within its rectangle.
+        mirrored: bool,
+    },
+}
+
+impl Item<'_> {
+    /// The item reflected about the vertical line at `axis / 2`.
+    fn mirror(&mut self, axis: f64) {
+        match self {
+            Item::Glyph { x, mirrored, .. } => {
+                *x = axis - *x;
+                *mirrored = !*mirrored;
+            }
+            Item::Rule { x, width, .. } => *x = axis - *x - *width,
+            Item::Path {
+                x, width, mirrored, ..
+            } => {
+                *x = axis - *x - *width;
+                *mirrored = !*mirrored;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -525,6 +660,7 @@ mod tests {
                 y: gy,
                 scale,
                 glyph,
+                mirrored: false,
             },
             Item::Rule {
                 x: rx,
@@ -544,5 +680,89 @@ mod tests {
         // The rule follows the scaled box: 1 + (0.2 + 0.57153) * 0.5.
         assert!((rx - (1.0 + (0.2 + 0.57153) * 0.5)).abs() < 1e-9);
         assert_eq!((*ry, *width, *height, *color), (-0.5, 1.0, 0.75, None));
+    }
+
+    #[test]
+    fn paths_fill_their_box() {
+        let size = (Em(2.0), Em(0.5), Em(0.25));
+        let arrow = Bx::path(
+            "M0 0H1",
+            [0.0, 0.0, 400_000.0, 522.0],
+            Fit::Crop(Align::Min),
+            size,
+            &opts(),
+        );
+        assert_eq!(sized(&arrow), (2.0, 0.5, 0.25));
+        let items = Bx::hlist(vec![Bx::kern(Em(1.0)), arrow]).items();
+        let [
+            Item::Path {
+                x,
+                y,
+                width,
+                height,
+                path,
+                mirrored,
+            },
+        ] = items.as_slice()
+        else {
+            unreachable!("a path: {items:?}")
+        };
+        assert_eq!(
+            (*x, *y, *width, *height, *mirrored),
+            (1.0, -0.5, 2.0, 0.75, false)
+        );
+        assert_eq!(
+            (path.data.as_ref(), path.fit),
+            ("M0 0H1", Fit::Crop(Align::Min))
+        );
+    }
+
+    #[test]
+    fn mirrored_boxes_reflect_their_items() {
+        // A rule 1em wide at the left of a 3em box lands at its right.
+        let inner = Bx::hlist(vec![
+            rule(1.0, 0.5, 0.0),
+            Bx::kern(Em(1.0)),
+            Bx::glyph("x", Face::MathItalic, Mode::Math, &opts()),
+        ]);
+        let width = inner.width.0;
+        let tree = Bx::hlist(vec![Bx::kern(Em(1.0)), Bx::mirrored(inner)]);
+        assert_eq!(tree.width.0, 1.0 + width);
+        let items = tree.items();
+        let [
+            Item::Rule {
+                x: rx, width: rw, ..
+            },
+            Item::Glyph {
+                x: gx, mirrored, ..
+            },
+        ] = items.as_slice()
+        else {
+            unreachable!("a rule and a glyph: {items:?}")
+        };
+        assert!((rx + rw - (1.0 + width)).abs() < 1e-9, "{rx}");
+        // The glyph started at 2em from the box's left; mirrored, it ends 2em from its right.
+        assert!((gx - (1.0 + width - 2.0)).abs() < 1e-9, "{gx}");
+        assert!(*mirrored);
+        // Mirroring twice restores the items.
+        let twice = Bx::mirrored(Bx::mirrored(rule(1.0, 0.5, 0.0)));
+        assert_eq!(twice.items(), rule(1.0, 0.5, 0.0).items());
+    }
+
+    #[test]
+    fn shadowed_boxes_draw_an_offset_copy_first() {
+        let x = Bx::glyph("x", Face::MathItalic, Mode::Math, &opts());
+        let shadowed = Bx::shadowed(x.clone());
+        assert_eq!(sized(&shadowed), sized(&x));
+        let items = shadowed.items();
+        let [
+            Item::Glyph { x: x1, y: y1, .. },
+            Item::Glyph { x: x2, y: y2, .. },
+        ] = items.as_slice()
+        else {
+            unreachable!("two glyphs: {items:?}")
+        };
+        assert_eq!((*x1, *y1), (SHADOW_OFFSET.0.0, SHADOW_OFFSET.1.0));
+        assert_eq!((*x2, *y2), (0.0, 0.0));
     }
 }
