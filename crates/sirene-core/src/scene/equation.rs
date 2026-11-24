@@ -90,7 +90,8 @@ fn formula(_: &Equation, _: &Theme) -> Option<Scene> {
     None
 }
 
-#[cfg(all(test, feature = "math"))]
+#[cfg(test)]
+#[cfg(feature = "math")]
 mod tests {
     use super::*;
     use crate::equation::Flavor;

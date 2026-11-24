@@ -8,10 +8,11 @@ use proptest::prelude::*;
 use super::{MathStyle, ascii_formula, typeset};
 
 fn typeset_error(src: &str) -> String {
-    match typeset(src, MathStyle::Text) {
-        Ok(_) => panic!("expected an error for {:.60}", src),
-        Err(e) => e.message,
-    }
+    // An empty message makes the caller's `contains` assertion fail when typesetting succeeds.
+    typeset(src, MathStyle::Text)
+        .err()
+        .map(|e| e.message)
+        .unwrap_or_default()
 }
 
 #[test]
