@@ -67,6 +67,23 @@ pub(crate) struct Macro<'a> {
     body: Vec<Token<'a>>,
     num_args: usize,
     delimiters: Option<Vec<Vec<Token<'a>>>>,
+    /// Set for the `|` and `\|` that `\bra@ket` and `\bra@set` define while they expand their
+    /// argument: the macro then stands for the separator and ignores its body.
+    mid: Option<Mid<'a>>,
+}
+
+/// The `|` or `\|` inside a `\bra@ket` or `\bra@set` argument.
+#[derive(Clone, Debug)]
+struct Mid<'a> {
+    /// Whether this is `\|` (so the double separator is used without looking ahead).
+    double: bool,
+    /// `\bra@set`: only the first `|` or `\|` is replaced.
+    one: bool,
+    middle: Vec<Token<'a>>,
+    middle_double: Vec<Token<'a>>,
+    /// What `|` and `\|` meant before the command, restored by `one`.
+    old_middle: Option<Rc<Macro<'a>>>,
+    old_double: Option<Rc<Macro<'a>>>,
 }
 
 /// The commands that read their own arguments.
@@ -101,6 +118,9 @@ enum Builtin {
     Message,
     /// `\show`: reads a token and writes nothing.
     Show,
+    /// `\bra@ket` (`false`) and `\bra@set` (`true`): four arguments (left, middle, middle for
+    /// `||`, right) and the text between, in which `|` stands for the middle.
+    BraKet(bool),
 }
 
 const DIGITS: [&str; 10] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
@@ -225,14 +245,12 @@ impl Builtin {
             "noexpand" => Builtin::NoExpand,
             "message" | "errmessage" => Builtin::Message,
             "show" => Builtin::Show,
+            "bra@ket" => Builtin::BraKet(false),
+            "bra@set" => Builtin::BraKet(true),
             _ => return None,
         })
     }
 }
-
-/// KaTeX's function-defined macros this expander does not implement yet: they look ahead or
-/// build tokens from numbers, and each needs its own port.
-const UNIMPLEMENTED: &[&str] = &["bra@ket", "bra@set"];
 
 /// Commands the parser handles that are not macros, so a definition may not take their name.
 const IMPLICIT: &[&str] = &["limits", "nolimits"];
@@ -606,7 +624,11 @@ impl<'a> Expander<'a> {
     // Expansion.
 
     fn count_expansion(&mut self, at: &Range<usize>) -> Result<(), MathError> {
-        self.expansions += 1;
+        self.count_expansions(1, at)
+    }
+
+    fn count_expansions(&mut self, n: usize, at: &Range<usize>) -> Result<(), MathError> {
+        self.expansions = self.expansions.saturating_add(n);
         if self.expansions > limits::MAX_EXPANSIONS {
             return Err(MathError::new(
                 format!(
@@ -650,7 +672,7 @@ impl<'a> Expander<'a> {
         let tokens = if let Some(definition) = self.macros.get(&key).cloned() {
             self.count_expansion(&token.span)?;
             self.instantiate(&definition)?
-        } else if let Some(builtin) = self.builtin(&key, &token)?
+        } else if let Some(builtin) = Self::builtin(&key)
             // KaTeX's `\def` is a function of the parser, not a macro: `\expandafter` leaves it.
             && !(expandable_only && matches!(builtin, Builtin::Def | Builtin::GlobalDef))
         {
@@ -698,7 +720,7 @@ impl<'a> Expander<'a> {
         self.macros.contains_key(key)
             || matches!(key, Key::Word(word)
                 if Builtin::named(word).is_some_and(|b| !matches!(b, Builtin::Def | Builtin::GlobalDef))
-                    || UNIMPLEMENTED.contains(word))
+            )
             || key.with_name(|name| {
                 let (table, text) = match name {
                     Name::Control(k) => (macros_data::CONTROLS, k),
@@ -709,20 +731,11 @@ impl<'a> Expander<'a> {
             || functions::lookup(&key.display()).is_some_and(|f| !f.primitive)
     }
 
-    fn builtin(&self, key: &Key<'a>, token: &Token<'a>) -> Result<Option<Builtin>, MathError> {
-        let Key::Word(word) = key else {
-            return Ok(None);
-        };
-        if let Some(builtin) = Builtin::named(word) {
-            return Ok(Some(builtin));
+    fn builtin(key: &Key<'a>) -> Option<Builtin> {
+        match key {
+            Key::Word(word) => Builtin::named(word),
+            _ => None,
         }
-        if UNIMPLEMENTED.contains(word) {
-            return Err(MathError::new(
-                format!("\\{word} is not supported yet"),
-                token.span.clone(),
-            ));
-        }
-        Ok(None)
     }
 
     /// KaTeX's predefined macro called `key`, lexed from its source with every token placed at
@@ -757,12 +770,16 @@ impl<'a> Expander<'a> {
             body: tokens,
             num_args: count_args(body),
             delimiters: None,
+            mid: None,
         })))
     }
 
     /// The tokens a macro call expands to: its arguments are read and put in place of `#1` to
     /// `#9`, and `##` is a single `#`.
     fn instantiate(&mut self, definition: &Macro<'a>) -> Result<Vec<Token<'a>>, MathError> {
+        if let Some(mid) = &definition.mid {
+            return self.separator(mid);
+        }
         let args = self.consume_args(definition.num_args, definition.delimiters.as_deref())?;
         if definition.num_args == 0 {
             return Ok(definition.body.clone());
@@ -933,7 +950,106 @@ impl<'a> Expander<'a> {
                 self.pop_token()?;
                 Ok(Vec::new())
             }
+            Builtin::BraKet(one) => self.bra_ket(one, &call.span),
         }
+    }
+
+    /// Makes `key` mean `old` (nothing if `None`) in the current group.
+    fn restore(&mut self, key: Key<'a>, old: Option<Rc<Macro<'a>>>) {
+        if let Some(undo) = self.undo.last_mut() {
+            undo.push((key, self.macros.get(&key).cloned()));
+        }
+        match old {
+            Some(old) => self.macros.insert(key, old),
+            None => self.macros.remove(&key),
+        };
+    }
+
+    /// Expands `tokens` (in reading order) as far as macros go, and returns what is left, also in
+    /// reading order. Tokens that are not macros are kept as they are.
+    fn expand_tokens(
+        &mut self,
+        tokens: Vec<Token<'a>>,
+        at: &Range<usize>,
+    ) -> Result<Vec<Token<'a>>, MathError> {
+        let mut out = Vec::new();
+        let base = self.stack.len();
+        self.push_tokens(tokens);
+        while self.stack.len() > base {
+            if !self.expand_once_in(true)? {
+                let mut token = self.pop_token()?;
+                // The expansion of `\noexpand\x` is `\x` itself, expandable again later.
+                if let TokenKind::Frozen(inner) = token.kind {
+                    token.kind = *inner;
+                }
+                out.push(token);
+            }
+        }
+        // Each token out counts as an expansion, as in KaTeX, so repeated expansion of long
+        // text is bounded by the expansion limit.
+        self.count_expansions(out.len(), at)?;
+        Ok(out)
+    }
+
+    /// `\bra@ket{left}{middle}{middle for ||}{right}<text>` and `\bra@set`: `left`, the text with
+    /// each `|` replaced by `middle` (and `||` or `\|` by the third argument, if it is not empty),
+    /// then `right`. For `\bra@set` only the first `|` is replaced.
+    fn bra_ket(&mut self, one: bool, at: &Range<usize>) -> Result<Vec<Token<'a>>, MathError> {
+        let left = self.consume_arg(None)?.tokens;
+        let middle = self.consume_arg(None)?.tokens;
+        let middle_double = self.consume_arg(None)?.tokens;
+        let right = self.consume_arg(None)?.tokens;
+        let old_middle = self.macros.get(&Key::Char("|")).cloned();
+        let old_double = self.macros.get(&Key::Symbol('|')).cloned();
+        self.begin_group(at)?;
+        let result = (|| {
+            let separator = |double: bool| Macro {
+                body: Vec::new(),
+                num_args: 0,
+                delimiters: None,
+                mid: Some(Mid {
+                    double,
+                    one,
+                    middle: middle.clone(),
+                    middle_double: middle_double.clone(),
+                    old_middle: old_middle.clone(),
+                    old_double: old_double.clone(),
+                }),
+            };
+            self.set(Key::Char("|"), separator(false), false);
+            if !middle_double.is_empty() {
+                self.set(Key::Symbol('|'), separator(true), false);
+            }
+            let arg = self.consume_arg(None)?.tokens;
+            let mut input = left.clone();
+            input.extend(arg);
+            input.extend(right.iter().cloned());
+            self.expand_tokens(input, at)
+        })();
+        self.end_group(at)?;
+        result
+    }
+
+    /// What `|` or `\|` stands for inside a `\bra@ket` or `\bra@set` argument.
+    fn separator(&mut self, mid: &Mid<'a>) -> Result<Vec<Token<'a>>, MathError> {
+        if mid.one {
+            // Only the first one is replaced: the rest mean what they did before.
+            self.restore(Key::Char("|"), mid.old_middle.clone());
+            if !mid.middle_double.is_empty() {
+                self.restore(Key::Symbol('|'), mid.old_double.clone());
+            }
+        }
+        let mut doubled = mid.double;
+        if !doubled && !mid.middle_double.is_empty() && is_char(self.future()?, "|") {
+            // `||`, as `\@ifnextchar` would see it.
+            self.pop_token()?;
+            doubled = true;
+        }
+        Ok(if doubled {
+            mid.middle_double.clone()
+        } else {
+            mid.middle.clone()
+        })
     }
 
     /// The tokens of `text`, a constant, all placed at `at`.
@@ -1026,6 +1142,7 @@ impl<'a> Expander<'a> {
             body,
             num_args: 0,
             delimiters: None,
+            mid: None,
         };
         self.set(Key::Word(name), definition, global);
         Ok(())
@@ -1067,9 +1184,8 @@ impl<'a> Expander<'a> {
             Key::Word(word) => Some(*word),
             _ => None,
         };
-        word.is_some_and(|w| {
-            Builtin::named(w).is_some() || UNIMPLEMENTED.contains(&w) || IMPLICIT.contains(&w)
-        }) || matches!(key, Key::Char("^" | "_"))
+        word.is_some_and(|w| Builtin::named(w).is_some() || IMPLICIT.contains(&w))
+            || matches!(key, Key::Char("^" | "_"))
             || key.with_name(|name| {
                 let in_table = |table: &[(&str, &str)], k: &str| {
                     table.binary_search_by(|(t, _)| (*t).cmp(k)).is_ok()
@@ -1159,6 +1275,7 @@ impl<'a> Expander<'a> {
                     body: body.tokens,
                     num_args,
                     delimiters: None,
+                    mid: None,
                 },
                 false,
             );
@@ -1239,6 +1356,7 @@ impl<'a> Expander<'a> {
                 body,
                 num_args,
                 delimiters: Some(delimiters),
+                mid: None,
             },
             global,
         );
@@ -1468,9 +1586,230 @@ mod tests {
         assert_eq!(expand("\\@ifstar{S}{T}x").unwrap(), "Tx");
     }
 
+    /// What `\,`, `\:` and `\;` expand to.
+    const THIN: &str = "\\mskip+3mu\\relax";
+    const MEDIUM: &str = "\\mskip+4mu\\relax";
+    const THICK: &str = "\\mskip+5mu\\relax";
+
+    #[test]
+    fn bra_and_ket_without_separators_are_plain_macros() {
+        assert_eq!(expand("\\bra{x}").unwrap(), "\\mathinner{\\langle{x}|}");
+        assert_eq!(expand("\\ket{x}").unwrap(), "\\mathinner{|{x}\\rangle}");
+        assert_eq!(
+            expand("\\braket{x}").unwrap(),
+            "\\mathinner{\\langle{x}\\rangle}"
+        );
+        // `\braket` leaves a `|` as it is; only `\Braket` reads it.
+        assert_eq!(
+            expand("\\braket{\\phi|\\psi}").unwrap(),
+            "\\mathinner{\\langle{\\phi|\\psi}\\rangle}"
+        );
+        assert_eq!(expand("\\Bra{x}").unwrap(), "\\left\\langlex\\right|");
+        assert_eq!(expand("\\Ket{x}").unwrap(), "\\left|x\\right\\rangle");
+    }
+
+    #[test]
+    fn upper_case_braket_replaces_every_bar() {
+        let bar = format!("{THIN}\\middle\\vert{THIN}");
+        assert_eq!(
+            expand("\\Braket{\\phi|\\psi}").unwrap(),
+            format!("\\left\\langle\\phi{bar}\\psi\\right\\rangle")
+        );
+        assert_eq!(
+            expand("\\Braket{a|b|c}").unwrap(),
+            format!("\\left\\langlea{bar}b{bar}c\\right\\rangle")
+        );
+        // `||` and `\|` take the double separator, which for `\Braket` is the same.
+        let want = format!("\\left\\langlea{bar}b\\right\\rangle");
+        assert_eq!(expand("\\Braket{a||b}").unwrap(), want);
+        assert_eq!(expand("\\Braket{a\\|b}").unwrap(), want);
+        assert_eq!(
+            expand("\\Braket{}").unwrap(),
+            "\\left\\langle\\right\\rangle"
+        );
+        // Spaces after a control word are not tokens.
+        assert_eq!(
+            expand("\\Braket{ \\phi | \\frac{\\partial^2}{\\partial t^2} | \\psi }").unwrap(),
+            format!(
+                "\\left\\langle \\phi{bar} \\frac{{\\partial^2}}{{\\partialt^2}} {bar} \\psi\\right\\rangle"
+            )
+        );
+    }
+
+    #[test]
+    fn set_replaces_only_the_first_bar() {
+        let t = THIN;
+        assert_eq!(
+            expand("\\set{x|x<5}").unwrap(),
+            format!("\\{{{t}x\\midx<5{t}\\}}")
+        );
+        assert_eq!(
+            expand("\\set{x|y|z}").unwrap(),
+            format!("\\{{{t}x\\midy|z{t}\\}}")
+        );
+        // `\set` has no double separator, so `||` is two bars and `\|` is left alone.
+        assert_eq!(
+            expand("\\set{x||y}").unwrap(),
+            format!("\\{{{t}x\\mid|y{t}\\}}")
+        );
+        assert_eq!(
+            expand("\\set{x\\|y}").unwrap(),
+            format!("\\{{{t}x\\|y{t}\\}}")
+        );
+        assert_eq!(expand("\\set{}").unwrap(), format!("\\{{{t}{t}\\}}"));
+        let bar = format!("{THICK}\\middle\\vert{THICK}");
+        assert_eq!(
+            expand("\\Set{ x | x<\\frac 12 }").unwrap(),
+            format!("\\left\\{{{MEDIUM} x {bar} x<\\frac12 {MEDIUM}\\right\\}}")
+        );
+        assert_eq!(
+            expand("\\Set{x|y|z}").unwrap(),
+            format!("\\left\\{{{MEDIUM}x{bar}y|z{MEDIUM}\\right\\}}")
+        );
+    }
+
+    #[test]
+    fn upper_case_set_has_a_double_separator() {
+        let (m, k) = (MEDIUM, THICK);
+        let double = format!("{k}\\middle\\Vert{k}");
+        let want = format!("\\left\\{{{m}x{double}y{m}\\right\\}}");
+        assert_eq!(expand("\\Set{x||y}").unwrap(), want);
+        assert_eq!(expand("\\Set{x\\|y}").unwrap(), want);
+        // The first separator ends the replacement, whichever kind it is.
+        assert_eq!(
+            expand("\\Set{x\\|y|z}").unwrap(),
+            format!("\\left\\{{{m}x{double}y|z{m}\\right\\}}")
+        );
+        assert_eq!(
+            expand("\\Set{x|y\\|z}").unwrap(),
+            format!("\\left\\{{{m}x{k}\\middle\\vert{k}y\\|z{m}\\right\\}}")
+        );
+    }
+
+    #[test]
+    fn bra_ket_and_bra_set_take_their_own_parts() {
+        assert_eq!(expand("\\bra@ket{L}{M}{D}{R}{a|b||c}").unwrap(), "LaMbDcR");
+        assert_eq!(expand("\\bra@ket{L}{M}{}{R}{a||b}").unwrap(), "LaMMbR");
+        assert_eq!(expand("\\bra@set{L}{M}{D}{R}{a|b|c}").unwrap(), "LaMb|cR");
+        assert_eq!(expand("\\bra@set{L}{M}{D}{R}{a||b|c}").unwrap(), "LaDb|cR");
+        // The text is one argument: a single token needs no braces, and the rest follows.
+        assert_eq!(expand("\\bra@ket{L}{M}{}{R}x|y").unwrap(), "LxR|y");
+        // A `\noexpand` token in the text comes out as itself, as KaTeX's `expandTokens`
+        // thaws it: a macro is expanded later, and a bar is not a separator.
+        assert_eq!(
+            expand("\\def\\foo{X}\\bra@ket{L}{M}{}{R}{a\\noexpand\\foo}").unwrap(),
+            "LaXR"
+        );
+        assert_eq!(
+            expand("\\bra@ket{L}{M}{}{R}{a\\noexpand|b}").unwrap(),
+            "La|bR"
+        );
+        // A bar that ends the text, with no right part, looks past the text for a second bar.
+        assert_eq!(expand("\\bra@ket{L}{M}{D}{}{a|}|b").unwrap(), "LaDb");
+    }
+
+    #[test]
+    fn bars_mean_what_they_did_before_afterwards() {
+        assert_eq!(
+            expand("\\Braket{a}|").unwrap(),
+            "\\left\\langlea\\right\\rangle|"
+        );
+        assert_eq!(expand("\\bra@set{L}{M}{D}{R}{a|b|c}|").unwrap(), "LaMb|cR|");
+        assert!(
+            expand("\\def|{Z}\\Braket{a}|")
+                .unwrap()
+                .ends_with("\\right\\rangleZ")
+        );
+        // `\set` puts back the bar it found, not the plain one.
+        assert_eq!(
+            expand("\\def|{Z}\\set{a|b|c}|").unwrap(),
+            format!("\\{{{THIN}a\\midbZc{THIN}\\}}Z")
+        );
+    }
+
+    #[test]
+    fn nested_forms_each_read_their_own_bars() {
+        let bar = format!("{THIN}\\middle\\vert{THIN}");
+        assert_eq!(
+            expand("\\Braket{a|\\Braket{b|c}|d}").unwrap(),
+            format!(
+                "\\left\\langlea{bar}\\left\\langleb{bar}c\\right\\rangle{bar}d\\right\\rangle"
+            )
+        );
+        let t = THIN;
+        assert_eq!(
+            expand("\\set{\\set{a|b}|c}").unwrap(),
+            format!("\\{{{t}\\{{{t}a\\midb{t}\\}}\\midc{t}\\}}")
+        );
+        assert_eq!(
+            expand("\\set{a|\\set{b|c}}").unwrap(),
+            // The inner one finds no earlier meaning of `|` to restore, and replaces its own.
+            format!("\\{{{t}a\\mid\\{{{t}b\\midc{t}\\}}{t}\\}}")
+        );
+    }
+
+    #[test]
+    fn the_parser_reads_the_bracket_macros() {
+        use super::super::parser::parse;
+        for src in [
+            "\\braket{\\phi|\\psi}",
+            "\\Braket{ \\phi | \\frac{\\partial^2}{\\partial t^2} | \\psi }",
+            "\\set{x|x<5}",
+            "\\Set{ x | x<\\frac 12 }",
+            "\\Set{x||y}",
+            "\\Bra{x}\\Ket{y}",
+        ] {
+            assert!(parse(src).is_ok(), "{src}: {:?}", parse(src).err());
+        }
+    }
+
+    #[test]
+    fn bra_ket_errors_are_clean() {
+        let eof = "Unexpected end of input in a macro argument, expected '}'";
+        assert_eq!(error("\\Braket"), eof);
+        assert_eq!(error("\\Braket{a|b"), eof);
+        assert_eq!(error("\\bra@ket{a}{b}"), eof);
+        assert_eq!(error("\\Braket}"), "Extra }");
+        assert_eq!(error("\\bra@ket{a}{b}{c}}"), "Extra }");
+        // An error inside leaves no group open.
+        let src = "\\Braket{a|\\expandafter x\\nosuchmacro}";
+        assert!(error(src).starts_with("Undefined control sequence"));
+        let mut e = Expander::new(src, Mode::Math).unwrap();
+        while e.expand_next_token().is_ok_and(|t| t.kind != Eof) {}
+        assert!(e.undo.is_empty());
+        assert!(!e.macros.contains_key(&Key::Char("|")));
+    }
+
+    #[test]
+    fn bra_ket_nesting_and_size_are_bounded() {
+        for src in [
+            "\\def\\a{\\Braket{\\a}}\\a",
+            "\\def\\a{\\set{\\a}}\\a",
+            "\\def\\a{\\bra@set{x}{y}{z}{w}{\\a}}\\a",
+        ] {
+            assert_eq!(
+                error(src),
+                format!("groups nested more than {} deep", limits::MAX_DEPTH)
+            );
+        }
+        let e = error("\\def\\a{\\Braket{\\a\\a}}\\a");
+        assert!(
+            e.starts_with("groups nested") || e.starts_with("Too many"),
+            "{e}"
+        );
+        let big = "x".repeat(1000);
+        let src = format!(
+            "\\def\\a{{{big}{big}{big}{big}}}\\def\\b{{\\a\\a\\a\\a\\a\\a\\a\\a}}\\def\\c{{\\b\\b\\b\\b\\b\\b\\b\\b}}\\def\\d{{\\c\\c\\c\\c\\c\\c\\c\\c}}\\Braket{{\\d}}"
+        );
+        assert!(error(&src).starts_with("Macro expansion produced more than"));
+    }
+
     #[test]
     fn commands_not_implemented_yet_say_so() {
-        assert_eq!(error("\\bra@ket"), "\\bra@ket is not supported yet");
+        assert_eq!(
+            error("\\newcommand{\\bra@ket}{}"),
+            "\\newcommand{\\bra@ket} attempting to redefine \\bra@ket; use \\renewcommand"
+        );
         assert_eq!(
             error("\\newcommand{\\noexpand}{}"),
             "\\newcommand{\\noexpand} attempting to redefine \\noexpand; use \\renewcommand"
@@ -1678,18 +2017,9 @@ mod tests {
                 .unwrap()
                 .unwrap();
         }
-        // Every function macro of KaTeX is either implemented or listed as not yet.
+        // Every function macro of KaTeX is implemented.
         for name in macros_data::FUNCTIONS {
-            assert!(
-                Builtin::named(name).is_some() || UNIMPLEMENTED.contains(name),
-                "{name} is neither implemented nor listed as unimplemented"
-            );
-        }
-        for name in UNIMPLEMENTED {
-            assert!(
-                macros_data::FUNCTIONS.contains(name),
-                "{name} is listed but KaTeX has no such function macro"
-            );
+            assert!(Builtin::named(name).is_some(), "{name} is not implemented");
         }
     }
 

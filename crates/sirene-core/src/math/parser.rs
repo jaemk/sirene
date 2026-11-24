@@ -6,6 +6,7 @@
 //! that the function table lists but the parser does not build yet fail with "not supported yet".
 
 mod arguments;
+mod cd;
 mod environments;
 mod handlers;
 
@@ -509,7 +510,12 @@ impl<'a> Parser<'a> {
                 // The symbol table keys a control symbol by its character, which is the last
                 // character of the token's range.
                 let end = token.span.end;
-                Name::Control(&self.src[end - c.len_utf8()..end])
+                let written = end
+                    .checked_sub(c.len_utf8())
+                    .and_then(|start| self.src.get(start..end))
+                    .filter(|s| s.starts_with(c));
+                // A token from a macro body has the range of the call, not of the symbol.
+                Name::Control(written.or_else(|| static_symbol(c)).unwrap_or(""))
             }
             TokenKind::Verb { star, body, .. } => {
                 self.consume();
@@ -621,6 +627,13 @@ impl<'a> Parser<'a> {
 fn split_marks(text: &str) -> (&str, &str) {
     let base = text.trim_end_matches(|c| ('\u{300}'..='\u{36f}').contains(&c));
     text.split_at(base.len())
+}
+
+/// The text of the ASCII control symbol `c`, for a token whose range is not the symbol's own.
+fn static_symbol(c: char) -> Option<&'static str> {
+    const ALL: &str = " !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+    let at = ALL.find(c)?;
+    ALL.get(at..at + c.len_utf8())
 }
 
 fn unsupported(name: &str, token: &Token<'_>) -> MathError {
@@ -832,6 +845,8 @@ mod tests {
                 None => format!("{label}<{}>", show(body)),
             },
             NodeKind::HorizBrace { label, base, .. } => format!("{label}<{}>", show(base)),
+            NodeKind::CdLabel { side, label } => format!("cd{side:?}<{}>", show(label)),
+            NodeKind::CdLabelParent { fragment } => format!("cdparent<{}>", show(fragment)),
         }
     }
 
@@ -1643,9 +1658,54 @@ mod tests {
 
     #[test]
     fn what_the_parser_lacks_is_said_so() {
-        assert!(error("\\begin{CD}a\\end{CD}").ends_with("supported yet"));
-        assert_eq!(error("\\bra@ket"), "\\bra@ket is not supported yet");
         assert!(error("x\u{2082}").ends_with("supported yet"));
+    }
+
+    #[test]
+    fn bra_ket_and_set_parse_as_delimited_groups() {
+        // The middle bar of the capitalized forms is `\middle\vert`, with the spaces around it.
+        let braket = "left\\langle[a kern3mu mid\\vert kern3mu b]right\\rangle";
+        assert_eq!(shown("\\Braket{a|b}"), braket);
+        assert_eq!(shown("\\Braket{a||b}"), braket);
+        assert_eq!(shown("\\Braket{a\\|b}"), braket);
+        assert_eq!(
+            shown("\\Braket{a|\\Braket{b|c}}"),
+            "left\\langle[a kern3mu mid\\vert kern3mu left\\langle[b kern3mu mid\\vert kern3mu c]right\\rangle]right\\rangle"
+        );
+        assert_eq!(
+            shown("\\Set{x|y}"),
+            "left\\{[kern4mu x kern5mu mid\\vert kern5mu y kern4mu]right\\}"
+        );
+        // `||` and `\|` are the double bar of `\Set`.
+        assert_eq!(
+            shown("\\Set{x||y}"),
+            "left\\{[kern4mu x kern5mu mid\\Vert kern5mu y kern4mu]right\\}"
+        );
+        assert_eq!(
+            shown("\\Set{x\\|y}"),
+            "left\\{[kern4mu x kern5mu mid\\Vert kern5mu y kern4mu]right\\}"
+        );
+        // Only the first bar of a set is a separator.
+        assert_eq!(
+            shown("\\Set{x|y|z}"),
+            "left\\{[kern4mu x kern5mu mid\\vert kern5mu y | z kern4mu]right\\}"
+        );
+        // `\set` is not stretchy: `\mid` between plain braces.
+        assert_eq!(
+            shown("\\set{x|y|z}"),
+            "\\{ kern3mu x \\mid y | z kern3mu \\}"
+        );
+        assert_eq!(
+            shown("\\Bra{x}\\Ket{y}"),
+            "left\\langle[x]right| left|[y]right\\rangle"
+        );
+        // `\braket` does not read the bar.
+        assert_eq!(shown("\\braket{a|b}"), "Inner[\\langle {a | b} \\rangle]");
+        assert_eq!(
+            error("\\bra@ket"),
+            "Unexpected end of input in a macro argument, expected '}'"
+        );
+        assert_eq!(error("\\Braket{a"), error("\\bra@ket{a"));
     }
 
     #[test]

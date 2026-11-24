@@ -284,12 +284,15 @@ Deviations from KaTeX (LMATH-T9):
   (Node 24 loads `macros.ts` through the resolver hook `scripts/katex-ts-loader.mjs`).
 - Bounds: `MAX_EXPANSIONS` macro calls and `MAX_EXPANDED` bytes of produced tokens, groups at
   `MAX_DEPTH`.
-- Not implemented yet, each an error naming the command: `\bra@ket`, `\bra@set` (which
-  `\Braket` and `\Set` use). A test keeps this list equal to KaTeX's function-defined macros
-  minus the implemented ones. Also out of scope (LPA-2): `\edef`, `\xdef`, `\let`, `\futurelet`,
-  `\global`, `\long`.
-- Baseline tests (`math::baseline`): the expander reads all 449 inputs KaTeX parses; 448 end
-  cleanly and the other one stops at `\bra@set`, so that count falls when it lands. For the 22 inputs KaTeX rejects with an expansion-level error (`Extra }`,
+- `\bra@ket` and `\bra@set` (which `\Braket`, `\Set` and `\set` use) read four arguments and
+  the text, define `|` and `\|` for the text as macros that stand for the separators, and expand
+  only the expandable tokens of the text, a `\noexpand` token coming out as itself (KaTeX's
+  `expandTokens`); each token out counts as an expansion. `\bra@set` restores the earlier meaning of both after the
+  first separator. Each call is a group, so nesting is bounded by `MAX_DEPTH`. A test checks that
+  every function-defined macro of KaTeX is implemented. Out of scope (LPA-2): `\edef`, `\xdef`,
+  `\let`, `\futurelet`, `\global`, `\long`.
+- Baseline tests (`math::baseline`): the expander reads all 449 inputs KaTeX parses, and all 449
+  end cleanly. For the 22 inputs KaTeX rejects with an expansion-level error (`Extra }`,
   a `\def` or `\newcommand` error, too many expansions, and the like) the expander gives the
   same message. KaTeX's "Unexpected end of input in a macro argument" for a function's missing
   argument (`\frac 1`) is raised by the parser's `scan_argument` and is checked in that stage.
@@ -307,6 +310,10 @@ More deviations (LMATH-T9):
 | `\def` and `\newcommand` | `\def` is a parser function; `\newcommand` a macro | both run in the expander | one place for definitions and their scope |
 | Macro lookup | strings keyed by text | `Key` enum, borrowed | no allocation per lookup |
 | `\arraystretch` | the macro is expanded to text | the macro's body text is read without expanding it | a table's stretch is a plain number in practice |
+| `\global` | prefix that makes the next `\def`, `\let` or `\futurelet` global | reported as unsupported | out of scope (LMATH-12); `\gdef` is supported |
+| `\long` | prefix that lets the next definition's arguments span paragraphs | reported as unsupported | out of scope (LMATH-12) |
+| `\edef` | defines a macro whose body is expanded at definition time | reported as unsupported | out of scope (LMATH-12) |
+| `\xdef` | `\edef` made global | reported as unsupported | out of scope (LMATH-12) |
 | `\def` as a script argument | "Got function '\def' with no arguments as superscript" | the script reads what follows the definition (`2^\def\foo{1}2` is `2^2`) | definitions are macros (the row above) |
 | Parse nodes | JS objects with a `type` string | `Node { kind: NodeKind, mode, span }`, one enum | LMATH-13 |
 | Bare size text | the longest run of tokens that fits a size, without limit | at most 64 bytes (`MAX_SIZE_TEXT`) | each token is tested against the text so far; LMATH-6 |
@@ -405,12 +412,14 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   automatic numbering) are `RowTag`s; `\tag` records its text in a global `\df@tag`, which a row
   or the whole formula reads (a formula outside a table becomes a `Tag` node; `\tag` outside
   display mode is an error). `\\` outside a table is a `Cr` node, `\hline` outside one an error,
-  and `\color` is remembered for the `\right` after it (`right_color`). `{CD}` is not built.
+  and `\color` is remembered for the `\right` after it (`right_color`). `{CD}` (`parser/cd.rs`,
+  KaTeX's `parseCD`) becomes an `Array` whose arrow cells are `CdLabelParent` and `CdLabel`
+  nodes and `\\cd...` arrows.
   `parse_with` takes the display-mode setting. Functions that read the rest of a table cell
   (`\displaystyle`, `\color`, the size commands) stop at the cell's `\\` as KaTeX's do.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 605 give exactly KaTeX's tree or KaTeX's error, 10 stop at a function not
-  built yet (`{CD}`, `\global`, `\long`, `\edef`, `\xdef`, `\bra@set`), and one is a listed
+  macro settings, 610 give exactly KaTeX's tree or KaTeX's error, 5 stop at a function not
+  built (`\global`, `\long`, `\edef`, `\xdef`, out of scope as LMATH-12), and one is a listed
   deviation. No input differs. The first number rises and the second falls as functions land.
   On a difference the test prints the path of the first differing field.
 - `\verb|x|` (`Verb`, always text mode) is read from the lexer's `Verb` token.
@@ -499,7 +508,8 @@ Layout (`layout/`, KaTeX's `buildHTML.ts` and the HTML builders of `functions/`)
   extensible arrows, `\overbrace` and `\underbrace` and their notes, `\oiint`/`\oiiint`,
   accents over and under a base (character, wide, and stretchy accents, and text accents), and
   the enclosures (`\fbox`, `\boxed`, `\colorbox`, `\fcolorbox`, the cancels, `\sout`, `\angl`,
-  `\phase`). Every other node fails with "... is not laid out yet".
+  `\phase`), and `{CD}` (through the array layout, with its labels beside the vertical
+  arrows). Every other node fails with "... is not laid out yet".
 - `layout/stretchy.rs` holds KaTeX's `svgSpan` (one, two, or three cropped paths per stretchy
   shape, a fixed number at any width) and `encloseSpan`. The box tree has only filled paths,
   so a `\cancel` stroke is a thin parallelogram, an `\fbox` border a ring of two subpaths, and
@@ -513,17 +523,18 @@ Layout (`layout/`, KaTeX's `buildHTML.ts` and the HTML builders of `functions/`)
   `\sout` is a 0.08em rule, the thickness KaTeX's border draws, in the box KaTeX sizes. Under a
   size command, `\phase`'s path is scaled to the angle's height, where KaTeX draws it at the
   base size and clips the image. A fill or border inside `\phantom` is transparent, where
-  KaTeX draws it.
+  KaTeX draws it. A `{CD}` label beside a vertical arrow takes no room, as KaTeX's absolutely
+  placed label; it is raised by KaTeX's `bottom: 0.8em - depth` taken from the arrow's depth,
+  and a left label on a first-column arrow can reach left of the formula's box, as in KaTeX.
 - `svg_data.rs` (generated by `scripts/katex-svg.mjs`) holds KaTeX's 59 fixed stretchy paths,
   and `svg_paths.rs` the paths built from parameters (radicals, tall delimiters, `\phase`),
   both tested against KaTeX's strings in `tests/fixtures/math/katex-svg.json`.
-- `math::baseline` holds layout to KaTeX's `katex-html` height and depth: 444 formulas agree to
-  1e-4 em, and the last of the 445 KaTeX builds stops at a mathematical alphanumeric character.
+- `math::baseline` holds layout to KaTeX's `katex-html` height and depth: 446 formulas agree to
+  1e-4 em, and the last of the 447 KaTeX builds stops at a mathematical alphanumeric character.
 
-Not yet built, in order (LMATH-9): `\bra@ket`, `\bra@set`, `{CD}`, and mathematical
-alphanumeric characters. The fuzz target for the lexer waits for a
-public entry point, since `fuzz/` reaches only public items; until then the property test
-covers it.
+Not yet built (LMATH-9): mathematical alphanumeric characters. The fuzz target for the lexer
+waits for a public entry point, since `fuzz/` reaches only public items; until then the
+property test covers it.
 
 ## LMATH-T Tasks
 
