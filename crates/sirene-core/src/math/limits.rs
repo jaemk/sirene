@@ -27,6 +27,10 @@ pub(crate) const MAX_SIZE_TEXT: usize = 64;
 /// for columns no row has.
 pub(crate) const MAX_COLUMNS: usize = 256;
 
+/// A length the source gives (`\kern`, `\rule`, `\raisebox`) is at most this many em either way,
+/// as KaTeX's `maxSize` setting caps it from above; KaTeX's default has no cap.
+pub(crate) const MAX_LENGTH_EM: f64 = 1000.0;
+
 /// The error for a source past `MAX_SOURCE`; the span is the first byte over the limit.
 pub(crate) fn check_source(src: &str) -> Result<(), MathError> {
     if src.len() <= MAX_SOURCE {
