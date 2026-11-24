@@ -13,6 +13,8 @@ mod ast;
 #[cfg(test)]
 mod baseline;
 mod boxes;
+#[cfg(feature = "math")]
+mod draw;
 mod error;
 mod expander;
 #[cfg(feature = "math")]
