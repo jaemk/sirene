@@ -771,6 +771,43 @@ mod tests {
             NodeKind::AccentUnder { label, base } => format!("{label}<{}>", show(base)),
             NodeKind::Overline { body } => format!("over<{}>", show(body)),
             NodeKind::Underline { body } => format!("under<{}>", show(body)),
+            NodeKind::Enclose {
+                label,
+                background_color,
+                border_color,
+                body,
+            } => format!(
+                "{label}[{}|{}]<{}>",
+                border_color.as_deref().unwrap_or(""),
+                background_color.as_deref().unwrap_or(""),
+                show(body)
+            ),
+            NodeKind::Pmb { class, body } => {
+                let inner: Vec<_> = body.iter().map(show).collect();
+                format!("pmb{class:?}[{}]", inner.join(" "))
+            }
+            NodeKind::HBox { body } => {
+                let inner: Vec<_> = body.iter().map(show).collect();
+                format!("hbox[{}]", inner.join(" "))
+            }
+            NodeKind::VCenter { body } => format!("vcenter<{}>", show(body)),
+            NodeKind::MathChoice {
+                display,
+                text,
+                script,
+                script_script,
+            } => {
+                let part =
+                    |nodes: &[Node<'_>]| nodes.iter().map(show).collect::<Vec<_>>().join(" ");
+                format!(
+                    "choice[{} | {} | {} | {}]",
+                    part(display),
+                    part(text),
+                    part(script),
+                    part(script_script)
+                )
+            }
+            NodeKind::ReflectBox { body } => format!("reflect<{}>", show(body)),
         }
     }
 
@@ -930,6 +967,40 @@ mod tests {
         };
         assert!(!bar);
         assert_eq!(error("a \\above b"), "Invalid size: 'b'");
+    }
+
+    #[test]
+    fn enclosures() {
+        // A box argument is text, in the text style.
+        assert_eq!(shown("\\fbox{a}"), "\\fbox[|]<Text[{a}]>");
+        assert_eq!(shown("\\colorbox{red}{a}"), "\\colorbox[|red]<Text[{a}]>");
+        assert_eq!(
+            shown("\\fcolorbox{red}{#00f}{a}"),
+            "\\fcolorbox[red|#00f]<Text[{a}]>"
+        );
+        // The lines take the body as it is.
+        assert_eq!(shown("\\cancel{x}"), "\\cancel[|]<{x}>");
+        assert_eq!(shown("\\bcancel x"), "\\bcancel[|]<{x}>");
+        assert_eq!(shown("\\sout{x}"), "\\sout[|]<{x}>");
+        assert_eq!(shown("\\phase{x}"), "\\phase[|]<{x}>");
+        assert_eq!(shown("\\angl{x}"), "\\angl[|]<Text[{x}]>");
+        assert_eq!(
+            error("\\text{\\angl{x}}"),
+            "Can't use function '\\angl' in text mode"
+        );
+        assert_eq!(error("\\colorbox{nope!}{a}"), "Invalid color: 'nope!'");
+    }
+
+    #[test]
+    fn boxes_and_choices() {
+        assert_eq!(shown("\\pmb{x}"), "pmbOrd[x]");
+        assert_eq!(shown("\\pmb =").as_str(), "pmbRel[=]");
+        assert_eq!(shown("\\hbox{a b}"), "hbox[a   b]");
+        assert_eq!(shown("\\vcenter{a}"), "vcenter<{a}>");
+        assert_eq!(shown("\\mathchoice{a}{b}{c}{d}"), "choice[a | b | c | d]");
+        assert_eq!(shown("\\mathchoice{a b}{}x{d}"), "choice[a b |  | x | d]");
+        assert_eq!(shown("\\reflectbox{a}"), "reflect<Text[{a}]>");
+        assert_eq!(shown("\\mathreflectbox{a}"), "reflect<{a}>");
     }
 
     #[test]

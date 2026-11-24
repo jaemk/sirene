@@ -214,6 +214,39 @@ pub(crate) enum NodeKind<'a> {
     Middle {
         delim: String,
     },
+    /// A box, a line or a background around the body: `\fbox`, `\colorbox`, `\fcolorbox`,
+    /// `\cancel` and its two variants, `\sout`, `\angl`, `\phase`. `label` is the command, with
+    /// its backslash.
+    Enclose {
+        label: String,
+        background_color: Option<String>,
+        border_color: Option<String>,
+        body: Box<Node<'a>>,
+    },
+    /// `\pmb{x}`: the body in poor man's bold, spaced as the class of its argument.
+    Pmb {
+        class: MathClass,
+        body: Vec<Node<'a>>,
+    },
+    /// `\hbox{...}`: text, set in no font of its own.
+    HBox {
+        body: Vec<Node<'a>>,
+    },
+    /// `\vcenter{...}`: the body centered on the math axis.
+    VCenter {
+        body: Box<Node<'a>>,
+    },
+    /// `\mathchoice{d}{t}{s}{ss}`: one of the four, by the style it is set in.
+    MathChoice {
+        display: Vec<Node<'a>>,
+        text: Vec<Node<'a>>,
+        script: Vec<Node<'a>>,
+        script_script: Vec<Node<'a>>,
+    },
+    /// `\reflectbox{x}` and `\mathreflectbox{x}`: the body mirrored.
+    ReflectBox {
+        body: Box<Node<'a>>,
+    },
 }
 
 impl NodeKind<'_> {
@@ -232,6 +265,12 @@ impl NodeKind<'_> {
             NodeKind::SupSub { .. } => "supsub",
             NodeKind::Frac { .. } => "genfrac",
             NodeKind::Infix { .. } => "infix",
+            NodeKind::Enclose { .. } => "enclose",
+            NodeKind::Pmb { .. } => "pmb",
+            NodeKind::HBox { .. } => "hbox",
+            NodeKind::VCenter { .. } => "vcenter",
+            NodeKind::MathChoice { .. } => "mathchoice",
+            NodeKind::ReflectBox { .. } => "reflectbox",
             NodeKind::Sqrt { .. } => "sqrt",
             NodeKind::Styling { .. } => "styling",
             NodeKind::Text { .. } => "text",
