@@ -609,13 +609,16 @@ mod tests {
     #[test]
     fn unbuilt_nodes_say_so() {
         let nodes = parse_with(
-            "\\sqrt x",
+            "\u{1d400}",
             Settings {
                 display_mode: false,
             },
         )
         .unwrap();
         let err = layout(&nodes, false).unwrap_err();
-        assert_eq!(err.message, "sqrt is not laid out yet");
+        assert_eq!(
+            err.message,
+            "a mathematical alphanumeric character is not laid out yet"
+        );
     }
 }

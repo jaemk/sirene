@@ -8,8 +8,8 @@
 use super::{Atom, Built, Class, accent, build, build_in, horiz_brace, op};
 use crate::math::{
     MathError,
-    ast::Node,
-    boxes::{BoxKind, Bx, Part, Position},
+    ast::{Node, NodeKind, OpContent},
+    boxes::{BoxKind, Bx, Item, Part, Position},
     options::{Em, Options},
     style::Style,
 };
@@ -43,7 +43,15 @@ pub(super) fn supsub<'t>(
         None => Built::One(Atom::new(Bx::hlist(Vec::new()), None, options)),
     };
     let class = built.right_class().unwrap_or(Class::Ord);
-    // A subscript does not move right by a lone symbol's italic correction.
+    // A subscript does not move right by a lone symbol's italic correction, nor by that of the
+    // integral under `\oiint`'s oval, which KaTeX keeps on the box around both.
+    let oiint = base.is_some_and(|base| {
+        matches!(
+            &base.kind,
+            NodeKind::Op { content: OpContent::Name(name), .. }
+                if name == "\\oiint" || name == "\\oiiint"
+        )
+    });
     let italic = match &built {
         Built::One(Atom {
             bx: Bx {
@@ -52,6 +60,15 @@ pub(super) fn supsub<'t>(
             },
             ..
         }) => glyph.italic,
+        Built::One(atom) if oiint => atom
+            .bx
+            .items()
+            .into_iter()
+            .find_map(|item| match item {
+                Item::Glyph { glyph, .. } => Some(glyph.italic),
+                _ => None,
+            })
+            .unwrap_or(Em::ZERO),
         _ => Em::ZERO,
     };
     let base_box = built.into_box();

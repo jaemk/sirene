@@ -730,6 +730,26 @@ mod tests {
     }
 
     #[test]
+    fn oiint_subscripts_tuck_under_the_slant_as_iint_subscripts_do() {
+        // Both subscripts start at the base's right edge less the integral's slant; the oval
+        // makes `\oiint`'s base wider than `\iint`'s.
+        for (display, face) in [(false, Face::Size1Regular), (true, Face::Size2Regular)] {
+            let italic = glyph('\u{222c}', face).3;
+            assert!(italic > 0.0);
+            for name in ["\\iint", "\\oiint"] {
+                let base = sized(name, display).0;
+                let (glyphs, _) = placed(&format!("{name}\\nolimits_a"), display);
+                let a = glyphs
+                    .iter()
+                    .find(|(t, _)| t == "a")
+                    .map(|&(_, x)| x)
+                    .unwrap();
+                assert!(close(a, base - italic), "{name}: {a} vs {base} - {italic}");
+            }
+        }
+    }
+
+    #[test]
     fn oiint_with_scripts_matches_katex() {
         // KaTeX's heights and depths for the contour integrals with scripts, from the oracle.
         for src in ["\\oiint_i^n", "\\oiiint_i^n", "\\oiint\\nolimits_i^n"] {
