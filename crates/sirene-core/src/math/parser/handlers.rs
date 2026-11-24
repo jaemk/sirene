@@ -1923,3 +1923,238 @@ impl<'a> Parser<'a> {
 fn missing(name: &str) -> MathError {
     MathError::new(format!("Missing arguments for {name}"), 0..0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::math::{expander::Expander, functions_data::FUNCTIONS, parser::parse};
+
+    fn parser(src: &str) -> Parser<'_> {
+        Parser {
+            src,
+            expander: Expander::new(src, Mode::Math).unwrap(),
+            next: None,
+            mode: Mode::Math,
+            depth: 0,
+            leftright_depth: 0,
+            break_on: None,
+            display_mode: false,
+            current_color: None,
+        }
+    }
+
+    fn x() -> Node<'static> {
+        Node {
+            kind: NodeKind::Symbol {
+                group: AtomGroup::MathOrd,
+                name: Name::Char("x"),
+            },
+            mode: Mode::Math,
+            span: 0..1,
+        }
+    }
+
+    fn none() -> Arguments<'static> {
+        Arguments {
+            required: Vec::new(),
+            optional: Vec::new(),
+        }
+    }
+
+    fn message<T>(result: Result<T, MathError>) -> String {
+        match result {
+            Ok(_) => "ok".to_string(),
+            Err(e) => e.message,
+        }
+    }
+
+    fn opens(build: Build) -> bool {
+        matches!(
+            build,
+            Build::Styling(_)
+                | Build::OldFont(_)
+                | Build::Color
+                | Build::Sizing(_)
+                | Build::Left
+                | Build::MathShift
+                | Build::Begin
+        )
+    }
+
+    /// A handler given fewer arguments than the table promises reports it, never panics: each
+    /// function `Build::of` knows, called with none, by both builders.
+    #[test]
+    fn a_handler_without_its_arguments_is_an_error() {
+        let mut wrong = String::new();
+        let mut checked = 0;
+        for row in FUNCTIONS {
+            let name = row.0;
+            let Some(build) = Build::of(name) else {
+                continue;
+            };
+            let Some(function) = functions::lookup(name) else {
+                continue;
+            };
+            checked += 1;
+            let token = Token {
+                kind: TokenKind::ControlWord(name.trim_start_matches('\\')),
+                span: 0..name.len(),
+            };
+            let missing = format!("Missing arguments for {name}");
+            // An untrusted command stands in as its name, and an infix one's size is optional.
+            let needs = function.num_args > 0
+                && !matches!(build, Build::Untrusted(_) | Build::Infix(_) | Build::Cr);
+            let built = message(parser("").build(build, name, &token, none()));
+            if (opens(build) || needs) && built != missing {
+                wrong.push_str(&format!("build {name}: {built}\n"));
+            }
+            let opened = message(parser("").build_open(build, name, &token, none()));
+            if (!opens(build) || function.num_args > 0) && opened != missing {
+                wrong.push_str(&format!("build_open {name}: {opened}\n"));
+            }
+        }
+        assert!(checked > 200, "{checked}");
+        assert!(wrong.is_empty(), "\n{wrong}");
+    }
+
+    #[test]
+    fn helpers_reject_nodes_of_the_wrong_kind() {
+        assert_eq!(
+            message(measurement(x(), "\\kern")),
+            "Missing arguments for \\kern"
+        );
+        assert_eq!(
+            message(color_token(x(), "\\color")),
+            "Missing arguments for \\color"
+        );
+        assert_eq!(
+            message(pop_color(&mut none(), "\\colorbox")),
+            "Missing arguments for \\colorbox"
+        );
+        let wanted_raw = "Expected node of type raw, but got node of type mathord";
+        assert_eq!(message(check_html_data(&x())), wanted_raw);
+        assert_eq!(message(check_graphics(&x())), wanted_raw);
+        assert_eq!(
+            message(frac_node(Build::Relax, x(), x(), 0, Mode::Math, "\\frac")),
+            "Missing arguments for \\frac"
+        );
+        let mut p = parser("x");
+        assert_eq!(
+            message(p.parse_argument("\\foo", b'p', true)),
+            "A primitive argument cannot be optional"
+        );
+        assert_eq!(
+            message(p.parse_argument("\\foo", b'z', false)),
+            "\\foo is not supported yet"
+        );
+    }
+
+    #[test]
+    fn an_infix_command_with_no_fraction_is_an_error() {
+        let infix = |replace_with| Node {
+            kind: NodeKind::Infix {
+                replace_with,
+                size: None,
+            },
+            mode: Mode::Math,
+            span: 1..2,
+        };
+        let mut p = parser("");
+        assert_eq!(
+            message(p.split_infix(vec![x(), infix("\\\\abovefrac"), x()])),
+            "Missing arguments for \\above"
+        );
+        assert_eq!(
+            message(p.split_infix(vec![infix("\\nosuch")])),
+            "Missing arguments for \\nosuch"
+        );
+        assert_eq!(
+            message(p.split_infix(vec![infix("\\frac"), infix("\\frac")])),
+            "only one infix operator per group"
+        );
+        // Halves with nothing in them are empty groups at the command.
+        let split = p.split_infix(vec![infix("\\frac")]).unwrap();
+        let [
+            Node {
+                kind: NodeKind::Frac { numer, denom, .. },
+                ..
+            },
+        ] = split.as_slice()
+        else {
+            panic!("{split:?}");
+        };
+        assert_eq!((numer.span.clone(), denom.span.clone()), (1..1, 2..2));
+    }
+
+    #[test]
+    fn js_parse_int_reads_as_javascript_does() {
+        for (text, want) in [
+            ("65", Some(65)),
+            ("  65", Some(65)),
+            ("+7", Some(7)),
+            ("-5", Some(-5)),
+            ("0x1F", Some(31)),
+            ("0X1f", Some(31)),
+            ("12abc", Some(12)),
+            ("0x", None),
+            ("abc", None),
+            ("", None),
+            ("-", None),
+            ("99999999999999999999999", Some(i64::MAX)),
+        ] {
+            assert_eq!(js_parse_int(text), want, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn errors_of_the_source() {
+        for (src, want) in [
+            (
+                r"\smash[\frac{a}{b}]{x}",
+                "Expected node of symbol group type, but got node of type genfrac",
+            ),
+            (
+                r"\includegraphics[width=1em,depth=2em]{x}",
+                "Invalid key: 'depth' in \\includegraphics.",
+            ),
+        ] {
+            assert_eq!(message(parse(src)), want, "{src}");
+        }
+        // `\@binrel{a}{b}`: `b` spaced as `a` would be.
+        for (src, want) in [
+            (r"\@binrel{=}{xy}", MathClass::Rel),
+            (r"\@binrel{+}{x}", MathClass::Bin),
+            (r"\@binrel{a}{x}", MathClass::Ord),
+        ] {
+            let nodes = parse(src).unwrap();
+            let [
+                Node {
+                    kind:
+                        NodeKind::MClass {
+                            class,
+                            body,
+                            character_box,
+                        },
+                    span,
+                    ..
+                },
+            ] = nodes.as_slice()
+            else {
+                panic!("{src}: {nodes:?}");
+            };
+            assert_eq!(*class, want, "{src}");
+            assert_eq!(*character_box, body.len() == 1, "{src}");
+            assert_eq!(span.clone(), 0..src.len(), "{src}");
+        }
+        // An option with no `=`, or more than one, is passed over.
+        for src in [
+            r"\includegraphics[alt]{x}",
+            r"\includegraphics[a=b=c]{x}",
+            r"\smash[tb]{x}",
+            r"\smash[q]{x}",
+            r"\htmlData{a{,}b=c}{x}",
+        ] {
+            assert_eq!(message(parse(src)), "ok", "{src}");
+        }
+    }
+}

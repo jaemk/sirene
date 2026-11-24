@@ -537,3 +537,416 @@ pub(crate) enum StyleName {
     Script,
     ScriptScript,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(kind: NodeKind<'static>) -> Node<'static> {
+        Node {
+            kind,
+            mode: Mode::Math,
+            span: 0..1,
+        }
+    }
+
+    fn x() -> Node<'static> {
+        node(NodeKind::Symbol {
+            group: AtomGroup::MathOrd,
+            name: Name::Char("x"),
+        })
+    }
+
+    fn bx() -> Box<Node<'static>> {
+        Box::new(x())
+    }
+
+    fn em() -> Measurement {
+        Measurement {
+            number: 1.0,
+            unit: "em".to_string(),
+        }
+    }
+
+    fn symbol(group: AtomGroup) -> NodeKind<'static> {
+        NodeKind::Symbol {
+            group,
+            name: Name::Char("x"),
+        }
+    }
+
+    /// Every kind, with the type name KaTeX's error messages give it.
+    #[test]
+    fn type_names_are_katex_s() {
+        let array = Array {
+            add_jot: false,
+            arraystretch: 1.0,
+            body: Vec::new(),
+            cols: None,
+            row_gaps: Vec::new(),
+            hskip_before_and_after: None,
+            hlines_before_row: Vec::new(),
+            col_separation: None,
+            tags: None,
+            leqno: None,
+        };
+        let cases: Vec<(NodeKind<'static>, &str)> = vec![
+            (symbol(AtomGroup::MathOrd), "mathord"),
+            (symbol(AtomGroup::TextOrd), "textord"),
+            (symbol(AtomGroup::Spacing), "spacing"),
+            (symbol(AtomGroup::Op), "op-token"),
+            (symbol(AtomGroup::Accent), "accent-token"),
+            (symbol(AtomGroup::Bin), "atom"),
+            (symbol(AtomGroup::Rel), "atom"),
+            (symbol(AtomGroup::Open), "atom"),
+            (symbol(AtomGroup::Close), "atom"),
+            (symbol(AtomGroup::Punct), "atom"),
+            (symbol(AtomGroup::Inner), "atom"),
+            (
+                NodeKind::Group {
+                    body: vec![],
+                    semisimple: false,
+                },
+                "ordgroup",
+            ),
+            (
+                NodeKind::SupSub {
+                    base: None,
+                    sup: Some(bx()),
+                    sub: None,
+                },
+                "supsub",
+            ),
+            (
+                NodeKind::Frac {
+                    numer: bx(),
+                    denom: bx(),
+                    continued: false,
+                    bar: true,
+                    bar_size: None,
+                    left: None,
+                    right: None,
+                },
+                "genfrac",
+            ),
+            (
+                NodeKind::Infix {
+                    replace_with: "\\frac",
+                    size: None,
+                },
+                "infix",
+            ),
+            (
+                NodeKind::Sqrt {
+                    body: bx(),
+                    index: None,
+                },
+                "sqrt",
+            ),
+            (
+                NodeKind::Styling {
+                    style: StyleName::Script,
+                    body: vec![],
+                    reset_font: false,
+                },
+                "styling",
+            ),
+            (
+                NodeKind::Text {
+                    body: vec![],
+                    font: None,
+                },
+                "text",
+            ),
+            (
+                NodeKind::Font {
+                    font: "mathbf",
+                    body: bx(),
+                },
+                "font",
+            ),
+            (
+                NodeKind::MClass {
+                    class: MathClass::Bin,
+                    body: vec![],
+                    character_box: false,
+                },
+                "mclass",
+            ),
+            (NodeKind::Overline { body: bx() }, "overline"),
+            (NodeKind::Underline { body: bx() }, "underline"),
+            (
+                NodeKind::DelimSizing {
+                    size: 1,
+                    class: MathClass::Open,
+                    delim: "(".to_string(),
+                },
+                "delimsizing",
+            ),
+            (
+                NodeKind::LeftRight {
+                    body: vec![],
+                    left: "(".to_string(),
+                    right: ")".to_string(),
+                    right_color: None,
+                },
+                "leftright",
+            ),
+            (
+                NodeKind::Accent {
+                    label: "\\hat".to_string(),
+                    stretchy: false,
+                    shifty: true,
+                    base: bx(),
+                },
+                "accent",
+            ),
+            (
+                NodeKind::AccentUnder {
+                    label: "\\utilde".to_string(),
+                    base: bx(),
+                },
+                "accentUnder",
+            ),
+            (
+                NodeKind::Op {
+                    limits: true,
+                    always_handle_supsub: false,
+                    symbol: true,
+                    suppress_base_shift: None,
+                    content: OpContent::Name("\\sum".to_string()),
+                },
+                "op",
+            ),
+            (
+                NodeKind::OperatorName {
+                    body: vec![],
+                    always_handle_supsub: false,
+                    limits: false,
+                },
+                "operatorname",
+            ),
+            (NodeKind::Kern { dimension: em() }, "kern"),
+            (
+                NodeKind::Rule {
+                    shift: None,
+                    width: em(),
+                    height: em(),
+                },
+                "rule",
+            ),
+            (
+                NodeKind::Color {
+                    color: "red".to_string(),
+                    body: vec![],
+                },
+                "color",
+            ),
+            (NodeKind::Phantom { body: vec![] }, "phantom"),
+            (NodeKind::VPhantom { body: bx() }, "vphantom"),
+            (
+                NodeKind::Smash {
+                    body: bx(),
+                    height: true,
+                    depth: true,
+                },
+                "smash",
+            ),
+            (
+                NodeKind::Lap {
+                    alignment: "llap",
+                    body: bx(),
+                },
+                "lap",
+            ),
+            (
+                NodeKind::RaiseBox {
+                    dy: em(),
+                    body: bx(),
+                },
+                "raisebox",
+            ),
+            (
+                NodeKind::Sizing {
+                    size: 6,
+                    body: vec![],
+                },
+                "sizing",
+            ),
+            (
+                NodeKind::Size {
+                    value: em(),
+                    is_blank: false,
+                },
+                "size",
+            ),
+            (NodeKind::ColorToken("red".to_string()), "color-token"),
+            (NodeKind::Internal, "internal"),
+            (NodeKind::Array(Box::new(array)), "array"),
+            (
+                NodeKind::Cr {
+                    new_line: true,
+                    size: None,
+                },
+                "cr",
+            ),
+            (
+                NodeKind::Environment {
+                    name: "matrix".to_string(),
+                },
+                "environment",
+            ),
+            (
+                NodeKind::Tag {
+                    body: vec![],
+                    tag: vec![],
+                },
+                "tag",
+            ),
+            (
+                NodeKind::Middle {
+                    delim: "|".to_string(),
+                },
+                "middle",
+            ),
+            (
+                NodeKind::Enclose {
+                    label: "\\fbox".to_string(),
+                    background_color: None,
+                    border_color: None,
+                    body: bx(),
+                },
+                "enclose",
+            ),
+            (
+                NodeKind::Pmb {
+                    class: MathClass::Ord,
+                    body: vec![],
+                },
+                "pmb",
+            ),
+            (NodeKind::HBox { body: vec![] }, "hbox"),
+            (NodeKind::VCenter { body: bx() }, "vcenter"),
+            (
+                NodeKind::MathChoice {
+                    display: vec![],
+                    text: vec![],
+                    script: vec![],
+                    script_script: vec![],
+                },
+                "mathchoice",
+            ),
+            (NodeKind::ReflectBox { body: bx() }, "reflectbox"),
+            (
+                NodeKind::Verb {
+                    body: "x",
+                    star: false,
+                },
+                "verb",
+            ),
+            (
+                NodeKind::HtmlMathml {
+                    html: vec![],
+                    mathml: vec![],
+                },
+                "htmlmathml",
+            ),
+            (NodeKind::CharCode('A'), "textord"),
+            (
+                NodeKind::Raw {
+                    string: "a".to_string(),
+                },
+                "raw",
+            ),
+            (
+                NodeKind::Url {
+                    url: "a".to_string(),
+                },
+                "url",
+            ),
+            (
+                NodeKind::XArrow {
+                    label: "\\xrightarrow".to_string(),
+                    body: bx(),
+                    below: None,
+                },
+                "xArrow",
+            ),
+            (
+                NodeKind::HorizBrace {
+                    label: "\\overbrace".to_string(),
+                    is_over: true,
+                    base: bx(),
+                },
+                "horizBrace",
+            ),
+            (
+                NodeKind::CdLabel {
+                    side: CdSide::Left,
+                    label: bx(),
+                },
+                "cdlabel",
+            ),
+            (NodeKind::CdLabelParent { fragment: bx() }, "cdlabelparent"),
+        ];
+        let mut wrong = String::new();
+        for (kind, want) in &cases {
+            let got = kind.type_name();
+            if got != *want {
+                wrong.push_str(&format!("{kind:?}: {got} want {want}\n"));
+            }
+        }
+        assert!(wrong.is_empty(), "\n{wrong}");
+    }
+
+    #[test]
+    fn a_group_of_one_stands_for_its_node() {
+        let group = |body| {
+            node(NodeKind::Group {
+                body,
+                semisimple: false,
+            })
+        };
+        assert_eq!(group(vec![x()]).normalized(), x());
+        let two = group(vec![x(), x()]);
+        assert_eq!(two.clone().normalized(), two);
+        assert_eq!(x().normalized(), x());
+        assert_eq!(group(vec![x(), x()]).into_body().len(), 2);
+        assert_eq!(x().into_body(), vec![x()]);
+    }
+
+    #[test]
+    fn character_boxes_and_binrel_classes() {
+        let colored = node(NodeKind::Color {
+            color: "red".to_string(),
+            body: vec![x()],
+        });
+        assert!(colored.is_character_box());
+        let font = node(NodeKind::Font {
+            font: "mathbf",
+            body: bx(),
+        });
+        assert!(font.is_character_box());
+        assert!(node(NodeKind::CharCode('A')).is_character_box());
+        assert!(!node(symbol(AtomGroup::Op)).is_character_box());
+        let two = node(NodeKind::Color {
+            color: "red".to_string(),
+            body: vec![x(), x()],
+        });
+        assert!(!two.is_character_box());
+
+        assert_eq!(node(symbol(AtomGroup::Bin)).binrel_class(), MathClass::Bin);
+        assert_eq!(node(symbol(AtomGroup::Rel)).binrel_class(), MathClass::Rel);
+        assert_eq!(x().binrel_class(), MathClass::Ord);
+        let rel_first = node(NodeKind::Group {
+            body: vec![node(symbol(AtomGroup::Rel)), x()],
+            semisimple: false,
+        });
+        assert_eq!(rel_first.binrel_class(), MathClass::Rel);
+        let empty = node(NodeKind::Group {
+            body: vec![],
+            semisimple: false,
+        });
+        assert_eq!(empty.binrel_class(), MathClass::Ord);
+    }
+}

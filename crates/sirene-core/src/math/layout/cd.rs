@@ -100,9 +100,11 @@ pub(super) fn cd_label_parent<'t>(
 #[cfg(test)]
 mod tests {
     use crate::math::{
+        ast::{CdSide, Node, NodeKind},
         boxes::{Bx, Item},
         layout::layout,
         parser::{Settings, parse_with},
+        symbols::{AtomGroup, Mode, Name},
     };
 
     fn laid_out(src: &str) -> Bx<'static> {
@@ -242,6 +244,60 @@ mod tests {
             let nodes = parse_with(src, Settings { display_mode: true }).unwrap();
             assert!(layout(&nodes, true).is_ok(), "{src}");
         }
+    }
+
+    fn x() -> Node<'static> {
+        Node {
+            kind: NodeKind::Symbol {
+                group: AtomGroup::MathOrd,
+                name: Name::Char("x"),
+            },
+            mode: Mode::Math,
+            span: 0..1,
+        }
+    }
+
+    /// The parser puts a label only in a vertical arrow's fragment; built alone, a label draws
+    /// and takes no room.
+    #[test]
+    fn a_label_alone_takes_no_room() {
+        for side in [CdSide::Left, CdSide::Right] {
+            let nodes = [Node {
+                kind: NodeKind::CdLabel {
+                    side,
+                    label: Box::new(x()),
+                },
+                mode: Mode::Math,
+                span: 0..1,
+            }];
+            let bx = layout(&nodes, true).unwrap();
+            assert_eq!((bx.width.0, bx.height.0, bx.depth.0), (0.0, 0.0, 0.0));
+            assert!(
+                bx.items()
+                    .iter()
+                    .any(|i| matches!(i, Item::Glyph { glyph, .. } if glyph.text == "x")),
+                "{side:?}"
+            );
+        }
+    }
+
+    /// A fragment that is not a group is the arrow alone, sized as it is.
+    #[test]
+    fn a_fragment_that_is_not_a_group_is_the_arrow() {
+        let nodes = [Node {
+            kind: NodeKind::CdLabelParent {
+                fragment: Box::new(x()),
+            },
+            mode: Mode::Math,
+            span: 0..1,
+        }];
+        let bx = layout(&nodes, true).unwrap();
+        let plain = [x()];
+        let alone = layout(&plain, true).unwrap();
+        assert_eq!(
+            (bx.width, bx.height, bx.depth),
+            (alone.width, alone.height, alone.depth)
+        );
     }
 
     #[test]

@@ -31,3 +31,18 @@ impl fmt::Display for MathError {
 }
 
 impl std::error::Error for MathError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn displays_the_message_and_the_span() {
+        let e = MathError::new("Undefined control sequence: \\foo", 3..7);
+        assert_eq!(e.to_string(), "Undefined control sequence: \\foo at 3..7");
+        assert_eq!(MathError::new("", 0..0).to_string(), " at 0..0");
+        let boxed: Box<dyn std::error::Error> = Box::new(e.clone());
+        assert!(boxed.source().is_none());
+        assert_eq!(boxed.to_string(), e.to_string());
+    }
+}
