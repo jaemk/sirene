@@ -141,7 +141,7 @@ fn the_expander_reads_what_katex_parses() {
         "{}",
         failures.join("\n")
     );
-    assert_eq!((read, failures.len()), (448, 1));
+    assert_eq!((read, failures.len()), (449, 0));
 }
 
 /// The errors KaTeX's expander raises are the expander's errors too: for each input KaTeX
@@ -715,7 +715,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (605, 10));
+    assert_eq!((same, unsupported), (606, 9));
 }
 
 /// Layout gives each formula KaTeX parses the height and depth KaTeX gives it, or says the
@@ -759,7 +759,7 @@ fn layout_agrees_with_katex_on_height_and_depth() {
         }
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    assert_eq!((same, not_yet), (444, 1));
+    assert_eq!((same, not_yet), (445, 1));
 }
 
 /// A development aid, not a check: which nodes stop layout of the most baseline inputs. Run
