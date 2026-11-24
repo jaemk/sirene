@@ -306,6 +306,8 @@ More deviations (LMATH-T9):
 | Parse nodes | JS objects with a `type` string | `Node { kind: NodeKind, mode, span }`, one enum | LMATH-13 |
 | Bare size text | the longest run of tokens that fits a size, without limit | at most 64 bytes (`MAX_SIZE_TEXT`) | each token is tested against the text so far; LMATH-6 |
 | Nesting depth | none | braces and functions together at most `MAX_DEPTH` (64) | the parser recurses; LMATH-6 |
+| `\@char` of a lone surrogate (`\@char{55296}`) | a string with that code unit | "\@char with invalid code point 55296" | a Rust `char` is a scalar value |
+| `\href`, `\url`, `\includegraphics`, `\htmlClass`, `\htmlId`, `\htmlStyle`, `\htmlData` | run if the `trust` setting allows | always as KaTeX does with `trust` off: the command's name in `#cc0000` | no `trust` setting; a link or an attribute from formula text is not wanted (LPA-2) |
 
 Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of its stages:
 
@@ -373,7 +375,13 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   box commands read the body as text), `\pmb` (`Pmb`), `\hbox`, `\vcenter`, `\mathchoice`
   (the four choices), and `\reflectbox` with `\mathreflectbox`. The stretchy arrows
   (`\xrightarrow[below]{above}` and 21 others; `XArrow`) and the braces `\overbrace`,
-  `\underbrace`, `\overbracket`, `\underbracket` (`HorizBrace`) are built too. `\sout` in math mode is a
+  `\underbrace`, `\overbracket`, `\underbracket` (`HorizBrace`) are built too, and
+  `\overset`, `\underset`, `\stackrel` (an `MClass` around an `Op` with scripts).
+  Text and math: `$ ... $` and `\(` ... `\)` inside text mode (`Styling`, text style, font
+  reset); `\)` and `\]` alone are "Mismatched"; `\@char{65}` (`CharCode`, read as
+  JavaScript's `parseInt` does); `\html@mathml` (`HtmlMathml`). The link and HTML commands read
+  and check their arguments (a `url` or `raw` string, with `%` a plain character in it) and then
+  give the command's name in the error color, as KaTeX does when the formula is not trusted. `\sout` in math mode is a
   KaTeX strict-mode warning, which the parser does not report.
   Stack: braces and functions share one nesting budget of `MAX_DEPTH` (the parser reads both by
   recursion), and the functions that read the rest of the group are built in a function of their
@@ -396,7 +404,7 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   `parse_with` takes the display-mode setting. Functions that read the rest of a table cell
   (`\displaystyle`, `\color`, the size commands) stop at the cell's `\\` as KaTeX's do.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 510 give exactly KaTeX's tree or KaTeX's error, 105 stop at a function not
+  macro settings, 582 give exactly KaTeX's tree or KaTeX's error, 33 stop at a function not
   built yet, and one is a listed deviation. No input differs. The first number rises and the
   second falls as functions land.
 

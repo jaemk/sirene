@@ -43,6 +43,8 @@ pub(crate) struct Token<'a> {
 pub(crate) struct Lexer<'a> {
     src: &'a str,
     at: usize,
+    /// `%` is a character, not the start of a comment, as in the argument of `\url`.
+    plain_percent: bool,
 }
 
 fn is_space(c: char) -> bool {
@@ -72,7 +74,17 @@ impl<'a> Lexer<'a> {
     /// A lexer over `src`, which must be within `limits::MAX_SOURCE`.
     pub(crate) fn new(src: &'a str) -> Result<Self, MathError> {
         limits::check_source(src)?;
-        Ok(Self { src, at: 0 })
+        Ok(Self {
+            src,
+            at: 0,
+            plain_percent: false,
+        })
+    }
+
+    /// Makes `%` a character (or a comment again), for the tokens read from now on. Returns the
+    /// setting it replaces.
+    pub(crate) fn set_plain_percent(&mut self, plain: bool) -> bool {
+        std::mem::replace(&mut self.plain_percent, plain)
     }
 
     /// The next token, with `Eof` forever at the end of the source. An error leaves the lexer at
@@ -92,7 +104,7 @@ impl<'a> Lexer<'a> {
                 '\\' => self.control(start)?,
                 c if is_plain(c) => {
                     let token = self.character(start, c);
-                    if matches!(token.kind, TokenKind::Char("%")) {
+                    if matches!(token.kind, TokenKind::Char("%")) && !self.plain_percent {
                         // A comment runs to the end of its line, and the newline goes with it.
                         self.at = match self.src[self.at..].find('\n') {
                             Some(newline) => self.at + newline + 1,

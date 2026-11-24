@@ -137,6 +137,42 @@ impl<'a> Parser<'a> {
     }
 }
 
+/// The checks `\includegraphics` makes of a size option: a bare number (in `bp`), or a number
+/// and a unit as a size argument has.
+pub(super) fn check_graphics_size(text: &str, span: &Range<usize>) -> Result<(), MathError> {
+    if is_plain_number(text) {
+        return Ok(());
+    }
+    let Some((_, unit)) = find_measurement(text) else {
+        return Err(MathError::new(
+            format!("Invalid size: '{text}' in \\includegraphics"),
+            span.clone(),
+        ));
+    };
+    if !UNITS.contains(&unit) {
+        return Err(MathError::new(
+            format!("Invalid unit: '{unit}' in \\includegraphics."),
+            span.clone(),
+        ));
+    }
+    Ok(())
+}
+
+/// A number with an optional sign and no unit: `5`, `-2.`, `+ .5`.
+fn is_plain_number(text: &str) -> bool {
+    let rest = text
+        .strip_prefix(['-', '+'])
+        .unwrap_or(text)
+        .trim_start_matches(' ');
+    let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    match rest.split_once('.') {
+        None => !rest.is_empty() && digits(rest),
+        Some((whole, fraction)) => {
+            digits(whole) && digits(fraction) && !(whole.is_empty() && fraction.is_empty())
+        }
+    }
+}
+
 /// Whether `text` could be the start of a size: an optional sign, a number with at most one
 /// point, and up to two lowercase letters, with spaces allowed between the parts.
 fn is_size_prefix(text: &str) -> bool {

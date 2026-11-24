@@ -252,6 +252,12 @@ impl<'a> Expander<'a> {
         self.mode = mode;
     }
 
+    /// Makes `%` a plain character in the source read from now on (or a comment again), as it is
+    /// in the argument of `\url`. Returns the setting it replaces.
+    pub(crate) fn set_plain_percent(&mut self, plain: bool) -> bool {
+        self.lexer.set_plain_percent(plain)
+    }
+
     /// Macro expansions so far, which `limits::MAX_EXPANSIONS` bounds.
     pub(crate) fn expansions(&self) -> usize {
         self.expansions

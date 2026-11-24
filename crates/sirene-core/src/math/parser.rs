@@ -677,8 +677,16 @@ mod tests {
             }
             NodeKind::Text { body, font } => {
                 let inner: Vec<_> = body.iter().map(show).collect();
-                format!("\\{font}[{}]", inner.join(" "))
+                format!("\\{}[{}]", font.unwrap_or(""), inner.join(" "))
             }
+            NodeKind::HtmlMathml { html, mathml } => {
+                let part =
+                    |nodes: &[Node<'_>]| nodes.iter().map(show).collect::<Vec<_>>().join(" ");
+                format!("htmlmathml[{} | {}]", part(html), part(mathml))
+            }
+            NodeKind::CharCode(c) => format!("char<{c}>"),
+            NodeKind::Raw { string } => format!("raw<{string}>"),
+            NodeKind::Url { url } => format!("url<{url}>"),
             NodeKind::Font { font, body } => format!("{font}<{}>", show(body)),
             NodeKind::MClass { class, body, .. } => {
                 let inner: Vec<_> = body.iter().map(show).collect();
@@ -994,6 +1002,96 @@ mod tests {
             "Can't use function '\\angl' in text mode"
         );
         assert_eq!(error("\\colorbox{nope!}{a}"), "Invalid color: 'nope!'");
+    }
+
+    #[test]
+    fn math_inside_text() {
+        assert_eq!(shown("\\text{a $x$ b}"), "\\text[a   Text[x]   b]");
+        assert_eq!(shown("\\text{\\(x\\)}"), "\\text[Text[x]]");
+        assert_eq!(error("\\text{$x}"), "Expected '$', got 'EOF'");
+        assert_eq!(error("$x$"), "Can't use function '$' in math mode");
+        assert_eq!(error("\\text{x \\)}"), "Mismatched \\)");
+        assert_eq!(error("\\]"), "Can't use function '\\]' in math mode");
+    }
+
+    #[test]
+    fn characters_from_numbers() {
+        assert_eq!(shown("\\@char{65}"), "char<A>");
+        // As `parseInt` reads it: up to the first character that is not a digit. Letters are
+        // characters only in text mode.
+        assert_eq!(shown("\\text{\\@char{0x41}}"), "\\text[char<A>]");
+        assert_eq!(shown("\\text{\\@char{66z}}"), "\\text[char<B>]");
+        assert_eq!(
+            error("\\text{\\@char{z}}"),
+            "\\@char has non-numeric argument z"
+        );
+        assert_eq!(error("\\@char{z}"), "\\@char has non-numeric argument");
+        assert_eq!(
+            error("\\@char{\\text{2}}"),
+            "\\@char has non-numeric argument"
+        );
+        assert_eq!(
+            error("\\@char{1114112}"),
+            "\\@char with invalid code point 1114112"
+        );
+        assert_eq!(
+            error("\\@char{55296}"),
+            "\\@char with invalid code point 55296"
+        );
+    }
+
+    #[test]
+    fn links_and_html_are_left_out_as_untrusted() {
+        // KaTeX with no trust shows the command's name in the error color.
+        let shown_name = |src: &str| match &parse(src).unwrap()[0].kind {
+            NodeKind::Color { color, body } => {
+                let NodeKind::Text { body, font } = &body[0].kind else {
+                    unreachable!("text");
+                };
+                assert_eq!(*font, None);
+                format!(
+                    "{color} {}",
+                    body.iter().map(show).collect::<Vec<_>>().join("")
+                )
+            }
+            other => unreachable!("a left out command, not {other:?}"),
+        };
+        assert_eq!(shown_name("\\href{http://a.b/}{x}"), "#cc0000 \\href");
+        assert_eq!(shown_name("\\url{http://a.b/}"), "#cc0000 \\url");
+        assert_eq!(shown_name("\\htmlId{a}{x}"), "#cc0000 \\htmlId");
+        assert_eq!(
+            shown_name("\\includegraphics{a.png}"),
+            "#cc0000 \\includegraphics"
+        );
+        // A `%` in the argument is a character.
+        assert_eq!(shown("\\url{a%b} c"), shown("\\url{ab} c"));
+        // Checks KaTeX makes first.
+        assert_eq!(
+            error("\\htmlData{a}{x}"),
+            "\\htmlData key/value 'a' missing equals sign"
+        );
+        assert!(parse("\\htmlData{a=1,b=2{,}3}{x}").is_ok());
+        assert_eq!(
+            error("\\includegraphics[depth=1em]{a.png}"),
+            "Invalid key: 'depth' in \\includegraphics."
+        );
+        assert_eq!(
+            error("\\includegraphics[width=wide]{a.png}"),
+            "Invalid size: 'wide' in \\includegraphics"
+        );
+        assert_eq!(
+            error("\\includegraphics[height=1zz]{a.png}"),
+            "Invalid unit: 'zz' in \\includegraphics."
+        );
+        assert!(parse("\\includegraphics[width=2, height=1.5em, alt=x]{a.png}").is_ok());
+        assert_eq!(shown("\\html@mathml{a}{b}"), "htmlmathml[a | b]");
+    }
+
+    #[test]
+    fn one_body_on_another() {
+        assert_eq!(shown("\\overset{a}{=}"), "Rel[(opL[=] ^{a})]");
+        assert_eq!(shown("\\underset{a}{x}"), "Ord[(opL[x] _{a})]");
+        assert_eq!(shown("\\stackrel{a}{x}"), "Rel[(opL[x] ^{a})]");
     }
 
     #[test]
@@ -1526,7 +1624,7 @@ mod tests {
 
     #[test]
     fn what_the_parser_lacks_is_said_so() {
-        assert_eq!(error("\\href{u}{x}"), "\\href is not supported yet");
+        assert!(error("\\begin{CD}a\\end{CD}").ends_with("supported yet"));
         assert_eq!(error("\\verb|x|"), "\\verb is not supported yet");
         assert!(error("x\u{2082}").ends_with("supported yet"));
     }

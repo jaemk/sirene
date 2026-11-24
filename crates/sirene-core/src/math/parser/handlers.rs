@@ -6,8 +6,11 @@
 //! its arguments are read. The commands here: fractions and binomials, `\sqrt`, the style
 //! commands, and `\text` with its font variants.
 
+use std::ops::Range;
+
 use super::{
-    MathError, Mode, Name, Node, NodeKind, Parser, TokenKind, environments, unsupported, written,
+    MathError, Mode, Name, Node, NodeKind, Parser, TokenKind, arguments, environments, unsupported,
+    written,
 };
 use crate::math::{
     ast::{MathClass, Measurement, OpContent, StyleName},
@@ -34,12 +37,26 @@ enum Build {
     /// `\over`, `\atop` and the like: they split the expression, and become the fraction
     /// command named (`\frac`) around the two halves.
     Infix(&'static str),
+    /// `$` and `\(`: math inside text, to the closing `$` or `\)`.
+    MathShift,
+    /// `\)` and `\]` with nothing open.
+    Mismatched,
+    /// `\@char{65}`.
+    Char,
+    /// `\html@mathml{html}{mathml}`.
+    HtmlMathml,
+    /// `\href`, `\url`, `\includegraphics`, `\htmlClass` and the other HTML commands, which
+    /// KaTeX leaves out unless the formula is trusted: sirene never trusts one. The command's
+    /// arguments are read and checked, and its name stands in its place in the error color.
+    Untrusted(&'static str),
     /// `\fbox`, `\colorbox`, `\fcolorbox`, `\cancel` and the rest that draw around a body.
     Enclose,
     /// `\xrightarrow` and the other stretchy arrows with a label.
     XArrow,
     /// `\overbrace`, `\underbrace`, `\overbracket`, `\underbracket`.
     HorizBrace,
+    /// `\overset`, `\underset` and `\stackrel`: one body on another.
+    Stack,
     Pmb,
     HBox,
     VCenter,
@@ -141,6 +158,17 @@ impl Build {
             "\\brace" => Build::Infix("\\\\bracefrac"),
             "\\brack" => Build::Infix("\\\\brackfrac"),
             "\\above" => Build::Infix("\\\\abovefrac"),
+            "$" | "\\(" => Build::MathShift,
+            "\\)" | "\\]" => Build::Mismatched,
+            "\\@char" => Build::Char,
+            "\\html@mathml" => Build::HtmlMathml,
+            "\\href" => Build::Untrusted("\\href"),
+            "\\url" => Build::Untrusted("\\url"),
+            "\\includegraphics" => Build::Untrusted("\\includegraphics"),
+            "\\htmlClass" => Build::Untrusted("\\htmlClass"),
+            "\\htmlId" => Build::Untrusted("\\htmlId"),
+            "\\htmlStyle" => Build::Untrusted("\\htmlStyle"),
+            "\\htmlData" => Build::Untrusted("\\htmlData"),
             "\\fbox" | "\\colorbox" | "\\fcolorbox" | "\\cancel" | "\\bcancel" | "\\xcancel"
             | "\\sout" | "\\angl" | "\\phase" => Build::Enclose,
             "\\xleftarrow"
@@ -168,6 +196,7 @@ impl Build {
             "\\overbrace" | "\\underbrace" | "\\overbracket" | "\\underbracket" => {
                 Build::HorizBrace
             }
+            "\\overset" | "\\underset" | "\\stackrel" => Build::Stack,
             "\\pmb" => Build::Pmb,
             "\\hbox" => Build::HBox,
             "\\vcenter" => Build::VCenter,
@@ -419,6 +448,25 @@ impl<'a> Parser<'a> {
             b't' => self.parse_argument_group(optional, Some(Mode::Text)),
             b's' => self.parse_size_group(optional),
             b'c' => self.parse_color_group(optional),
+            // The string of the tokens, with `%` a character in it. A raw argument skips the
+            // spaces and comments before it first.
+            b'u' | b'r' => {
+                if kind == b'r' {
+                    self.expander.consume_spaces()?;
+                }
+                let before = self.expander.set_plain_percent(true);
+                let found = self.parse_string_group(optional);
+                self.expander.set_plain_percent(before);
+                let Some((text, span)) = found? else {
+                    return Ok(None);
+                };
+                let (kind, mode) = if kind == b'u' {
+                    (NodeKind::Url { url: text }, self.mode)
+                } else {
+                    (NodeKind::Raw { string: text }, Mode::Text)
+                };
+                Ok(Some(Node { kind, mode, span }))
+            }
             b'h' => {
                 // A box argument is text, set in the text style with the font reset.
                 let Some(group) = self.parse_argument_group(optional, Some(Mode::Text))? else {
@@ -504,6 +552,7 @@ impl<'a> Parser<'a> {
             | Build::Color
             | Build::Sizing(_)
             | Build::Left
+            | Build::MathShift
             | Build::Begin => self.build_open(build, name, token, args),
             _ => self.build(build, name, token, args),
         }
@@ -619,6 +668,22 @@ impl<'a> Parser<'a> {
                     },
                     mode,
                     span: start..right_arg.span.end,
+                })
+            }
+            Build::MathShift => {
+                let close = if name == "\\(" { "\\)" } else { "$" };
+                self.switch_mode(Mode::Math);
+                let body = self.parse_expression_until(false, Some(close))?;
+                let end = self.expect(close)?;
+                self.switch_mode(mode);
+                Ok(Node {
+                    kind: NodeKind::Styling {
+                        style: StyleName::Text,
+                        body,
+                        reset_font: true,
+                    },
+                    mode,
+                    span: start..end.span.end,
                 })
             }
             Build::Begin => {
@@ -785,6 +850,54 @@ impl<'a> Parser<'a> {
                     mode,
                 })
             }
+            Build::Mismatched => Err(MathError::new(
+                format!("Mismatched {name}"),
+                token.span.clone(),
+            )),
+            Build::Char => {
+                let Some(arg) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let message = "\\@char has non-numeric argument";
+                let number = environments::character_group(&arg, message, false)?;
+                let Some(code) = js_parse_int(&number) else {
+                    return Err(MathError::new(format!("{message} {number}"), arg.span));
+                };
+                let Some(c) = u32::try_from(code).ok().and_then(char::from_u32) else {
+                    return Err(MathError::new(
+                        format!("\\@char with invalid code point {number}"),
+                        arg.span,
+                    ));
+                };
+                Ok(Node {
+                    kind: NodeKind::CharCode(c),
+                    mode,
+                    span: start..arg.span.end,
+                })
+            }
+            Build::HtmlMathml => {
+                let (Some(mathml), Some(html)) = (args.required.pop(), args.required.pop()) else {
+                    return Err(missing(name));
+                };
+                let span = start..mathml.span.end;
+                Ok(Node {
+                    kind: NodeKind::HtmlMathml {
+                        html: html.into_body(),
+                        mathml: mathml.into_body(),
+                    },
+                    mode,
+                    span,
+                })
+            }
+            Build::Untrusted(command) => {
+                // What KaTeX checks before it asks whether the command is trusted.
+                match (command, args.required.first(), args.optional.first()) {
+                    ("\\htmlData", Some(raw), _) => check_html_data(raw)?,
+                    ("\\includegraphics", _, Some(Some(raw))) => check_graphics(raw)?,
+                    _ => {}
+                }
+                Ok(left_out(command, mode, token.span.clone()))
+            }
             Build::XArrow => {
                 let Some(body) = args.required.pop() else {
                     return Err(missing(name));
@@ -812,6 +925,54 @@ impl<'a> Parser<'a> {
                         base: Box::new(base),
                     },
                     mode,
+                })
+            }
+            Build::Stack => {
+                let (Some(base), Some(shifted)) = (args.required.pop(), args.required.pop()) else {
+                    return Err(missing(name));
+                };
+                // `\stackrel` is a relation; the others space as their base would.
+                let class = if name == "\\stackrel" {
+                    MathClass::Rel
+                } else {
+                    base.binrel_class()
+                };
+                let (base_mode, shifted_mode) = (base.mode, shifted.mode);
+                let span = start..base.span.end;
+                let op = Node {
+                    kind: NodeKind::Op {
+                        limits: true,
+                        always_handle_supsub: true,
+                        symbol: false,
+                        suppress_base_shift: Some(name != "\\stackrel"),
+                        content: OpContent::Body(base.into_body()),
+                    },
+                    mode: base_mode,
+                    span: span.clone(),
+                };
+                let (sup, sub) = if name == "\\underset" {
+                    (None, Some(Box::new(shifted)))
+                } else {
+                    (Some(Box::new(shifted)), None)
+                };
+                let supsub = Node {
+                    kind: NodeKind::SupSub {
+                        base: Some(Box::new(op)),
+                        sup,
+                        sub,
+                    },
+                    mode: shifted_mode,
+                    span: span.clone(),
+                };
+                let character_box = supsub.is_character_box();
+                Ok(Node {
+                    kind: NodeKind::MClass {
+                        class,
+                        body: vec![supsub],
+                        character_box,
+                    },
+                    mode,
+                    span,
                 })
             }
             Build::Pmb => {
@@ -928,7 +1089,10 @@ impl<'a> Parser<'a> {
                     _ => return Err(missing(name)),
                 };
                 Ok(Node {
-                    kind: NodeKind::Text { body, font },
+                    kind: NodeKind::Text {
+                        body,
+                        font: Some(font),
+                    },
                     mode,
                     span,
                 })
@@ -1244,6 +1408,7 @@ impl<'a> Parser<'a> {
                     limits,
                     always_handle_supsub: false,
                     symbol,
+                    suppress_base_shift: None,
                     content: OpContent::Name(canonical_operator(name)),
                 },
                 mode,
@@ -1259,6 +1424,7 @@ impl<'a> Parser<'a> {
                         limits: false,
                         always_handle_supsub: false,
                         symbol: false,
+                        suppress_base_shift: None,
                         content: OpContent::Body(arg.into_body()),
                     },
                     mode,
@@ -1302,6 +1468,7 @@ impl<'a> Parser<'a> {
             | Build::Color
             | Build::Sizing(_)
             | Build::Left
+            | Build::MathShift
             | Build::Begin => Err(missing(name)),
             Build::End => {
                 let Some(arg) = args.required.pop() else {
@@ -1364,6 +1531,126 @@ fn color_token(node: Node<'_>, name: &str) -> Result<String, MathError> {
         NodeKind::ColorToken(color) => Ok(color),
         _ => Err(missing(name)),
     }
+}
+
+/// The color KaTeX gives a command it leaves out (its `errorColor` setting).
+const ERROR_COLOR: &str = "#cc0000";
+
+/// What stands for a command that is not run: its name as text, in the error color.
+fn left_out<'a>(command: &'static str, mode: Mode, span: Range<usize>) -> Node<'a> {
+    let letter = |text| Node {
+        kind: NodeKind::Symbol {
+            group: AtomGroup::TextOrd,
+            name: Name::Char(text),
+        },
+        mode: Mode::Text,
+        span: span.clone(),
+    };
+    let body = command
+        .char_indices()
+        .filter_map(|(i, c)| command.get(i..i + c.len_utf8()))
+        .map(letter)
+        .collect();
+    let text = Node {
+        kind: NodeKind::Text { body, font: None },
+        mode,
+        span: span.clone(),
+    };
+    Node {
+        kind: NodeKind::Color {
+            color: ERROR_COLOR.to_string(),
+            body: vec![text],
+        },
+        mode,
+        span,
+    }
+}
+
+/// The checks `\htmlData` makes of its attribute list: `key=value` items split at commas, where
+/// `{,}` is a comma inside an item.
+fn check_html_data(raw: &Node<'_>) -> Result<(), MathError> {
+    let NodeKind::Raw { string } = &raw.kind else {
+        return Err(expected_type("raw", raw));
+    };
+    let mut items = Vec::new();
+    let mut current = String::new();
+    let mut rest = string.as_str();
+    loop {
+        if let Some(after) = rest.strip_prefix("{,}") {
+            current.push(',');
+            rest = after;
+        } else if let Some(after) = rest.strip_prefix(',') {
+            items.push(std::mem::take(&mut current));
+            rest = after;
+        } else {
+            let mut chars = rest.chars();
+            let Some(c) = chars.next() else { break };
+            current.push(c);
+            rest = chars.as_str();
+        }
+    }
+    items.push(current);
+    for item in items {
+        if !item.contains('=') {
+            return Err(MathError::new(
+                format!("\\htmlData key/value '{item}' missing equals sign"),
+                raw.span.clone(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// The checks `\includegraphics` makes of its `key=value` options before it looks at the URL.
+fn check_graphics(raw: &Node<'_>) -> Result<(), MathError> {
+    let NodeKind::Raw { string } = &raw.kind else {
+        return Err(expected_type("raw", raw));
+    };
+    for attribute in string.split(',') {
+        let parts: Vec<&str> = attribute.split('=').collect();
+        if let [key, value] = parts.as_slice() {
+            match key.trim() {
+                "alt" => {}
+                "width" | "height" | "totalheight" => {
+                    arguments::check_graphics_size(value.trim(), &raw.span)?;
+                }
+                _ => {
+                    return Err(MathError::new(
+                        format!("Invalid key: '{key}' in \\includegraphics."),
+                        raw.span.clone(),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// What JavaScript's `parseInt` makes of `text`: a sign, then decimal digits (or hexadecimal ones
+/// after `0x`), up to the first other character. `None` if there are no digits. A number too big
+/// for the type stays at its largest, which is out of every range the caller allows.
+fn js_parse_int(text: &str) -> Option<i64> {
+    let text = text.trim_start();
+    let (negative, rest) = match text.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    };
+    let (radix, digits) = match rest.strip_prefix("0x").or_else(|| rest.strip_prefix("0X")) {
+        Some(digits) => (16, digits),
+        None => (10, rest),
+    };
+    let mut value: i64 = 0;
+    let mut any = false;
+    for c in digits.chars() {
+        let Some(digit) = c.to_digit(radix) else {
+            break;
+        };
+        any = true;
+        value = value
+            .saturating_mul(i64::from(radix))
+            .saturating_add(i64::from(digit));
+    }
+    any.then_some(if negative { -value } else { value })
 }
 
 /// The last required argument, a color.
