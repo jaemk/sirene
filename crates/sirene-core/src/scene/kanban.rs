@@ -62,7 +62,7 @@ struct CardBox {
 
 /// Draws `board` (MKAN-3).
 pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let (fs, lh) = (theme.font_size, theme.line_height);
     let small = fs - 2.0;
     let small_lh = lh - 4.0;
@@ -143,11 +143,7 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
         top + col_h + MARGIN
     };
 
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     let text = |p: &mut Painter, owner: Owner, s: &str, center: Pt, size: f32| {
         p.elements.push(Element {
             owner,

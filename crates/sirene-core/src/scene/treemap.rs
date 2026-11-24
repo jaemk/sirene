@@ -179,11 +179,7 @@ pub fn treemap(treemap: &Treemap, metrics: &impl TextMetrics, theme: &Theme) -> 
     };
 
     let owner = Owner::Diagram;
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     let text = |p: &mut Painter, s: &str, center: Pt, size: f32, color: Color, style| {
         p.elements.push(Element {
             owner,

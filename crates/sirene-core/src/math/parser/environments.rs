@@ -550,6 +550,7 @@ impl<'a> Parser<'a> {
         let outer_color = self.current_color.clone();
 
         let mut body: Vec<Vec<Node<'a>>> = vec![Vec::new()];
+        let mut cell_count = 0_usize;
         let mut row_gaps = Vec::new();
         let mut hlines_before_row = Vec::new();
         let mut tags: Option<Vec<RowTag<'a>>> = options.auto_tag.map(|_| Vec::new());
@@ -588,6 +589,17 @@ impl<'a> Parser<'a> {
             }
             let row = body.len() - 1;
             body[row].push(cell);
+            cell_count += 1;
+            if body.len() > limits::MAX_ROWS || cell_count > limits::MAX_CELLS {
+                return Err(MathError::new(
+                    format!(
+                        "table larger than {} rows or {} cells",
+                        limits::MAX_ROWS,
+                        limits::MAX_CELLS
+                    ),
+                    self.fetch()?.span,
+                ));
+            }
             let token = self.fetch()?;
             match token_text(&token.kind).as_str() {
                 "&" => {

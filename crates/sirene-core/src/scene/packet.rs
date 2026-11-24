@@ -69,7 +69,7 @@ fn label_lines(px: &Px<'_, impl TextMetrics>, label: &str, max: f32) -> Vec<Vec<
 
 /// Draws `packet` (MPKT-3).
 pub fn packet(packet: &Packet, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let (fs, lh) = (theme.font_size, theme.line_height);
     let small = (fs - 4.0).max(8.0);
     let title = packet
@@ -118,11 +118,7 @@ pub fn packet(packet: &Packet, metrics: &impl TextMetrics, theme: &Theme) -> Sce
     let left = (width - row_w) / 2.0;
     let height = top + heights.iter().map(|h| numbers_h + h + ROW_GAP).sum::<f32>() + MARGIN;
 
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     let text = |p: &mut Painter, owner: Owner, s: &str, center: Pt, size: f32, color: Color| {
         p.elements.push(Element {
             owner,
@@ -283,10 +279,7 @@ mod tests {
                 }
             }
         }
-        let px = Px {
-            metrics: &Shaped,
-            theme: &Theme::LIGHT,
-        };
+        let px = Px::new(&Shaped, &Theme::LIGHT);
         let lines = label_lines(&px, "abcdefgh", 28.0);
         assert!(lines.len() > 1);
         for line in lines {
@@ -315,10 +308,7 @@ mod tests {
         };
         let scene = super::packet(&packet, &Styled, &Theme::LIGHT);
         assert!(scene.width >= 50.0 + 4.0 + 2.0 * MARGIN);
-        let px = Px {
-            metrics: &Styled,
-            theme: &Theme::LIGHT,
-        };
+        let px = Px::new(&Styled, &Theme::LIGHT);
         assert_eq!(label_lines(&px, "abc", 54.0).len(), 3);
     }
 }

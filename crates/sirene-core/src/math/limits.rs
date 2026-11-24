@@ -31,6 +31,35 @@ pub(crate) const MAX_COLUMNS: usize = 256;
 /// as KaTeX's `maxSize` setting caps it from above; KaTeX's default has no cap.
 pub(crate) const MAX_LENGTH_EM: f64 = 1000.0;
 
+/// Source text echoed in an error message is cut to this many characters.
+pub(crate) const MAX_ECHO: usize = 64;
+
+#[cfg(feature = "math")]
+/// A formula's display list holds at most this many items (glyphs, rules, paths).
+pub(crate) const MAX_ITEMS: usize = 100_000;
+
+#[cfg(feature = "math")]
+/// A block of ASCII rows covers at most this many cells (rows times width).
+pub(crate) const MAX_ASCII_CELLS: usize = 4 * 1024 * 1024;
+
+/// An array or matrix has at most this many rows.
+pub(crate) const MAX_ROWS: usize = 1024;
+
+/// An array or matrix has at most this many cells in all.
+pub(crate) const MAX_CELLS: usize = 16 * 1024;
+
+#[cfg(feature = "math")]
+/// A formula's width, ascent, or descent is at most this many em, and never negative.
+pub(crate) const MAX_EXTENT_EM: f64 = 10_000.0;
+
+/// `text` cut to `MAX_ECHO` characters, with an ASCII `...` after a cut.
+pub(crate) fn clip(text: &str) -> String {
+    match text.char_indices().nth(MAX_ECHO) {
+        Some((at, _)) => format!("{}...", &text[..at]),
+        None => text.to_string(),
+    }
+}
+
 /// The error for a source past `MAX_SOURCE`; the span is the first byte over the limit.
 pub(crate) fn check_source(src: &str) -> Result<(), MathError> {
     if src.len() <= MAX_SOURCE {

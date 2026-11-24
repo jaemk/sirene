@@ -32,6 +32,9 @@ mod formula;
 mod functions;
 #[rustfmt::skip]
 mod functions_data;
+#[cfg(test)]
+#[cfg(feature = "math")]
+mod hardening_tests;
 mod layout;
 mod lexer;
 mod limits;

@@ -267,13 +267,8 @@ impl Lower {
     /// Reports each `<latex>` formula in `text` that does not typeset (LEMB-4, LEMB-5). `token`
     /// is the source text it came from, when it has one.
     fn check_math(&mut self, token: Option<&SyntaxToken>, text: &Text, fallback: TextRange) {
-        if !text.iter().any(|l| formula::has(l, Delim::Latex)) {
-            return;
-        }
-        let raw = token.map_or("", |t| t.text());
-        let start = token.map_or(fallback.start(), |t| t.text_range().start());
-        let errors = formula::errors(start, raw, text.iter().cloned(), fallback, Delim::Latex);
-        self.diagnostics.extend(errors);
+        let found = formula::check_text(token, text, fallback, Delim::Latex);
+        self.diagnostics.extend(found);
     }
 
     fn find(&self, id: &str) -> Option<usize> {

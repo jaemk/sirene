@@ -11,6 +11,7 @@ use super::{
     draw::draw,
     error::MathError,
     layout::layout,
+    limits,
     parser::{Settings, parse_with},
 };
 use crate::scene::{Color, Element, Owner, Pt, Scene};
@@ -185,12 +186,34 @@ pub fn typeset(source: &str, style: MathStyle) -> Result<Formula, MathError> {
         },
     )?;
     let bx = layout(&nodes, display)?;
+    let items = bx.items();
+    if items.len() > limits::MAX_ITEMS {
+        return Err(MathError::new(
+            format!(
+                "formula draws more than {} glyphs and rules",
+                limits::MAX_ITEMS
+            ),
+            0..0,
+        ));
+    }
     Ok(Formula {
-        width: bx.width.0 as f32,
-        ascent: bx.height.0 as f32,
-        descent: bx.depth.0 as f32,
-        items: bx.items().iter().map(Owned::new).collect(),
+        width: extent(bx.width.0)?,
+        ascent: extent(bx.height.0)?,
+        descent: extent(bx.depth.0)?,
+        items: items.iter().map(Owned::new).collect(),
     })
+}
+
+/// A box side in em for the public `Formula`: a negative side (a `\kern` back past the start)
+/// is zero, and one that is not finite or is past `limits::MAX_EXTENT_EM` is an error.
+fn extent(em: f64) -> Result<f32, MathError> {
+    if em.is_finite() && em <= limits::MAX_EXTENT_EM {
+        return Ok(em.max(0.0) as f32);
+    }
+    Err(MathError::new(
+        format!("formula larger than {} em", limits::MAX_EXTENT_EM),
+        0..0,
+    ))
 }
 
 impl Formula {

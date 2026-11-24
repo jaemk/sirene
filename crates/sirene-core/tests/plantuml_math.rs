@@ -118,7 +118,13 @@ fn the_models_know_their_delimiters() {
 #[test]
 fn a_formula_keeps_a_literal_backslash_n() {
     let (seq, d) = sequence(&valid("latex_inline_message"));
-    assert!(d.is_empty(), "{d:?}");
+    // Without the `math` feature each formula is a warning; with it, none is wrong.
+    assert!(
+        d.iter()
+            .all(|d| d.severity == sirene_core::Severity::Warning),
+        "{d:?}"
+    );
+    assert!(cfg!(not(feature = "math")) || d.is_empty(), "{d:?}");
     let texts: Vec<_> = seq.messages().map(|m| m.text.clone()).collect();
     assert_eq!(texts[1], [r"<latex>\neq 0</latex> only"]);
     // Outside a formula `\n` still breaks the line.
@@ -713,6 +719,23 @@ mod math {
         }
     }
 
+    /// The formula is found with its tags: the same text before it is not it.
+    #[test]
+    fn a_diagnostic_is_on_the_formula_not_the_same_text_before_it() {
+        for src in [
+            "@startuml\nA -> B : \\foo is <latex>\\foo</latex>\n@enduml\n",
+            "@startuml\nstart\n:\\foo is <latex>\\foo</latex>;\nstop\n@enduml\n",
+        ] {
+            let d = diagram::lower(src).diagnostics;
+            let [d] = d.as_slice() else {
+                panic!("one diagnostic, got {d:?}");
+            };
+            let (from, to) = (usize::from(d.range.start()), usize::from(d.range.end()));
+            assert_eq!(&src[from..to], r"\foo", "{src}");
+            assert_eq!(&src[from - 7..from], "<latex>", "{src}");
+        }
+    }
+
     #[test]
     fn failing_notes_and_participants_are_diagnosed_on_their_spans() {
         let src = "@startuml\nparticipant \"<latex>\\foo</latex>\" as A\nA -> A : ok <latex>x</latex>\nnote over A\n  fine\n  <latex>\\baz</latex> bad\nend note\n@enduml\n";
@@ -807,26 +830,38 @@ mod math {
 mod no_math {
     use super::*;
 
+    /// One warning per formula, on its body in the source, as `@startlatex` gives.
+    fn assert_warned(src: &str, d: &[sirene_core::Diagnostic], formulas: usize) {
+        assert_eq!(d.len(), formulas, "{d:?}");
+        for x in d {
+            assert_eq!(x.severity, sirene_core::Severity::Warning, "{x:?}");
+            let at = &src[usize::from(x.range.start())..usize::from(x.range.end())];
+            assert!(!at.is_empty() && !at.contains('<'), "{x:?}: {at:?}");
+        }
+    }
+
     #[test]
     fn tags_stay_literal_without_the_math_feature() {
         let src = fixture("errors", "latex_inline_fail");
         let (seq, d) = sequence(&src);
-        assert!(d.is_empty(), "{d:?}");
+        assert_warned(&src, &d, src.matches("<latex>").count());
         let scene = draw_sequence(&seq);
         let t = texts(&scene);
         assert!(
             t.iter().any(|x| x.contains(r"<latex>a + \foo{x}</latex>")),
             "{t:?}"
         );
-        let (chart, d) = graph(&fixture("errors", "latex_inline_fail_activity"));
-        assert!(d.is_empty(), "{d:?}");
+        let src = fixture("errors", "latex_inline_fail_activity");
+        let (chart, d) = graph(&src);
+        assert_warned(&src, &d, src.matches("<latex>").count());
         assert!(
             texts(&draw_graph(&chart))
                 .iter()
                 .any(|x| x.contains("<latex>"))
         );
-        let (seq, d) = sequence(&valid("latex_inline_message"));
-        assert!(d.is_empty(), "{d:?}");
+        let src = valid("latex_inline_message");
+        let (seq, d) = sequence(&src);
+        assert_warned(&src, &d, src.matches("<latex>").count());
         assert!(texts(&draw_sequence(&seq)).contains(&r"<latex>\alpha</latex>"));
     }
 }

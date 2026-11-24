@@ -359,6 +359,30 @@ mod math {
         }
     }
 
+    /// The body is found with its delimiters: the same text outside the formula is not it.
+    #[test]
+    fn a_diagnostic_is_on_the_formula_not_the_same_text_before_it() {
+        let src = "flowchart LR\n  A[\"\\foo is $$\\foo$$\"]\n";
+        let l = flowchart::parse(src).lower();
+        let [d] = l.diagnostics.as_slice() else {
+            panic!("one diagnostic, got {:?}", l.diagnostics);
+        };
+        let range = usize::from(d.range.start())..usize::from(d.range.end());
+        assert_eq!(&src[range.clone()], r"\foo");
+        assert_eq!(&src[range.start - 2..range.start], "$$", "{d:?}");
+    }
+
+    #[test]
+    fn a_doubled_backslash_diagnostic_covers_the_doubled_source() {
+        let src = "flowchart LR\n  A[\"x $$\\\\foo$$ y\"]\n";
+        let l = flowchart::parse(src).lower();
+        let [d] = l.diagnostics.as_slice() else {
+            panic!("one diagnostic, got {:?}", l.diagnostics);
+        };
+        let range = usize::from(d.range.start())..usize::from(d.range.end());
+        assert_eq!(&src[range], r"\\foo", "{d:?}");
+    }
+
     #[test]
     fn a_formula_on_a_failing_edge_label_is_diagnosed_once_per_formula() {
         let src = "flowchart LR\n  A & B -->|\"$$\\foo$$\"| C\n";
@@ -456,15 +480,38 @@ mod math {
 #[cfg(not(feature = "math"))]
 mod no_math {
     use super::*;
+    use sirene_core::ascii::{self, Options};
     use sirene_core::flowchart::Span;
 
     #[test]
     fn dollars_stay_literal_without_the_math_feature() {
+        let src = fixture("math_fail");
         let l = lower("math_fail");
-        assert!(l.diagnostics.is_empty(), "{:?}", l.diagnostics);
+        // One warning, on the body, as `@startlatex` gives.
+        let [d] = l.diagnostics.as_slice() else {
+            panic!("one diagnostic, got {:?}", l.diagnostics);
+        };
+        assert_eq!(d.severity, sirene_core::Severity::Warning);
+        let range = usize::from(d.range.start())..usize::from(d.range.end());
+        assert_eq!(&src[range], r"\foo", "{d:?}");
+        // The formula is a run of its own, read as no markdown, and drawn as its source.
         let label = &l.flowchart.node("A").unwrap().label;
         let spans: Vec<Span> = label.runs().concat();
-        assert_eq!(spans, [Span::plain(r"$$\foo$$")]);
+        let formula = Span {
+            text: r"$$\foo$$".to_owned(),
+            math: true,
+            ..Span::default()
+        };
+        assert_eq!(spans, [formula]);
         assert!(texts(&draw(&l.flowchart)).contains(&r"$$\foo$$"));
+    }
+
+    #[test]
+    fn markdown_does_not_reach_into_a_formula_without_the_math_feature() {
+        let chart = flowchart::parse("flowchart TD\n  A[\"`**b** $$a*b*c$$`\"]\n")
+            .lower()
+            .flowchart;
+        let out = ascii::render(&chart, &Options::default()).unwrap();
+        assert!(out.contains("$$a*b*c$$"), "{out}");
     }
 }

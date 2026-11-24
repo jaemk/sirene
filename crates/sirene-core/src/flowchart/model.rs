@@ -85,6 +85,16 @@ impl Delim {
                 .is_some_and(|t| t.eq_ignore_ascii_case("<math>"))
     }
 
+    /// The language of `formula`, a formula run with its delimiters.
+    #[cfg(feature = "math")]
+    pub(crate) fn flavor(self, formula: &str) -> crate::equation::Flavor {
+        if self.asciimath(formula) {
+            crate::equation::Flavor::AsciiMath
+        } else {
+            crate::equation::Flavor::Tex
+        }
+    }
+
     /// The byte ranges of the formulas in one line, delimiters included.
     pub(crate) fn ranges(self, line: &str) -> Vec<std::ops::Range<usize>> {
         match self {
@@ -154,9 +164,10 @@ impl Label {
 
     /// Like [`Label::spans`], but each `$$...$$` formula (LEMB-1) is a span of its own, so a line
     /// is a row of text runs and formula runs. A label with a formula is not read as markdown, as
-    /// in Mermaid. Without the `math` feature, or without a formula, this is `spans()`.
+    /// in Mermaid, with or without the `math` feature (without it, a formula run draws as its
+    /// source). Without a formula, this is `spans()`.
     pub fn runs(&self) -> Vec<Vec<Span>> {
-        if !cfg!(feature = "math") || !self.has_formula() {
+        if !self.has_formula() {
             return self.spans();
         }
         self.text
@@ -223,11 +234,7 @@ impl Span {
     #[cfg(feature = "math")]
     pub(crate) fn typeset(&self) -> Option<Result<crate::math::Formula, crate::math::MathError>> {
         let (src, style) = (self.formula()?, self.delim()?.style());
-        Some(if self.is_asciimath() {
-            crate::math::typeset_asciimath(&src, style)
-        } else {
-            crate::math::typeset(&src, style)
-        })
+        Some(self.flavor().typeset(&src, style))
     }
 
     /// A formula span as rows of text and the baseline row, as [`Span::typeset`] sets it.
@@ -236,11 +243,14 @@ impl Span {
         &self,
     ) -> Option<Result<(Vec<String>, usize), crate::math::MathError>> {
         let (src, style) = (self.formula()?, self.delim()?.style());
-        Some(if self.is_asciimath() {
-            crate::math::ascii_asciimath_rows(&src, style)
-        } else {
-            crate::math::ascii_formula_rows(&src, style)
-        })
+        Some(self.flavor().ascii_rows(&src, style))
+    }
+
+    /// The language of a formula span.
+    #[cfg(feature = "math")]
+    pub(crate) fn flavor(&self) -> crate::equation::Flavor {
+        self.delim()
+            .map_or(crate::equation::Flavor::Tex, |d| d.flavor(&self.text))
     }
 }
 

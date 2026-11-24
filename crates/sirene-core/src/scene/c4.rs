@@ -106,7 +106,7 @@ const ITALIC: TextStyle = TextStyle {
 };
 
 pub fn c4(c: &C4, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Scene> {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let t = Text { metrics, theme };
     let inner = WIDTH - 2.0 * PAD;
     // Each element's lines, above and below the person icon.

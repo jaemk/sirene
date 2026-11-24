@@ -42,7 +42,7 @@ fn stroke(color: Color, width: f32, dash: Option<(f32, f32)>) -> Option<Stroke> 
 
 /// Draws `journey` (MJOUR-3).
 pub fn journey(journey: &Journey, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let lh = theme.line_height;
     let wrap = |text: &str| px.wrap(&Label::plain(text).spans(), TASK_W - 2.0 * PAD);
     let block_h = |lines: &[Vec<Span>]| (lines.len() as f32 * lh + 2.0 * PAD).max(MIN_H);
@@ -108,11 +108,7 @@ pub fn journey(journey: &Journey, metrics: &impl TextMetrics, theme: &Theme) -> 
     };
 
     let owner = Owner::Diagram;
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     let text = |p: &mut Painter, s: &str, at: Pt, color: Color, size: f32| {
         p.elements.push(Element {
             owner,

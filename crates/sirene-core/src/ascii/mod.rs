@@ -65,6 +65,7 @@ use crate::flowchart::{
 };
 use crate::layout::{self, Config, Point, Rect, Size, Spacing};
 use canvas::{Canvas, DOWN, Glyph, LEFT, Line, RIGHT, UP, glyph};
+use mathtext::Rows;
 
 /// Characters to draw with (ASCIIR-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -121,10 +122,12 @@ pub fn render(chart: &Flowchart, options: &Options) -> crate::Result<String> {
         .then(|| guillemets_to_ascii(chart))
         .flatten();
     let chart = plain.as_ref().unwrap_or(chart);
-    let graph = chart.layout_graph(&Cells)?;
+    // The formulas set to size the layout are the ones drawn.
+    let rows = Rows::default();
+    let graph = chart.layout_graph(&CellsIn(&rows))?;
     let layout = layout::layout(&graph, &CONFIG)?;
     let _phase = crate::profile::Phase::start("ascii.draw");
-    Ok(draw(chart, &layout, options))
+    Ok(draw_in(chart, &layout, options, &rows))
 }
 
 /// `chart` with `«` and `»` in its text written `<<` and `>>`, or `None` when it has none.
@@ -186,6 +189,11 @@ fn guillemets_to_ascii(chart: &Flowchart) -> Option<Flowchart> {
 
 /// Draws `chart` placed by `layout`, in cells.
 fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String {
+    draw_in(chart, layout, options, &Rows::default())
+}
+
+/// [`draw`] with the formulas already set in `rows`.
+fn draw_in(chart: &Flowchart, layout: &layout::Layout, options: &Options, rows: &Rows) -> String {
     let mut canvas = Canvas::new(layout.size.w, layout.size.h);
 
     for (s, r) in chart.subgraphs.iter().zip(&layout.clusters) {
@@ -209,7 +217,8 @@ fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String
         }
         draw_box(&mut canvas, r, Line::Light);
         canvas.glyph(r.right(), r.y, glyph('╮', '.'));
-        draw_lines(&mut canvas, &lines(&note.label), r.x + 1, r.w - 2, r.y + 1);
+        let note_lines = lines_in(rows, &note.label);
+        draw_lines(&mut canvas, &note_lines, r.x + 1, r.w - 2, r.y + 1);
     }
     for (n, r) in chart.nodes.iter().zip(&layout.nodes) {
         draw_node_frame(&mut canvas, n, *r);
@@ -241,14 +250,14 @@ fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String
         }
     }
     for (n, r) in chart.nodes.iter().zip(&layout.nodes) {
-        draw_node_text(&mut canvas, n, *r);
+        draw_node_text_in(&mut canvas, n, *r, rows);
     }
     for (e, route) in chart.edges.iter().zip(&layout.edges) {
         let label = route.as_ref().and_then(|r| r.label).zip(e.label.as_ref());
         if let Some((r, l)) = label
             && e.stroke != Stroke::Invisible
         {
-            draw_lines(&mut canvas, &lines(l), r.x, r.w, r.y);
+            draw_lines(&mut canvas, &lines_in(rows, l), r.x, r.w, r.y);
         }
     }
     for (s, r) in chart.subgraphs.iter().zip(&layout.titles) {
@@ -273,9 +282,36 @@ fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String
 /// Sizes in terminal cells.
 struct Cells;
 
+/// Sizes in terminal cells, with the formulas set so far in `Rows`, for the one render that
+/// measures and then draws.
+struct CellsIn<'a>(&'a Rows);
+
+/// Sizes without a cache of formulas: each call sets its own.
 impl Measure for Cells {
     fn node(&self, node: &Node) -> Size {
-        let lines = title_lines(node);
+        CellsIn(&Rows::default()).node(node)
+    }
+
+    fn edge_label(&self, label: &Label) -> Option<Size> {
+        CellsIn(&Rows::default()).edge_label(label)
+    }
+
+    fn subgraph_title(&self, subgraph: &Subgraph) -> Size {
+        CellsIn(&Rows::default()).subgraph_title(subgraph)
+    }
+
+    fn note(&self, label: &Label) -> Size {
+        CellsIn(&Rows::default()).note(label)
+    }
+
+    fn row(&self, node: &Node, row: usize) -> Option<i32> {
+        CellsIn(&Rows::default()).row(node, row)
+    }
+}
+
+impl Measure for CellsIn<'_> {
+    fn node(&self, node: &Node) -> Size {
+        let lines = title_lines(node, self.0);
         let w = lines.iter().map(|l| width(l)).max().unwrap_or(0);
         let h = lines.len() as i32;
         if !node.sections.is_empty() {
@@ -298,7 +334,7 @@ impl Measure for Cells {
     }
 
     fn edge_label(&self, label: &Label) -> Option<Size> {
-        let lines = lines(label);
+        let lines = lines_in(self.0, label);
         let w = lines.iter().map(|l| width(l)).max().unwrap_or(0);
         (w > 0).then(|| Size::new(w, lines.len() as i32))
     }
@@ -314,14 +350,14 @@ impl Measure for Cells {
     }
 
     fn note(&self, label: &Label) -> Size {
-        let lines = lines(label);
+        let lines = lines_in(self.0, label);
         let w = lines.iter().map(|l| width(l)).max().unwrap_or(0);
         Size::new(w + 4, lines.len() as i32 + 2)
     }
 
     /// The label's lines start below the top border; each section's rows below its rule.
     fn row(&self, node: &Node, row: usize) -> Option<i32> {
-        let title = title_lines(node).len();
+        let title = title_lines(node, self.0).len();
         if row < title {
             return Some(1 + row as i32);
         }
@@ -362,7 +398,12 @@ fn width(s: &str) -> i32 {
 /// Display lines of a label, with markdown emphasis markers dropped (ASCIIR-3). A line with a
 /// `$$...$$` formula is as many rows as the formula has (LEMB-4).
 fn lines(label: &Label) -> Vec<String> {
-    mathtext::rows(label).unwrap_or_else(|| label.lines())
+    lines_in(&Rows::default(), label)
+}
+
+/// [`lines`] with the formulas already set in `rows`.
+fn lines_in(rows: &Rows, label: &Label) -> Vec<String> {
+    mathtext::rows(rows, label).unwrap_or_else(|| label.lines())
 }
 
 fn title(s: &Subgraph) -> String {
@@ -566,8 +607,11 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
     // An untitled node's first section starts at the top border.
     let mut y = if node.untitled() {
         r.y
+    } else if node.sections.is_empty() {
+        // No compartments: nothing below uses it.
+        r.y + 1
     } else {
-        r.y + 1 + title_lines(node).len() as i32
+        r.y + 1 + node.label.lines().len() as i32
     };
     for (i, section) in node.sections.iter().enumerate() {
         if i > 0 || !node.untitled() {
@@ -579,18 +623,22 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
 
 /// The lines of a node's title: none for an untitled compartment node, and the text as
 /// written for a compartment node.
-fn title_lines(node: &Node) -> Vec<String> {
+fn title_lines(node: &Node, rows: &Rows) -> Vec<String> {
     if node.untitled() {
         Vec::new()
     } else if node.sections.is_empty() {
-        lines(&node.label)
+        lines_in(rows, &node.label)
     } else {
         node.label.lines()
     }
 }
 
 fn draw_node_text(canvas: &mut Canvas, node: &Node, r: Rect) {
-    let lines = title_lines(node);
+    draw_node_text_in(canvas, node, r, &Rows::default());
+}
+
+fn draw_node_text_in(canvas: &mut Canvas, node: &Node, r: Rect, rows: &Rows) {
+    let lines = title_lines(node, rows);
     if !node.sections.is_empty() {
         draw_lines(canvas, &lines, r.x + 1, r.w - 2, r.y + 1);
         let mut y = if node.untitled() {

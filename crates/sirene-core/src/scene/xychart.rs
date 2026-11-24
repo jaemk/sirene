@@ -42,7 +42,7 @@ fn value_ticks(chart: &XyChart) -> Vec<f64> {
 
 /// Draws `chart` (MXY-3).
 pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
-    let px = Px { metrics, theme };
+    let px = Px::new(metrics, theme);
     let (fs, lh) = (theme.font_size, theme.line_height);
     let small = fs - 2.0;
     let n = chart.positions();
@@ -225,11 +225,7 @@ pub fn xychart(chart: &XyChart, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     };
 
     let owner = Owner::Diagram;
-    let mut p = Painter {
-        theme,
-        metrics,
-        elements: Vec::new(),
-    };
+    let mut p = Painter::new(theme, metrics);
     let text = |p: &mut Painter, s: &str, center: Pt, color: Color, size: f32| {
         p.elements.push(Element {
             owner,
