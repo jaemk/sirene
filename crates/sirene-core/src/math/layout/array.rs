@@ -17,7 +17,8 @@
 //!   automatically has an empty tag box of the row's size.
 //! - The extra space `\\[1em]` puts above a line break at the top level is a margin, which a
 //!   box does not have, so that break is an empty box.
-//! - `{CD}` is not an array of this tree, so its `3ex` baseline skip has no place here.
+//! - `{CD}` is an array of this tree whose baseline skip is `3ex`; its arrows and labels are
+//!   built by `arrow` and `cd`.
 
 use std::ops::Range;
 
@@ -63,7 +64,16 @@ pub(super) fn array<'t>(
     }
 
     // Vertical spacing, from size10.clo: `\baselineskip`, `\jot`, and the strut of each row.
-    let baselineskip = 12.0 * pt;
+    let baselineskip = if array.col_separation == Some(ColSeparation::Cd) {
+        // A commutative diagram's rows are `3ex` apart.
+        let skip = Measurement {
+            number: 3.0,
+            unit: "ex".to_string(),
+        };
+        options.length(&skip, span.clone())?.0
+    } else {
+        12.0 * pt
+    };
     let jot = 3.0 * pt;
     let arrayskip = array.arraystretch * baselineskip;
     let strut_height = 0.7 * arrayskip;

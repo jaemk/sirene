@@ -270,7 +270,10 @@ impl<'a> Parser<'a> {
                 };
                 self.parse_array(options, Some(StyleName::Display))?
             }
-            // Commutative diagrams are not built yet.
+            "CD" => {
+                ams(self)?;
+                return self.parse_cd(name_span);
+            }
             _ => {
                 return Err(MathError::new(
                     format!("{{{name}}} is not supported yet"),

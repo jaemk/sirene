@@ -14,6 +14,7 @@
 mod accent;
 mod array;
 mod arrow;
+mod cd;
 mod delimiter;
 mod enclose;
 mod frac;
@@ -510,6 +511,10 @@ fn build<'t>(node: &'t Node<'_>, options: &Options<'t>) -> Result<Built<'t>, Mat
         NodeKind::Array(array) => array::array(array, mode, options, span),
         NodeKind::Cr { new_line, size } => array::cr(*new_line, size.as_ref(), options, span),
         NodeKind::Tag { body, tag } => array::tag(body, tag, options, span),
+
+        // The labels of a commutative diagram's vertical arrows.
+        NodeKind::CdLabel { label, .. } => cd::cd_label(label, options),
+        NodeKind::CdLabelParent { fragment } => cd::cd_label_parent(fragment, options),
 
         // Size and placement.
         NodeKind::Phantom { body } => misc::phantom(body, options, span),

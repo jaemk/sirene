@@ -351,9 +351,24 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
         NodeKind::ReflectBox { body } => {
             json!({"type": "reflectbox", "mode": mode, "body": katex_json(body)})
         }
+        // KaTeX calls the long equals sign of `{CD}` with no arguments, so it has no body.
+        NodeKind::XArrow { label, .. } if label == "\\\\cdlongequal" => {
+            json!({"type": "xArrow", "mode": mode, "label": label})
+        }
         NodeKind::XArrow { label, body, below } => json!({"type": "xArrow", "mode": mode,
             "label": label, "body": katex_json(body),
             "below": below.as_deref().map(katex_json)}),
+        NodeKind::CdLabel { side, label } => {
+            use super::ast::CdSide;
+            let side = match side {
+                CdSide::Left => "left",
+                CdSide::Right => "right",
+            };
+            json!({"type": "cdlabel", "mode": mode, "side": side, "label": katex_json(label)})
+        }
+        NodeKind::CdLabelParent { fragment } => {
+            json!({"type": "cdlabelparent", "mode": mode, "fragment": katex_json(fragment)})
+        }
         NodeKind::HorizBrace {
             label,
             is_over,
@@ -538,6 +553,7 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
                     ColSeparation::Alignat => "alignat",
                     ColSeparation::Gather => "gather",
                     ColSeparation::Small => "small",
+                    ColSeparation::Cd => "CD",
                 };
                 fields.insert("colSeparationType".into(), kind.into());
             }
@@ -715,7 +731,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (606, 9));
+    assert_eq!((same, unsupported), (610, 5));
 }
 
 /// Layout gives each formula KaTeX parses the height and depth KaTeX gives it, or says the
@@ -759,7 +775,7 @@ fn layout_agrees_with_katex_on_height_and_depth() {
         }
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    assert_eq!((same, not_yet), (445, 1));
+    assert_eq!((same, not_yet), (446, 1));
 }
 
 /// A development aid, not a check: which nodes stop layout of the most baseline inputs. Run

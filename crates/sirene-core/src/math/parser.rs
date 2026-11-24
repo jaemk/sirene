@@ -6,6 +6,7 @@
 //! that the function table lists but the parser does not build yet fail with "not supported yet".
 
 mod arguments;
+mod cd;
 mod environments;
 mod handlers;
 
@@ -844,6 +845,8 @@ mod tests {
                 None => format!("{label}<{}>", show(body)),
             },
             NodeKind::HorizBrace { label, base, .. } => format!("{label}<{}>", show(base)),
+            NodeKind::CdLabel { side, label } => format!("cd{side:?}<{}>", show(label)),
+            NodeKind::CdLabelParent { fragment } => format!("cdparent<{}>", show(fragment)),
         }
     }
 
@@ -1655,7 +1658,6 @@ mod tests {
 
     #[test]
     fn what_the_parser_lacks_is_said_so() {
-        assert!(error("\\begin{CD}a\\end{CD}").ends_with("supported yet"));
         assert!(error("x\u{2082}").ends_with("supported yet"));
     }
 

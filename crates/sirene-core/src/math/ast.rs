@@ -287,6 +287,22 @@ pub(crate) enum NodeKind<'a> {
         is_over: bool,
         base: Box<Node<'a>>,
     },
+    /// The label beside a vertical arrow of a `{CD}` diagram.
+    CdLabel {
+        side: CdSide,
+        label: Box<Node<'a>>,
+    },
+    /// A vertical arrow of a `{CD}` diagram with its two labels, which sit beside it.
+    CdLabelParent {
+        fragment: Box<Node<'a>>,
+    },
+}
+
+/// Which side of a vertical arrow a `{CD}` label is on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CdSide {
+    Left,
+    Right,
 }
 
 impl NodeKind<'_> {
@@ -348,6 +364,8 @@ impl NodeKind<'_> {
             NodeKind::OperatorName { .. } => "operatorname",
             NodeKind::Accent { .. } => "accent",
             NodeKind::AccentUnder { .. } => "accentUnder",
+            NodeKind::CdLabel { .. } => "cdlabel",
+            NodeKind::CdLabelParent { .. } => "cdlabelparent",
         }
     }
 }
@@ -467,6 +485,8 @@ pub(crate) enum ColSeparation {
     Alignat,
     Gather,
     Small,
+    /// A `{CD}` diagram, whose rows are `3ex` apart.
+    Cd,
 }
 
 /// A row's equation tag: whether it is numbered automatically, or the nodes of its `\tag`.
