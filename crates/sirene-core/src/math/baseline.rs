@@ -338,6 +338,15 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
         NodeKind::ReflectBox { body } => {
             json!({"type": "reflectbox", "mode": mode, "body": katex_json(body)})
         }
+        NodeKind::XArrow { label, body, below } => json!({"type": "xArrow", "mode": mode,
+            "label": label, "body": katex_json(body),
+            "below": below.as_deref().map(katex_json)}),
+        NodeKind::HorizBrace {
+            label,
+            is_over,
+            base,
+        } => json!({"type": "horizBrace", "mode": mode, "label": label,
+            "isOver": is_over, "base": katex_json(base)}),
         NodeKind::Overline { body } => {
             json!({"type": "overline", "mode": mode, "body": katex_json(body)})
         }
@@ -658,7 +667,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (488, 127));
+    assert_eq!((same, unsupported), (510, 105));
 }
 
 /// A development aid, not a check: which unsupported commands stop the most baseline inputs, to

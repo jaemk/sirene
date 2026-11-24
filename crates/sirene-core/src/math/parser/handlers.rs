@@ -36,6 +36,10 @@ enum Build {
     Infix(&'static str),
     /// `\fbox`, `\colorbox`, `\fcolorbox`, `\cancel` and the rest that draw around a body.
     Enclose,
+    /// `\xrightarrow` and the other stretchy arrows with a label.
+    XArrow,
+    /// `\overbrace`, `\underbrace`, `\overbracket`, `\underbracket`.
+    HorizBrace,
     Pmb,
     HBox,
     VCenter,
@@ -139,6 +143,31 @@ impl Build {
             "\\above" => Build::Infix("\\\\abovefrac"),
             "\\fbox" | "\\colorbox" | "\\fcolorbox" | "\\cancel" | "\\bcancel" | "\\xcancel"
             | "\\sout" | "\\angl" | "\\phase" => Build::Enclose,
+            "\\xleftarrow"
+            | "\\xrightarrow"
+            | "\\xLeftarrow"
+            | "\\xRightarrow"
+            | "\\xleftrightarrow"
+            | "\\xLeftrightarrow"
+            | "\\xhookleftarrow"
+            | "\\xhookrightarrow"
+            | "\\xmapsto"
+            | "\\xrightharpoondown"
+            | "\\xrightharpoonup"
+            | "\\xleftharpoondown"
+            | "\\xleftharpoonup"
+            | "\\xrightleftharpoons"
+            | "\\xleftrightharpoons"
+            | "\\xlongequal"
+            | "\\xtwoheadrightarrow"
+            | "\\xtwoheadleftarrow"
+            | "\\xtofrom"
+            | "\\xrightleftarrows"
+            | "\\xrightequilibrium"
+            | "\\xleftequilibrium" => Build::XArrow,
+            "\\overbrace" | "\\underbrace" | "\\overbracket" | "\\underbracket" => {
+                Build::HorizBrace
+            }
             "\\pmb" => Build::Pmb,
             "\\hbox" => Build::HBox,
             "\\vcenter" => Build::VCenter,
@@ -752,6 +781,35 @@ impl<'a> Parser<'a> {
                         background_color,
                         border_color,
                         body: Box::new(body),
+                    },
+                    mode,
+                })
+            }
+            Build::XArrow => {
+                let Some(body) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                let below = args.optional.pop().flatten();
+                Ok(Node {
+                    span: start..body.span.end,
+                    kind: NodeKind::XArrow {
+                        label: name.to_string(),
+                        body: Box::new(body),
+                        below: below.map(Box::new),
+                    },
+                    mode,
+                })
+            }
+            Build::HorizBrace => {
+                let Some(base) = args.required.pop() else {
+                    return Err(missing(name));
+                };
+                Ok(Node {
+                    span: start..base.span.end,
+                    kind: NodeKind::HorizBrace {
+                        label: name.to_string(),
+                        is_over: name.contains("\\over"),
+                        base: Box::new(base),
                     },
                     mode,
                 })

@@ -247,6 +247,19 @@ pub(crate) enum NodeKind<'a> {
     ReflectBox {
         body: Box<Node<'a>>,
     },
+    /// An arrow that stretches to its label: `\xrightarrow[below]{above}`. `label` is the
+    /// command, with its backslash.
+    XArrow {
+        label: String,
+        body: Box<Node<'a>>,
+        below: Option<Box<Node<'a>>>,
+    },
+    /// A brace or bracket over or under a base: `\overbrace{x}`, `\underbracket{x}`.
+    HorizBrace {
+        label: String,
+        is_over: bool,
+        base: Box<Node<'a>>,
+    },
 }
 
 impl NodeKind<'_> {
@@ -271,6 +284,8 @@ impl NodeKind<'_> {
             NodeKind::VCenter { .. } => "vcenter",
             NodeKind::MathChoice { .. } => "mathchoice",
             NodeKind::ReflectBox { .. } => "reflectbox",
+            NodeKind::XArrow { .. } => "xArrow",
+            NodeKind::HorizBrace { .. } => "horizBrace",
             NodeKind::Sqrt { .. } => "sqrt",
             NodeKind::Styling { .. } => "styling",
             NodeKind::Text { .. } => "text",
