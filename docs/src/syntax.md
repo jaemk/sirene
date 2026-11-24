@@ -38,6 +38,10 @@ F:::important
 - `<br>` is a line break. In a label that is not markdown, `<b>`/`<strong>` and `<i>`/`<em>`
   pairs are bold and italic, and other HTML tags (`<span>`, `<u>`, ...) are dropped. Font Awesome
   icons (`fa:fa-car`) are not drawn: they stay as text.
+- `$$...$$` in a node or edge label is a LaTeX formula, set in display style on the text's
+  baseline (`A["Area $$\pi r^2$$"]`). A formula does not span lines, `$$` has no escape, and an
+  unclosed `$$` is text. A formula that does not typeset is drawn as its source with a
+  diagnostic. A label with a formula is not read as markdown. Needs the `math` feature.
 - `:::name` adds a class.
 - `end` is reserved and cannot be a node id.
 

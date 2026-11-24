@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use super::mathtext;
 use super::shapes::{self, BoxF, Outline};
 use super::style::{self, Resolved};
 use super::{
@@ -79,7 +80,9 @@ fn style_of(s: &Span) -> TextStyle {
 /// matches.
 fn push_span(line: &mut Vec<Span>, text: &str, like: &Span) {
     match line.last_mut() {
-        Some(s) if s.bold == like.bold && s.italic == like.italic => s.text.push_str(text),
+        Some(s) if !s.math && s.bold == like.bold && s.italic == like.italic => {
+            s.text.push_str(text);
+        }
         _ => line.push(Span {
             text: text.to_owned(),
             ..like.clone()
@@ -92,12 +95,29 @@ impl<M: TextMetrics> Px<'_, M> {
         self.metrics.styled_width(text, self.theme.font_size, style)
     }
 
+    /// The width of a span: a formula that typesets is its own width, anything else is text.
+    fn span_width(&self, s: &Span) -> f32 {
+        match mathtext::inline(s) {
+            Some(f) if s.math => f.width * self.theme.font_size,
+            _ => self.width(&s.text, style_of(s)),
+        }
+    }
+
     fn line_width(&self, line: &[Span]) -> f32 {
-        line.iter().map(|s| self.width(&s.text, style_of(s))).sum()
+        line.iter().map(|s| self.span_width(s)).sum()
+    }
+
+    /// The height of a line: a line height, or more for a line with a tall formula.
+    fn line_height(&self, line: &[Span]) -> f32 {
+        mathtext::line_box(self.theme, line).map_or(self.theme.line_height, |(a, d)| a + d)
     }
 
     pub(super) fn text_size(&self, lines: &[Vec<Span>]) -> (f32, f32) {
         let w = lines.iter().map(|l| self.line_width(l)).fold(0.0, f32::max);
+        if lines.iter().any(|l| l.iter().any(|s| s.math)) {
+            let h = lines.iter().map(|l| self.line_height(l)).sum();
+            return (w, h);
+        }
         (w, lines.len() as f32 * self.theme.line_height)
     }
 
@@ -113,6 +133,12 @@ impl<M: TextMetrics> Px<'_, M> {
             // Words, each a run of spans without spaces.
             let mut words: Vec<Vec<Span>> = vec![Vec::new()];
             for span in line {
+                // A formula is one unbreakable piece of the word it touches.
+                if span.math {
+                    let last = words.len() - 1;
+                    words[last].push(span.clone());
+                    continue;
+                }
                 for (k, part) in span.text.split(' ').enumerate() {
                     if k > 0 && !words.last().is_some_and(Vec::is_empty) {
                         words.push(Vec::new());
@@ -137,7 +163,11 @@ impl<M: TextMetrics> Px<'_, M> {
                     cur_w += space;
                 }
                 for s in &word {
-                    push_span(&mut cur, &s.text, s);
+                    if s.math {
+                        cur.push(s.clone());
+                    } else {
+                        push_span(&mut cur, &s.text, s);
+                    }
                 }
                 cur_w += ww;
             }
@@ -149,7 +179,11 @@ impl<M: TextMetrics> Px<'_, M> {
     /// A label's lines as drawn: wrapped at `WRAP`, and for a diamond-like `shape` at the width
     /// that makes the smallest shape.
     fn label_lines(&self, label: &Label, shape: Option<Shape>) -> Vec<Vec<Span>> {
-        let lines = label.spans();
+        self.fit_lines(label.runs(), shape)
+    }
+
+    /// `lines` as `label_lines` sets them.
+    fn fit_lines(&self, lines: Vec<Vec<Span>>, shape: Option<Shape>) -> Vec<Vec<Span>> {
         let mut best = self.wrap(&lines, WRAP);
         if let Some(shape) = shape.filter(|&s| shapes::grows_square(s))
             && let [line] = lines.as_slice()
@@ -228,6 +262,18 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
             } else {
                 Compartments::title(node, self.theme)
             };
+            if node.sections.is_empty() {
+                let lines = node.label.runs();
+                if lines.iter().any(|l| l.iter().any(|s| s.math)) {
+                    // Lines with formulas are taller: the row's middle is its line box's.
+                    let heights: Vec<f32> = lines.iter().map(|l| self.line_height(l)).collect();
+                    let above: f32 = heights.iter().take(row).sum();
+                    let mid = height / 2.0 - heights.iter().sum::<f32>() / 2.0
+                        + above
+                        + heights.get(row).copied().unwrap_or(lh) / 2.0;
+                    return Some(mid.round() as i32);
+                }
+            }
             let mid = height / 2.0 + (row as f32 - (title as f32 - 1.0) / 2.0) * lh;
             return Some(mid.round() as i32);
         }
@@ -528,7 +574,12 @@ pub(super) fn draw(
         let mut classes = vec!["default"];
         classes.extend(n.classes.iter().map(String::as_str));
         let s = style::resolve(&[], &classes, &n.styles, &defs);
-        let lines = px.label_lines(&n.label, Some(n.shape));
+        // A compartment node's title is measured as text, so it is drawn as text.
+        let lines = if n.sections.is_empty() {
+            px.label_lines(&n.label, Some(n.shape))
+        } else {
+            px.fit_lines(n.label.spans(), Some(n.shape))
+        };
         let mut o = o;
         if chart.agentflow && n.shape == Shape::Collapsed {
             // An agentflow collapsed flow is drawn like an open one: unfilled, rx 10, thin
@@ -821,6 +872,9 @@ impl Painter<'_> {
 
     /// Lines of styled spans centered as a block on `center`, one text run per span.
     pub(super) fn lines(&mut self, owner: Owner, lines: &[Vec<Span>], center: Pt, color: Color) {
+        if lines.iter().any(|l| l.iter().any(|s| s.math)) {
+            return self.math_lines(owner, lines, center, color);
+        }
         let (lh, size) = (self.theme.line_height, self.theme.font_size);
         let width = |text: &str, style| self.metrics.styled_width(text, size, style);
         let top = center.y - lh * (lines.len() as f32 - 1.0) / 2.0;
@@ -843,6 +897,65 @@ impl Painter<'_> {
         }
         for (text, at, style) in runs {
             self.text(owner, text, at, size, color, style);
+        }
+    }
+
+    /// `lines` with formulas: each line is a row of text and formula runs on one baseline, as
+    /// tall as `mathtext::line_box` says, and the block is centered on `center`. A line with no
+    /// formula that typesets is a line height tall with its text on the line's center.
+    fn math_lines(&mut self, owner: Owner, lines: &[Vec<Span>], center: Pt, color: Color) {
+        let (lh, size) = (self.theme.line_height, self.theme.font_size);
+        let width = |text: &str, style| self.metrics.styled_width(text, size, style);
+        let boxes: Vec<Option<(f32, f32)>> = lines
+            .iter()
+            .map(|l| mathtext::line_box(self.theme, l))
+            .collect();
+        let height = |b: &Option<(f32, f32)>| b.map_or(lh, |(above, below)| above + below);
+        let mut top = center.y - boxes.iter().map(height).sum::<f32>() / 2.0;
+        let mut out = Vec::new();
+        for (line, b) in lines.iter().zip(&boxes) {
+            let (baseline, mid) = match *b {
+                Some((above, _)) => (top + above, top + above - mathtext::BASELINE * size),
+                None => (top + lh / 2.0, top + lh / 2.0),
+            };
+            let items: Vec<(&Span, Option<mathtext::Inline>)> = line
+                .iter()
+                .map(|s| (s, if s.math { mathtext::inline(s) } else { None }))
+                .collect();
+            let total: f32 = items
+                .iter()
+                .map(|(s, f)| match f {
+                    Some(f) => f.width * size,
+                    None => width(&s.text, style_of(s)),
+                })
+                .sum();
+            let mut x = center.x - total / 2.0;
+            for (span, formula) in &items {
+                if let Some(f) = formula {
+                    out.extend(f.place(Pt::new(x, baseline), size, color));
+                    x += f.width * size;
+                    continue;
+                }
+                let style = style_of(span);
+                let trimmed = span.text.trim();
+                if !trimmed.is_empty() {
+                    let lead = &span.text[..span.text.len() - span.text.trim_start().len()];
+                    let left = x + width(lead, style);
+                    let at = Pt::new(left + width(trimmed, style) / 2.0, mid);
+                    out.push(Primitive::Text {
+                        text: trimmed.to_owned(),
+                        center: at,
+                        size,
+                        color,
+                        style,
+                    });
+                }
+                x += width(&span.text, style);
+            }
+            top += height(b);
+        }
+        for primitive in out {
+            self.push(owner, primitive);
         }
     }
 

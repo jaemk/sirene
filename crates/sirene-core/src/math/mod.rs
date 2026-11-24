@@ -52,7 +52,7 @@ mod symbols_data;
 mod unicode_data;
 
 #[cfg(feature = "math")]
-pub use ascii::ascii_formula;
+pub use ascii::{ascii_formula, ascii_formula_rows};
 pub use error::MathError;
 #[cfg(feature = "math")]
 pub use formula::{Formula, MathStyle, typeset};

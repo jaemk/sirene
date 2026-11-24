@@ -14,6 +14,7 @@ mod info;
 mod ishikawa;
 mod journey;
 mod kanban;
+mod mathtext;
 mod mindmap;
 mod packet;
 mod paint;
