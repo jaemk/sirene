@@ -92,7 +92,8 @@ fn phase<'t>(
     // Size changes like \Huge do not change the line's thickness.
     let scale = options.size_multiplier() / options.having_base_sizing().size_multiplier();
     let angle_height = inner.height + inner.depth + line_weight + clearance;
-    let left = (angle_height / 2.0 + line_weight).0;
+    // A negative pad is invalid CSS, which the browser drops.
+    let left = (angle_height / 2.0 + line_weight).0.max(0.0);
     let shift = inner.depth + line_weight + clearance;
     let body = padded(inner, left, 0.0);
 
@@ -399,6 +400,15 @@ mod tests {
             colors("\\fcolorbox{red}{blue}{x}"),
             [Some("blue".to_owned()), Some("red".to_owned())]
         );
+        // An `\fbox` border takes the color around it.
+        assert_eq!(colors("\\color{red}\\fbox{x}"), [Some("red".to_owned())]);
+    }
+
+    #[test]
+    fn a_phase_of_a_negative_body_has_no_negative_pad() {
+        // KaTeX's negative `padding-left` is invalid CSS, which the browser drops.
+        let (w, ..) = size("\\phase{\\rule{0em}{-1em}}");
+        assert!(w >= 0.0, "{w}");
     }
 
     #[test]

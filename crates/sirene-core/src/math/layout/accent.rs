@@ -110,9 +110,19 @@ fn accent_box<'t>(accent: &Accent<'t, '_>, options: &Options<'t>) -> Result<Bx<'
         };
         let chars = Some(char_count(accent.base));
         let svg = stretchy::svg_span(accent.label, chars, width, options, accent.span.clone())?;
+        // KaTeX centers the rows of an accent (`.katex-accent > .vlist-t`), so a base narrower
+        // than the accent's least width is centered under it.
+        let full = body.width.max(svg.width + dx);
+        let body_dx = (full - body.width) / 2.0;
         return Ok(Bx::vlist(
             Position::FirstBaseline,
-            vec![Part::of(body), Part::Box { child: svg, dx }],
+            vec![
+                Part::Box {
+                    child: body,
+                    dx: body_dx,
+                },
+                Part::Box { child: svg, dx },
+            ],
         ));
     }
 
@@ -128,8 +138,9 @@ fn accent_box<'t>(accent: &Accent<'t, '_>, options: &Options<'t>) -> Result<Bx<'
     }
     let (width, height, depth) = (glyph.width, glyph.height, glyph.depth);
 
-    // A "full" accent is as wide as the accent and sits on the base; any other has no width, so
-    // it is shifted by half its own width to center it.
+    // KaTeX centers the rows of an accent (`.katex-accent > .vlist-t`). A "full" accent is as
+    // wide as the accent and sits on the base; any other has no width, so it sits at the base's
+    // middle and is shifted by half its own width.
     let full = accent.label == "\\textcircled";
     let mut left = skew;
     let mut drop = Em::ZERO;
@@ -151,9 +162,22 @@ fn accent_box<'t>(accent: &Accent<'t, '_>, options: &Options<'t>) -> Result<Bx<'
     placed.height = height;
     placed.depth = depth;
 
+    let row = body.width.max(placed.width);
+    let body_dx = (row - body.width) / 2.0;
+    let placed_dx = (row - placed.width) / 2.0;
     Ok(Bx::vlist(
         Position::FirstBaseline,
-        vec![Part::of(body), Part::Kern(-clearance), Part::of(placed)],
+        vec![
+            Part::Box {
+                child: body,
+                dx: body_dx,
+            },
+            Part::Kern(-clearance),
+            Part::Box {
+                child: placed,
+                dx: placed_dx,
+            },
+        ],
     ))
 }
 
@@ -221,10 +245,12 @@ pub(super) fn supsub<'t>(
         options,
     )?;
     let Built::One(Atom {
-        bx: Bx {
-            kind: BoxKind::HList(mut children),
-            ..
-        },
+        bx:
+            Bx {
+                kind: BoxKind::HList(mut children),
+                depth,
+                ..
+            },
         ..
     }) = scripted
     else {
@@ -234,7 +260,10 @@ pub(super) fn supsub<'t>(
         return Ok(None);
     };
     *first = accented;
-    let bx = Bx::hlist(children);
+    // KaTeX recomputes only the height after swapping the accent in (`accent.ts`), so the
+    // depth stays the scripted character's.
+    let mut bx = Bx::hlist(children);
+    bx.depth = depth;
     Ok(Some(Built::One(Atom::new(bx, Some(Class::Ord), options))))
 }
 
@@ -303,9 +332,10 @@ mod tests {
         let ((w, h, d), _, glyphs) = drawn("\\hat x");
         let x = metrics::glyph('x', Face::MathItalic, Mode::Math).unwrap();
         let hat = metrics::glyph('^', Face::MainRegular, Mode::Math).unwrap();
-        // The accent is centered on the base, then moved by the skew; its italic is dropped.
+        // The accent is centered on the base, then moved by the skew; its italic is dropped
+        // (TeX's rule 12, and KaTeX's centered rows with the accent's `left`).
         let (_, hx, hy) = glyph_at(&glyphs, "^");
-        assert!(close(*hx, x.skew - hat.width / 2.0), "{hx}");
+        assert!(close(*hx, w / 2.0 + x.skew - hat.width / 2.0), "{hx}");
         // The hat sits min(height, x-height) = 0.43056 into the base, which is all of it: its
         // baseline is on the base's baseline less the glyph's depth.
         assert!(close(*hy, hat.depth), "{hy}");
@@ -324,7 +354,7 @@ mod tests {
         let y = metrics::glyph('y', Face::MathItalic, Mode::Math).unwrap();
         let base = x.width + x.italic.max(0.0) + y.width + y.italic.max(0.0);
         assert!(close(w, base), "{w}");
-        assert!(close(*hx, -hat.width / 2.0), "{hx}");
+        assert!(close(*hx, (w - hat.width) / 2.0), "{hx}");
         assert!(close(h, hat.height + hat.depth), "{h}");
     }
 
@@ -341,11 +371,14 @@ mod tests {
             assert_eq!(data.as_str(), svg_data::path("vec").unwrap());
             assert!(close(rect[2], 0.471) && close(rect[3], 0.714), "{rect:?}");
         }
-        let (_, paths, _) = drawn("\\vec x");
+        let ((w, ..), paths, _) = drawn("\\vec x");
         let skew = metrics::glyph('x', Face::MathItalic, Mode::Math)
             .unwrap()
             .skew;
-        assert!(close(paths[0].0[0], skew - 0.471 / 2.0), "{paths:?}");
+        assert!(
+            close(paths[0].0[0], w / 2.0 + skew - 0.471 / 2.0),
+            "{paths:?}"
+        );
     }
 
     #[test]
@@ -397,11 +430,15 @@ mod tests {
         );
         assert!(close(rect[3], 0.522));
         // Narrower than the arrow's least width: the arrow is wider than the base.
-        let ((w, ..), paths, _) = drawn("\\overrightarrow{x}");
+        let ((w, ..), paths, glyphs) = drawn("\\overrightarrow{x}");
         assert!(
             close(paths[0].0[2], 0.888) && close(w, 0.888),
             "{w} {paths:?}"
         );
+        // KaTeX centers the rows of an accent, so the x is centered under the arrow.
+        let x = metrics::glyph('x', Face::MathItalic, Mode::Math).unwrap();
+        let (_, bx, _) = glyph_at(&glyphs, "x");
+        assert!(close(*bx, (0.888 - x.width) / 2.0), "{bx}");
     }
 
     #[test]
@@ -426,10 +463,15 @@ mod tests {
         assert!(h > 0.8141079999999999 - 1e-9);
         let (_, hx, _) = glyph_at(&glyphs, "^");
         let hat = metrics::glyph('^', Face::MainRegular, Mode::Math).unwrap();
-        let skew = metrics::glyph('x', Face::MathItalic, Mode::Math)
-            .unwrap()
-            .skew;
-        assert!(close(*hx, skew - hat.width / 2.0), "{hx}");
+        let x = metrics::glyph('x', Face::MathItalic, Mode::Math).unwrap();
+        assert!(close(*hx, x.width / 2.0 + x.skew - hat.width / 2.0), "{hx}");
+        // A color around the character is seen through, as KaTeX's `getBaseElem` does: the
+        // script is placed as on a bare x.
+        let ((_, h, _), _, colored) = drawn("\\hat{\\textcolor{red}{x}}^2");
+        let ((_, h2, _), _, plain) = drawn("\\hat{x}^2");
+        assert!(close(h, h2), "{h} {h2}");
+        assert!(close(glyph_at(&colored, "2").2, glyph_at(&plain, "2").2));
+        assert!(close(glyph_at(&colored, "^").1, glyph_at(&plain, "^").1));
     }
 
     #[test]
@@ -480,7 +522,10 @@ mod tests {
         let e = metrics::glyph('e', Face::MainRegular, Mode::Text).unwrap();
         let acute = metrics::glyph('\u{2ca}', Face::MainRegular, Mode::Text).unwrap();
         let (_, ax, ay) = glyph_at(&glyphs, "\u{2ca}");
-        assert!(close(*ax, e.skew - acute.width / 2.0), "{ax}");
+        assert!(
+            close(*ax, e.width / 2.0 + e.skew - acute.width / 2.0),
+            "{ax}"
+        );
         let clearance = e.height.min(0.43056);
         assert!(close(*ay, -(e.height - clearance - acute.depth)), "{ay}");
         assert!(
@@ -496,11 +541,14 @@ mod tests {
         let a = metrics::glyph('a', Face::MainRegular, Mode::Text).unwrap();
         let circle = metrics::glyph('\u{25ef}', Face::MainRegular, Mode::Text).unwrap();
         let (_, cx, cy) = glyph_at(&glyphs, "\u{25ef}");
-        // It overlays the character: at its left, and 0.2em lower than its box, which is as
-        // high as the character.
-        assert!(close(*cx, a.skew), "{cx}");
+        // It overlays the character, 0.2em lower than its box, which is as high as the
+        // character. The circle is wider, so the rows, centered, put the letter in its middle.
+        let row = circle.width.max(a.width);
+        assert!(close(w, row), "{w}");
+        assert!(close(*cx, (row - circle.width) / 2.0 + a.skew), "{cx}");
         assert!(close(*cy, 0.2 - circle.depth), "{cy}");
-        assert!(w >= a.width, "{w}");
+        let (_, ax, _) = glyph_at(&glyphs, "a");
+        assert!(close(*ax, (row - a.width) / 2.0), "{ax}");
     }
 
     #[test]
