@@ -141,7 +141,7 @@ fn the_expander_reads_what_katex_parses() {
         "{}",
         failures.join("\n")
     );
-    assert_eq!((read, failures.len()), (437, 12));
+    assert_eq!((read, failures.len()), (448, 1));
 }
 
 /// The errors KaTeX's expander raises are the expander's errors too: for each input KaTeX
@@ -293,6 +293,9 @@ fn katex_json(node: &super::ast::Node<'_>) -> Value {
                 value["font"] = format!("\\{font}").into();
             }
             value
+        }
+        NodeKind::Verb { body, star } => {
+            json!({"type": "verb", "mode": "text", "body": body, "star": star})
         }
         NodeKind::HtmlMathml { html, mathml } => json!({"type": "htmlmathml", "mode": mode,
             "html": nodes_json(html), "mathml": nodes_json(mathml)}),
@@ -626,6 +629,34 @@ fn plain_oracle() -> Vec<(String, bool, Value)> {
         .collect()
 }
 
+/// Where two trees first differ, and what each has there.
+fn first_difference(ours: &Value, theirs: &Value, path: &str) -> String {
+    match (ours, theirs) {
+        (Value::Object(a), Value::Object(b)) => {
+            let keys: std::collections::BTreeSet<_> = a.keys().chain(b.keys()).collect();
+            for key in keys {
+                let (x, y) = (a.get(key), b.get(key));
+                if x != y {
+                    return match (x, y) {
+                        (Some(x), Some(y)) => first_difference(x, y, &format!("{path}.{key}")),
+                        _ => format!("{path}.{key}: ours {x:?}, KaTeX's {y:?}"),
+                    };
+                }
+            }
+            format!("{path}: equal")
+        }
+        (Value::Array(a), Value::Array(b)) if a.len() == b.len() => {
+            for (i, (x, y)) in a.iter().zip(b).enumerate() {
+                if x != y {
+                    return first_difference(x, y, &format!("{path}[{i}]"));
+                }
+            }
+            format!("{path}: equal")
+        }
+        _ => format!("{path}: ours {ours}, KaTeX's {theirs}"),
+    }
+}
+
 /// The parser builds the tree KaTeX builds, for every baseline input it supports, and fails with
 /// KaTeX's message where KaTeX fails. An input that reaches a command the parser lacks is counted
 /// as not yet supported; the count falls as the parser grows.
@@ -657,7 +688,10 @@ fn the_parser_agrees_with_katex() {
                 if ours == *tree {
                     same += 1;
                 } else {
-                    differences.push(format!("tree differs  <-  {input:?}"));
+                    differences.push(format!(
+                        "tree differs at {}  <-  {input:?}",
+                        first_difference(&ours, tree, "")
+                    ));
                 }
             }
             (Err(e), None, Some(Value::String(expected))) => {
@@ -681,7 +715,7 @@ fn the_parser_agrees_with_katex() {
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     // This count falls as the parser gains the functions.
-    assert_eq!((same, unsupported), (582, 33));
+    assert_eq!((same, unsupported), (605, 10));
 }
 
 /// A development aid, not a check: which unsupported commands stop the most baseline inputs, to

@@ -634,10 +634,13 @@ impl<'a> Parser<'a> {
                         _ => None,
                     });
                     self.end_row(&mut tags, options.auto_tag)?;
+                    // KaTeX starts the row after it reads the rules, but its `\nonumber` (a
+                    // `\gdef`) has not run by then, since only the parser runs it. Here the
+                    // expander runs it as the token is read, so the row starts first.
+                    self.begin_row(options.auto_tag)?;
                     // Rules may follow the row separator.
                     hlines_before_row.push(self.get_hlines()?);
                     body.push(Vec::new());
-                    self.begin_row(options.auto_tag)?;
                 }
                 _ => {
                     return Err(MathError::new(

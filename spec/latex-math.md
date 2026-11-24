@@ -272,19 +272,23 @@ Deviations from KaTeX (LMATH-T9):
   scoped to groups with an undo list per group, and `\gdef` is global.
 - Implemented here: `\newcommand`, `\renewcommand`, `\providecommand` (up to nine parameters),
   `\def` and `\gdef` (delimited parameters, `#{`), `\@firstoftwo`, `\@secondoftwo`,
-  `\@ifnextchar`, and `\TextOrMath`. The other 277 control-sequence and 42 character macros are
+  `\@ifnextchar`, `\TextOrMath`, `\char` (to `\@char{N}`, in the four forms), `\dots`
+  (amsmath's choice of `\dotsb`, `\dotsc`, `\dotsi` or `\dotso` from the token after it),
+  `\dotso`, `\dotsc`, `\cdots` (a thin space before a closing symbol or punctuation),
+  `\expandafter`, `\noexpand` (a `Frozen` token, which the parser reads as `\relax`),
+  `\message`, `\errmessage`, `\show` (read their argument, write nothing), and `\tag@literal`.
+  `\expandafter` leaves `\def` alone, since it is a function of the parser in KaTeX. The other
+  277 control-sequence and 42 character macros are
   KaTeX's table of TeX source, generated into `macros_data.rs` by `scripts/katex-macros.mjs`
   (Node 24 loads `macros.ts` through the resolver hook `scripts/katex-ts-loader.mjs`).
 - Bounds: `MAX_EXPANSIONS` macro calls and `MAX_EXPANDED` bytes of produced tokens, groups at
   `MAX_DEPTH`.
-- Not implemented yet, each an error naming the command: `\noexpand`, `\expandafter`, `\char`,
-  `\message`, `\errmessage`, `\show`, `\dots`, `\dotso`, `\dotsc`, `\cdots`, `\tag@literal`,
-  `\bra@ket`, `\bra@set`. A test keeps this list equal to KaTeX's function-defined macros minus
-  the implemented ones. Also out of scope (LPA-2): `\edef`, `\xdef`, `\let`, `\futurelet`,
+- Not implemented yet, each an error naming the command: `\bra@ket`, `\bra@set` (which
+  `\Braket` and `\Set` use). A test keeps this list equal to KaTeX's function-defined macros
+  minus the implemented ones. Also out of scope (LPA-2): `\edef`, `\xdef`, `\let`, `\futurelet`,
   `\global`, `\long`.
-- Baseline tests (`math::baseline`): the expander reads all 449 inputs KaTeX parses; 436 end
-  cleanly and the other 13 stop only at one of the unimplemented commands above, so that count
-  falls as they land. For the 22 inputs KaTeX rejects with an expansion-level error (`Extra }`,
+- Baseline tests (`math::baseline`): the expander reads all 449 inputs KaTeX parses; 448 end
+  cleanly and the other one stops at `\bra@set`, so that count falls when it lands. For the 22 inputs KaTeX rejects with an expansion-level error (`Extra }`,
   a `\def` or `\newcommand` error, too many expansions, and the like) the expander gives the
   same message. KaTeX's "Unexpected end of input in a macro argument" for a function's missing
   argument (`\frac 1`) is raised by the parser's `scan_argument` and is checked in that stage.
@@ -404,12 +408,14 @@ Parser (`ast.rs`, `parser.rs`, `functions.rs`, `unicode_data.rs`), the first of 
   `parse_with` takes the display-mode setting. Functions that read the rest of a table cell
   (`\displaystyle`, `\color`, the size commands) stop at the cell's `\\` as KaTeX's do.
 - Baseline (`math::baseline::the_parser_agrees_with_katex`): of the 615 inputs that need no
-  macro settings, 582 give exactly KaTeX's tree or KaTeX's error, 33 stop at a function not
-  built yet, and one is a listed deviation. No input differs. The first number rises and the
-  second falls as functions land.
+  macro settings, 605 give exactly KaTeX's tree or KaTeX's error, 10 stop at a function not
+  built yet (`{CD}`, `\global`, `\long`, `\edef`, `\xdef`, `\bra@set`), and one is a listed
+  deviation. No input differs. The first number rises and the second falls as functions land.
+  On a difference the test prints the path of the first differing field.
+- `\verb|x|` (`Verb`, always text mode) is read from the lexer's `Verb` token.
 
-Not yet built, in order (LMATH-9): the remaining macros above, the parser's functions (accents,
-operators, fractions, text, environments), `Options` and `Style`, boxes, and layout. The fuzz target for the lexer waits for a
+Not yet built, in order (LMATH-9): `\bra@ket`, `\bra@set`, `{CD}`, `Options` and `Style`, boxes,
+and layout. The fuzz target for the lexer waits for a
 public entry point, since `fuzz/` reaches only public items; until then the property test
 covers it.
 
