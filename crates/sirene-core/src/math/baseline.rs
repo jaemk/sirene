@@ -718,6 +718,75 @@ fn the_parser_agrees_with_katex() {
     assert_eq!((same, unsupported), (605, 10));
 }
 
+/// Layout gives each formula KaTeX parses the height and depth KaTeX gives it, or says the
+/// formula has a node it does not lay out yet. The counts change as layout covers more nodes.
+#[test]
+fn layout_agrees_with_katex_on_height_and_depth() {
+    use super::layout::layout;
+    use super::parser::{Settings, parse_with};
+
+    let (mut same, mut not_yet) = (0, 0);
+    let mut differences = Vec::new();
+    for (input, display, entry) in plain_oracle() {
+        let (Some(height), Some(depth)) = (
+            entry.get("height").and_then(Value::as_f64),
+            entry.get("depth").and_then(Value::as_f64),
+        ) else {
+            continue;
+        };
+        let Ok(nodes) = parse_with(
+            &input,
+            Settings {
+                display_mode: display,
+            },
+        ) else {
+            continue;
+        };
+        match layout(&nodes, display) {
+            Err(e) if e.message.ends_with("not laid out yet") => not_yet += 1,
+            Err(e) => differences.push(format!("{:?}  <-  {input:?}", e.message)),
+            Ok(bx) => {
+                let ours = (bx.height.0, bx.depth.0);
+                if (ours.0 - height).abs() < 1e-4 && (ours.1 - depth).abs() < 1e-4 {
+                    same += 1;
+                } else {
+                    differences.push(format!(
+                        "{ours:?} vs KaTeX's {:?}  <-  {input:?}",
+                        (height, depth)
+                    ));
+                }
+            }
+        }
+    }
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+    assert_eq!((same, not_yet), (141, 304));
+}
+
+/// A development aid, not a check: which nodes stop layout of the most baseline inputs. Run
+/// with `cargo test -p sirene-core --lib unlaid_nodes -- --ignored --nocapture`.
+#[test]
+#[ignore]
+fn unlaid_nodes_by_inputs_stopped() {
+    use super::parser::{Settings, parse_with};
+
+    let mut counts = std::collections::BTreeMap::<String, usize>::new();
+    for (input, display, _) in plain_oracle() {
+        let settings = Settings {
+            display_mode: display,
+        };
+        if let Ok(nodes) = parse_with(&input, settings)
+            && let Err(e) = super::layout::layout(&nodes, display)
+        {
+            *counts.entry(e.message).or_default() += 1;
+        }
+    }
+    let mut rows: Vec<_> = counts.into_iter().collect();
+    rows.sort_by_key(|row| std::cmp::Reverse(row.1));
+    for (message, count) in rows.iter().take(40) {
+        println!("{count:4} {message}");
+    }
+}
+
 /// A development aid, not a check: which unsupported commands stop the most baseline inputs, to
 /// pick the next ones to build. Run with `cargo test -p sirene-core --lib unsupported_commands --
 /// --ignored --nocapture`.

@@ -457,8 +457,29 @@ Box tree (`boxes.rs`, LMATH-T3):
   `makeVList`'s do.
 - `items` flattens a tree into glyphs and rules at absolute positions in the root's em (y down),
   the display list of LMATH-4.
+- A glyph's width includes a positive italic correction, which KaTeX draws as a right margin.
 
-Not yet built, in order (LMATH-9): `\bra@ket`, `\bra@set`, `{CD}`, and layout. The fuzz target for the lexer waits for a
+Layout (`layout.rs`, KaTeX's `buildHTML.ts` and the HTML builders of `functions/`):
+
+- `layout(nodes, display)` builds the tree in display or text style at `\normalsize`. Each node
+  builds to atoms: a box with the class TeX spaces it by (ord, op, bin, rel, open, close, punct,
+  inner), or none.
+- A list of nodes turns a binary operator ordinary where it has no operand on one side (TeX's
+  rules 5 and 6), then puts the spaces of TeX's class table between neighbors (3, 4, or 5 mu;
+  only the thin ones around operators in script styles). Explicit spaces are passed over. A
+  `\color`, a size or style command, and a `\begingroup` group join the list around them, as
+  KaTeX's fragments do; a list of one size or style command takes its spaces in that size or
+  style.
+- Built so far: symbols (`makeOrd` font choice for letters and digits, `mathsym` for the
+  rest, spaces), `\char`, groups, scripts (rules 18a to 18f), fractions without delimiters
+  (rules 15a to 15e), style, size, color, kerns, math fonts, `\text` and its font variants,
+  `\mathbin` and the class commands, and `\rule`. Every other node fails with "... is not laid
+  out yet".
+- `math::baseline` holds layout to KaTeX's `katex-html` height and depth: 141 formulas agree to
+  1e-4 em, and the rest of the 445 KaTeX builds stop at a node not laid out yet.
+
+Not yet built, in order (LMATH-9): `\bra@ket`, `\bra@set`, `{CD}`, and layout of the remaining
+nodes (arrays, operators, accents, `\left`/`\right` and delimiters, roots, enclosures). The fuzz target for the lexer waits for a
 public entry point, since `fuzz/` reaches only public items; until then the property test
 covers it.
 
@@ -478,7 +499,8 @@ tracker; this one holds what is left for the engine itself.
 - [ ] LMATH-T6 Read the KaTeX behavior for the first subset, then write the Rust types for
   tokens, parse nodes, options, and boxes (LMATH-13) before any logic, and review them. Done:
   errors, limits, tokens, the lexer, the expander, the parser and its functions, `Style`,
-  `Options`, the font parameters, the glyph metrics, and the box tree (LMATH-14). Next: layout.
+  `Options`, the font parameters, the glyph metrics, the box tree (LMATH-14), and the core of
+  layout. Next: layout of the remaining nodes.
 - [ ] LMATH-T8 Port the baseline tests as data (LMATH-13). Done so far:
   `scripts/katex-fixtures.mjs` (needs node, KaTeX 0.19.1, and the `yaml` package; setup in its
   header) extracts the `expect`...`` cases of `katex-spec.ts` and the `ss_data.yaml` inputs, runs
