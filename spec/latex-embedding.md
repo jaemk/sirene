@@ -114,7 +114,8 @@ nested text).
 Status (flowchart): the lowering typesets each formula of a node or edge label and reports a
 failure as an error on the offending command, found in the label's source text (the label's
 whole range when the decoded text is not found there as written). One diagnostic per failing
-formula, once per edge for an `&` product. Without the `math` feature there is none.
+formula, once per edge for an `&` product. Without the `math` feature each formula gets one
+warning on its body and is drawn as its source.
 
 Status (sequence): the lowering reports each failing formula of a participant alias (`as` text
 or a metadata `alias`), message, or note on the offending command, with the statement's range
@@ -129,6 +130,10 @@ as the fallback (`flowchart::formula::errors` is shared with the flowchart lower
 - [ ] LEMB-T7 Read Mermaid's source for the `$$` rules listed at the end of LEMB-1.
 - [ ] LEMB-T8 Read PlantUML's source or run it for the escape and alignment rules in LEMB-2.
 - [ ] LEMB-T3 Decide LEMB-3 with the Markdown spec.
-- [ ] LEMB-T4 Define `Formula` and the inline-label item in the display list (DISPLA).
+- [x] LEMB-T4 Define `Formula` and the inline-label item in the display list. A formula is drawn
+  as `Primitive::Path` items (with an optional clip), placed on a baseline shared with the text
+  runs of its line (`scene/mathtext.rs`, `ascii/mathtext.rs`); no new display-list item.
 - [ ] LEMB-T5 Per diagram kind: where a label is measured and drawn today, and what must change
-  to take a formula (a table in this spec).
+  to take a formula. Done for flowcharts, sequence diagrams, and the PlantUML graph kinds
+  listed in PCREO-3; open for the rest (PlantUML compartment rows, edge end labels, titles,
+  legends, and the other Mermaid kinds of LEMB-T6).
