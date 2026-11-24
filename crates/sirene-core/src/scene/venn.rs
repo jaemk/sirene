@@ -225,6 +225,7 @@ pub fn venn(chart: &Venn, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
             elements.push(Element {
                 owner: Owner::Diagram,
                 primitive: Primitive::Path {
+                    clip: None,
                     segments: outline(region, top),
                     fill: Some(faded(base, opacity)),
                     stroke: (width > 0.0).then_some(Stroke {
@@ -240,6 +241,7 @@ pub fn venn(chart: &Venn, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
                 elements.push(Element {
                     owner: Owner::Diagram,
                     primitive: Primitive::Path {
+                        clip: None,
                         segments: outline(region, top),
                         fill: Some(fill),
                         stroke: None,

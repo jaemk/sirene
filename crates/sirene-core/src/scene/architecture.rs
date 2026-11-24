@@ -206,11 +206,13 @@ fn icon_paths(icon: Option<&str>, b: BoxF) -> Vec<Primitive> {
     let p = |x: f32, y: f32| Pt::new(b.x + x * s, b.y + y * s);
     let w = 2.0 * s.max(0.5);
     let mut out = vec![Primitive::Path {
+        clip: None,
         segments: shapes::rounded(b, 4.0 * s),
         fill: Some(BLUE),
         stroke: None,
     }];
     let path = |segments: Vec<Segment>| Primitive::Path {
+        clip: None,
         segments,
         fill: None,
         stroke: line(w),

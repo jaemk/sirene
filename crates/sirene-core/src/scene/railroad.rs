@@ -81,6 +81,7 @@ impl<M: TextMetrics> Draw<'_, M> {
     fn path(&mut self, segments: Vec<Segment>) {
         let stroke = self.stroke();
         self.lines.push(el(Primitive::Path {
+            clip: None,
             segments,
             fill: None,
             stroke: Some(stroke),
@@ -317,6 +318,7 @@ impl<M: TextMetrics> Draw<'_, M> {
             Look::Special => (t.edge_label_fill, t.node_stroke, Some((5.0, 3.0)), rect(b)),
         };
         self.boxes.push(el(Primitive::Path {
+            clip: None,
             segments,
             fill: Some(fill),
             stroke: Some(Stroke {
@@ -337,6 +339,7 @@ impl<M: TextMetrics> Draw<'_, M> {
     fn marker(&mut self, c: Pt) {
         let color: Color = self.theme.edge;
         self.boxes.push(el(Primitive::Path {
+            clip: None,
             segments: shapes::ellipse(c, MARKER_R, MARKER_R),
             fill: Some(color),
             stroke: None,

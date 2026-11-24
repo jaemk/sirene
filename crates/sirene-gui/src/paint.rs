@@ -1,8 +1,8 @@
 //! Painting scenes with gpui (GUISHE-4).
 
 use gpui::{
-    App, BorderStyle, Bounds, Font, FontStyle, FontWeight, Hsla, PathBuilder, Pixels, Point, Rgba,
-    SharedString, TextAlign, TextRun, Window, point, px,
+    App, BorderStyle, Bounds, ContentMask, Font, FontStyle, FontWeight, Hsla, PathBuilder, Pixels,
+    Point, Rgba, SharedString, TextAlign, TextRun, Window, point, px,
 };
 use sirene_core::scene::{Color, Owner, Primitive, Pt, Scene, Segment, TextMetrics, TextStyle};
 
@@ -223,21 +223,33 @@ pub fn paint(
                 segments,
                 fill,
                 stroke,
+                clip,
             } => {
-                if let Some(c) = fill
-                    && let Ok(path) = build(PathBuilder::fill(), segments, at).build()
-                {
-                    window.paint_path(path, color(*c));
-                }
-                if let Some(s) = stroke {
-                    let mut b = PathBuilder::stroke(px(s.width * at.zoom));
-                    if let Some((d, g)) = s.dash {
-                        b = b.dash_array(&[px(d * at.zoom), px(g * at.zoom)]);
+                let mask = clip.map(|r| {
+                    let (a, b) = (
+                        at.map(Pt::new(r.x, r.y)),
+                        at.map(Pt::new(r.x + r.w, r.y + r.h)),
+                    );
+                    ContentMask {
+                        bounds: Bounds::from_corners(a, b),
                     }
-                    if let Ok(path) = build(b, segments, at).build() {
-                        window.paint_path(path, color(s.color));
+                });
+                window.with_content_mask(mask, |window| {
+                    if let Some(c) = fill
+                        && let Ok(path) = build(PathBuilder::fill(), segments, at).build()
+                    {
+                        window.paint_path(path, color(*c));
                     }
-                }
+                    if let Some(s) = stroke {
+                        let mut b = PathBuilder::stroke(px(s.width * at.zoom));
+                        if let Some((d, g)) = s.dash {
+                            b = b.dash_array(&[px(d * at.zoom), px(g * at.zoom)]);
+                        }
+                        if let Ok(path) = build(b, segments, at).build() {
+                            window.paint_path(path, color(s.color));
+                        }
+                    }
+                });
             }
             Primitive::Text {
                 text,
@@ -278,6 +290,7 @@ mod tests {
                 color: Color::rgb(0),
                 dash: None,
             }),
+            clip: None,
         }
     }
 

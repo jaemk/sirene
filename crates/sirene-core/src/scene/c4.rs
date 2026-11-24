@@ -333,6 +333,7 @@ pub fn c4(c: &C4, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Sc
             push(
                 owner,
                 Primitive::Path {
+                    clip: None,
                     segments: body,
                     fill: Some(fill),
                     stroke,
@@ -341,6 +342,7 @@ pub fn c4(c: &C4, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Sc
             push(
                 owner,
                 Primitive::Path {
+                    clip: None,
                     segments: end,
                     fill: None,
                     stroke,
@@ -460,11 +462,13 @@ fn person(top: Pt, color: Color) -> Vec<Primitive> {
     ];
     vec![
         Primitive::Path {
+            clip: None,
             segments: shapes::ellipse(head, r, r),
             fill: Some(color),
             stroke: None,
         },
         Primitive::Path {
+            clip: None,
             segments: shoulders,
             fill: Some(color),
             stroke: None,

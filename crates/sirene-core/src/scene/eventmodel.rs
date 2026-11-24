@@ -190,6 +190,7 @@ impl Draw {
 
     fn path(&mut self, segments: Vec<Segment>, fill: Option<Color>, stroke: Option<Stroke>) {
         self.push(Primitive::Path {
+            clip: None,
             segments,
             fill,
             stroke,
