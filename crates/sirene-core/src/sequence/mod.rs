@@ -241,6 +241,9 @@ pub struct Sequence {
     pub events: Vec<Event>,
     /// PlantUML's `hide footbox`: no headers at the bottom.
     pub hide_footbox: bool,
+    /// Whether `$$...$$` in participant labels, message text, and notes is a formula (Mermaid,
+    /// LEMB-1). The text keeps the formula's source; [`crate::flowchart::formula`] reads it.
+    pub math: bool,
 }
 
 impl Sequence {

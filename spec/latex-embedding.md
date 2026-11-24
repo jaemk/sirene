@@ -33,8 +33,11 @@ before typesetting, as Mermaid does. A label with a formula is not read as markd
 Status: flowchart node and edge labels are done (`Label::runs`, `scene/mathtext.rs`,
 `ascii/mathtext.rs`; tests in `tests/flowchart_math.rs`). Other kinds that lower to the
 flowchart model share the label type but are not wired: subgraph titles, end labels, and
-compartment titles draw the formula as text. Sequence participants, messages, and notes are
-not done.
+compartment titles draw the formula as text. Sequence participant names and aliases, message
+text, and notes are done (`tests/sequence_math.rs`); block, divider, group, and title text and
+the PlantUML-only separators, delays, and `ref` text draw the formula as text. The sequence
+model keeps `Text = Vec<String>` with the source, and `Sequence::math` (set by the Mermaid
+lowering) says `$$` is a formula; `flowchart::formula::runs` gives a line's runs.
 
 To verify in Mermaid's source (LEMB-T7): the delimiter regular expression, multiple formulas per
 label, `$$` inside quoted and Markdown strings, and whether display or inline style is used.
@@ -86,6 +89,13 @@ formula's source (`Span::formula`), not a `Formula`; the painter typesets for me
 drawing. In the text renderer a line is as many rows as its tallest formula (`ascii_formula_rows`),
 text and formulas aligned on the baseline row, every row of a line the same width.
 
+Status (sequence): the same runs and baseline rule (`scene/mathtext.rs` `draw_lines`,
+`block_size`; shared with the flowchart painter). A header, message label, or note is as tall
+as its lines' boxes and as wide as its widest line, so lanes and notes grow for a wide formula
+and rows for a tall one; the arrow sits below the whole label. In the text renderer a message
+label, note, or name is expanded to rows before sizing (`ascii/mathtext.rs` `text_rows`), so
+the lifelines stay aligned.
+
 ## LEMB-5 Positions
 
 A formula's source range is in the user's source, inside its delimiters, so a diagnostic from
@@ -96,6 +106,10 @@ Status (flowchart): the lowering typesets each formula of a node or edge label a
 failure as an error on the offending command, found in the label's source text (the label's
 whole range when the decoded text is not found there as written). One diagnostic per failing
 formula, once per edge for an `&` product. Without the `math` feature there is none.
+
+Status (sequence): the lowering reports each failing formula of a participant alias (`as` text
+or a metadata `alias`), message, or note on the offending command, with the statement's range
+as the fallback (`flowchart::formula::errors` is shared with the flowchart lowering).
 
 ## LEMB-T Tasks
 

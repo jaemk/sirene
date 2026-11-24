@@ -141,7 +141,7 @@ pub(crate) fn formulas(line: &str) -> Vec<std::ops::Range<usize>> {
     out
 }
 
-fn math_line(line: &str) -> Vec<Span> {
+pub(crate) fn math_line(line: &str) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut at = 0;
     for r in formulas(line) {

@@ -206,25 +206,8 @@ pub const MAX_NESTING: usize = MAX_DEPTH + 1;
 pub const DEFAULT_LANE: &str = "__swimlane_default__";
 
 /// The label token of a `LABEL` node: its raw text and where it starts.
-#[cfg(feature = "math")]
 fn label_token(node: &SyntaxNode) -> Option<SyntaxToken> {
     tokens(node).find(|t| matches!(t.kind(), STRING | MD_STRING | TEXT))
-}
-
-/// The offset in `body` of byte `at` of `body` with `\\` read as `\`.
-#[cfg(feature = "math")]
-fn uncollapsed(body: &str, at: usize) -> usize {
-    let bytes = body.as_bytes();
-    let (mut i, mut seen) = (0, 0);
-    while i < bytes.len() && seen < at {
-        i += if bytes[i] == b'\\' && bytes.get(i + 1) == Some(&b'\\') {
-            2
-        } else {
-            1
-        };
-        seen += 1;
-    }
-    i
 }
 
 impl Lowerer {
@@ -236,9 +219,7 @@ impl Lowerer {
         label
     }
 
-    #[cfg(feature = "math")]
     fn check_formulas(&mut self, node: &SyntaxNode, label: &Label) {
-        use crate::math::{MathStyle, typeset};
         if !label.has_formula() {
             return;
         }
@@ -247,35 +228,10 @@ impl Lowerer {
         let start = token
             .as_ref()
             .map_or(node.text_range().start(), |t| t.text_range().start());
-        let mut cursor = 0;
-        for line in label.text.split('\n') {
-            let line = super::model::clean(line);
-            for r in super::model::formulas(&line) {
-                let body = &line[r.start + 2..r.end - 2];
-                // Where the body is in the source text, when it is there as written.
-                let found = raw[cursor..].find(body).map(|i| cursor + i);
-                if let Some(p) = found {
-                    cursor = p + body.len();
-                }
-                let Err(e) = typeset(&body.replace("\\\\", "\\"), MathStyle::Display) else {
-                    continue;
-                };
-                let range = match found {
-                    Some(p) => {
-                        let from = uncollapsed(body, e.span.start);
-                        let to = uncollapsed(body, e.span.end).max(from);
-                        let at = |o: usize| start + rowan::TextSize::new((p + o) as u32);
-                        TextRange::new(at(from), at(to))
-                    }
-                    None => node.text_range(),
-                };
-                self.error(range, e.message);
-            }
-        }
+        let lines = label.text.split('\n').map(super::model::clean);
+        self.diagnostics
+            .extend(super::formula::errors(start, raw, lines, node.text_range()));
     }
-
-    #[cfg(not(feature = "math"))]
-    fn check_formulas(&mut self, _: &SyntaxNode, _: &Label) {}
 
     fn error(&mut self, range: TextRange, message: impl Into<String>) {
         self.diagnostics.push(Diagnostic::new(range, message));
