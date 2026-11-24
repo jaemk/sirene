@@ -43,8 +43,17 @@ pub(crate) enum NodeKind<'a> {
         denom: Box<Node<'a>>,
         continued: bool,
         bar: bool,
-        left: Option<&'static str>,
-        right: Option<&'static str>,
+        /// The thickness of the bar, if the source gave one (`\above`, `\genfrac`).
+        bar_size: Option<Measurement>,
+        left: Option<String>,
+        right: Option<String>,
+    },
+    /// An infix fraction command (`\over`, `\above`) as read: the expression around it is
+    /// split at it and it becomes a `Frac`, so it stays in the tree only where no expression
+    /// holds it. `replace_with` is the command it stands for.
+    Infix {
+        replace_with: &'static str,
+        size: Option<Measurement>,
     },
     /// A root, with an optional index (`\sqrt[3]{x}`).
     Sqrt {
@@ -222,6 +231,7 @@ impl NodeKind<'_> {
             NodeKind::Group { .. } => "ordgroup",
             NodeKind::SupSub { .. } => "supsub",
             NodeKind::Frac { .. } => "genfrac",
+            NodeKind::Infix { .. } => "infix",
             NodeKind::Sqrt { .. } => "sqrt",
             NodeKind::Styling { .. } => "styling",
             NodeKind::Text { .. } => "text",
