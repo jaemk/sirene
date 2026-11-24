@@ -48,7 +48,8 @@ types of MACOSP-3 with the same descriptions and extensions (`xtask::DOCUMENT_TY
 writes `sirene-X.Y.Z-1.ARCH.rpm`.
 
 RPM's `find-requires` derives dependencies from the executable's linked libraries, including
-its glibc 2.39 floor. The metadata also declares `libvulkan.so.1` and
+its glibc floor. `bin/linux-package.sh` refuses an executable that needs a glibc newer than
+2.35, the floor of the Ubuntu 22.04 runners that build it (LINUXP-6). The metadata also declares `libvulkan.so.1` and
 `libwayland-client.so.0`, which gpui loads at run time. Use `find-requires` from the `rpm`
 package because cargo-generate-rpm's built-in scanner can emit glibc `[WEAK]` symbol
 requirements that packages do not provide.
@@ -69,12 +70,14 @@ is followed by a zstd SquashFS of APPDIR (LINUXP-1), with mode 0755. The build n
 The image carries the runtime license texts under `usr/share/licenses/appimage-runtime/`. The
 adjacent `*.AppImage-runtime-source.tar.gz` contains the corresponding source archives, runtime
 object and static application libraries, licenses, and instructions to rebuild the runtime
-or relink it with a modified libfuse. The Sirene executable uses the host's glibc 2.39 or later,
+or relink it with a modified libfuse. The Sirene executable uses the host's glibc 2.35 or later,
 X11 or Wayland, and Vulkan libraries. Use FUSE to mount the image or `--appimage-extract-and-run`
 to launch from a temporary extraction.
 
 ## LINUXP-6 Release build
 
+The `build` job compiles the GNU executables on native Ubuntu 22.04 runners, whose glibc 2.35
+sets the packages' floor (LINUXP-4).
 The `linux` job of `.github/workflows/release.yml` (WORKSP-8) runs on native Ubuntu 24.04
 runners for `x86_64` and `aarch64` after `build`. It extracts `sirene` from the GNU tarball and
 calls `bin/linux-package.sh ARCH VERSION BINARY OUT`. This writes the AppDir (LINUXP-1) and

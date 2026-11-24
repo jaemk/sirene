@@ -6,6 +6,12 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The glibc Linux binaries, `.rpm`, and AppImage are built on Ubuntu 22.04 and need glibc 2.35
+  instead of 2.39, so `dnf` installs the `.rpm` on RED OS 8, Debian 12, and Fedora 36 and later.
+  Packaging refuses a binary that needs a newer glibc.
+
 ## [0.6.4] - 2026-11-22
 
 ### Added

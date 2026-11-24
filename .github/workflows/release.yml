@@ -185,9 +185,9 @@ jobs:
           # The gnu legs include the GUI and link the system's X11, Wayland,
           # and Vulkan libraries; the Homebrew formula uses them.
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-24.04-arm
+            os: ubuntu-22.04-arm
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-24.04
+            os: ubuntu-22.04
           # musl legs: statically linked, glibc-version-independent binaries
           # for bin/install.sh. gpui cannot link statically, so these are built
           # without the GUI.
@@ -226,7 +226,9 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          key: ${{ matrix.target }}
+          # rust-cache keys on the OS family, not its release: name the runner image so tools in
+          # ~/.cargo/bin built against a newer glibc are not restored on Ubuntu 22.04.
+          key: ${{ matrix.target }}-${{ matrix.os }}
       # Embed a dependency SBOM in the shipped binary (cargo-auditable) so
       # `cargo audit bin sirene` can scan a downloaded release against the
       # RustSec advisory database. Pinned for a reproducible release build.

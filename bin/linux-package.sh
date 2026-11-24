@@ -27,6 +27,14 @@ if [ ! -x "$binary" ]; then
     echo "expected an executable GNU editor binary: $binary" >&2
     exit 1
 fi
+# The binary needs the glibc of the system it was built on (LINUXP-4). Ubuntu 22.04's 2.35 keeps
+# the packages installable on Debian 12, RED OS 8, and Fedora 36 and later.
+glibc_floor="2.35"
+glibc_needed="$(objdump -T "$binary" | grep -o 'GLIBC_[0-9.]*' | sed 's/^GLIBC_//' | sort -uV | tail -n 1)"
+if [ "$(printf '%s\n%s\n' "$glibc_needed" "$glibc_floor" | sort -V | tail -n 1)" != "$glibc_floor" ]; then
+    echo "$binary needs glibc $glibc_needed, newer than $glibc_floor: build it on Ubuntu 22.04" >&2
+    exit 1
+fi
 
 rpm_version="${version/-dev/\~dev}"
 mkdir -p "$out"

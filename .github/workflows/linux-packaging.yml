@@ -27,9 +27,9 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            os: ubuntu-24.04
+            os: ubuntu-22.04
           - arch: aarch64
-            os: ubuntu-24.04-arm
+            os: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,7 +46,9 @@ jobs:
           targets: ${{ matrix.arch }}-unknown-linux-gnu
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          key: linux-packaging-${{ matrix.arch }}
+          # rust-cache keys on the OS family, not its release: name the runner image so tools in
+          # ~/.cargo/bin built against a newer glibc are not restored on Ubuntu 22.04.
+          key: linux-packaging-${{ matrix.arch }}-${{ matrix.os }}
       - name: install the release tools
         run: |
           cargo install cargo-auditable --version 0.7.5 --locked

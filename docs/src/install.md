@@ -44,8 +44,8 @@ asks before the first launch.
 
 ## RPM packages
 
-The editor RPM is available for x86_64 and aarch64. It requires glibc 2.39 or later, which
-Fedora 40 and RHEL 10 provide. `dnf` installs it from the release URL and pulls in the required
+The editor RPM is available for x86_64 and aarch64. It requires glibc 2.35 or later, which
+Fedora 36, RHEL 10, and RED OS 8 provide. `dnf` installs it from the release URL and pulls in the required
 X11, Wayland, and Vulkan libraries.
 
 ```
@@ -59,7 +59,7 @@ RPM URL.
 ## AppImage
 
 Download `Sirene-X.Y.Z-x86_64.AppImage` or the `aarch64` variant for your system. The editor
-requires glibc 2.39 or later and uses the system's X11 or Wayland and Vulkan libraries.
+requires glibc 2.35 or later and uses the system's X11 or Wayland and Vulkan libraries.
 
 ```
 chmod +x Sirene-X.Y.Z-x86_64.AppImage

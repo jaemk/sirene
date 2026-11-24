@@ -859,6 +859,19 @@ fn the_release_carries_the_linux_packages() {
     assert!(checks.contains("bash bin/release-archive.sh extract "));
     assert!(checks.contains("bash bin/release-checksums.sh "));
     assert!(checks.contains("merge-multiple: true"));
+    // The GNU binaries link Ubuntu 22.04's glibc 2.35, and packaging refuses a newer floor.
+    for (arch, os) in [("x86_64", "ubuntu-22.04"), ("aarch64", "ubuntu-22.04-arm")] {
+        assert!(workflow.contains(&format!(
+            "          - target: {arch}-unknown-linux-gnu\n            os: {os}\n"
+        )));
+        assert!(checks.contains(&format!("          - arch: {arch}\n            os: {os}\n")));
+    }
+    assert!(read(&repo_root().join("bin/linux-package.sh")).contains("glibc_floor=\"2.35\""));
+    // A cache saved on another Ubuntu release would restore tools linked against its glibc.
+    assert!(workflow.contains("          key: ${{ matrix.target }}-${{ matrix.os }}\n"));
+    assert!(
+        checks.contains("          key: linux-packaging-${{ matrix.arch }}-${{ matrix.os }}\n")
+    );
     assert_eq!(
         workflow
             .matches(
