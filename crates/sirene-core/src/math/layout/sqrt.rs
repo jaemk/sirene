@@ -34,6 +34,8 @@ const SIZE_TO_MAX_HEIGHT: [f64; 4] = [1.2, 1.8, 2.4, 3.0];
 struct SqrtImage<'t> {
     /// The sign: as high as TeX's box for it, and as wide as its least width.
     sign: Bx<'t>,
+    /// The sign's height for layout, less the room the drawing has above the line.
+    tex_height: f64,
     /// The thickness of the vinculum.
     rule_width: f64,
     /// How far right the body starts.
@@ -109,18 +111,17 @@ fn sqrt_image<'t>(
         ),
     };
 
-    // The drawing is `span_height` tall and its bottom is the box's. The box leaves out the room
-    // at the top, so the view box does too, at the drawing's own scale.
-    let pad = view_height * (span_height - tex_height) / span_height;
+    // The drawing is `span_height` tall, its bottom the box's; `sqrt` lays it out at `tex_height`.
     let sign = Bx::path(
         sqrt_path(size, extra, view_height),
-        [0.0, pad, 400_000.0, view_height - pad],
+        [0.0, 0.0, 400_000.0, view_height],
         Fit::Crop(Align::Min),
-        (Em(min_width), Em(tex_height), Em::ZERO),
+        (Em(min_width), Em(span_height), Em::ZERO),
         options,
     );
     Ok(SqrtImage {
         sign,
+        tex_height,
         // The width of the line depends on the font chosen, and `\boldmath` should use the
         // thicker signs of the bold font; KaTeX does not either.
         rule_width: (metrics.sqrt_rule_thickness + extra) * size_multiplier,
@@ -157,19 +158,23 @@ pub(super) fn sqrt<'t>(
 
     let SqrtImage {
         mut sign,
+        tex_height,
         rule_width,
         advance_width,
     } = sqrt_image(min_delimiter_height, options, &span)?;
 
     // A sign taller than needed shares the extra between above and below the body.
-    let delim_depth = sign.height.0 - rule_width;
+    let delim_depth = tex_height - rule_width;
     if delim_depth > body_size + line_clearance {
         line_clearance = (line_clearance + delim_depth - body_size) / 2.0;
     }
-    let sign_shift = sign.height.0 - inner.height.0 - line_clearance - rule_width;
+    let sign_shift = tex_height - inner.height.0 - line_clearance - rule_width;
 
-    // The sign is as wide as the body with the room it leaves for the sign's hook.
+    // The sign is as wide as the body with the room it leaves for the sign's hook. The drawing
+    // reaches above the box by the room KaTeX leaves over the line, so the line is not cut.
     sign.width = sign.width.max(inner.width + Em(advance_width));
+    let mut sign = Bx::hlist(vec![sign]);
+    sign.height = Em(tex_height);
     let kern = Em(-(inner.height.0 + sign_shift));
     let body_box = Bx::vlist(
         Position::FirstBaseline,
@@ -283,18 +288,17 @@ mod tests {
             close(found[0].1, 0.833) && close(found[0].2, 0.0),
             "{found:?}"
         );
-        // The sign is one path 1em high, from the baseline's 0.23972 below up to 0.76028 above,
-        // as wide as the root.
+        // The sign is one path from the baseline's 0.23972 below up to 0.76028 above, and the
+        // drawing reaches 0.08em higher, over the line, as KaTeX's does; as wide as the root.
         let sign = signs("\\sqrt x", false);
         assert_eq!(sign.len(), 1);
         let (x, y, width, height, view_box) = sign[0];
         assert!(
-            close(x, 0.0) && close(y, -0.76028) && close(height, 1.0),
+            close(x, 0.0) && close(y, -0.84028) && close(height, 1.08),
             "{sign:?}"
         );
         assert!(close(width, w), "{sign:?}");
-        // The view box leaves out the 0.08em of room KaTeX draws above the line.
-        let want = [0.0, 80.0, 400_000.0, 1000.0];
+        let want = [0.0, 0.0, 400_000.0, 1080.0];
         assert!(view_box.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-6));
     }
 
@@ -349,23 +353,48 @@ mod tests {
         assert_eq!(sign.len(), 1);
         let (x, y, width, height, view_box) = sign[0];
         assert!(
-            close(x, 0.0) && close(y, -3.09) && close(height, 3.09),
+            close(x, 0.0) && close(y, -3.17) && close(height, 3.17),
             "{sign:?}"
         );
         assert!(close(width, w), "{sign:?}");
-        let want = [0.0, 80.0, 400_000.0, 3090.0];
+        let want = [0.0, 0.0, 400_000.0, 3170.0];
         assert!(view_box.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-6));
         // Under 3em it is a glyph-sized sign: Size1's for a body that is a little too tall for
-        // the main font's.
+        // the main font's, 1.2em and the 0.08em over the line.
         let sign = signs("\\sqrt{\\rule{1em}{1em}}", false);
-        assert!(close(sign[0].3, 1.2), "{sign:?}");
+        assert!(close(sign[0].3, 1.28), "{sign:?}");
+    }
+
+    #[test]
+    fn every_sign_draws_its_whole_view_box() {
+        // The line is drawn 80 to 120 units from the view box's top, so a view box cropped at
+        // the top would cut it. Scaled to the drawing, its lower edge is about the line's
+        // 0.04em below the box's top, which is 0.08em under the drawing's; a size font's sign
+        // fits its view box in a little less than 1em per 1000 units, raising the line by up to
+        // 0.006em, as in KaTeX.
+        for body in [
+            "{x}",
+            "{\\rule{1em}{1em}}",
+            "{\\rule{1em}{2.5em}}",
+            "{\\rule{1em}{4em}}",
+        ] {
+            let src = format!("\\sqrt{body}");
+            for (_, _, _, height, view_box) in signs(&src, false) {
+                assert_eq!(view_box[1], 0.0, "{src}: {view_box:?}");
+                let line_bottom = 120.0 * height / view_box[3];
+                assert!(
+                    (line_bottom - 0.12).abs() < 7e-3,
+                    "{src}: {line_bottom} {height} {view_box:?}"
+                );
+            }
+        }
     }
 
     #[test]
     fn a_huge_body_is_still_one_path() {
         let sign = signs("\\sqrt{\\rule{1em}{900em}}", false);
         assert_eq!(sign.len(), 1);
-        assert!(close(sign[0].3, 900.09), "{sign:?}");
+        assert!(close(sign[0].3, 900.17), "{sign:?}");
     }
 
     #[test]

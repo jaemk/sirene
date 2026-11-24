@@ -81,6 +81,8 @@ struct Atom<'t> {
     tight: bool,
     /// A line break (`\\` outside a table), which starts a new line for spacing at the root.
     newline: bool,
+    /// A `\middle` delimiter, which the `\left ... \right` around it resizes.
+    middle: Option<Box<delimiter::Middle<'t>>>,
 }
 
 impl<'t> Atom<'t> {
@@ -91,6 +93,7 @@ impl<'t> Atom<'t> {
             space: false,
             tight: options.style.is_tight(),
             newline: false,
+            middle: None,
         }
     }
 

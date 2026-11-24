@@ -15,14 +15,19 @@ use crate::math::{
 };
 
 /// The space a label is padded by on each side: `\xrightarrow` pads by 0.5em, and the arrows of
-/// a commutative diagram by `\;` before and `\;\;` after.
-fn padded<'t>(label: Bx<'t>, x_arrow: bool) -> Bx<'t> {
+/// a commutative diagram by `\;` before and `\;\;` after, in the label's em (KaTeX's CSS pads
+/// the label's sizing span).
+fn padded<'t>(label: Bx<'t>, x_arrow: bool, scale: f64) -> Bx<'t> {
     let (left, right) = if x_arrow {
         (0.5, 0.5)
     } else {
         (0.27778, 0.55556)
     };
-    Bx::hlist(vec![Bx::kern(Em(left)), label, Bx::kern(Em(right))])
+    Bx::hlist(vec![
+        Bx::kern(Em(left * scale)),
+        label,
+        Bx::kern(Em(right * scale)),
+    ])
 }
 
 pub(super) fn x_arrow<'t>(
@@ -37,13 +42,19 @@ pub(super) fn x_arrow<'t>(
 
     // The labels are in script and scriptscript style (amsmath: `\scriptstyle\mkern#3mu{#6}`).
     let upper_options = options.having_style(style.sup());
-    let upper = padded(build_in(body, &upper_options, options)?.into_box(), x_arrow);
+    let scale = |inner: &Options<'_>| inner.size_multiplier() / options.size_multiplier();
+    let upper = padded(
+        build_in(body, &upper_options, options)?.into_box(),
+        x_arrow,
+        scale(&upper_options),
+    );
     let lower = match below {
         Some(below) => {
             let lower_options = options.having_style(style.sub());
             Some(padded(
                 build_in(below, &lower_options, options)?.into_box(),
                 x_arrow,
+                scale(&lower_options),
             ))
         }
         None => None,
@@ -149,20 +160,24 @@ mod tests {
         assert_eq!(*view_box, [0.0, 0.0, 400_000.0, 522.0]);
         assert_eq!(*fit, Fit::Crop(Align::Max));
         assert_eq!(data, svg_data::path("rightarrow").unwrap());
-        // The label is centered over it, in script size with 0.5em of padding.
+        // The label is centered over it, in script size with 0.5 of the script em of padding.
         let label = 0.57153 * 0.7;
         let [(text, at)] = glyphs.as_slice() else {
             panic!("one glyph: {glyphs:?}");
         };
         assert_eq!(text, "x");
-        assert!(close(*at, (1.469 - (1.0 + label)) / 2.0 + 0.5), "{at}");
+        assert!(close(*at, (1.469 - (0.7 + label)) / 2.0 + 0.35), "{at}");
     }
 
     #[test]
     fn a_long_label_stretches_the_arrow() {
         let ((w, h, d), paths, _) = drawn("\\xrightarrow{xxxxxxxx}", false);
-        let width = 1.0 + 8.0 * 0.57153 * 0.7;
+        // KaTeX pads the label in its own em: 0.7 * (0.5 + 8 x + 0.5).
+        let width = 0.7 * (1.0 + 8.0 * 0.57153);
         assert!(close(w, width), "{w}");
+        // In script style the label is scriptscript, padded by 0.5 of its own em.
+        let ((w, ..), ..) = drawn("\\scriptstyle\\xrightarrow{xxxxxxxx}", false);
+        assert!(close(w, 0.5 * (1.0 + 8.0 * 0.57153)), "{w}");
         assert!(close(h, 0.923392) && close(d, 0.011), "{h} {d}");
         let [([_, _, path_width, _], view_box, ..)] = paths.as_slice() else {
             panic!("one path: {paths:?}");

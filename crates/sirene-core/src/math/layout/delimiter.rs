@@ -202,33 +202,22 @@ pub(super) fn left_right<'t>(
         options,
         span: &span,
     };
-    // The body as `expression` builds it, but keeping where the `\middle` delimiters are: they
-    // are built small and replaced once the body's size is known.
+    // The body as `expression` builds it. The `\middle` delimiters in it, at the top or within
+    // a `\color` or style or size command, are built small and replaced once the body's size
+    // is known.
     let mut atoms = Vec::new();
-    let mut middles: Vec<Option<&'t str>> = Vec::new();
     for node in body {
         match build(node, options)? {
-            Built::One(atom) => {
-                middles.push(match &node.kind {
-                    NodeKind::Middle { delim } if delim != "." => Some(delim.as_str()),
-                    _ => None,
-                });
-                atoms.push(atom);
-            }
-            Built::Many(more) => {
-                middles.extend(more.iter().map(|_| None));
-                atoms.extend(more);
-            }
+            Built::One(atom) => atoms.push(atom),
+            Built::Many(more) => atoms.extend(more),
         }
     }
 
     let mut inner_height = Em::ZERO;
     let mut inner_depth = Em::ZERO;
-    for (atom, middle) in atoms.iter().zip(&middles) {
-        if middle.is_none() {
-            inner_height = inner_height.max(atom.bx.height);
-            inner_depth = inner_depth.max(atom.bx.depth);
-        }
+    for atom in atoms.iter().filter(|atom| atom.middle.is_none()) {
+        inner_height = inner_height.max(atom.bx.height);
+        inner_depth = inner_depth.max(atom.bx.depth);
     }
     // The size of delimiters is the same whatever the style, so the body's size is scaled down
     // to the base size.
@@ -240,9 +229,14 @@ pub(super) fn left_right<'t>(
     } else {
         left_right_delim(left, inner_height, inner_depth, ctx)?
     };
-    for (atom, middle) in atoms.iter_mut().zip(&middles) {
-        if let Some(delim) = middle {
-            atom.bx = left_right_delim(delim, inner_height, inner_depth, ctx)?;
+    for atom in &mut atoms {
+        if let Some(middle) = atom.middle.take() {
+            let ctx = Ctx {
+                mode: middle.mode,
+                options: &middle.options,
+                span: &middle.span,
+            };
+            atom.bx = left_right_delim(middle.delim, inner_height, inner_depth, ctx)?;
         }
     }
     let right = if right == "." {
@@ -306,7 +300,26 @@ pub(super) fn middle<'t>(
         };
         sized_delim(delim, 1, ctx)?
     };
-    Ok(Built::One(Atom::new(bx, None, options)))
+    let mut atom = Atom::new(bx, None, options);
+    if delim != "." {
+        atom.middle = Some(Box::new(Middle {
+            delim,
+            mode,
+            options: *options,
+            span,
+        }));
+    }
+    Ok(Built::One(atom))
+}
+
+/// A `\middle` delimiter as it was built, for `left_right` to rebuild at the body's size with
+/// its own options (KaTeX's `isMiddle`), however deep in `\color` or a style or size command.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Middle<'t> {
+    delim: &'t str,
+    mode: Mode,
+    options: Options<'t>,
+    span: Range<usize>,
 }
 
 /// Which glyph the radical sign is drawn from at a height.
@@ -1062,6 +1075,22 @@ mod tests {
     }
 
     #[test]
+    fn middle_delimiters_inside_color_and_style_commands_grow_too() {
+        let plain = paths("\\left|\\frac12\\middle|\\frac12\\right|", false);
+        for src in [
+            "\\left|\\frac12\\color{red}\\middle|\\frac12\\right|",
+            "\\left|\\frac12\\textstyle\\middle|\\frac12\\right|",
+        ] {
+            let found = paths(src, false);
+            assert_eq!(found.len(), 3, "{src}: {found:?}");
+            assert!(
+                found.iter().zip(&plain).all(|(a, b)| close(a.3, b.3)),
+                "{src}: {found:?} {plain:?}"
+            );
+        }
+    }
+
+    #[test]
     fn middle_by_itself_is_a_big_delimiter() {
         let options = Options::new(false);
         let Ok(Built::One(atom)) = middle("|", Mode::Math, &options, 0..1) else {
@@ -1193,9 +1222,8 @@ mod tests {
                 )
                 .unwrap();
                 let bx = layout(&nodes, false).unwrap_or_else(|e| panic!("{src}: {e}"));
-                // The delimiter never stretches past the cap, however tall the body.
-                let capped = bx.height.0 <= 300.0 && bx.depth.0 <= 300.0;
-                assert!(capped, "{src}");
+                // A fixed number of pieces however tall the body; the cap on their height is
+                // `a_huge_body_stretches_no_further_than_the_cap`.
                 assert!(bx.items().len() < 64, "{src}: {} items", bx.items().len());
             }
             if name != "." {
