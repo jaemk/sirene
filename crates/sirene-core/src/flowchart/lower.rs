@@ -205,7 +205,78 @@ pub const MAX_NESTING: usize = MAX_DEPTH + 1;
 /// The id of the untitled lane that holds a swimlane diagram's nodes outside every lane.
 pub const DEFAULT_LANE: &str = "__swimlane_default__";
 
+/// The label token of a `LABEL` node: its raw text and where it starts.
+#[cfg(feature = "math")]
+fn label_token(node: &SyntaxNode) -> Option<SyntaxToken> {
+    tokens(node).find(|t| matches!(t.kind(), STRING | MD_STRING | TEXT))
+}
+
+/// The offset in `body` of byte `at` of `body` with `\\` read as `\`.
+#[cfg(feature = "math")]
+fn uncollapsed(body: &str, at: usize) -> usize {
+    let bytes = body.as_bytes();
+    let (mut i, mut seen) = (0, 0);
+    while i < bytes.len() && seen < at {
+        i += if bytes[i] == b'\\' && bytes.get(i + 1) == Some(&b'\\') {
+            2
+        } else {
+            1
+        };
+        seen += 1;
+    }
+    i
+}
+
 impl Lowerer {
+    /// The label of a `LABEL` node, reporting each `$$...$$` formula in it that does not
+    /// typeset (LEMB-4, LEMB-5).
+    fn label(&mut self, node: &SyntaxNode) -> Label {
+        let label = label_of(node);
+        self.check_formulas(node, &label);
+        label
+    }
+
+    #[cfg(feature = "math")]
+    fn check_formulas(&mut self, node: &SyntaxNode, label: &Label) {
+        use crate::math::{MathStyle, typeset};
+        if !label.has_formula() {
+            return;
+        }
+        let token = label_token(node);
+        let raw = token.as_ref().map_or("", |t| t.text());
+        let start = token
+            .as_ref()
+            .map_or(node.text_range().start(), |t| t.text_range().start());
+        let mut cursor = 0;
+        for line in label.text.split('\n') {
+            let line = super::model::clean(line);
+            for r in super::model::formulas(&line) {
+                let body = &line[r.start + 2..r.end - 2];
+                // Where the body is in the source text, when it is there as written.
+                let found = raw[cursor..].find(body).map(|i| cursor + i);
+                if let Some(p) = found {
+                    cursor = p + body.len();
+                }
+                let Err(e) = typeset(&body.replace("\\\\", "\\"), MathStyle::Display) else {
+                    continue;
+                };
+                let range = match found {
+                    Some(p) => {
+                        let from = uncollapsed(body, e.span.start);
+                        let to = uncollapsed(body, e.span.end).max(from);
+                        let at = |o: usize| start + rowan::TextSize::new((p + o) as u32);
+                        TextRange::new(at(from), at(to))
+                    }
+                    None => node.text_range(),
+                };
+                self.error(range, e.message);
+            }
+        }
+    }
+
+    #[cfg(not(feature = "math"))]
+    fn check_formulas(&mut self, _: &SyntaxNode, _: &Label) {}
+
     fn error(&mut self, range: TextRange, message: impl Into<String>) {
         self.diagnostics.push(Diagnostic::new(range, message));
     }
@@ -466,11 +537,12 @@ impl Lowerer {
             if self.chart.agentflow {
                 kind = self.agentflow_delimited(kind, shape.text_range());
             }
+            let label = child(&shape, LABEL)
+                .map(|l| self.label(&l))
+                .unwrap_or_default();
             let node = &mut self.chart.nodes[i];
             node.shape = kind;
-            node.label = child(&shape, LABEL)
-                .map(|l| label_of(&l))
-                .unwrap_or_default();
+            node.label = label;
         }
         if let Some(class) = child(syntax, CLASS_SHORTHAND).and_then(|c| token(&c, IDENT)) {
             self.chart.nodes[i].classes.push(class.text().to_owned());
@@ -602,7 +674,7 @@ impl Lowerer {
         };
         let label = child(syntax, EDGE_LABEL)
             .and_then(|l| child(&l, LABEL))
-            .map(|l| label_of(&l))
+            .map(|l| self.label(&l))
             .filter(|l| !l.text.is_empty());
         let mut user_id = child(syntax, EDGE_ID).and_then(|n| {
             let id = token(&n, IDENT)?.text().to_owned();

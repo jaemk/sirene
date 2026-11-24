@@ -82,6 +82,12 @@ A label is text plus a markdown flag.
 - `Label::spans` gives each line as styled spans. In markdown, `**bold**` and `__bold__` are bold
   and `*italic*` and `_italic_` italic; a marker without a partner on its line stays as text, and
   `_` marks only at a word edge (`snake_case` is text). `Label::lines` is the spans' text.
+- `Label::runs` is `spans` with each `$$...$$` formula (Mermaid's lazy `/\$\$(.*?)\$\$/` per line,
+  no escape; LEMB-1) a span with `math` set. Its `text` is the formula as written, delimiters
+  included (what is drawn when it does not typeset), and `Span::formula` is the TeX source with
+  `\\` read as `\`. A label with a formula is not read as markdown. Without the `math` feature,
+  `runs` is `spans`. Only the flowchart painters and the text renderer read `runs`; every other
+  consumer of `spans` and `lines` sees the formula as text.
 
 ## FLOWMO-7 Metadata
 

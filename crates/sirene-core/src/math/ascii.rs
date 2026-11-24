@@ -19,6 +19,15 @@ use super::{
 ///
 /// Trailing spaces and blank rows at either end are removed. Fails as `typeset` does.
 pub fn ascii_formula(source: &str, style: MathStyle) -> Result<String, MathError> {
+    Ok(ascii_formula_rows(source, style)?.0.join("\n"))
+}
+
+/// Like `ascii_formula`, but as the rows and the index of the row the baseline is on, so a
+/// formula can sit in a line of text.
+pub fn ascii_formula_rows(
+    source: &str,
+    style: MathStyle,
+) -> Result<(Vec<String>, usize), MathError> {
     let nodes = parse_with(
         source,
         Settings {
@@ -30,7 +39,7 @@ pub fn ascii_formula(source: &str, style: MathStyle) -> Result<String, MathError
         compact: false,
     };
     let block = renderer.list(&nodes, style == MathStyle::Display);
-    Ok(block.finish())
+    Ok(block.finish_rows())
 }
 
 /// How a block's rows sit in a wider space.
@@ -190,8 +199,9 @@ impl Block {
         self
     }
 
-    /// The rows as text: trailing spaces and blank rows at either end are cut.
-    fn finish(self) -> String {
+    /// The rows as text, trailing spaces and blank rows at either end cut, and the index of the
+    /// baseline row among them.
+    fn finish_rows(self) -> (Vec<String>, usize) {
         let lines: Vec<String> = self
             .rows
             .iter()
@@ -200,8 +210,15 @@ impl Block {
         let first = lines.iter().position(|l| !l.is_empty());
         let last = lines.iter().rposition(|l| !l.is_empty());
         match (first, last) {
-            (Some(a), Some(b)) => lines.get(a..=b).map(|l| l.join("\n")).unwrap_or_default(),
-            _ => String::new(),
+            (Some(a), Some(b)) => {
+                let rows = lines.get(a..=b).map(<[String]>::to_vec).unwrap_or_default();
+                let base = self
+                    .base
+                    .saturating_sub(a)
+                    .min(rows.len().saturating_sub(1));
+                (rows, base)
+            }
+            _ => (Vec::new(), 0),
         }
     }
 }

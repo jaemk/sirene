@@ -73,14 +73,38 @@ impl Label {
             })
             .collect()
     }
+
+    /// Like [`Label::spans`], but each `$$...$$` formula (LEMB-1) is a span of its own, so a line
+    /// is a row of text runs and formula runs. A label with a formula is not read as markdown, as
+    /// in Mermaid. Without the `math` feature, or without a formula, this is `spans()`.
+    pub fn runs(&self) -> Vec<Vec<Span>> {
+        if !cfg!(feature = "math") || !self.has_formula() {
+            return self.spans();
+        }
+        self.text
+            .split('\n')
+            .map(|line| math_line(&clean(line)))
+            .collect()
+    }
+
+    /// Whether some line holds a `$$...$$` formula.
+    pub fn has_formula(&self) -> bool {
+        self.text
+            .split('\n')
+            .any(|line| !formulas(&clean(line)).is_empty())
+    }
 }
 
-/// A run of label text in one style.
+/// A run of label text in one style, or a formula.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Span {
+    /// The text. For a formula, its source as written, `$$` delimiters included: what is drawn
+    /// when the formula cannot be typeset.
     pub text: String,
     pub bold: bool,
     pub italic: bool,
+    /// Whether the span is a `$$...$$` formula (see [`Span::formula`]).
+    pub math: bool,
 }
 
 impl Span {
@@ -90,6 +114,54 @@ impl Span {
             ..Self::default()
         }
     }
+
+    /// The TeX source of a formula span, without its delimiters and with `\\` read as `\`, as
+    /// Mermaid does before it typesets.
+    pub fn formula(&self) -> Option<String> {
+        let inner = self
+            .text
+            .strip_prefix("$$")
+            .and_then(|t| t.strip_suffix("$$"))?;
+        self.math.then(|| inner.replace("\\\\", "\\"))
+    }
+}
+
+/// The byte ranges of the `$$...$$` formulas in one line: Mermaid's lazy `/\$\$(.*?)\$\$/g`. A
+/// formula never spans lines, `$$` has no escape, and an unclosed `$$` is text.
+pub(crate) fn formulas(line: &str) -> Vec<std::ops::Range<usize>> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while let Some(open) = line[at..].find("$$").map(|i| at + i) {
+        let Some(close) = line[open + 2..].find("$$").map(|i| open + 2 + i) else {
+            break;
+        };
+        out.push(open..close + 2);
+        at = close + 2;
+    }
+    out
+}
+
+fn math_line(line: &str) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let mut at = 0;
+    for r in formulas(line) {
+        if at < r.start {
+            spans.push(Span::plain(&line[at..r.start]));
+        }
+        spans.push(Span {
+            text: line[r.clone()].to_owned(),
+            math: true,
+            ..Span::default()
+        });
+        at = r.end;
+    }
+    if at < line.len() {
+        spans.push(Span::plain(&line[at..]));
+    }
+    if spans.is_empty() {
+        spans.push(Span::default());
+    }
+    spans
 }
 
 /// An emphasis marker in a markdown line: `true` for bold.
@@ -177,6 +249,7 @@ fn markdown_spans(line: &str) -> Vec<Span> {
                 text: text.to_owned(),
                 bold,
                 italic,
+                math: false,
             }),
         }
     }

@@ -13,6 +13,7 @@ mod info;
 mod ishikawa;
 mod journey;
 mod kanban;
+mod mathtext;
 mod mindmap;
 mod packet;
 mod pie;
@@ -358,13 +359,14 @@ fn width(s: &str) -> i32 {
         .sum()
 }
 
-/// Display lines of a label, with markdown emphasis markers dropped (ASCIIR-3).
+/// Display lines of a label, with markdown emphasis markers dropped (ASCIIR-3). A line with a
+/// `$$...$$` formula is as many rows as the formula has (LEMB-4).
 fn lines(label: &Label) -> Vec<String> {
-    label.lines()
+    mathtext::rows(label).unwrap_or_else(|| label.lines())
 }
 
 fn title(s: &Subgraph) -> String {
-    lines(&s.title).join(" ").trim().to_owned()
+    s.title.lines().join(" ").trim().to_owned()
 }
 
 /// A compartment's rows with their cells padded into columns (LANGS-3).
@@ -565,7 +567,7 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
     let mut y = if node.untitled() {
         r.y
     } else {
-        r.y + 1 + lines(&node.label).len() as i32
+        r.y + 1 + title_lines(node).len() as i32
     };
     for (i, section) in node.sections.iter().enumerate() {
         if i > 0 || !node.untitled() {
@@ -575,12 +577,15 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
     }
 }
 
-/// The lines of a node's title: none for an untitled compartment node.
+/// The lines of a node's title: none for an untitled compartment node, and the text as
+/// written for a compartment node.
 fn title_lines(node: &Node) -> Vec<String> {
     if node.untitled() {
         Vec::new()
-    } else {
+    } else if node.sections.is_empty() {
         lines(&node.label)
+    } else {
+        node.label.lines()
     }
 }
 
@@ -775,7 +780,7 @@ fn draw_edge(
         let (Some(l), Some(&p)) = (label, path.get(at)) else {
             continue;
         };
-        let text = lines(l).join(" ");
+        let text = l.lines().join(" ");
         let vertical = path.get(next).is_none_or(|q| q.x == p.x);
         if vertical {
             canvas.text(p.x + 1, p.y, &text);
