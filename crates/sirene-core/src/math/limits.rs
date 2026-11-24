@@ -5,6 +5,9 @@ use super::MathError;
 /// A formula's source is at most 64 KiB.
 pub(crate) const MAX_SOURCE: usize = 64 * 1024;
 
+/// The TeX an AsciiMath source translates to is at most this long (the TeX lexer's own bound).
+pub(crate) const MAX_TRANSLATED_TEX: usize = MAX_SOURCE;
+
 /// Groups, scripts, and environments nest at most this deep (shared with every other language).
 pub(crate) const MAX_DEPTH: usize = crate::lines::MAX_DEPTH;
 

@@ -12,6 +12,7 @@ use std::ops::Range;
 use super::{MathError, Mode, Name, Node, NodeKind, Parser, environments::symbol_text, token_text};
 use crate::math::{
     ast::{AlignSpec, Array, CdSide, ColSeparation, MathClass, StyleName},
+    limits,
     symbols::AtomGroup,
 };
 
@@ -175,6 +176,9 @@ impl<'a> Parser<'a> {
         loop {
             let nodes = self.parse_expression_until(false, Some("\\\\"))?;
             parsed_rows.push(nodes);
+            if parsed_rows.len() > limits::MAX_ROWS {
+                return Err(table_too_large(self.fetch()?.span));
+            }
             self.expander.end_group(&at)?;
             self.expander.begin_group(&at)?;
             self.current_color = outer_color.clone();
@@ -199,8 +203,14 @@ impl<'a> Parser<'a> {
         self.expander.end_group(&at)?;
 
         let mut body: Vec<Vec<Node<'a>>> = Vec::with_capacity(parsed_rows.len() + 1);
+        let mut cell_count = 0;
         for (i, nodes) in parsed_rows.into_iter().enumerate() {
-            body.push(cd_row(i, nodes, mode, &at)?);
+            let row = cd_row(i, nodes, mode, &at)?;
+            cell_count += row.len();
+            if cell_count > limits::MAX_CELLS {
+                return Err(table_too_large(at.clone()));
+            }
+            body.push(row);
         }
         // The table ends in an empty row.
         body.push(Vec::new());
@@ -236,6 +246,18 @@ impl<'a> Parser<'a> {
 }
 
 /// The cells and arrows of row `i` of the diagram, from the nodes read for it.
+/// The error for a `CD` past `limits::MAX_ROWS` rows or `limits::MAX_CELLS` cells.
+fn table_too_large(span: Range<usize>) -> MathError {
+    MathError::new(
+        format!(
+            "table larger than {} rows or {} cells",
+            limits::MAX_ROWS,
+            limits::MAX_CELLS
+        ),
+        span,
+    )
+}
+
 fn cd_row<'a>(
     i: usize,
     nodes: Vec<Node<'a>>,
@@ -558,17 +580,24 @@ mod tests {
 
     #[test]
     fn a_huge_diagram_is_read_in_bounds() {
-        let row = "A @>>> B ".repeat(2000);
+        let row = "A @>>> B ".repeat(1000);
         let src = format!(
             "\\begin{{CD}}{row}\\\\{}\\end{{CD}}",
-            "@VVV @. ".repeat(2000)
+            "@VVV @. ".repeat(1000)
         );
         let array = array_of(&src);
         assert_eq!(array.body.len(), 3);
-        assert_eq!(array.body[0].len(), 2000 * 2 + 1);
-        // Many rows, and a long run of marks that never close.
-        let many = format!("\\begin{{CD}}{}\\end{{CD}}", "A\\\\".repeat(5000));
-        assert_eq!(array_of(&many).body.len(), 5001);
+        assert_eq!(array.body[0].len(), 1000 * 2 + 1);
+        // Many rows are past the table limits, and so is a long run of marks that never close.
+        let rows = |n: usize| format!("\\begin{{CD}}{}\\end{{CD}}", "A\\\\".repeat(n));
+        assert_eq!(
+            array_of(&rows(crate::math::limits::MAX_ROWS - 1))
+                .body
+                .len(),
+            crate::math::limits::MAX_ROWS
+        );
+        let err = parse_with(&rows(5000), Settings { display_mode: true }).unwrap_err();
+        assert!(err.message.contains("table larger"), "{err}");
         let open = format!("\\begin{{CD}}{}\\end{{CD}}", "@>".repeat(5000));
         assert!(parse_with(&open, Settings { display_mode: true }).is_err());
     }

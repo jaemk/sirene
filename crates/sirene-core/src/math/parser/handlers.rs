@@ -1593,7 +1593,10 @@ fn check_html_data(raw: &Node<'_>) -> Result<(), MathError> {
     for item in items {
         if !item.contains('=') {
             return Err(MathError::new(
-                format!("\\htmlData key/value '{item}' missing equals sign"),
+                format!(
+                    "\\htmlData key/value '{}' missing equals sign",
+                    crate::math::limits::clip(&item)
+                ),
                 raw.span.clone(),
             ));
         }
@@ -1616,7 +1619,10 @@ fn check_graphics(raw: &Node<'_>) -> Result<(), MathError> {
                 }
                 _ => {
                     return Err(MathError::new(
-                        format!("Invalid key: '{key}' in \\includegraphics."),
+                        format!(
+                            "Invalid key: '{}' in \\includegraphics.",
+                            crate::math::limits::clip(key)
+                        ),
                         raw.span.clone(),
                     ));
                 }

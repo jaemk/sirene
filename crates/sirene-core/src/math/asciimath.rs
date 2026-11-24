@@ -1182,7 +1182,24 @@ pub fn typeset_asciimath(
     style: super::formula::MathStyle,
 ) -> Res<super::formula::Formula> {
     let t = translate(source)?;
+    check_tex(&t)?;
     super::formula::typeset(&t.tex, style).map_err(|e| remap(&t, e))
+}
+
+/// The error for translated TeX past the TeX limit, which is named as such: the AsciiMath source
+/// passed its own limit in `translate`, so the length is one the user never wrote.
+#[cfg(feature = "math")]
+fn check_tex(t: &Translation) -> Res<()> {
+    if t.tex.len() <= limits::MAX_TRANSLATED_TEX {
+        return Ok(());
+    }
+    Err(MathError::new(
+        format!(
+            "translated TeX longer than {} bytes",
+            limits::MAX_TRANSLATED_TEX
+        ),
+        t.source_span(limits::MAX_TRANSLATED_TEX..t.tex.len()),
+    ))
 }
 
 /// The AsciiMath `source` as rows of text and the row of the baseline (see
@@ -1193,6 +1210,7 @@ pub fn ascii_asciimath_rows(
     style: super::formula::MathStyle,
 ) -> Res<(Vec<String>, usize)> {
     let t = translate(source)?;
+    check_tex(&t)?;
     super::ascii::ascii_formula_rows(&t.tex, style).map_err(|e| remap(&t, e))
 }
 
