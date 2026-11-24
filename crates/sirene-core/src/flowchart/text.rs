@@ -38,6 +38,7 @@ fn decode_lines(text: &str, markdown: bool) -> Label {
     Label {
         text: decode_entities(&text),
         markdown,
+        ..Label::default()
     }
 }
 

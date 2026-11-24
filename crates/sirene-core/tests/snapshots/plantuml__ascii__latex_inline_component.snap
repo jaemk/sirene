@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\n[Web] --> [Api] : <latex>O(n^2)</latex>\n(Use <latex>\\alpha</latex>) as UC\n@enduml\n"
+---
++-----+   .-------.
+| Web |   ( Use α )
++--+--+   '-------'
+   |
+ O(n²)
+   v
++-----+
+| Api |
++-----+

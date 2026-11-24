@@ -1,0 +1,6 @@
+@startuml
+start
+:Total <latex>\bar{</latex>;
+:Total <latex>\frac{1}{2}</latex>;
+stop
+@enduml

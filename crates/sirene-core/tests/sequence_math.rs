@@ -56,7 +56,7 @@ fn a_diagram_without_a_formula_draws_the_same_when_read_as_text() {
         let (mut seq, diagnostics) = lower(&src);
         assert!(diagnostics.is_empty(), "{text:?}: {diagnostics:?}");
         let with = draw(&seq);
-        seq.math = false;
+        seq.math = None;
         assert_eq!(with, draw(&seq), "{text:?}");
     }
 }
@@ -66,7 +66,7 @@ mod math {
     use super::*;
     use sirene_core::Severity;
     use sirene_core::ascii::{Charset, Options};
-    use sirene_core::flowchart::formula;
+    use sirene_core::flowchart::{Delim, formula};
     use sirene_core::scene::{Owner, Rect, Segment};
 
     /// Left, top, right, bottom.
@@ -166,12 +166,12 @@ mod math {
     #[test]
     fn the_model_keeps_the_source_text() {
         let (seq, _) = lower(&fixture("math_participant"));
-        assert!(seq.math);
+        assert_eq!(seq.math, Some(Delim::Dollar));
         assert_eq!(seq.participants[0].label, [r"$$\alpha$$"]);
         let (seq, _) = lower(&fixture("math_mixed"));
         let m = seq.messages().next().unwrap();
         assert_eq!(m.text, [r"Area $$\pi r^2$$ and $$\frac{a}{b}$$ done"]);
-        let runs = formula::runs(&m.text[0]);
+        let runs = formula::runs(&m.text[0], Delim::Dollar);
         let shape: Vec<(&str, bool)> = runs.iter().map(|s| (s.text.as_str(), s.math)).collect();
         assert_eq!(
             shape,
@@ -348,7 +348,7 @@ mod math {
             "sequenceDiagram\n    participant 1\n    participant 2\n    1->>2: $$\\\\alpha$$\n";
         let (seq, diagnostics) = lower(src);
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
-        let runs = formula::runs(&seq.messages().next().unwrap().text[0]);
+        let runs = formula::runs(&seq.messages().next().unwrap().text[0], Delim::Dollar);
         assert_eq!(runs[0].formula().as_deref(), Some(r"\alpha"));
     }
 

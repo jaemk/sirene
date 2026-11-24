@@ -7,7 +7,7 @@ use super::{
     Sequence, Text,
 };
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::{formula, text};
+use crate::flowchart::{Delim, formula, text};
 use crate::lines::{MAX_DEPTH, too_deep};
 use crate::scene::parse_color;
 use crate::syntax::SyntaxKind::{self, *};
@@ -154,12 +154,12 @@ impl Lower {
     /// Reports each `$$...$$` formula in `text` that does not typeset (LEMB-4, LEMB-5). `token`
     /// is the source text it came from, when it has one.
     fn check_math(&mut self, token: Option<&SyntaxToken>, text: &Text, fallback: TextRange) {
-        if !text.iter().any(|l| formula::has(l)) {
+        if !text.iter().any(|l| formula::has(l, Delim::Dollar)) {
             return;
         }
         let raw = token.map_or("", |t| t.text());
         let start = token.map_or(fallback.start(), |t| t.text_range().start());
-        let errors = formula::errors(start, raw, text.iter().cloned(), fallback);
+        let errors = formula::errors(start, raw, text.iter().cloned(), fallback, Delim::Dollar);
         self.diagnostics.extend(errors);
     }
 
@@ -492,7 +492,7 @@ impl Lower {
             }
         }
         self.seq.title = self.title;
-        self.seq.math = true;
+        self.seq.math = Some(Delim::Dollar);
         (self.seq, self.diagnostics)
     }
 }

@@ -1,0 +1,5 @@
+@startuml
+[*] --> Idle
+state "rate <latex>\lambda</latex>" as Idle
+Idle --> Busy : <latex>p = \frac{1}{2}</latex>
+@enduml

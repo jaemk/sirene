@@ -1,0 +1,8 @@
+@startuml
+start
+:Compute <latex>\sqrt{x^2 + y^2}</latex>;
+if (<latex>a \gt 0</latex>?) then (yes)
+  :plain;
+endif
+stop
+@enduml

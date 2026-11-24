@@ -1,0 +1,4 @@
+@startuml
+[Web] --> [Api] : <latex>O(n^2)</latex>
+(Use <latex>\alpha</latex>) as UC
+@enduml

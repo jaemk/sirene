@@ -801,6 +801,7 @@ impl Lowerer {
                 Some(s) => Label {
                     text: format!("«{s}»\n{}", el.label.text),
                     markdown: el.label.markdown,
+                    ..Label::default()
                 },
                 None => el.label.clone(),
             };

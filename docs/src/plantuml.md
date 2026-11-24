@@ -42,6 +42,16 @@ diagram until a use case or component appears. The [examples](examples.md) inclu
 class, activity, and timing diagram. See
 `spec/plantuml.md` and the `spec/plantuml-*.md` pages for what each kind reads.
 
+## Math
+
+`<latex>...</latex>` in label text is a LaTeX formula, set in text style on the text's baseline
+(any case; several per line). It is read in sequence participants, messages, and notes, and in
+the node, edge, and note labels of activity, class, state, component, use case, deployment,
+WBS, Chen, and network diagrams. An unclosed tag is text; a formula that does not typeset is
+drawn as its source with a diagnostic. `$$...$$` and `<math>` are text. Class and state rows,
+edge-end labels, and titles are not read. It needs the `math` feature. `@startlatex` draws one
+formula.
+
 ## Errors
 
 Syntax a kind does not read is an error on its line; a construct that is read but not drawn
@@ -55,7 +65,7 @@ diagrams. A second `@start` block in a file is a warning. A `#color` before a se
 
 ## Not drawn
 
-Salt (`@startsalt`), ditaa, math, LaTeX, wire, board, creole, and def diagrams, and any other
+Salt (`@startsalt`), ditaa, math (`@startmath`), wire, board, creole, and def diagrams, and any other
 `@start` word, are errors naming the kind. So is the older activity syntax (`(*) --> "First"`);
 use `start` and `:action;`. The preprocessor (`!define`, `!function`, variables, conditionals)
 is not evaluated: the lines in every `!if` branch are read as statements, and macro calls are

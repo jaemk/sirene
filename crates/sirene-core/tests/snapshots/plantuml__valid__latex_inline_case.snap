@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nA -> B : <LaTeX>\\alpha</LaTeX> and <LATEX>\\beta</latex>\n@enduml\n"
+---
+
+┌───┐    ┌───┐
+│ A │    │ B │
+└─┬─┘    └─┬─┘
+  │        │
+  │α and β │
+  ├───────►│
+  │        │
+┌─┴─┐    ┌─┴─┐
+│ A │    │ B │
+└───┘    └───┘

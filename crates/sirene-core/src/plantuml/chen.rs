@@ -138,6 +138,7 @@ impl Lower {
                 Label {
                     text: format!("**{text}**"),
                     markdown: true,
+                    ..Label::default()
                 }
             } else {
                 Label::plain(text)

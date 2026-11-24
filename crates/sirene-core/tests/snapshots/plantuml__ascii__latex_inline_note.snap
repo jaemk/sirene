@@ -1,0 +1,24 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nAlice -> Bob : hi\nnote over Alice, Bob\n  Given <latex>x^2</latex> and <latex>\\sqrt{y}</latex>,\n  plain second line\nend note\nnote right of Bob : area <latex>\\pi r^2</latex>\n@enduml\n"
+---
+ +-------+   +-----+
+ | Alice |   | Bob |
+ +---+---+   +--+--+
+     |          |
+     |    hi    |
+     +--------->|
+     |          |
+ +-------------------+
+ |               ¯   |
+ | Given x² and √y,  |
+ | plain second line |
+ +-------------------+
+     |          |
+     |          | +----------+
+     |          | | area πr² |
+     |          | +----------+
+     |          |
+ +---+---+   +--+--+
+ | Alice |   | Bob |
+ +-------+   +-----+

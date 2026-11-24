@@ -32,12 +32,78 @@ impl Direction {
 }
 
 /// Label text with its markup flavor (FLOWMO-6).
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct Label {
     /// Decoded text; lines are separated by `\n`.
     pub text: String,
     /// Whether `text` is mermaid markdown (`**bold**`, `*italic*`).
     pub markdown: bool,
+    /// The delimiters that make a formula in `text`.
+    pub delim: Delim,
+}
+
+/// Shows `delim` only when it is not Mermaid's, so the debug text of Mermaid labels is as it was.
+impl std::fmt::Debug for Label {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("Label");
+        s.field("text", &self.text)
+            .field("markdown", &self.markdown);
+        if self.delim != Delim::Dollar {
+            s.field("delim", &self.delim);
+        }
+        s.finish()
+    }
+}
+
+/// The delimiters of a formula in label text (LEMB-1, LEMB-2): each source language has its own.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Delim {
+    /// Mermaid's `$$...$$`, typeset in display style.
+    #[default]
+    Dollar,
+    /// PlantUML's `<latex>...</latex>`, tags in any case, typeset in text style.
+    Latex,
+}
+
+impl Delim {
+    /// The byte lengths of the opening and closing delimiters.
+    pub(crate) fn lens(self) -> (usize, usize) {
+        match self {
+            Delim::Dollar => (2, 2),
+            Delim::Latex => ("<latex>".len(), "</latex>".len()),
+        }
+    }
+
+    /// The byte ranges of the formulas in one line, delimiters included.
+    pub(crate) fn ranges(self, line: &str) -> Vec<std::ops::Range<usize>> {
+        match self {
+            Delim::Dollar => formulas(line),
+            Delim::Latex => crate::plantuml::creole::latex_tags(line),
+        }
+    }
+
+    /// The text of a formula run between its delimiters.
+    fn body(self, text: &str) -> Option<&str> {
+        let (open, close) = self.lens();
+        text.get(open..text.len().checked_sub(close)?)
+    }
+
+    /// The style a formula is typeset in.
+    #[cfg(feature = "math")]
+    pub(crate) fn style(self) -> crate::math::MathStyle {
+        match self {
+            Delim::Dollar => crate::math::MathStyle::Display,
+            Delim::Latex => crate::math::MathStyle::Text,
+        }
+    }
+
+    /// The TeX source of the formula `body`: Mermaid reads `\\` as `\`.
+    pub(crate) fn source(self, body: &str) -> String {
+        match self {
+            Delim::Dollar => body.replace("\\\\", "\\"),
+            Delim::Latex => body.to_owned(),
+        }
+    }
 }
 
 impl Label {
@@ -45,6 +111,7 @@ impl Label {
         Self {
             text: text.into(),
             markdown: false,
+            delim: Delim::Dollar,
         }
     }
 
@@ -83,15 +150,15 @@ impl Label {
         }
         self.text
             .split('\n')
-            .map(|line| math_line(&clean(line)))
+            .map(|line| math_line(&clean(line), self.delim))
             .collect()
     }
 
-    /// Whether some line holds a `$$...$$` formula.
+    /// Whether some line holds a formula in the label's delimiters.
     pub fn has_formula(&self) -> bool {
         self.text
             .split('\n')
-            .any(|line| !formulas(&clean(line)).is_empty())
+            .any(|line| !self.delim.ranges(&clean(line)).is_empty())
     }
 }
 
@@ -115,14 +182,24 @@ impl Span {
         }
     }
 
-    /// The TeX source of a formula span, without its delimiters and with `\\` read as `\`, as
-    /// Mermaid does before it typesets.
+    /// The TeX source of a formula span, without its delimiters and, for Mermaid's `$$`, with
+    /// `\\` read as `\`, as Mermaid does before it typesets.
     pub fn formula(&self) -> Option<String> {
-        let inner = self
-            .text
-            .strip_prefix("$$")
-            .and_then(|t| t.strip_suffix("$$"))?;
-        self.math.then(|| inner.replace("\\\\", "\\"))
+        let delim = self.delim()?;
+        Some(delim.source(delim.body(&self.text)?))
+    }
+
+    /// The delimiters of a formula span, `None` for a text span. A formula span keeps its
+    /// delimiters in its text, which tells them apart.
+    pub fn delim(&self) -> Option<Delim> {
+        if !self.math {
+            return None;
+        }
+        Some(if self.text.starts_with("$$") {
+            Delim::Dollar
+        } else {
+            Delim::Latex
+        })
     }
 }
 
@@ -141,10 +218,10 @@ pub(crate) fn formulas(line: &str) -> Vec<std::ops::Range<usize>> {
     out
 }
 
-pub(crate) fn math_line(line: &str) -> Vec<Span> {
+pub(crate) fn math_line(line: &str, delim: Delim) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut at = 0;
-    for r in formulas(line) {
+    for r in delim.ranges(line) {
         if at < r.start {
             spans.push(Span::plain(&line[at..r.start]));
         }

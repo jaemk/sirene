@@ -60,8 +60,8 @@ struct Painter<'a, M> {
     /// Who what is drawn next belongs to: participant `i`'s header and lifeline are
     /// `Owner::Node(i)`, the `n`th message `Owner::Edge(n)` (DISPLA-1).
     owner: Owner,
-    /// Whether `$$...$$` in labels, messages, and notes is a formula.
-    math: bool,
+    /// The delimiters of a formula in labels, messages, and notes, if they are read.
+    math: Option<crate::flowchart::Delim>,
 }
 
 fn solid(width: f32, color: Color) -> Stroke {
@@ -106,13 +106,9 @@ impl<M: TextMetrics> Painter<'_, M> {
         self.metrics.styled_width(text, self.theme.font_size, bold)
     }
 
-    /// The runs of `lines` when the diagram reads `$$...$$` as a formula and some line has one.
+    /// The runs of `lines` when the diagram reads formulas and some line has one.
     fn runs(&self, lines: &[String]) -> Option<Vec<Vec<Span>>> {
-        if self.math {
-            mathtext::source_runs(lines)
-        } else {
-            None
-        }
+        mathtext::source_runs(lines, self.math?)
     }
 
     /// The width and height of `lines`: a line with a tall formula is taller (LEMB-4).

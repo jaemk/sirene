@@ -229,8 +229,13 @@ impl Lowerer {
             .as_ref()
             .map_or(node.text_range().start(), |t| t.text_range().start());
         let lines = label.text.split('\n').map(super::model::clean);
-        self.diagnostics
-            .extend(super::formula::errors(start, raw, lines, node.text_range()));
+        self.diagnostics.extend(super::formula::errors(
+            start,
+            raw,
+            lines,
+            node.text_range(),
+            label.delim,
+        ));
     }
 
     fn error(&mut self, range: TextRange, message: impl Into<String>) {

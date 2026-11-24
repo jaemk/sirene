@@ -140,13 +140,10 @@ fn header(canvas: &mut Canvas, kind: ParticipantKind, lines: &[String], x: i32, 
 
 /// Renders `seq` as text (MSEQ-4).
 pub fn render(seq: &Sequence, options: &Options) -> String {
-    // A line with a `$$...$$` formula is as many rows as the formula has (LEMB-4).
-    let rows = |lines: &[String]| {
-        if seq.math {
-            mathtext::text_rows(lines)
-        } else {
-            lines.to_vec()
-        }
+    // A line with a formula is as many rows as the formula has (LEMB-4).
+    let rows = |lines: &[String]| match seq.math {
+        Some(delim) => mathtext::text_rows(lines, delim),
+        None => lines.to_vec(),
     };
     let names: Vec<Vec<String>> = seq.participants.iter().map(|p| rows(&p.label)).collect();
     let headers: Vec<(i32, i32)> = seq
