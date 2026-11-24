@@ -21,12 +21,10 @@ const PAD: f32 = 4.0;
 const SLACK: f32 = 0.1;
 
 /// Inputs that are expected not to typeset, with the reason.
-const EXPECTED_FAILURES: &[(&str, &str)] = &[
-    (
-        "UnsupportedCmds",
-        "KaTeX rejects it too (`\\err` is undefined); the yaml marks it noThrow",
-    ),
-];
+const EXPECTED_FAILURES: &[(&str, &str)] = &[(
+    "UnsupportedCmds",
+    "KaTeX rejects it too (`\\err` is undefined); the yaml marks it noThrow",
+)];
 
 /// Inputs known to draw outside their box, with the reason. A drawing bug to fix, not a rule.
 const KNOWN_ESCAPES: &[(&str, &str)] = &[];
