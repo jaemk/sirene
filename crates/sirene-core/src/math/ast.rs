@@ -395,10 +395,13 @@ impl<'a> Node<'a> {
         }
     }
 
-    /// The node inside any groups of one node and fonts around it.
+    /// The node inside any groups or colors of one node and fonts around it (KaTeX's
+    /// `getBaseElem`).
     fn base(&self) -> &Node<'a> {
         match &self.kind {
-            NodeKind::Group { body, .. } if body.len() == 1 => body[0].base(),
+            NodeKind::Group { body, .. } | NodeKind::Color { body, .. } if body.len() == 1 => {
+                body[0].base()
+            }
             NodeKind::Font { body, .. } => body.base(),
             _ => self,
         }
