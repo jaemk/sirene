@@ -1,21 +1,21 @@
 ---
 source: crates/sirene-core/tests/plantuml.rs
-expression: "@startuml\nA -> B : <latex>\\alpha unclosed\nA -> B : $$x^2$$ stays text\nA -> B : <latex></latex> empty and <math>x</math> literal\n@enduml\n"
+expression: "@startuml\nA -> B : <latex>\\alpha unclosed\nA -> B : $$x^2$$ stays text\nA -> B : <latex></latex> empty and <math>x unclosed\n@enduml\n"
 ---
 
-┌───┐                                             ┌───┐
-│ A │                                             │ B │
-└─┬─┘                                             └─┬─┘
-  │                                                 │
-  │             <latex>\alpha unclosed              │
-  ├────────────────────────────────────────────────►│
-  │                                                 │
-  │               $$x^2$$ stays text                │
-  ├────────────────────────────────────────────────►│
-  │                                                 │
-  │<latex></latex> empty and <math>x</math> literal │
-  ├────────────────────────────────────────────────►│
-  │                                                 │
-┌─┴─┐                                             ┌─┴─┐
-│ A │                                             │ B │
-└───┘                                             └───┘
+┌───┐                                       ┌───┐
+│ A │                                       │ B │
+└─┬─┘                                       └─┬─┘
+  │                                           │
+  │          <latex>\alpha unclosed           │
+  ├──────────────────────────────────────────►│
+  │                                           │
+  │            $$x^2$$ stays text             │
+  ├──────────────────────────────────────────►│
+  │                                           │
+  │<latex></latex> empty and <math>x unclosed │
+  ├──────────────────────────────────────────►│
+  │                                           │
+┌─┴─┐                                       ┌─┴─┐
+│ A │                                       │ B │
+└───┘                                       └───┘

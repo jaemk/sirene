@@ -1,0 +1,6 @@
+@startuml
+participant "<math>alpha</math>" as A
+participant Bob
+Bob -> A : <math>a/b</math> and <latex>\frac{a}{b}</latex> and <MATH>sqrt x</MATH>
+A --> Bob : literal <math>unclosed
+@enduml

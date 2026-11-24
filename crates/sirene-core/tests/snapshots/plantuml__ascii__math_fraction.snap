@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startmath\n(a+b)/c\n@endmath\n"
+---
+ a + b
+-------
+   c

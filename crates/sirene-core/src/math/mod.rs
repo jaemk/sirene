@@ -16,6 +16,7 @@
 
 #[cfg(feature = "math")]
 mod ascii;
+mod asciimath;
 mod ast;
 #[cfg(test)]
 mod baseline;
@@ -53,6 +54,9 @@ mod unicode_data;
 
 #[cfg(feature = "math")]
 pub use ascii::{ascii_formula, ascii_formula_rows};
+pub use asciimath::{Translation, to_tex, translate};
+#[cfg(feature = "math")]
+pub use asciimath::{ascii_asciimath, ascii_asciimath_rows, typeset_asciimath};
 pub use error::MathError;
 #[cfg(feature = "math")]
 pub use formula::{Formula, MathStyle, typeset};

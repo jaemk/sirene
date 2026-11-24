@@ -1,6 +1,7 @@
 //! Formulas in label text (LEMB-1, LEMB-2), shared by every diagram that has them: the runs of
 //! a line and the diagnostics for formulas that do not typeset (LEMB-4, LEMB-5). Mermaid writes
-//! a formula `$$...$$` and PlantUML `<latex>...</latex>`: a [`Delim`] says which.
+//! a formula `$$...$$` and PlantUML `<latex>...</latex>` (TeX) or `<math>...</math>`
+//! (AsciiMath): a [`Delim`] says which.
 
 use super::model::math_line;
 use super::{Delim, Span};
@@ -43,18 +44,30 @@ pub(crate) fn failures(
     lines: impl IntoIterator<Item = String>,
     delim: Delim,
 ) -> Vec<(String, crate::math::MathError)> {
-    use crate::math::typeset;
-    let (open, close) = delim.lens();
     let mut out = Vec::new();
     for line in lines {
         for r in delim.ranges(&line) {
-            let body = &line[r.start + open..r.end - close];
-            if let Err(e) = typeset(&delim.source(body), delim.style()) {
+            let text = &line[r.clone()];
+            let (open, close) = delim.lens(text);
+            let body = &text[open..text.len() - close];
+            if let Err(e) = check(delim, text, body) {
                 out.push((body.to_owned(), e));
             }
         }
     }
     out
+}
+
+/// Typesets the formula `body` of the run `text` (delimiters included), as its delimiters say.
+#[cfg(feature = "math")]
+fn check(delim: Delim, text: &str, body: &str) -> Result<(), crate::math::MathError> {
+    use crate::math::{typeset, typeset_asciimath};
+    let (src, style) = (delim.source(body), delim.style());
+    if delim.asciimath(text) {
+        typeset_asciimath(&src, style).map(drop)
+    } else {
+        typeset(&src, style).map(drop)
+    }
 }
 
 /// A diagnostic for each formula in `lines` that does not typeset, in order.
@@ -71,14 +84,14 @@ pub(crate) fn errors(
     delim: Delim,
 ) -> Vec<crate::diagnostic::Diagnostic> {
     use crate::diagnostic::Diagnostic;
-    use crate::math::typeset;
     use rowan::TextRange;
-    let (open, close) = delim.lens();
     let mut out = Vec::new();
     let mut cursor = 0;
     for line in lines {
         for r in delim.ranges(&line) {
-            let body = &line[r.start + open..r.end - close];
+            let text = &line[r.clone()];
+            let (open, close) = delim.lens(text);
+            let body = &text[open..text.len() - close];
             // Where the body is in the source text, when it is there as written.
             let found = raw
                 .get(cursor..)
@@ -87,7 +100,7 @@ pub(crate) fn errors(
             if let Some(p) = found {
                 cursor = p + body.len();
             }
-            let Err(e) = typeset(&delim.source(body), delim.style()) else {
+            let Err(e) = check(delim, text, body) else {
                 continue;
             };
             let range = match found {

@@ -61,17 +61,28 @@ pub enum Delim {
     /// Mermaid's `$$...$$`, typeset in display style.
     #[default]
     Dollar,
-    /// PlantUML's `<latex>...</latex>`, tags in any case, typeset in text style.
+    /// PlantUML's tags, typeset in text style: `<latex>...</latex>` is TeX and
+    /// `<math>...</math>` is AsciiMath, tags in any case.
     Latex,
 }
 
 impl Delim {
-    /// The byte lengths of the opening and closing delimiters.
-    pub(crate) fn lens(self) -> (usize, usize) {
+    /// The byte lengths of the opening and closing delimiters of `formula`, a formula run with
+    /// its delimiters.
+    pub(crate) fn lens(self, formula: &str) -> (usize, usize) {
         match self {
             Delim::Dollar => (2, 2),
+            Delim::Latex if self.asciimath(formula) => ("<math>".len(), "</math>".len()),
             Delim::Latex => ("<latex>".len(), "</latex>".len()),
         }
+    }
+
+    /// Whether `formula`, a formula run with its delimiters, is AsciiMath: a `<math>` tag.
+    pub(crate) fn asciimath(self, formula: &str) -> bool {
+        self == Delim::Latex
+            && formula
+                .get(.."<math>".len())
+                .is_some_and(|t| t.eq_ignore_ascii_case("<math>"))
     }
 
     /// The byte ranges of the formulas in one line, delimiters included.
@@ -84,7 +95,7 @@ impl Delim {
 
     /// The text of a formula run between its delimiters.
     fn body(self, text: &str) -> Option<&str> {
-        let (open, close) = self.lens();
+        let (open, close) = self.lens(text);
         text.get(open..text.len().checked_sub(close)?)
     }
 
@@ -199,6 +210,36 @@ impl Span {
             Delim::Dollar
         } else {
             Delim::Latex
+        })
+    }
+
+    /// Whether a formula span is AsciiMath (a `<math>` tag) rather than TeX.
+    pub fn is_asciimath(&self) -> bool {
+        self.math && self.delim().is_some_and(|d| d.asciimath(&self.text))
+    }
+
+    /// A formula span typeset in the style of its delimiters (display for Mermaid's `$$`, text
+    /// for PlantUML's tags). `None` for a text span.
+    #[cfg(feature = "math")]
+    pub(crate) fn typeset(&self) -> Option<Result<crate::math::Formula, crate::math::MathError>> {
+        let (src, style) = (self.formula()?, self.delim()?.style());
+        Some(if self.is_asciimath() {
+            crate::math::typeset_asciimath(&src, style)
+        } else {
+            crate::math::typeset(&src, style)
+        })
+    }
+
+    /// A formula span as rows of text and the baseline row, as [`Span::typeset`] sets it.
+    #[cfg(feature = "math")]
+    pub(crate) fn ascii_rows(
+        &self,
+    ) -> Option<Result<(Vec<String>, usize), crate::math::MathError>> {
+        let (src, style) = (self.formula()?, self.delim()?.style());
+        Some(if self.is_asciimath() {
+            crate::math::ascii_asciimath_rows(&src, style)
+        } else {
+            crate::math::ascii_formula_rows(&src, style)
         })
     }
 }

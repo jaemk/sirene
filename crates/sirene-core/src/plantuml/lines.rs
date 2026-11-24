@@ -156,7 +156,7 @@ pub(crate) fn color(s: &str) -> Option<String> {
     crate::dot::lower::color(s).map(crate::dot::lower::hex)
 }
 
-/// `\n` in PlantUML text breaks the line, except inside a `<latex>` formula; other escapes are
+/// `\n` in PlantUML text breaks the line, except inside a `<latex>` or `<math>` formula; other escapes are
 /// kept as written.
 pub(crate) fn text(s: &str) -> String {
     super::creole::newlines(s)

@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startmath\na +\n x^1^2 + c\n@endmath\n"
+---
+3:5: error: Double superscript
+
+a + x^1^2 + c

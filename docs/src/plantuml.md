@@ -44,13 +44,13 @@ class, activity, and timing diagram. See
 
 ## Math
 
-`<latex>...</latex>` in label text is a LaTeX formula, set in text style on the text's baseline
-(any case; several per line). It is read in sequence participants, messages, and notes, and in
+`<latex>...</latex>` in label text is a LaTeX formula and `<math>...</math>` an AsciiMath
+formula, set in text style on the text's baseline (any case; several per line, mixed freely). It is read in sequence participants, messages, and notes, and in
 the node, edge, and note labels of activity, class, state, component, use case, deployment,
 WBS, Chen, and network diagrams. An unclosed tag is text; a formula that does not typeset is
-drawn as its source with a diagnostic. `$$...$$` and `<math>` are text. Class and state rows,
-edge-end labels, and titles are not read. It needs the `math` feature. `@startlatex` draws one
-formula.
+drawn as its source with a diagnostic. `$$...$$` is text. Class and state rows,
+edge-end labels, and titles are not read. It needs the `math` feature. `@startlatex` and
+`@startmath` (AsciiMath) each draw one formula.
 
 ## Errors
 
