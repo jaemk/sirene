@@ -22,6 +22,7 @@ pub mod diagram;
 mod directive;
 pub mod dot;
 mod edits;
+pub mod equation;
 pub mod er;
 pub mod error;
 pub mod eventmodel;

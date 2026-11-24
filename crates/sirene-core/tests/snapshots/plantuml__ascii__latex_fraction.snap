@@ -1,0 +1,8 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+assertion_line: 93
+expression: "@startlatex\n\\frac{a+b}{c} = x\n@endlatex\n"
+---
+ a + b
+------- = x
+   c

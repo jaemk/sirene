@@ -309,10 +309,15 @@ impl Parser<'_> {
         if self.at_eof() {
             if started {
                 let at = self.pos;
+                let end = if self.kind == Kind::Other("latex") {
+                    "@endlatex"
+                } else {
+                    "@enduml"
+                };
                 self.warn(
                     at,
                     at,
-                    "missing `@enduml`; the diagram runs to the end of the file",
+                    format!("missing `{end}`; the diagram runs to the end of the file"),
                 );
             }
             return true;

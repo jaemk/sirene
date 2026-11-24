@@ -1,0 +1,8 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+assertion_line: 75
+expression: "@startlatex\na +\n \\foo{x} + b\n@endlatex\n"
+---
+3:2: error: Undefined control sequence: \foo
+
+a + \foo{x} + b
