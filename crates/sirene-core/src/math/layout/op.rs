@@ -1,18 +1,26 @@
 //! Large and named operators: `\sum`, `\int`, `\lim`, `\mathop{...}`, `\operatorname{...}`, and
 //! their limits.
 //!
-//! To build from KaTeX's `src/functions/op.ts`, `src/functions/operatorname.ts`, and
+//! Adapted from KaTeX's `src/functions/op.ts`, `src/functions/operatorname.ts`, and
 //! `src/functions/utils/assembleSupSub.ts` (MIT, Copyright (c) 2013-2020 Khan Academy and other
-//! contributors).
+//! contributors), with TeX's rule 13 for operators and the placement of limits from the
+//! TeXbook, Appendix G.
 
+use std::borrow::Cow;
 use std::ops::Range;
 
-use super::{Built, not_yet};
+use super::{
+    Atom, Built, Class, Grouping, build, build_in, cancel_binary_operators, expression,
+    insert_spaces, not_yet, symbol,
+};
 use crate::math::{
     MathError,
-    ast::{Node, OpContent},
-    options::Options,
-    symbols::Mode,
+    ast::{Node, NodeKind, OpContent},
+    boxes::{BoxKind, Bx, Part, Position},
+    metrics_data::Face,
+    options::{Em, MathFont, Options},
+    style::Style,
+    symbols::{Mode, Name},
 };
 
 /// An operator: what `NodeKind::Op` holds, and where it is.
@@ -25,26 +33,254 @@ pub(super) struct Operator<'t, 'n> {
     pub span: Range<usize>,
 }
 
+/// An operator's own box, with what its limits need: the slant of its symbol and how far the
+/// symbol sits off the axis.
+struct OperatorBase<'t> {
+    bx: Bx<'t>,
+    slant: Em,
+    shift: Em,
+}
+
+/// The one large operator that stays small in display style.
+const NO_SUCCESSOR: &str = "\\smallint";
+
+fn operator_base<'t>(
+    op: &Operator<'t, '_>,
+    options: &Options<'t>,
+) -> Result<OperatorBase<'t>, MathError> {
+    let bx = match op.content {
+        OpContent::Name(name) if op.symbol => {
+            if matches!(name.as_str(), "\\oiint" | "\\oiiint") {
+                // KaTeX draws the oval over the integral signs as an SVG path.
+                return Err(not_yet("op", op.span.clone()));
+            }
+            // Most symbol operators get larger in display style (rule 13).
+            let large = options.style.size() == Style::Display.size() && name != NO_SUCCESSOR;
+            let face = if large {
+                Face::Size2Regular
+            } else {
+                Face::Size1Regular
+            };
+            let symbol_name = Name::Control(name.strip_prefix('\\').unwrap_or(name));
+            let text = symbol::drawn_text(
+                Some(symbol_name),
+                &symbol::source_text(symbol_name),
+                Mode::Math,
+            );
+            Bx::glyph(text, face, Mode::Math, options)
+        }
+        OpContent::Body(body) => {
+            let atoms = expression(body, options, Grouping::Group)?;
+            let mut boxes: Vec<Bx<'t>> = atoms.into_iter().map(|atom| atom.bx).collect();
+            if let [
+                Bx {
+                    kind: BoxKind::Glyph(_),
+                    ..
+                },
+            ] = boxes.as_slice()
+                && let Some(only) = boxes.pop()
+            {
+                only
+            } else {
+                Bx::hlist(boxes)
+            }
+        }
+        OpContent::Name(name) => {
+            // A text operator: the characters of the name after its backslash.
+            let text = name.strip_prefix('\\').unwrap_or(name);
+            let glyphs = text
+                .char_indices()
+                .map(|(at, c)| {
+                    let one = &text[at..at + c.len_utf8()];
+                    symbol::math_symbol(Name::Char(one), op.mode, options)
+                })
+                .collect();
+            Bx::hlist(glyphs)
+        }
+    };
+    // A single symbol is centered on the axis (rule 13), unless an `\overset` or `\underset`
+    // keeps its base in place. Its slant is its italic correction.
+    let (slant, shift) = match &bx.kind {
+        BoxKind::Glyph(glyph) if op.suppress_base_shift != Some(true) => {
+            let axis = options.metrics().axis_height;
+            (glyph.italic, (bx.height - bx.depth) / 2.0 - Em(axis))
+        }
+        _ => (Em::ZERO, Em::ZERO),
+    };
+    Ok(OperatorBase { bx, slant, shift })
+}
+
+/// An operator without limits. KaTeX moves a lone symbol onto the axis with a relative offset
+/// that leaves its box where it was (a few thousandths of an em at most); a box here has no such
+/// offset, so the symbol stays put and a subscript still follows its italic correction.
 pub(super) fn op<'t>(op: Operator<'t, '_>, options: &Options<'t>) -> Result<Built<'t>, MathError> {
-    let _ = (
-        op.limits,
-        op.symbol,
-        op.suppress_base_shift,
-        op.content,
-        op.mode,
-        options,
-    );
-    Err(not_yet("op", op.span))
+    let base = operator_base(&op, options)?;
+    Ok(Built::One(Atom::new(base.bx, Some(Class::Op), options)))
+}
+
+/// The base of `\operatorname`: its body set upright, with the minus and asterisk drawn as the
+/// hyphen and asterisk of `amsopn`.
+fn operator_name_base<'t>(
+    body: &'t [Node<'_>],
+    options: &Options<'t>,
+) -> Result<Bx<'t>, MathError> {
+    let upright = options.with_font(MathFont::Rm);
+    let mut atoms: Vec<Atom<'t>> = Vec::new();
+    for node in body {
+        // A symbol of any kind is set as an ordinary character.
+        let built = match &node.kind {
+            NodeKind::Symbol { name, .. } => symbol::ord(
+                symbol::source_text(*name),
+                Some(*name),
+                false,
+                node.mode,
+                &upright,
+                node.span.clone(),
+            )?,
+            _ => build(node, &upright)?,
+        };
+        match built {
+            Built::One(atom) => atoms.push(atom),
+            Built::Many(more) => atoms.extend(more),
+        }
+    }
+    cancel_binary_operators(&mut atoms);
+    let mut atoms = insert_spaces(atoms, &upright);
+    for atom in &mut atoms {
+        if let BoxKind::Glyph(glyph) = &mut atom.bx.kind {
+            // The glyph keeps the size of the character it replaces, as KaTeX's.
+            glyph.text = Cow::Owned(
+                glyph
+                    .text
+                    .replacen('\u{2212}', "-", 1)
+                    .replacen('\u{2217}', "*", 1),
+            );
+        }
+    }
+    Ok(Bx::hlist(atoms.into_iter().map(|atom| atom.bx).collect()))
 }
 
 pub(super) fn operator_name<'t>(
     body: &'t [Node<'_>],
-    mode: Mode,
+    _mode: Mode,
     options: &Options<'t>,
-    span: Range<usize>,
+    _span: Range<usize>,
 ) -> Result<Built<'t>, MathError> {
-    let _ = (body, mode, options);
-    Err(not_yet("operatorname", span))
+    let bx = operator_name_base(body, options)?;
+    Ok(Built::One(Atom::new(bx, Some(Class::Op), options)))
+}
+
+/// A limit built in `style`, and the kern between it and the base.
+fn limit<'t>(
+    node: &'t Node<'_>,
+    style: Style,
+    options: &Options<'t>,
+    kern: impl FnOnce(&Bx<'t>) -> f64,
+) -> Result<(Bx<'t>, Em), MathError> {
+    let inner = options.having_style(style);
+    let elem = build_in(node, &inner, options)?.into_box();
+    let kern = Em(kern(&elem));
+    Ok((elem, kern))
+}
+
+/// The base, superscript, and subscript stacked as limits (KaTeX's `assembleSupSub`): the
+/// subscript below the base and the superscript above, each centered, the symbol's slant moving
+/// them apart.
+fn assemble_limits<'t>(
+    base: OperatorBase<'t>,
+    sup: Option<&'t Node<'_>>,
+    sub: Option<&'t Node<'_>>,
+    options: &Options<'t>,
+) -> Result<Built<'t>, MathError> {
+    let metrics = options.metrics();
+    let style = options.style;
+    let OperatorBase { bx, slant, shift } = base;
+    // The base goes in a box of its own, which is never below the baseline when its glyph is.
+    let bx = Bx::hlist(vec![bx]);
+    let sub_is_single_character = sub.is_some_and(Node::is_character_box);
+    let sup = sup
+        .map(|node| {
+            limit(node, style.sup(), options, |elem| {
+                metrics
+                    .big_op_spacing1
+                    .max(metrics.big_op_spacing3 - elem.depth.0)
+            })
+        })
+        .transpose()?;
+    let sub = sub
+        .map(|node| {
+            limit(node, style.sub(), options, |elem| {
+                metrics
+                    .big_op_spacing2
+                    .max(metrics.big_op_spacing4 - elem.height.0)
+            })
+        })
+        .transpose()?;
+    let spacing5 = Em(metrics.big_op_spacing5);
+
+    let stack = match (sup, sub.as_ref()) {
+        (Some((sup, sup_kern)), Some((sub, sub_kern))) => {
+            let bottom = spacing5 + sub.height + sub.depth + *sub_kern + bx.depth + shift;
+            Bx::vlist(
+                Position::Bottom(bottom),
+                vec![
+                    Part::Kern(spacing5),
+                    Part::Box {
+                        child: sub.clone(),
+                        dx: -slant,
+                    },
+                    Part::Kern(*sub_kern),
+                    Part::of(bx),
+                    Part::Kern(sup_kern),
+                    Part::Box {
+                        child: sup,
+                        dx: slant,
+                    },
+                    Part::Kern(spacing5),
+                ],
+            )
+        }
+        (None, Some((sub, sub_kern))) => {
+            // The subscript hangs below the base, which keeps its place less its shift.
+            let top = bx.height - shift;
+            Bx::vlist(
+                Position::Top(top),
+                vec![
+                    Part::Kern(spacing5),
+                    Part::Box {
+                        child: sub.clone(),
+                        dx: -slant,
+                    },
+                    Part::Kern(*sub_kern),
+                    Part::of(bx),
+                ],
+            )
+        }
+        (Some((sup, sup_kern)), None) => {
+            let bottom = bx.depth + shift;
+            Bx::vlist(
+                Position::Bottom(bottom),
+                vec![
+                    Part::of(bx),
+                    Part::Kern(sup_kern),
+                    Part::Box {
+                        child: sup,
+                        dx: slant,
+                    },
+                    Part::Kern(spacing5),
+                ],
+            )
+        }
+        (None, None) => bx,
+    };
+    // The lower limit moved left by the slant; a space of the slant keeps it off what comes
+    // before, unless it is one character, which clears it.
+    let bx = if sub.is_some() && slant != Em::ZERO && !sub_is_single_character {
+        Bx::hlist(vec![Bx::kern(slant), stack])
+    } else {
+        stack
+    };
+    Ok(Built::One(Atom::new(bx, Some(Class::Op), options)))
 }
 
 /// Scripts on an operator base that takes them as limits (an `Op` with `limits` in display
@@ -56,6 +292,275 @@ pub(super) fn supsub<'t>(
     sub: Option<&'t Node<'_>>,
     options: &Options<'t>,
 ) -> Result<Option<Built<'t>>, MathError> {
-    let _ = (base, sup, sub, options);
-    Ok(None)
+    let display = options.style.size() == Style::Display.size();
+    match &base.kind {
+        NodeKind::Op {
+            limits,
+            always_handle_supsub,
+            symbol,
+            suppress_base_shift,
+            content,
+        } if *limits && (display || *always_handle_supsub) => {
+            let operator = Operator {
+                limits: *limits,
+                symbol: *symbol,
+                suppress_base_shift: *suppress_base_shift,
+                content,
+                mode: base.mode,
+                span: base.span.clone(),
+            };
+            let base = operator_base(&operator, options)?;
+            assemble_limits(base, sup, sub, options).map(Some)
+        }
+        NodeKind::OperatorName {
+            body,
+            always_handle_supsub,
+            limits,
+        } if *always_handle_supsub && (display || *limits) => {
+            let base = OperatorBase {
+                bx: operator_name_base(body, options)?,
+                slant: Em::ZERO,
+                shift: Em::ZERO,
+            };
+            assemble_limits(base, sup, sub, options).map(Some)
+        }
+        _ => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::layout;
+    use crate::math::{
+        boxes::Item,
+        metrics,
+        metrics_data::Face,
+        parser::{Settings, parse_with},
+        symbols::Mode,
+    };
+
+    /// The box of a formula: its width, height, and depth, and the text of its glyphs.
+    fn laid_out(src: &str, display: bool) -> ((f64, f64, f64), Vec<String>) {
+        let nodes = parse_with(
+            src,
+            Settings {
+                display_mode: display,
+            },
+        )
+        .unwrap();
+        let bx = layout(&nodes, display).unwrap();
+        let glyphs = bx
+            .items()
+            .into_iter()
+            .filter_map(|item| match item {
+                Item::Glyph { glyph, .. } => Some(glyph.text.into_owned()),
+                _ => None,
+            })
+            .collect();
+        ((bx.width.0, bx.height.0, bx.depth.0), glyphs)
+    }
+
+    fn sized(src: &str, display: bool) -> (f64, f64, f64) {
+        laid_out(src, display).0
+    }
+
+    fn close(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-6
+    }
+
+    /// The width of a glyph as a box has it (its italic correction included) and its height and
+    /// depth, from the metrics.
+    fn glyph(c: char, face: Face) -> (f64, f64, f64, f64) {
+        let m = metrics::glyph(c, face, Mode::Math).unwrap();
+        (m.width + m.italic.max(0.0), m.height, m.depth, m.italic)
+    }
+
+    // The expected heights and depths below are KaTeX's, from the oracle fixture
+    // `tests/fixtures/math/katex-oracle.json`; widths and the limits are KaTeX's formulas worked
+    // through with the font metrics.
+
+    #[test]
+    fn symbols_are_large_only_in_display_style() {
+        let (w, h, d) = sized("\\int", false);
+        let (iw, ih, id, _) = glyph('\u{222b}', Face::Size1Regular);
+        assert!(
+            close(w, iw) && close(h, 0.805) && close(d, 0.30612),
+            "{w} {h} {d}"
+        );
+        assert!(close(ih, 0.805) && close(id, 0.30612));
+        // Display style takes the Size2 face.
+        let (w, h, d) = sized("\\int", true);
+        let (iw, ih, id, _) = glyph('\u{222b}', Face::Size2Regular);
+        assert!(close(w, iw) && close(h, ih) && close(d, id), "{w} {h} {d}");
+        assert!(close(h, 1.36) && close(d, 0.86225));
+        // `\smallint` stays small.
+        let (_, h, _) = sized("\\smallint", true);
+        assert!(close(h, glyph('\u{222b}', Face::Size1Regular).1));
+    }
+
+    #[test]
+    fn mathop_of_a_symbol_is_the_symbol() {
+        let (w, h, d) = sized("\\mathop{\\int}", false);
+        assert!(close(w, sized("\\int", false).0));
+        assert!(close(h, 0.805) && close(d, 0.30612), "{h} {d}");
+        // Anything else is an operator box of its own, which a symbol is not.
+        let (w, h, _) = sized("\\mathop{ab}", false);
+        let (aw, ah, ..) = glyph('a', Face::MathItalic);
+        let (bw, bh, ..) = glyph('b', Face::MathItalic);
+        assert!(close(w, aw + bw) && close(h, ah.max(bh)), "{w} {h}");
+    }
+
+    #[test]
+    fn text_operators_are_upright_names() {
+        let ((w, h, d), glyphs) = laid_out("\\sin", false);
+        let width: f64 = ['s', 'i', 'n']
+            .iter()
+            .map(|&c| glyph(c, Face::MainRegular).0)
+            .sum();
+        assert!(
+            close(w, width) && close(h, 0.66786) && close(d, 0.0),
+            "{w} {h} {d}"
+        );
+        assert_eq!(glyphs, ["s", "i", "n"]);
+    }
+
+    #[test]
+    fn integrals_take_scripts_beside_them() {
+        // Text style, and `\nolimits`: ordinary scripts, as the oracle has them.
+        let (_, h, d) = sized("\\int_i^n", false);
+        assert!(close(h, 0.859292) && close(d, 0.35582), "{h} {d}");
+        let (_, h, d) = sized("\\int^2\\nolimits_2", false);
+        assert!(close(h, 1.009008) && close(d, 0.35582), "{h} {d}");
+        let (_, h, d) = sized("\\sum\\nolimits_3^4 4", false);
+        assert!(close(h, 0.954008) && close(d, 0.29971), "{h} {d}");
+    }
+
+    #[test]
+    fn limits_stack_above_and_below() {
+        // `\int\limits` in text style, in a formula KaTeX gives these numbers for.
+        let (_, h, d) = sized("\\int\\limits_2^2 3", false);
+        assert!(close(h, 1.556668) && close(d, 1.022668), "{h} {d}");
+        // A sum in display style, with the oracle's fraction after it.
+        let (_, h, d) = sized("\\sum_{i=0}^\\infty \\frac{1}{i}", true);
+        assert!(close(h, 1.651397) && close(d, 1.277669), "{h} {d}");
+        // `\underset` keeps its arrow's box off the axis and clamps its depth at zero.
+        let (_, h, d) = sized("\\underset{f}{\\rightarrow} Y", false);
+        assert!(close(h, 0.68333) && close(d, 0.888216), "{h} {d}");
+    }
+
+    #[test]
+    fn a_sum_with_limits_in_display_style() {
+        // The base is centered on the axis (shift = (h - d) / 2 - 0.25); the superscript sits
+        // `max(bigOpSpacing1, bigOpSpacing3 - depth)` above and the subscript `max(bigOpSpacing2,
+        // bigOpSpacing4 - height)` below, with `bigOpSpacing5` beyond each, all in display style.
+        let (bw, bh, bd, italic) = glyph('\u{2211}', Face::Size2Regular);
+        let shift = (bh - bd) / 2.0 - 0.25;
+        let (aw, ah, ..) = glyph('a', Face::MathItalic);
+        let (bbw, bbh, ..) = glyph('b', Face::MathItalic);
+        let (sub_h, sup_h) = (0.7 * ah, 0.7 * bbh);
+        let sup_kern = 0.111_f64.max(0.2);
+        let sub_kern = 0.166_f64.max(0.6 - sub_h);
+        let (w, h, d) = sized("\\sum_a^b", true);
+        assert!(close(h, bh - shift + sup_kern + sup_h + 0.1), "{h}");
+        assert!(close(d, bd + shift + sub_kern + sub_h + 0.1), "{d}");
+        // Single-character limits are centered on the symbol, shifted by its slant.
+        assert!(
+            close(w, bw.max(0.7 * aw - italic).max(0.7 * bbw + italic)),
+            "{w}"
+        );
+    }
+
+    #[test]
+    fn named_limits_in_display_style() {
+        // `\lim_x`: the base is the name's height; the subscript hangs below it by
+        // `max(bigOpSpacing2, bigOpSpacing4 - height)`, with `bigOpSpacing5` above it.
+        let ((w, h, d), glyphs) = laid_out("\\lim_x", true);
+        let name: f64 = ['l', 'i', 'm']
+            .iter()
+            .map(|&c| glyph(c, Face::MainRegular).0)
+            .sum();
+        let x_h = 0.7 * glyph('x', Face::MathItalic).1;
+        assert!(close(w, name), "{w}");
+        assert!(close(h, 0.69444), "{h}");
+        assert!(close(d, 0.1 + x_h + 0.166_f64.max(0.6 - x_h)), "{d}");
+        // The stack lists the subscript first, as it is built bottom to top.
+        assert_eq!(glyphs, ["x", "l", "i", "m"]);
+        // A `\mathop` body takes limits with `\limits`; KaTeX's oracle has depth 0.7 for the
+        // same stack with a wider subscript (`bigOpSpacing4` less the subscript's height).
+        let (_, h, d) = sized("\\mathop{\\mathrm{lim}}\\limits_x", false);
+        assert!(
+            close(h, 0.69444) && close(d, 0.1 + x_h + 0.166_f64.max(0.6 - x_h)),
+            "{h} {d}"
+        );
+        // In text style the limits are ordinary scripts.
+        let (_, h, d) = sized("\\lim_x", false);
+        assert!(close(h, 0.69444) && close(d, 0.15), "{h} {d}");
+    }
+
+    #[test]
+    fn a_lower_limit_leaves_room_for_the_slant() {
+        // A subscript wider than one character moves left by the slant, and a space of the slant
+        // keeps it clear of what comes before.
+        let (_, _, _, slant) = glyph('\u{222b}', Face::Size1Regular);
+        assert!(slant > 0.0);
+        let (iw, ..) = glyph('\u{222b}', Face::Size1Regular);
+        let sub: f64 = ['a', 'b']
+            .iter()
+            .map(|&c| glyph(c, Face::MathItalic).0)
+            .sum();
+        let (w, ..) = sized("\\int\\limits_{ab}", false);
+        assert!(close(w, slant + iw.max(0.7 * sub - slant)), "{w}");
+        // One character does not.
+        let (w, ..) = sized("\\int\\limits_a", false);
+        let a = glyph('a', Face::MathItalic).0;
+        assert!(close(w, iw.max(0.7 * a - slant)), "{w}");
+    }
+
+    #[test]
+    fn operator_names_are_upright_and_take_limits_when_starred() {
+        let (_, h, d) = sized("\\operatorname{f}", false);
+        let (_, fh, fd, _) = glyph('f', Face::MainRegular);
+        assert!(close(h, fh) && close(d, fd), "{h} {d}");
+        // Scripts on the plain form are ordinary ones, on the starred form limits in display
+        // style only.
+        let (_, h, d) = sized("\\operatorname*{asin}_y x", false);
+        let (_, _, plain_d) = sized("\\operatorname{asin}_y x", false);
+        assert!(close(h, 0.66786) && close(d, plain_d), "{h} {d}");
+        let (_, _, limits_d) = sized("\\operatorname*{asin}_y", true);
+        let (_, _, scripted_d) = sized("\\operatorname{asin}_y", true);
+        assert!(limits_d > scripted_d, "{limits_d} {scripted_d}");
+        // `\limits` asks for them in any style.
+        let (_, h, d) = sized("\\operatorname{sn}\\limits_{b>c}(b+c)", false);
+        assert!(close(h, 0.75) && close(d, 0.25), "{h} {d}");
+    }
+
+    #[test]
+    fn operator_names_use_hyphen_and_asterisk() {
+        // The glyphs are the hyphen and asterisk; their widths are the minus sign's and
+        // asterisk operator's.
+        let ((w, ..), glyphs) = laid_out("\\operatorname{a-b*c}", false);
+        assert_eq!(glyphs, ["a", "-", "b", "*", "c"]);
+        let main = |c: char| glyph(c, Face::MainRegular).0;
+        let minus = glyph('\u{2212}', Face::MainRegular).0;
+        let ast = glyph('\u{2217}', Face::MainRegular).0;
+        assert!(
+            close(w, main('a') + minus + main('b') + ast + main('c')),
+            "{w}"
+        );
+    }
+
+    #[test]
+    fn oiint_is_not_laid_out_yet() {
+        for src in ["\\oiint", "\\oiiint_a^b"] {
+            let nodes = parse_with(
+                src,
+                Settings {
+                    display_mode: false,
+                },
+            )
+            .unwrap();
+            let err = layout(&nodes, false).unwrap_err();
+            assert_eq!(err.message, "op is not laid out yet", "{src}");
+        }
+    }
 }
