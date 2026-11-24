@@ -11,8 +11,9 @@
 //! - A dashed rule (`\hdashline`, `:` between columns) is a run of short rules, each three times
 //!   as long as the rule is thick, with gaps of the same length.
 //! - An equation tag follows the table (or the formula) on the baseline's side, where KaTeX's
-//!   style sheet pins it to the right edge of the page and `leqno` moves it to the left; the
-//!   caller places it. Numbers made by `{align}` and kin are CSS counters, so a row numbered
+//!   style sheet pins it to the right edge of the page and `leqno` moves it to the left. It
+//!   follows with no space between; moving it to the edge waits for the formula's own type,
+//!   which will carry it apart. Numbers made by `{align}` and kin are CSS counters, so a row numbered
 //!   automatically has an empty tag box of the row's size.
 //! - The extra space `\\[1em]` puts above a line break at the top level is a margin, which a
 //!   box does not have, so that break is an empty box.
@@ -298,11 +299,18 @@ fn vertical_rule<'t>(
 
 /// The runs of a dashed rule of a thickness and a length, from its start: `(length, is_dash)`.
 /// A dash and the gap after it are each three times the thickness, and the rule ends in a dash
-/// that takes up what is left.
+/// that takes up what is left. A rule longer than `MAX_DASHES` steps takes longer dashes instead
+/// of more of them (KaTeX's CSS dashes cost the same at any length), and a length that is not
+/// finite is one run.
 fn dash_runs(length: f64, thickness: f64) -> Vec<(f64, bool)> {
-    let step = 3.0 * thickness;
+    const MAX_DASHES: f64 = 1000.0;
+    let mut left = if length.is_finite() {
+        length.max(0.0)
+    } else {
+        0.0
+    };
+    let step = (3.0 * thickness).max(left / (2.0 * MAX_DASHES));
     let mut runs = Vec::new();
-    let mut left = length.max(0.0);
     while left > 2.0 * step && step > 0.0 {
         runs.push((step, true));
         runs.push((step, false));
@@ -341,20 +349,22 @@ pub(super) fn cr<'t>(
     if let (true, Some(size)) = (new_line, size) {
         options.length(size, span)?;
     }
-    Ok(Built::One(Atom::space(
-        Bx::space(Em::ZERO, Em::ZERO, Em::ZERO),
-        options,
-    )))
+    let mut atom = Atom::space(Bx::space(Em::ZERO, Em::ZERO, Em::ZERO), options);
+    atom.newline = new_line;
+    Ok(Built::One(atom))
 }
 
-/// A display formula with an equation tag at its right.
+/// A display formula with an equation tag at its right. A tag node is only ever the whole
+/// formula (KaTeX's `buildHTML` takes it apart there), so its body is built as the root. The
+/// tag follows the formula with no space between; KaTeX's style sheet pins it to the right
+/// edge of the page, which is the caller's to do.
 pub(super) fn tag<'t>(
     body: &'t [Node<'_>],
     tag: &'t [Node<'_>],
     options: &Options<'t>,
     _span: Range<usize>,
 ) -> Result<Built<'t>, MathError> {
-    let mut boxes: Vec<Bx<'t>> = expression(body, options, Grouping::Group)?
+    let mut boxes: Vec<Bx<'t>> = expression(body, options, Grouping::Root)?
         .into_iter()
         .map(|atom| atom.bx)
         .collect();
@@ -498,6 +508,16 @@ mod tests {
     }
 
     #[test]
+    fn long_dashed_rules_have_a_bounded_number_of_dashes() {
+        let runs = super::dash_runs(1e9, 0.04);
+        assert!(runs.len() <= 2001, "{}", runs.len());
+        let total: f64 = runs.iter().map(|(length, _)| length).sum();
+        assert!((total - 1e9).abs() < 1e-3, "{total}");
+        assert_eq!(super::dash_runs(f64::INFINITY, 0.04), vec![(0.0, true)]);
+        assert_eq!(super::dash_runs(f64::NAN, 0.04), vec![(0.0, true)]);
+    }
+
+    #[test]
     fn vertical_rules_take_no_width() {
         let plain = width("\\begin{array}{cc}a&b\\end{array}");
         assert!(close(width("\\begin{array}{c|c}a&b\\end{array}"), plain));
@@ -617,5 +637,25 @@ mod tests {
         // The size of `\\[1em]` is a margin, which a box does not have.
         let bx = laid_out("a\\\\[1em]b", false);
         assert!(close(bx.height.0, 0.69444) && close(bx.depth.0, 0.0));
+    }
+
+    #[test]
+    fn a_line_break_starts_spacing_afresh() {
+        // After a break, `-` starts a line: unary, with no space on either side.
+        let bx = laid_out("a\\\\-b", false);
+        assert!(close(bx.width.0, width("a") + width("-") + width("b")));
+        // Before a break, `+` keeps its class and the space on its left, but none on its right.
+        let medium = 4.0 / 18.0;
+        let bx = laid_out("a+\\\\b", false);
+        assert!(close(
+            bx.width.0,
+            width("a") + medium + width("-") + width("b")
+        ));
+        // Inside a group a break is a space like any other: `-` still has `a` on its left.
+        let grouped = laid_out("{a\\\\-b}", false);
+        assert!(close(
+            grouped.width.0,
+            width("a") + 2.0 * medium + width("-") + width("b")
+        ));
     }
 }

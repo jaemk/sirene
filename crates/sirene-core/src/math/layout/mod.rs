@@ -38,7 +38,7 @@ use super::{
 /// Lays out a formula: its nodes in display or text style at `\normalsize`.
 pub(crate) fn layout<'t>(nodes: &'t [Node<'_>], display: bool) -> Result<Bx<'t>, MathError> {
     let options = Options::new(display);
-    let atoms = expression(nodes, &options, Grouping::Group)?;
+    let atoms = expression(nodes, &options, Grouping::Root)?;
     Ok(Bx::hlist(atoms.into_iter().map(|a| a.bx).collect()))
 }
 
@@ -79,6 +79,8 @@ struct Atom<'t> {
     space: bool,
     /// Built in script or scriptscript style, where fewer spaces apply.
     tight: bool,
+    /// A line break (`\\` outside a table), which starts a new line for spacing at the root.
+    newline: bool,
 }
 
 impl<'t> Atom<'t> {
@@ -88,6 +90,7 @@ impl<'t> Atom<'t> {
             class,
             space: false,
             tight: options.style.is_tight(),
+            newline: false,
         }
     }
 
@@ -124,12 +127,14 @@ impl<'t> Built<'t> {
     }
 }
 
-/// How a list of nodes stands: as part of the list around it (spacing is left to that list), or
-/// as a group of its own. The formula is a group; line breaks are not built yet.
+/// How a list of nodes stands: as part of the list around it (spacing is left to that list), as
+/// a group of its own, or as the formula itself, where a line break starts spacing afresh as the
+/// start of a list does (KaTeX's `"root"`).
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Grouping {
     Partial,
     Group,
+    Root,
 }
 
 fn not_yet(what: &str, span: Range<usize>) -> MathError {
@@ -168,23 +173,36 @@ fn expression<'t>(
         ] => options.having_style((*style).into()),
         _ => *options,
     };
-    cancel_binary_operators(&mut atoms);
-    Ok(insert_spaces(atoms, &glue_options))
+    let root = grouping == Grouping::Root;
+    cancel_binary_operators(&mut atoms, root);
+    Ok(insert_spaces(atoms, &glue_options, root))
 }
 
-/// The indices of the atoms that are not spaces, in order.
-fn non_space(atoms: &[Atom<'_>]) -> Vec<usize> {
-    (0..atoms.len()).filter(|&i| !atoms[i].space).collect()
+/// The pairs of neighbors that spacing looks at: the atoms that are not spaces, in order, from
+/// the start of the list (`None`) to its end (`None`). At the root a line break starts over, as
+/// KaTeX's `traverseNonSpaceNodes` does: the atom after it has the start of a list on its left,
+/// and the atom before it is paired with nothing on its right.
+fn neighbors(atoms: &[Atom<'_>], root: bool) -> Vec<(Option<usize>, Option<usize>)> {
+    let mut pairs = Vec::new();
+    let mut prev = None;
+    for (i, atom) in atoms.iter().enumerate() {
+        if atom.space {
+            if root && atom.newline {
+                prev = None;
+            }
+            continue;
+        }
+        pairs.push((prev, Some(i)));
+        prev = Some(i);
+    }
+    pairs.push((prev, None));
+    pairs
 }
 
 /// TeX's rules 5 and 6: a binary operator with no operand on one side is ordinary. `None` is
 /// the edge of the list.
-fn cancel_binary_operators(atoms: &mut [Atom<'_>]) {
-    let order = non_space(atoms);
-    let neighbors = std::iter::once(None)
-        .chain(order.iter().copied().map(Some))
-        .zip(order.iter().copied().map(Some).chain(std::iter::once(None)));
-    for (prev, next) in neighbors {
+fn cancel_binary_operators(atoms: &mut [Atom<'_>], root: bool) {
+    for (prev, next) in neighbors(atoms, root) {
         let prev_class = prev.and_then(|p| atoms[p].class);
         let next_class = next.and_then(|n| atoms[n].class);
         if let Some(p) = prev
@@ -208,18 +226,20 @@ fn cancel_binary_operators(atoms: &mut [Atom<'_>]) {
 
 /// The spaces TeX puts between atoms by their classes, after the earlier atom and before any
 /// explicit space that follows it.
-fn insert_spaces<'t>(atoms: Vec<Atom<'t>>, options: &Options<'t>) -> Vec<Atom<'t>> {
-    let order = non_space(&atoms);
+fn insert_spaces<'t>(atoms: Vec<Atom<'t>>, options: &Options<'t>, root: bool) -> Vec<Atom<'t>> {
     // The space to put after each atom, by index.
     let mut after: Vec<(usize, Em)> = Vec::new();
-    for pair in order.windows(2) {
-        let (prev, next) = (&atoms[pair[0]], &atoms[pair[1]]);
+    for pair in neighbors(&atoms, root) {
+        let (Some(p), Some(n)) = pair else {
+            continue;
+        };
+        let (prev, next) = (&atoms[p], &atoms[n]);
         let (Some(left), Some(right)) = (prev.class, next.class) else {
             continue;
         };
         if let Some(mu) = space_between(left, right, next.tight) {
             let size = Em(mu * options.metrics().css_em_per_mu);
-            after.push((pair[0], size));
+            after.push((p, size));
         }
     }
     if after.is_empty() {

@@ -111,8 +111,10 @@ fn operator_base<'t>(
 }
 
 /// An operator without limits. KaTeX moves a lone symbol onto the axis with a relative offset
-/// that leaves its box where it was (a few thousandths of an em at most); a box here has no such
-/// offset, so the symbol stays put and a subscript still follows its italic correction.
+/// that leaves its box where it was (a few thousandths of an em for the large operator glyphs,
+/// up to about 0.2em for a one-glyph `\mathop` body such as `\mathop{.}`); a box here has no
+/// such offset, so the symbol is drawn on the baseline and a subscript still follows its italic
+/// correction.
 pub(super) fn op<'t>(op: Operator<'t, '_>, options: &Options<'t>) -> Result<Built<'t>, MathError> {
     let base = operator_base(&op, options)?;
     Ok(Built::One(Atom::new(base.bx, Some(Class::Op), options)))
@@ -144,8 +146,8 @@ fn operator_name_base<'t>(
             Built::Many(more) => atoms.extend(more),
         }
     }
-    cancel_binary_operators(&mut atoms);
-    let mut atoms = insert_spaces(atoms, &upright);
+    cancel_binary_operators(&mut atoms, false);
+    let mut atoms = insert_spaces(atoms, &upright, false);
     for atom in &mut atoms {
         if let BoxKind::Glyph(glyph) = &mut atom.bx.kind {
             // The glyph keeps the size of the character it replaces, as KaTeX's.
@@ -218,6 +220,21 @@ fn assemble_limits<'t>(
         .transpose()?;
     let spacing5 = Em(metrics.big_op_spacing5);
 
+    // Each row is centered in the stack (KaTeX's `.op-limits` `text-align: center`), and its
+    // margin, the slant, moves it by half of that: a row is as wide as its box and margin.
+    let mut width = bx.width;
+    if let Some((sup, _)) = &sup {
+        width = width.max(sup.width + slant);
+    }
+    if let Some((sub, _)) = &sub {
+        width = width.max(sub.width - slant);
+    }
+    let centered = |row: &Bx<'_>, margin: Em| (width + margin - row.width) / 2.0;
+    let base_dx = centered(&bx, Em::ZERO);
+    let sup_dx = sup.as_ref().map(|(sup, _)| centered(sup, slant));
+    let sub_dx = sub.as_ref().map(|(sub, _)| centered(sub, -slant));
+    let (sup_dx, sub_dx) = (sup_dx.unwrap_or(Em::ZERO), sub_dx.unwrap_or(Em::ZERO));
+
     let stack = match (sup, sub.as_ref()) {
         (Some((sup, sup_kern)), Some((sub, sub_kern))) => {
             let bottom = spacing5 + sub.height + sub.depth + *sub_kern + bx.depth + shift;
@@ -227,14 +244,17 @@ fn assemble_limits<'t>(
                     Part::Kern(spacing5),
                     Part::Box {
                         child: sub.clone(),
-                        dx: -slant,
+                        dx: sub_dx,
                     },
                     Part::Kern(*sub_kern),
-                    Part::of(bx),
+                    Part::Box {
+                        child: bx,
+                        dx: base_dx,
+                    },
                     Part::Kern(sup_kern),
                     Part::Box {
                         child: sup,
-                        dx: slant,
+                        dx: sup_dx,
                     },
                     Part::Kern(spacing5),
                 ],
@@ -249,10 +269,13 @@ fn assemble_limits<'t>(
                     Part::Kern(spacing5),
                     Part::Box {
                         child: sub.clone(),
-                        dx: -slant,
+                        dx: sub_dx,
                     },
                     Part::Kern(*sub_kern),
-                    Part::of(bx),
+                    Part::Box {
+                        child: bx,
+                        dx: base_dx,
+                    },
                 ],
             )
         }
@@ -261,11 +284,14 @@ fn assemble_limits<'t>(
             Bx::vlist(
                 Position::Bottom(bottom),
                 vec![
-                    Part::of(bx),
+                    Part::Box {
+                        child: bx,
+                        dx: base_dx,
+                    },
                     Part::Kern(sup_kern),
                     Part::Box {
                         child: sup,
-                        dx: slant,
+                        dx: sup_dx,
                     },
                     Part::Kern(spacing5),
                 ],
@@ -358,6 +384,47 @@ mod tests {
             })
             .collect();
         ((bx.width.0, bx.height.0, bx.depth.0), glyphs)
+    }
+
+    /// The x of each glyph, by its text, and the formula's width.
+    fn placed(src: &str, display: bool) -> (Vec<(String, f64)>, f64) {
+        let nodes = parse_with(
+            src,
+            Settings {
+                display_mode: display,
+            },
+        )
+        .unwrap();
+        let bx = layout(&nodes, display).unwrap();
+        let glyphs = bx
+            .items()
+            .into_iter()
+            .filter_map(|item| match item {
+                Item::Glyph { x, glyph, .. } => Some((glyph.text.into_owned(), x)),
+                _ => None,
+            })
+            .collect();
+        (glyphs, bx.width.0)
+    }
+
+    #[test]
+    fn limits_are_centered_on_the_base() {
+        // `lim` over a wider subscript sits in the middle of it (KaTeX's `text-align: center`).
+        let (glyphs, width) = placed("\\lim_{xxxxxx}", true);
+        let lim = 0.27778 + 0.27778 + 0.83334;
+        let x_of = |glyphs: &[(String, f64)], text: &str| {
+            glyphs
+                .iter()
+                .find(|(t, _)| t == text)
+                .map(|&(_, x)| x)
+                .unwrap()
+        };
+        let l = x_of(&glyphs, "l");
+        assert!((l + lim / 2.0 - width / 2.0).abs() < 1e-4, "{l} in {width}");
+        assert!(x_of(&glyphs, "x").abs() < 1e-9, "{glyphs:?}");
+        // A lower limit under a slanted integral stays inside the box.
+        let (glyphs, _) = placed("\\int\\limits_a", false);
+        assert!(x_of(&glyphs, "a") > 0.0, "{glyphs:?}");
     }
 
     fn sized(src: &str, display: bool) -> (f64, f64, f64) {
