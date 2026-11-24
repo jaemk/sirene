@@ -506,6 +506,10 @@ mod tests {
     fn the_diagram_needs_display_mode() {
         let err = parse("\\begin{CD}A\\end{CD}").unwrap_err();
         assert_eq!(err.message, "{CD} can be used only in display mode.");
+        // Nor in text inside a display formula, as no environment can be.
+        let src = "\\text{\\begin{CD}A\\end{CD}}";
+        let err = parse_with(src, Settings { display_mode: true }).unwrap_err();
+        assert_eq!(err.message, "Can't use function '\\begin' in text mode");
     }
 
     #[test]

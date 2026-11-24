@@ -624,7 +624,11 @@ impl<'a> Expander<'a> {
     // Expansion.
 
     fn count_expansion(&mut self, at: &Range<usize>) -> Result<(), MathError> {
-        self.expansions += 1;
+        self.count_expansions(1, at)
+    }
+
+    fn count_expansions(&mut self, n: usize, at: &Range<usize>) -> Result<(), MathError> {
+        self.expansions = self.expansions.saturating_add(n);
         if self.expansions > limits::MAX_EXPANSIONS {
             return Err(MathError::new(
                 format!(
@@ -963,15 +967,27 @@ impl<'a> Expander<'a> {
 
     /// Expands `tokens` (in reading order) as far as macros go, and returns what is left, also in
     /// reading order. Tokens that are not macros are kept as they are.
-    fn expand_tokens(&mut self, tokens: Vec<Token<'a>>) -> Result<Vec<Token<'a>>, MathError> {
+    fn expand_tokens(
+        &mut self,
+        tokens: Vec<Token<'a>>,
+        at: &Range<usize>,
+    ) -> Result<Vec<Token<'a>>, MathError> {
         let mut out = Vec::new();
         let base = self.stack.len();
         self.push_tokens(tokens);
         while self.stack.len() > base {
             if !self.expand_once_in(true)? {
-                out.push(self.pop_token()?);
+                let mut token = self.pop_token()?;
+                // The expansion of `\noexpand\x` is `\x` itself, expandable again later.
+                if let TokenKind::Frozen(inner) = token.kind {
+                    token.kind = *inner;
+                }
+                out.push(token);
             }
         }
+        // Each token out counts as an expansion, as in KaTeX, so repeated expansion of long
+        // text is bounded by the expansion limit.
+        self.count_expansions(out.len(), at)?;
         Ok(out)
     }
 
@@ -1008,7 +1024,7 @@ impl<'a> Expander<'a> {
             let mut input = left.clone();
             input.extend(arg);
             input.extend(right.iter().cloned());
-            self.expand_tokens(input)
+            self.expand_tokens(input, at)
         })();
         self.end_group(at)?;
         result
@@ -1678,6 +1694,18 @@ mod tests {
         assert_eq!(expand("\\bra@set{L}{M}{D}{R}{a||b|c}").unwrap(), "LaDb|cR");
         // The text is one argument: a single token needs no braces, and the rest follows.
         assert_eq!(expand("\\bra@ket{L}{M}{}{R}x|y").unwrap(), "LxR|y");
+        // A `\noexpand` token in the text comes out as itself, as KaTeX's `expandTokens`
+        // thaws it: a macro is expanded later, and a bar is not a separator.
+        assert_eq!(
+            expand("\\def\\foo{X}\\bra@ket{L}{M}{}{R}{a\\noexpand\\foo}").unwrap(),
+            "LaXR"
+        );
+        assert_eq!(
+            expand("\\bra@ket{L}{M}{}{R}{a\\noexpand|b}").unwrap(),
+            "La|bR"
+        );
+        // A bar that ends the text, with no right part, looks past the text for a second bar.
+        assert_eq!(expand("\\bra@ket{L}{M}{D}{}{a|}|b").unwrap(), "LaDb");
     }
 
     #[test]
