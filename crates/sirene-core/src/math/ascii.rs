@@ -36,32 +36,49 @@ pub fn ascii_formula_rows(
         },
     )?;
     // Layout rejects what the scene would, so the two outputs agree on what is an error.
-    super::layout::layout(&nodes, style == MathStyle::Display)?;
-    OVERSIZE.with(|flag| flag.set(false));
+    super::formula::checked_layout(&nodes, style == MathStyle::Display)?;
+    reset_budget();
     let renderer = Renderer {
         source,
         compact: false,
     };
     let block = renderer.list(&nodes, style == MathStyle::Display);
-    if OVERSIZE.with(|flag| flag.replace(false)) {
+    if reset_budget() {
         return Err(MathError::new("formula too large to draw as text", 0..0));
     }
     Ok(block.finish_rows())
 }
 
 thread_local! {
-    /// Set when a block would pass `limits::MAX_ASCII_CELLS`; the block is then empty and the
-    /// render fails once it is done.
+    /// The cells the render in progress may still allocate, over all its blocks.
+    static BUDGET: std::cell::Cell<usize> = const { std::cell::Cell::new(limits::MAX_ASCII_CELLS) };
+    /// Set once the budget is spent: every block built after that is empty and the render fails
+    /// when it is done.
     static OVERSIZE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Whether a block of `height` rows and `width` columns is past the cap, which it records.
+/// Refills the budget and clears the spent flag, returning whether it was set.
+fn reset_budget() -> bool {
+    BUDGET.with(|b| b.set(limits::MAX_ASCII_CELLS));
+    OVERSIZE.with(|flag| flag.replace(false))
+}
+
+/// Charges a block of `height` rows and `width` columns to the render's budget. True if it does
+/// not fit (or the budget is already spent), and the caller then builds an empty block.
 fn too_big(height: usize, width: usize) -> bool {
-    let over = height.saturating_mul(width) > limits::MAX_ASCII_CELLS;
-    if over {
-        OVERSIZE.with(|flag| flag.set(true));
+    if OVERSIZE.with(std::cell::Cell::get) {
+        return true;
     }
-    over
+    // A row costs at least a cell, so a tall block of nothing is bounded too.
+    let cost = height.saturating_mul(width.max(1));
+    let left = BUDGET.with(std::cell::Cell::get);
+    if cost > left {
+        OVERSIZE.with(|flag| flag.set(true));
+        BUDGET.with(|b| b.set(0));
+        return true;
+    }
+    BUDGET.with(|b| b.set(left - cost));
+    false
 }
 
 /// How a block's rows sit in a wider space.
@@ -84,10 +101,18 @@ struct Block {
 /// takes columns on screen; `finish_rows` drops it.
 const WIDE_FILL: char = '\0';
 
-/// The cells of a line of text: each character, and `WIDE_FILL` after a wide one.
+/// The cells of a line of text, one per column on screen: each character, and `WIDE_FILL` after
+/// a wide one. A zero-width character (a joiner, a variation selector, a combining mark) is
+/// dropped, and a control character or NUL, which would collide with `WIDE_FILL`, is U+FFFD.
 fn cells_of(line: &str) -> Vec<char> {
     let mut cells = Vec::with_capacity(line.len());
     for c in line.chars() {
+        let c = match unicode_width::UnicodeWidthChar::width(c) {
+            None => '\u{fffd}',
+            Some(0) if c != '\0' => continue,
+            Some(_) if c == '\0' => '\u{fffd}',
+            Some(_) => c,
+        };
         cells.push(c);
         if unicode_width::UnicodeWidthChar::width(c) == Some(2) {
             cells.push(WIDE_FILL);
@@ -102,6 +127,9 @@ impl Block {
         let lines: Vec<Vec<char>> = s.split('\n').map(cells_of).collect();
         let width = lines.iter().map(Vec::len).max().unwrap_or(0);
         if width == 0 && lines.len() <= 1 {
+            return Block::default();
+        }
+        if too_big(lines.len(), width) {
             return Block::default();
         }
         let rows = lines
@@ -231,6 +259,9 @@ impl Block {
     }
 
     fn blank_like(&self) -> Block {
+        if too_big(self.height(), self.width) {
+            return Block::default();
+        }
         Block {
             rows: vec![vec![' '; self.width]; self.height()],
             base: self.base,
@@ -570,6 +601,9 @@ impl Renderer<'_> {
             NodeKind::Phantom { body } => self.list(body, d).blank_like(),
             NodeKind::VPhantom { body } => {
                 let b = self.node(body, d);
+                if too_big(b.height(), 1) {
+                    return Block::default();
+                }
                 Block {
                     rows: vec![Vec::new(); b.height()],
                     base: b.base,
@@ -730,6 +764,9 @@ impl Renderer<'_> {
         });
         let lead: Vec<char> = index.unwrap_or_default().chars().collect();
         let pad = lead.len();
+        if too_big(body.height() + 1, pad + 1 + body.width) {
+            return Block::default();
+        }
         let mut rows = Vec::new();
         let mut top = vec![' '; pad + 1];
         top.extend(std::iter::repeat_n('\u{af}', body.width));
@@ -762,7 +799,10 @@ impl Renderer<'_> {
         let Some(c) = shown.chars().next().filter(|c| *c != '.') else {
             return Block::default();
         };
-        let height = above + below + 1;
+        let height = above.saturating_add(below).saturating_add(1);
+        if too_big(height, 1) {
+            return Block::default();
+        }
         let mut rows = Vec::with_capacity(height);
         for r in 0..height {
             let at = if height == 1 {
@@ -822,6 +862,9 @@ impl Renderer<'_> {
         let Some(mark) = accent_mark(label) else {
             return block;
         };
+        if too_big(1, block.width) {
+            return Block::default();
+        }
         let mut row = vec![' '; block.width];
         let at = block.width.saturating_sub(1) / 2;
         for (k, c) in mark.chars().enumerate() {
@@ -846,6 +889,9 @@ impl Renderer<'_> {
     fn accent_under(&self, label: &str, base: &Node<'_>, d: bool) -> Block {
         let block = self.node(base, d);
         let w = block.width.max(1);
+        if too_big(1, w) {
+            return Block::default();
+        }
         let mut line = vec!['\u{2500}'; w];
         if label.contains("rightarrow") {
             if let Some(last) = line.last_mut() {
@@ -868,6 +914,9 @@ impl Renderer<'_> {
         let over = self.node(body, false);
         let under = below.map(|b| self.node(b, false)).unwrap_or_default();
         let n = over.width.max(under.width) + 2;
+        if too_big(1, n) {
+            return Block::default();
+        }
         let double = label.contains("Rightarrow")
             || label.contains("Leftarrow")
             || label.contains("Leftrightarrow")
@@ -1243,6 +1292,9 @@ fn bracket_line(width: usize, over: bool, brace: bool) -> Block {
         (true, false) => ('\u{250c}', '\u{2500}', '\u{2510}'),
         (false, false) => ('\u{2514}', '\u{2500}', '\u{2518}'),
     };
+    if too_big(1, width) {
+        return Block::default();
+    }
     let mut cells = vec!['\u{2500}'; width.max(1)];
     if width >= 2 {
         if let Some(c) = cells.first_mut() {
@@ -1268,6 +1320,9 @@ fn bracket_line(width: usize, over: bool, brace: bool) -> Block {
 /// A frame around a block.
 fn boxed(body: Block) -> Block {
     let w = body.width;
+    if too_big(body.height() + 2, w + 2) {
+        return Block::default();
+    }
     let mut rows = Vec::with_capacity(body.height() + 2);
     let mut top = vec!['\u{250c}'];
     top.extend(std::iter::repeat_n('\u{2500}', w));
@@ -1819,27 +1874,107 @@ mod tests {
     /// next formula on the thread is drawn as usual.
     #[test]
     fn a_formula_too_large_to_draw_is_an_error() {
-        // A rule 40 rows tall beside 5000 kerns of 40 cells: 8M cells.
-        let src = format!(r"\rule{{1em}}{{99em}}{}", r"\kern99em".repeat(5000));
-        let e = ascii_formula(&src, MathStyle::Text).unwrap_err();
+        // A row of 6000 cells (a kern is at most 40) over 1000 short rows: the table is 6M cells,
+        // in a box under the extent limit.
+        let wide = |kerns: usize| {
+            format!(
+                r"\begin{{matrix}}{}{}\end{{matrix}}",
+                r"\kern20em".repeat(kerns),
+                r"\\x".repeat(1000)
+            )
+        };
+        let e = ascii_formula(&wide(150), MathStyle::Text).unwrap_err();
         assert_eq!(e.message, "formula too large to draw as text");
         assert_eq!(e.span, 0..0);
         assert_eq!(text("x"), "x");
         // Narrower, the same formula draws.
-        let src = format!(r"\rule{{1em}}{{99em}}{}", r"\kern99em".repeat(10));
-        assert!(ascii_formula(&src, MathStyle::Text).is_ok());
+        assert!(ascii_formula(&wide(5), MathStyle::Text).is_ok());
     }
 
     #[test]
     fn a_filled_block_past_the_cap_is_empty_and_flags_the_render() {
-        OVERSIZE.with(|flag| flag.set(false));
+        reset_budget();
         let side = limits::MAX_ASCII_CELLS / 1000 + 1;
         let block = Block::filled('x', side, 1000, 0);
         assert!(block.is_empty());
-        assert!(OVERSIZE.with(|flag| flag.replace(false)));
+        assert!(reset_budget());
         let block = Block::filled('x', 3, 2, 1);
         assert_eq!((block.height(), block.width, block.base), (2, 3, 1));
-        assert!(!OVERSIZE.with(std::cell::Cell::get));
+        assert!(!reset_budget());
+    }
+
+    /// The cap is on the whole render: blocks that each fit but together do not are an error, and
+    /// once it is spent every builder returns an empty block.
+    #[test]
+    fn the_cell_budget_is_shared_by_all_blocks_of_a_render() {
+        reset_budget();
+        let half = limits::MAX_ASCII_CELLS / 2;
+        assert!(!Block::filled('x', half, 1, 0).is_empty());
+        assert!(!Block::filled('x', half, 1, 0).is_empty());
+        assert!(Block::filled('x', 2, 1, 0).is_empty());
+        assert!(Block::text("abc").is_empty());
+        assert!(Block::hcat(vec![Block::default()]).is_empty());
+        assert!(Block::default().blank_like().is_empty());
+        assert!(boxed(Block::default()).is_empty());
+        assert!(bracket_line(3, true, true).is_empty());
+        assert!(reset_budget());
+    }
+
+    /// Sibling groups, each well under the cap, are together over it.
+    #[test]
+    fn sibling_blocks_under_the_cap_are_an_error() {
+        // One group is 100 rows of about 4000 columns (a matrix beside a kern of 4000 cells).
+        let group = format!(
+            r"{{\begin{{matrix}}{}\end{{matrix}}{}}}",
+            vec!["a"; 100].join(r"\\"),
+            r"\kern20em".repeat(100)
+        );
+        assert!(ascii_formula(&group, MathStyle::Text).is_ok());
+        let src = format!(
+            r"\begin{{matrix}}{}\end{{matrix}}",
+            [group.as_str(); 4].join(r"\\")
+        );
+        let e = ascii_formula(&src, MathStyle::Text).unwrap_err();
+        assert_eq!(e.message, "formula too large to draw as text");
+    }
+
+    /// A character that is NUL in the source is not mistaken for the filler after a wide one.
+    #[test]
+    fn a_nul_character_keeps_its_column() {
+        let rows = ascii_formula_rows(r"\frac{\char0 ab}{c}", MathStyle::Text)
+            .unwrap()
+            .0;
+        assert_eq!(rows.len(), 3, "{rows:?}");
+        let widths: Vec<usize> = rows
+            .iter()
+            .map(|r| unicode_width::UnicodeWidthStr::width(r.as_str()))
+            .collect();
+        assert_eq!(widths[1], 5, "{rows:?}");
+        // The numerator is three columns wide, centered in five.
+        assert_eq!(widths[0], 4, "{rows:?}");
+        assert!(rows[0].contains('\u{fffd}'), "{rows:?}");
+    }
+
+    /// Zero-width characters take no column and controls take one, so a block is as wide as the
+    /// terminal shows it.
+    #[test]
+    fn block_width_is_the_display_width_of_the_text() {
+        // A family emoji: four wide characters joined by ZWJ, then a variation selector.
+        let emoji = "\u{1f468}\u{200d}\u{1f469}\u{200d}\u{1f467}\u{fe0f}";
+        let src = format!("\\frac{{\\text{{{emoji}}}}}{{2}}");
+        let rows = ascii_formula_rows(&src, MathStyle::Text).unwrap().0;
+        let shown = unicode_width::UnicodeWidthStr::width(
+            emoji.replace(['\u{200d}', '\u{fe0f}'], "").as_str(),
+        );
+        assert_eq!(rows.len(), 3, "{rows:?}");
+        // The rule is two columns wider than the widest side.
+        assert_eq!(rows[1].chars().count(), shown + 2, "{rows:?}");
+        assert!(!rows[0].contains('\u{200d}'), "{rows:?}");
+        assert_eq!(
+            Block::text("a\u{200b}b\u{7}").width,
+            3,
+            "zero-width dropped, control one column"
+        );
     }
 
     /// Nodes that no source reaches today, built by hand: the renderer draws an infix command,

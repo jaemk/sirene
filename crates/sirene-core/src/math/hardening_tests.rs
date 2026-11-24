@@ -64,6 +64,8 @@ fn echoed_text_in_errors_is_clipped() {
         format!("\\kern{{{long}}}"),
         format!("\\color{{#{long}}}{{x}}"),
         format!("\\newcommand\\f[{long}]{{}}"),
+        format!("\\htmlData{{{long}}}{{x}}"),
+        format!("\\includegraphics[{long}=1]{{x}}"),
     ] {
         let message = typeset_error(&src);
         assert!(message.len() < 200, "{message}");
@@ -76,7 +78,7 @@ fn echoed_text_in_errors_is_clipped() {
 fn a_wide_matrix_is_too_big_for_text_but_cheap_to_refuse() {
     let src = format!(
         "\\begin{{matrix}}{}{}\\end{{matrix}}",
-        "x".repeat(20_000),
+        "x".repeat(12_000),
         "\\\\a".repeat(1000)
     );
     let err = ascii_formula(&src, MathStyle::Text).unwrap_err();
@@ -85,9 +87,26 @@ fn a_wide_matrix_is_too_big_for_text_but_cheap_to_refuse() {
 
 #[test]
 fn a_table_with_too_many_rows_is_an_error() {
-    let src = format!("\\begin{{matrix}}{}\\end{{matrix}}", "a\\\\".repeat(12_000));
-    assert!(typeset_error(&src).contains("table larger"));
-    assert!(ascii_formula(&src, MathStyle::Text).is_err());
+    for src in [
+        format!("\\begin{{matrix}}{}\\end{{matrix}}", "a\\\\".repeat(12_000)),
+        format!("\\begin{{CD}}{}\\end{{CD}}", "A\\\\".repeat(15_000)),
+    ] {
+        let message = typeset(&src, MathStyle::Display).unwrap_err().message;
+        assert!(message.contains("table larger"), "{message}");
+        assert!(ascii_formula(&src, MathStyle::Display).is_err());
+    }
+}
+
+#[test]
+fn a_cd_with_too_many_cells_is_an_error() {
+    // Each row of 21 cells (A, 10 arrows and 10 more objects) is under the row limit together.
+    let row = format!("A{}\\\\", "@>>>B".repeat(10));
+    let src = format!("\\begin{{CD}}{}\\end{{CD}}", row.repeat(900));
+    let message = typeset(&src, MathStyle::Display).unwrap_err().message;
+    assert!(message.contains("table larger"), "{message}");
+    assert!(ascii_formula(&src, MathStyle::Display).is_err());
+    let few = format!("\\begin{{CD}}{}\\end{{CD}}", row.repeat(3));
+    assert!(typeset(&few, MathStyle::Display).is_ok());
 }
 
 #[test]
@@ -98,9 +117,27 @@ fn a_table_with_too_many_cells_is_an_error() {
 
 #[test]
 fn ascii_fails_where_layout_fails() {
-    let src = r"\textsf{\textbf{\textit{x}}}";
-    assert!(typeset(src, MathStyle::Text).is_err());
-    assert!(ascii_formula(src, MathStyle::Text).is_err());
+    for src in [
+        r"\textsf{\textbf{\textit{x}}}".to_string(),
+        "\\kern1000em".repeat(11) + "x",
+        format!("\\def\\a{{{}}}{}", "x".repeat(1000), "\\a".repeat(200)),
+        format!("\\mathrlap{{{}x}}", "\\kern1000em".repeat(11)),
+        "\\smash{\\raisebox{1000em}{".repeat(30) + "x" + &"}}".repeat(30),
+    ] {
+        assert!(typeset(&src, MathStyle::Text).is_err(), "{src:.60}");
+        assert!(ascii_formula(&src, MathStyle::Text).is_err(), "{src:.60}");
+    }
+}
+
+#[test]
+fn items_drawn_far_from_an_empty_box_are_an_error() {
+    let rlap = format!("\\mathrlap{{{}x}}", "\\kern1000em".repeat(11));
+    assert!(typeset_error(&rlap).contains("further than"), "{rlap:.60}");
+    let nested = "\\smash{\\raisebox{1000em}{".repeat(30) + "x" + &"}}".repeat(30);
+    let message = typeset_error(&nested);
+    assert!(message.contains("further than"), "{message}");
+    // A shift inside the bound still draws.
+    assert!(typeset("\\mathrlap{\\kern100em x}", MathStyle::Text).is_ok());
 }
 
 #[test]
@@ -108,6 +145,27 @@ fn a_formula_with_too_many_glyphs_is_an_error() {
     let src = format!("\\def\\a{{{}}}{}", "x".repeat(1000), "\\a".repeat(200));
     assert!(src.len() < 2000);
     assert!(typeset_error(&src).contains("glyphs"));
+}
+
+#[test]
+fn short_asciimath_that_translates_long_names_the_tex_limit() {
+    use super::{ascii_asciimath, typeset_asciimath};
+    // 12000 * 5 = 60000 bytes of AsciiMath, under the source limit; each `alpha` is `\alpha `.
+    let src = "alpha".repeat(12_000);
+    assert!(src.len() < 64 * 1024);
+    for message in [
+        typeset_asciimath(&src, MathStyle::Text)
+            .unwrap_err()
+            .message,
+        ascii_asciimath(&src, MathStyle::Text).unwrap_err().message,
+    ] {
+        assert!(message.contains("translated TeX"), "{message}");
+    }
+    let long = "a".repeat(64 * 1024 + 1);
+    let message = typeset_asciimath(&long, MathStyle::Text)
+        .unwrap_err()
+        .message;
+    assert!(!message.contains("translated"), "{message}");
 }
 
 #[test]

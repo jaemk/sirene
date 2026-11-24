@@ -185,7 +185,25 @@ pub fn typeset(source: &str, style: MathStyle) -> Result<Formula, MathError> {
             display_mode: display,
         },
     )?;
-    let bx = layout(&nodes, display)?;
+    let bx = checked_layout(&nodes, display)?;
+    let items = bx.items();
+    Ok(Formula {
+        width: extent(bx.width.0)?,
+        ascent: extent(bx.height.0)?,
+        descent: extent(bx.depth.0)?,
+        items: items.iter().map(Owned::new).collect(),
+    })
+}
+
+/// Lays out `nodes` and applies the limits on the result, so the scene and the text renderer
+/// agree on what is an error: at most `limits::MAX_ITEMS` glyphs and rules, a box within
+/// `limits::MAX_EXTENT_EM`, and every item drawn within that distance of the origin (a box can be
+/// empty while its contents are shifted far away, as with `\mathrlap` and `\raisebox`).
+pub(super) fn checked_layout<'t>(
+    nodes: &'t [super::ast::Node<'_>],
+    display: bool,
+) -> Result<super::boxes::Bx<'t>, MathError> {
+    let bx = layout(nodes, display)?;
     let items = bx.items();
     if items.len() > limits::MAX_ITEMS {
         return Err(MathError::new(
@@ -196,12 +214,37 @@ pub fn typeset(source: &str, style: MathStyle) -> Result<Formula, MathError> {
             0..0,
         ));
     }
-    Ok(Formula {
-        width: extent(bx.width.0)?,
-        ascent: extent(bx.height.0)?,
-        descent: extent(bx.depth.0)?,
-        items: items.iter().map(Owned::new).collect(),
-    })
+    extent(bx.width.0)?;
+    extent(bx.height.0)?;
+    extent(bx.depth.0)?;
+    let inside = |v: f64| v.is_finite() && v.abs() <= limits::MAX_EXTENT_EM;
+    let in_bounds = items.iter().all(|item| match item {
+        Item::Glyph { x, y, scale, .. } => inside(*x) && inside(*y) && scale.is_finite(),
+        Item::Rule {
+            x,
+            y,
+            width,
+            height,
+            ..
+        }
+        | Item::Path {
+            x,
+            y,
+            width,
+            height,
+            ..
+        } => inside(*x) && inside(*y) && inside(x + width) && inside(y + height),
+    });
+    if !in_bounds {
+        return Err(MathError::new(
+            format!(
+                "formula draws further than {} em out",
+                limits::MAX_EXTENT_EM
+            ),
+            0..0,
+        ));
+    }
+    Ok(bx)
 }
 
 /// A box side in em for the public `Formula`: a negative side (a `\kern` back past the start)
