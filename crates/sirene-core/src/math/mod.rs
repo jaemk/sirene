@@ -15,6 +15,8 @@ mod baseline;
 mod boxes;
 mod error;
 mod expander;
+#[cfg(feature = "math")]
+mod fonts;
 mod functions;
 #[rustfmt::skip]
 mod functions_data;
