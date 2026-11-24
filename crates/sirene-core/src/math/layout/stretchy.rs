@@ -238,7 +238,6 @@ pub(super) fn svg_span<'t>(
 
 /// What `enclose_span` draws around a box: its size, the padding around the content, the
 /// border and the colors.
-#[allow(dead_code)]
 pub(super) struct Enclosure<'t> {
     /// The width of the enclosed content with its horizontal padding.
     pub width: Em,
@@ -283,7 +282,6 @@ fn em_path<'t>(data: String, (width, height): (f64, f64), options: &Options<'t>)
 /// the box tree has only filled paths, so a stroke is the thin parallelogram it covers (in a
 /// view box of em, so a stroke has its thickness at any shape) and a border is a ring. A box of
 /// any other label is empty.
-#[allow(dead_code)]
 pub(super) fn enclose_span<'t>(label: &str, spec: &Enclosure<'t>, options: &Options<'t>) -> Bx<'t> {
     let w = coord(spec.width.0).max(0.0);
     let h = coord((spec.content + spec.top_pad + spec.bottom_pad).0).max(0.0);
