@@ -634,3 +634,160 @@ fn class_body_opening_with_separator() {
     assert_eq!(sections[0][0].cells, ["getters"]);
     assert_eq!(sections[0].len(), 2);
 }
+
+fn equation(src: &str) -> (String, Vec<sirene_core::Diagnostic>) {
+    let lowered = diagram::lower(src);
+    assert_eq!(Kind::of(src), Kind::PlantUml);
+    match lowered.diagram {
+        Diagram::Equation(e) => (e.source, lowered.diagnostics),
+        other => panic!("not an equation: {other:?}"),
+    }
+}
+
+/// The extent of a scene's primitives: paths by their points, text by its center.
+#[cfg(feature = "math")]
+fn extent(scene: &sirene_core::scene::Scene) -> (f32, f32, f32, f32) {
+    use sirene_core::scene::{Primitive, Segment};
+    let mut b = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+    let mut add = |p: sirene_core::scene::Pt| {
+        b = (b.0.min(p.x), b.1.min(p.y), b.2.max(p.x), b.3.max(p.y));
+    };
+    for e in &scene.elements {
+        match &e.primitive {
+            Primitive::Path { segments, .. } => {
+                for s in segments {
+                    match *s {
+                        Segment::Move(a) | Segment::Line(a) => add(a),
+                        Segment::Arc { to, .. } => add(to),
+                        Segment::Cubic { c1, c2, to } => {
+                            add(c1);
+                            add(c2);
+                            add(to);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Primitive::Text { center, .. } => add(*center),
+        }
+    }
+    b
+}
+
+/// PCREO-3: `@startlatex` is one formula, drawn as paths inside the scene, and as rows of text.
+#[cfg(feature = "math")]
+#[test]
+fn latex_formula() {
+    for (name, src) in fixtures("valid")
+        .into_iter()
+        .filter(|(n, _)| n.starts_with("latex_"))
+    {
+        let (source, d) = equation(&src);
+        assert!(d.is_empty(), "{name}: {d:?}");
+        assert!(!source.is_empty(), "{name}");
+        for theme in [Theme::LIGHT, Theme::DARK] {
+            let scene = diagram::lower(&src).diagram.scene(&Approx, &theme).unwrap();
+            assert!(!scene.elements.is_empty(), "{name}");
+            assert!(
+                scene
+                    .elements
+                    .iter()
+                    .all(|e| matches!(e.primitive, sirene_core::scene::Primitive::Path { .. })),
+                "{name}: a formula draws as paths"
+            );
+            let (x0, y0, x1, y1) = extent(&scene);
+            assert!(
+                x0 >= 0.0 && y0 >= 0.0 && x1 <= scene.width && y1 <= scene.height,
+                "{name}: {:?} not in {}x{}",
+                (x0, y0, x1, y1),
+                scene.width,
+                scene.height
+            );
+        }
+        let ascii = diagram::lower(&src)
+            .diagram
+            .ascii(&Options::default())
+            .unwrap();
+        assert!(ascii.ends_with('\n') && ascii.trim().len() > 3, "{name}");
+    }
+    let (source, _) = equation("@startlatex\n\\sum_{i=0}^{n-1} (a_i + b_i^2)\n@endlatex\n");
+    assert_eq!(source, "\\sum_{i=0}^{n-1} (a_i + b_i^2)");
+    // Lines are trimmed and joined with a space; `'` starts no comment.
+    let (source, d) = equation("@startlatex\n  a'\n\n   + b  \n@endlatex\n");
+    assert_eq!(source, "a' + b");
+    assert!(d.is_empty(), "{d:?}");
+    // A fraction is three rows of text.
+    let frac = equation("@startlatex\n\\frac{a}{b}\n@endlatex\n").0;
+    let rows = diagram::lower(&format!("@startlatex\n{frac}\n@endlatex\n"))
+        .diagram
+        .ascii(&Options::default())
+        .unwrap();
+    assert_eq!(rows.lines().count(), 3, "{rows}");
+}
+
+/// LEMB-5: a formula that does not typeset is drawn as its source, with one error on the
+/// offending command in the source.
+#[cfg(feature = "math")]
+#[test]
+fn latex_error_span() {
+    let src = "@startlatex\na +\n \\foo{x} + b\n@endlatex\n";
+    let lowered = diagram::lower(src);
+    assert_eq!(lowered.diagnostics.len(), 1, "{:?}", lowered.diagnostics);
+    let d = &lowered.diagnostics[0];
+    assert_eq!(d.severity, Severity::Error);
+    assert_eq!(
+        &src[usize::from(d.range.start())..usize::from(d.range.end())],
+        "\\foo"
+    );
+    assert_eq!(d.line_col(src), (3, 2));
+    let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+    let [e] = &scene.elements[..] else {
+        panic!("{:?}", scene.elements)
+    };
+    let sirene_core::scene::Primitive::Text { text, .. } = &e.primitive else {
+        panic!("{e:?}")
+    };
+    assert_eq!(text, "a + \\foo{x} + b");
+    let ascii = lowered.diagram.ascii(&Options::default()).unwrap();
+    assert_eq!(ascii, "a + \\foo{x} + b\n");
+}
+
+/// PCREO-3: a missing `@endlatex` is a warning that names it, and the formula still draws.
+#[test]
+fn latex_unclosed_and_empty() {
+    let (source, d) = equation("@startlatex\nx^2\n");
+    assert_eq!(source, "x^2");
+    let missing: Vec<_> = d
+        .iter()
+        .filter(|d| d.message.starts_with("missing `@endlatex`"))
+        .collect();
+    assert_eq!(missing.len(), 1, "{d:?}");
+    assert_eq!(missing[0].severity, Severity::Warning);
+    // With math support the formula typesets, so that warning is the only one.
+    #[cfg(feature = "math")]
+    assert_eq!(d.len(), 1, "{d:?}");
+    let (source, d) = equation("@startlatex\n@endlatex\n");
+    assert_eq!(source, "");
+    assert!(d.is_empty(), "{d:?}");
+    let lowered = diagram::lower("@startlatex\n@endlatex\n");
+    lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+    assert_eq!(lowered.diagram.ascii(&Options::default()).unwrap(), "\n");
+}
+
+/// With math support off the document draws its source as text, with one warning.
+#[cfg(not(feature = "math"))]
+#[test]
+fn latex_without_math_support() {
+    let src = "@startlatex\n\\frac{a}{b}\n@endlatex\n";
+    let (source, d) = equation(src);
+    assert_eq!(source, "\\frac{a}{b}");
+    assert_eq!(d.len(), 1, "{d:?}");
+    assert!(d[0].message.contains("math support is off"), "{d:?}");
+    let lowered = diagram::lower(src);
+    let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+    assert_eq!(scene.elements.len(), 1);
+    assert_eq!(
+        lowered.diagram.ascii(&Options::default()).unwrap(),
+        "\\frac{a}{b}\n"
+    );
+}

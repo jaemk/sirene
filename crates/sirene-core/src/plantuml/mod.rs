@@ -12,6 +12,7 @@ pub mod edit;
 mod embedded;
 mod files;
 mod gantt;
+mod latex;
 mod lines;
 mod link;
 mod lower;
@@ -45,14 +46,16 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Timing
             | Kind::Json
             | Kind::Yaml
-            | Kind::Other("dot" | "ebnf" | "files" | "regex" | "chen" | "nwdiag" | "chronology")
+            | Kind::Other(
+                "dot" | "ebnf" | "files" | "regex" | "chen" | "nwdiag" | "chronology" | "latex"
+            )
     )
 }
 
 /// Whether `kind`'s documents are written in another language, whose lines PlantUML's `'`
 /// comments do not apply to.
 pub(crate) fn raw(kind: Kind) -> bool {
-    matches!(kind, Kind::Other("dot" | "ebnf" | "regex"))
+    matches!(kind, Kind::Other("dot" | "ebnf" | "regex" | "latex"))
 }
 
 /// The result of parsing PlantUML source: a lossless syntax tree plus diagnostics.
@@ -142,6 +145,10 @@ impl Parse {
             Kind::Other("regex") => {
                 let (chart, d) = regex::lower(&root);
                 (Diagram::Railroad(chart), d)
+            }
+            Kind::Other("latex") => {
+                let (e, d) = latex::lower(&root);
+                (Diagram::Equation(e), d)
             }
             Kind::Other("files") => {
                 let (view, d) = files::lower(&root);

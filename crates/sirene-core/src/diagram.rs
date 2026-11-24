@@ -8,6 +8,7 @@ use crate::block::{self, Block};
 use crate::c4::{self, C4};
 use crate::cynefin::{self, Cynefin};
 use crate::diagnostic::{Diagnostic, Severity};
+use crate::equation::Equation;
 use crate::eventmodel::{self, EventModel};
 use crate::flowchart::{self, Flowchart};
 use crate::gantt::{self, Gantt};
@@ -331,6 +332,8 @@ pub enum Diagram {
     Cynefin(Cynefin),
     EventModel(EventModel),
     Timing(Timing),
+    /// A PlantUML `@startlatex` document: one formula (PCREO-3).
+    Equation(Equation),
 }
 
 impl Default for Diagram {
@@ -387,6 +390,7 @@ impl Diagram {
             Diagram::Cynefin(c) => scene::cynefin(c, metrics, theme),
             Diagram::EventModel(c) => scene::eventmodel(c, metrics, theme),
             Diagram::Timing(t) => scene::timing(t, metrics, theme),
+            Diagram::Equation(e) => scene::equation(e, metrics, theme),
         })
     }
 
@@ -421,6 +425,7 @@ impl Diagram {
             Diagram::Cynefin(c) => ascii::cynefin(c, options),
             Diagram::EventModel(c) => ascii::eventmodel(c, options),
             Diagram::Timing(t) => ascii::timing(t, options),
+            Diagram::Equation(e) => ascii::equation(e, options),
         })
     }
 }

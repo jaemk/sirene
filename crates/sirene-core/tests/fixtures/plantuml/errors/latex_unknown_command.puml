@@ -1,0 +1,4 @@
+@startlatex
+a +
+ \foo{x} + b
+@endlatex

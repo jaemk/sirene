@@ -1,0 +1,8 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+assertion_line: 93
+expression: "@startlatex\n\\sum_{i=0}^{n-1} (a_i + b_i^2)\n@endlatex\n"
+---
+n − 1
+  ∑  (aᵢ + bᵢ²)
+i = 0

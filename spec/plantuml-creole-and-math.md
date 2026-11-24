@@ -2,7 +2,7 @@
 
 PlantUML `@startcreole`, `@startmath`, and `@startlatex` documents (PUML-2). Reference:
 <https://plantuml.com/creole> and <https://plantuml.com/ascii-math>. Today each kind is an
-error naming it.
+error naming it, except `@startlatex` (PCREO-3).
 
 ## PCREO-1 Creole
 
@@ -21,9 +21,16 @@ is drawn as text.
 
 ## PCREO-3 LaTeX
 
-`@startlatex` needs the JLaTeXMath jars next to PlantUML, and the reference does not bundle
-them. It is an error naming the kind until sirene has its own typesetter (`latex-math.md`),
-which then draws it, and AsciiMath (PCREO-2) shares its math list.
+`@startlatex` is one formula in TeX math mode, typeset by sirene's own typesetter
+(`latex-math.md`) in display style. The body is the lines between `@startlatex` and
+`@endlatex`, each trimmed and joined with a space; `'` starts no comment. It draws as the
+formula's paths at the theme font size as one em, inside a 16 px margin, and as rows of text in
+ASCII (`ascii_formula`). A formula that does not typeset is drawn as its source, with one error
+on the offending command in the source (LEMB-4, LEMB-5). A missing `@endlatex` is a warning.
+An empty body draws nothing and reports nothing. With the `math` cargo feature off, the source
+is drawn as text with one warning that math support is off. The model is `Diagram::Equation`.
+Tests: `latex_*` in `crates/sirene-core/tests/plantuml.rs` and `tests/fixtures/plantuml`.
+AsciiMath (PCREO-2) shares its math list.
 
 ## PCREO-4 Open questions
 
