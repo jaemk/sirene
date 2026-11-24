@@ -376,10 +376,6 @@ impl<'a> Expander<'a> {
         })
     }
 
-    pub(crate) fn mode(&self) -> Mode {
-        self.mode
-    }
-
     /// Switches between text and math mode, which `\TextOrMath` reads.
     pub(crate) fn switch_mode(&mut self, mode: Mode) {
         self.mode = mode;
@@ -389,11 +385,6 @@ impl<'a> Expander<'a> {
     /// in the argument of `\url`. Returns the setting it replaces.
     pub(crate) fn set_plain_percent(&mut self, plain: bool) -> bool {
         self.lexer.set_plain_percent(plain)
-    }
-
-    /// Macro expansions so far, which `limits::MAX_EXPANSIONS` bounds.
-    pub(crate) fn expansions(&self) -> usize {
-        self.expansions
     }
 
     // Groups: a definition inside `{...}` ends with it.
@@ -426,6 +417,7 @@ impl<'a> Expander<'a> {
     }
 
     /// Closes every open group, as after an error in the middle of one.
+    #[cfg(test)]
     pub(crate) fn end_groups(&mut self) {
         while let Some(undo) = self.undo.pop() {
             for (key, old) in undo.into_iter().rev() {

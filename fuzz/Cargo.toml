@@ -25,4 +25,11 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "math"
+path = "fuzz_targets/math.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]

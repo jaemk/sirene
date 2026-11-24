@@ -31,6 +31,7 @@ pub(crate) struct Settings {
 }
 
 /// Parses a formula in math mode, in inline mode.
+#[cfg(test)]
 pub(crate) fn parse(src: &str) -> Result<Vec<Node<'_>>, MathError> {
     parse_with(src, Settings::default())
 }

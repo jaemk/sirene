@@ -2,12 +2,17 @@
 //!
 //! Source text goes through the lexer, a macro expander, and a parser to a tree, then through
 //! layout to a box tree that every output reads (LMATH-2). This module holds the stages built so
-//! far; the rest follow the order of LMATH-9. Nothing here is public until the typesetter draws
-//! a formula, so the items are used by tests only for now.
+//! far; the rest follow the order of LMATH-9. The public entry point is `typeset`, which gives a
+//! `Formula` that draws itself as scene primitives (LEMB-4).
 //!
 //! Behavior follows KaTeX (LMATH-11), whose test cases are the baseline (LMATH-13). The design is
 //! Rust's: values and `Result`s with byte ranges in the source, no global registries, no panics.
-#![allow(dead_code)]
+// `typeset`, which uses every stage, needs the fonts; without the `math` feature the stages are
+// built (and tested) but nothing calls them.
+#![cfg_attr(
+    not(feature = "math"),
+    allow(dead_code, reason = "the entry point is behind the `math` feature")
+)]
 
 mod ast;
 #[cfg(test)]
@@ -19,6 +24,8 @@ mod error;
 mod expander;
 #[cfg(feature = "math")]
 mod fonts;
+#[cfg(feature = "math")]
+mod formula;
 mod functions;
 #[rustfmt::skip]
 mod functions_data;
@@ -42,4 +49,6 @@ mod symbols_data;
 #[rustfmt::skip]
 mod unicode_data;
 
-pub(crate) use error::MathError;
+pub use error::MathError;
+#[cfg(feature = "math")]
+pub use formula::{Formula, MathStyle, typeset};

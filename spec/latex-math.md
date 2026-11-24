@@ -228,7 +228,8 @@ Per LMATH-6, the lexer, expander, and parser each carry their bound from the sta
 
 ## LMATH-14 Built so far: lexer, errors, limits, symbols, expander
 
-`sirene_core::math` (crate-private until the typesetter draws a formula) has:
+`sirene_core::math` has the public entry point `typeset(source, MathStyle) -> Result<Formula,
+MathError>` (feature `math`; see LEMB-4) over:
 
 - `MathError { message, span }`: KaTeX's wording without its `KaTeX parse error:` prefix, and a
   byte range in the formula (LEMB-5).

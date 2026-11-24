@@ -1,0 +1,1 @@
+\newcommand{\foo}{1}\foo\newcommand{\foo}{2}\foo
