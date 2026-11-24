@@ -775,7 +775,7 @@ fn layout_agrees_with_katex_on_height_and_depth() {
         }
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    assert_eq!((same, not_yet), (446, 1));
+    assert_eq!((same, not_yet), (447, 0));
 }
 
 /// A development aid, not a check: which nodes stop layout of the most baseline inputs. Run
