@@ -381,6 +381,170 @@ fn ascii_formula_via_tex(src: &str) -> String {
     super::super::ascii::ascii_formula(&tex(src), MathStyle::Text).unwrap()
 }
 
+/// `AMgetSymbol`'s search as the JavaScript makes it: every symbol, then every TeX name, the
+/// longest match winning and the first on a tie.
+fn longest_symbol_by_scan(look: &str) -> (Option<Sym>, usize) {
+    let mut best: Option<Sym> = None;
+    let mut best_len = 0;
+    for s in SYMS
+        .iter()
+        .copied()
+        .chain(SYMS.iter().filter_map(Sym::alias))
+    {
+        if s.input.len() > best_len && look.starts_with(s.input) {
+            best = Some(s);
+            best_len = s.input.len();
+        }
+    }
+    (best, best_len)
+}
+
+/// The lookup by first byte finds what a scan of the whole table finds: for every input and TeX
+/// name, each of their prefixes, and each with text after it.
+#[test]
+fn symbol_lookup_matches_a_scan_of_the_table() {
+    let mut looks: Vec<String> = Vec::new();
+    for s in SYMS
+        .iter()
+        .copied()
+        .chain(SYMS.iter().filter_map(Sym::alias))
+    {
+        for (at, _) in s.input.char_indices().skip(1) {
+            looks.push(s.input[..at].to_string());
+        }
+        for after in ["", "x", " ", "(", "_1", "ow", "arrow"] {
+            looks.push(format!("{}{after}", s.input));
+        }
+    }
+    looks.extend(["", " ", "\u{e9}", "\u{1f600}x", "zzz", "\\alpha"].map(String::from));
+    let mut wrong = String::new();
+    for look in &looks {
+        let (a, a_len) = longest_symbol(look);
+        let (b, b_len) = longest_symbol_by_scan(look);
+        if format!("{a:?}") != format!("{b:?}") || a_len != b_len {
+            wrong.push_str(&format!("{look:?}: {a:?} {a_len} vs {b:?} {b_len}\n"));
+        }
+    }
+    assert!(looks.len() > 1000, "{}", looks.len());
+    assert!(wrong.is_empty(), "\n{wrong}");
+}
+
+/// The fuzz seeds of `fuzz/corpus/asciimath` and a long run of big operators: each translates
+/// to bounded TeX, and translating and typesetting it in both styles takes well under the bound.
+#[cfg(feature = "math")]
+#[test]
+fn seeds_and_long_inputs_translate_and_typeset_in_bounded_time_and_size() {
+    use crate::math::formula::MathStyle;
+    use std::time::{Duration, Instant};
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fuzz/corpus/asciimath");
+    let mut inputs: Vec<(String, String)> = std::fs::read_dir(&dir)
+        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+        .map(|entry| {
+            let path = entry.unwrap().path();
+            let src = std::fs::read_to_string(&path).unwrap();
+            (path.display().to_string(), src)
+        })
+        .collect();
+    assert!(inputs.len() >= 5, "{} seeds", inputs.len());
+    inputs.push(("2000 sums".to_owned(), "sum_(i=1)^n ".repeat(2000)));
+    for (name, src) in &inputs {
+        let started = Instant::now();
+        let t = translate(src).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(
+            t.tex.len() <= 64 * src.len() + 4096,
+            "{name}: {} bytes of TeX from {}",
+            t.tex.len(),
+            src.len()
+        );
+        for style in [MathStyle::Display, MathStyle::Text] {
+            // An error is fine (the long run may pass a limit); a hang is not.
+            let _ = typeset_asciimath(src, style);
+        }
+        let took = started.elapsed();
+        assert!(took < Duration::from_secs(10), "{name}: {took:?}");
+    }
+}
+
+/// Where the time of each seed goes, for comparing with the TeX path. Run with
+/// `cargo test -p sirene-core --release --lib asciimath_seed_timings -- --ignored --nocapture`.
+#[cfg(feature = "math")]
+#[test]
+#[ignore = "prints timings"]
+fn asciimath_seed_timings() {
+    use crate::math::formula::{MathStyle, typeset};
+    use crate::scene::{Color, Pt};
+    use std::time::Instant;
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fuzz/corpus/asciimath");
+    let mut paths: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    paths.sort();
+    const RUNS: u32 = 200;
+    for path in paths {
+        let src = std::fs::read_to_string(&path).unwrap();
+        let t = translate(&src).unwrap();
+        let started = Instant::now();
+        for _ in 0..RUNS {
+            let _ = translate(&src);
+        }
+        let translating = started.elapsed() / RUNS;
+        let mut typesetting = Vec::new();
+        for style in [MathStyle::Display, MathStyle::Text] {
+            let started = Instant::now();
+            for _ in 0..RUNS {
+                let _ = typeset(&t.tex, style);
+            }
+            typesetting.push(started.elapsed() / RUNS);
+        }
+        let started = Instant::now();
+        for _ in 0..RUNS {
+            if let Ok(f) = typeset_asciimath(&src, MathStyle::Display) {
+                f.place(Pt::new(10.0, 40.0), 24.0, Color::rgb(0));
+            }
+        }
+        let with_place = started.elapsed() / RUNS;
+        // One symbol lookup at the start, and how many lookups the translation makes.
+        let chars: Vec<(char, usize)> = src.char_indices().map(|(i, c)| (c, i)).collect();
+        let cur = Cur {
+            chars: &chars,
+            pos: 0,
+            pending: Vec::new(),
+            end: src.len(),
+        };
+        let mut p = Parser {
+            nest: 0,
+            prev: Ty::Unset,
+            curr: Ty::Unset,
+            steps: 0,
+            max_steps: max_steps(src.len()),
+            frames: 0,
+        };
+        let started = Instant::now();
+        for _ in 0..RUNS {
+            let _ = p.symbol(&cur);
+        }
+        let lookup = started.elapsed() / RUNS;
+        let mut cur = cur;
+        let mut p = Parser {
+            steps: 0,
+            frames: 0,
+            ..p
+        };
+        cur.remove_blanks(0);
+        let _ = p.expr(&mut cur, false);
+        println!(
+            "{}: {} bytes -> {} bytes of TeX; translate {translating:?}, typeset display {:?}, text {:?}, translate+typeset+place {with_place:?}; one symbol lookup {lookup:?}, {} parser steps",
+            path.display(),
+            src.len(),
+            t.tex.len(),
+            typesetting[0],
+            typesetting[1],
+            p.steps,
+        );
+    }
+}
+
 mod prop {
     use super::*;
     use proptest::prelude::*;

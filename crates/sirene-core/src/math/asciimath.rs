@@ -61,6 +61,49 @@ const LOOKAHEAD: usize = 32;
 
 type Res<T> = Result<T, MathError>;
 
+/// The inputs a lookup tries, by their first byte: the table's symbols, then the TeX names that
+/// are inputs too (`Sym::alias`), each in table order. A symbol can only match text that starts
+/// with its first byte, so a lookup reads one bucket, not the whole table twice.
+fn candidates(first: u8) -> &'static [Sym] {
+    static BY_FIRST: std::sync::OnceLock<Vec<Vec<Sym>>> = std::sync::OnceLock::new();
+    BY_FIRST
+        .get_or_init(|| {
+            let mut by_first = vec![Vec::new(); 256];
+            for s in SYMS
+                .iter()
+                .copied()
+                .chain(SYMS.iter().filter_map(Sym::alias))
+            {
+                if let Some(bucket) = s
+                    .input
+                    .as_bytes()
+                    .first()
+                    .and_then(|b| by_first.get_mut(usize::from(*b)))
+                {
+                    bucket.push(s);
+                }
+            }
+            by_first
+        })
+        .get(usize::from(first))
+        .map_or(&[], Vec::as_slice)
+}
+
+/// The longest symbol `look` starts with and its length in bytes. On a tie the first wins, so
+/// a TeX name never wins over a symbol.
+fn longest_symbol(look: &str) -> (Option<Sym>, usize) {
+    let mut best: Option<Sym> = None;
+    let mut best_len = 0;
+    let bucket = look.as_bytes().first().map_or(&[][..], |b| candidates(*b));
+    for s in bucket {
+        if s.input.len() > best_len && look.starts_with(s.input) {
+            best = Some(*s);
+            best_len = s.input.len();
+        }
+    }
+    (best, best_len)
+}
+
 /// AsciiMath `source` as a TeX formula. Fails when the source is too long or too complex; any
 /// other text translates (an unknown word is a run of italic letters, as in AsciiMath).
 pub fn to_tex(source: &str) -> Res<String> {
@@ -443,24 +486,7 @@ impl Parser {
     /// the next character.
     fn symbol(&mut self, cur: &Cur<'_>) -> Tok {
         let look = cur.look(LOOKAHEAD);
-        let mut best: Option<Sym> = None;
-        let mut best_len = 0;
-        for s in SYMS {
-            if s.input.len() > best_len && look.starts_with(s.input) {
-                best = Some(*s);
-                best_len = s.input.len();
-            }
-        }
-        // The TeX names are inputs too, after every symbol, so they never win a tie.
-        for s in SYMS {
-            if let Some(a) = s.alias()
-                && a.input.len() > best_len
-                && look.starts_with(a.input)
-            {
-                best_len = a.input.len();
-                best = Some(a);
-            }
-        }
+        let (best, best_len) = longest_symbol(&look);
         self.prev = self.curr;
         if let Some(sym) = best {
             self.curr = sym.ttype;
