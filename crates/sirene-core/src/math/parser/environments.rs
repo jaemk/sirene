@@ -530,7 +530,9 @@ impl<'a> Parser<'a> {
             None => match self.expander.macro_text("arraystretch") {
                 None => 1.0,
                 Some(text) => match parse_float(&text) {
-                    Some(stretch) if stretch > 0.0 => stretch,
+                    // KaTeX takes an infinite stretch (`1e400`); it is refused here, since a
+                    // table of infinite rows has no layout.
+                    Some(stretch) if stretch > 0.0 && stretch.is_finite() => stretch,
                     _ => {
                         return Err(MathError::new(
                             format!("Invalid \\arraystretch: {text}"),
