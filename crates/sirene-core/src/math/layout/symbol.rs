@@ -279,3 +279,176 @@ pub(super) fn text_face(family: TextFamily, options: &Options<'_>) -> Result<Fac
         format!("Font metrics not found for font: {base}-{style}.")
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::math::{
+        ast::{Node, NodeKind},
+        boxes::Item,
+        layout::layout,
+        parser::{Settings, parse_with},
+    };
+
+    /// The faces of the glyphs `src` draws, in order.
+    fn faces(src: &str) -> Vec<(String, Face)> {
+        let nodes = parse_with(src, Settings::default()).unwrap();
+        let bx = layout(&nodes, false).unwrap();
+        bx.items()
+            .into_iter()
+            .filter_map(|item| match item {
+                Item::Glyph { glyph, .. } => Some((glyph.text.to_string(), glyph.face)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn error(src: &str) -> String {
+        let nodes = parse_with(src, Settings::default()).unwrap();
+        match layout(&nodes, false) {
+            Ok(_) => "no error".to_string(),
+            Err(e) => e.message,
+        }
+    }
+
+    #[test]
+    fn emph_toggles_italic() {
+        assert_eq!(
+            faces(r"\text{\emph{x}}"),
+            [("x".to_string(), Face::MainItalic)]
+        );
+        // Inside italic text it is upright, and inside that italic again.
+        assert_eq!(
+            faces(r"\textit{\emph{x}}"),
+            [("x".to_string(), Face::MainRegular)]
+        );
+        assert_eq!(
+            faces(r"\textit{\emph{\emph{x}}}"),
+            [("x".to_string(), Face::MainItalic)]
+        );
+    }
+
+    /// The pairs of family, weight and shape KaTeX has no font for fail with its message.
+    #[test]
+    fn a_text_face_with_no_font_is_an_error() {
+        for (src, want) in [
+            (r"\texttt{\textbf{x}}", "Typewriter-Bold"),
+            (r"\texttt{\textit{x}}", "Typewriter-Italic"),
+            (r"\textbf{\textsf{\textit{x}}}", "SansSerif-BoldItalic"),
+            (r"\textbf{\checkmark}", "AMS-Bold"),
+            (r"\textit{\checkmark}", "AMS-Italic"),
+        ] {
+            assert_eq!(
+                error(src),
+                format!("Font metrics not found for font: {want}."),
+                "{src}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_text_face_kate_x_has_is_found() {
+        let base = Options::new(false);
+        let cases = [
+            (TextFamily::Rm, None, None, Face::MainRegular),
+            (TextFamily::Rm, Some(Weight::Bold), None, Face::MainBold),
+            (TextFamily::Rm, None, Some(Shape::Italic), Face::MainItalic),
+            (
+                TextFamily::Rm,
+                Some(Weight::Bold),
+                Some(Shape::Italic),
+                Face::MainBoldItalic,
+            ),
+            (TextFamily::Sf, None, None, Face::SansSerifRegular),
+            (
+                TextFamily::Sf,
+                Some(Weight::Bold),
+                None,
+                Face::SansSerifBold,
+            ),
+            (
+                TextFamily::Sf,
+                None,
+                Some(Shape::Italic),
+                Face::SansSerifItalic,
+            ),
+            (TextFamily::Tt, None, None, Face::TypewriterRegular),
+            (TextFamily::Ams, None, None, Face::AmsRegular),
+            // Medium weight and upright shape are the regular face.
+            (
+                TextFamily::Tt,
+                Some(Weight::Medium),
+                Some(Shape::Upright),
+                Face::TypewriterRegular,
+            ),
+        ];
+        for (family, weight, shape, want) in cases {
+            let options = Options {
+                weight,
+                shape,
+                ..base
+            };
+            assert_eq!(text_face(family, &options), Ok(want), "{family:?}");
+        }
+        let bold_italic = Options {
+            weight: Some(Weight::Bold),
+            shape: Some(Shape::Italic),
+            ..base
+        };
+        assert_eq!(
+            text_face(TextFamily::Ams, &bold_italic),
+            Err("Font metrics not found for font: AMS-BoldItalic.".to_string())
+        );
+    }
+
+    /// An operator or accent reaches layout as its own node; a bare symbol of that group is an
+    /// error, not a glyph.
+    #[test]
+    fn an_operator_or_accent_symbol_is_an_error() {
+        for group in [AtomGroup::Op, AtomGroup::Accent] {
+            let nodes = [Node {
+                kind: NodeKind::Symbol {
+                    group,
+                    name: Name::Char("x"),
+                },
+                mode: Mode::Math,
+                span: 2..3,
+            }];
+            let e = layout(&nodes, false).unwrap_err();
+            assert_eq!(
+                e.message, "an operator or accent symbol is not laid out yet",
+                "{group:?}"
+            );
+            assert_eq!(e.span, 2..3);
+        }
+    }
+
+    #[test]
+    fn wide_characters_pick_their_face() {
+        for (code, want) in [
+            (0x1d400, Some(Face::MainBold)),
+            (0x1d434, Some(Face::MathItalic)),
+            (0x1d468, Some(Face::MainBoldItalic)),
+            (0x1d49c, Some(Face::ScriptRegular)),
+            // Bold script and Greek have no font.
+            (0x1d4d0, None),
+            (0x1d504, Some(Face::FrakturRegular)),
+            (0x1d538, Some(Face::AmsRegular)),
+            (0x1d5a0, Some(Face::SansSerifRegular)),
+            (0x1d5d4, Some(Face::SansSerifBold)),
+            (0x1d608, Some(Face::SansSerifItalic)),
+            (0x1d670, Some(Face::TypewriterRegular)),
+            (0x1d6a5, Some(Face::MainBold)),
+            (0x1d6a8, None),
+            (0x1d7ce, Some(Face::MainBold)),
+            (0x1d7d8, None),
+            (0x1d7e2, Some(Face::SansSerifRegular)),
+            (0x1d7ec, Some(Face::SansSerifBold)),
+            (0x1d7f6, Some(Face::TypewriterRegular)),
+            (u32::from('x'), None),
+        ] {
+            let c = char::from_u32(code).unwrap();
+            assert_eq!(wide_character_face(c), want, "U+{code:X}");
+        }
+    }
+}

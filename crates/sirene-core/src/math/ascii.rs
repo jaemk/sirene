@@ -80,10 +80,26 @@ struct Block {
     width: usize,
 }
 
+/// Held in the cell after a character two columns wide, so that a row has as many cells as it
+/// takes columns on screen; `finish_rows` drops it.
+const WIDE_FILL: char = '\0';
+
+/// The cells of a line of text: each character, and `WIDE_FILL` after a wide one.
+fn cells_of(line: &str) -> Vec<char> {
+    let mut cells = Vec::with_capacity(line.len());
+    for c in line.chars() {
+        cells.push(c);
+        if unicode_width::UnicodeWidthChar::width(c) == Some(2) {
+            cells.push(WIDE_FILL);
+        }
+    }
+    cells
+}
+
 impl Block {
     /// The text as rows, the baseline on the first.
     fn text(s: &str) -> Block {
-        let lines: Vec<Vec<char>> = s.split('\n').map(|l| l.chars().collect()).collect();
+        let lines: Vec<Vec<char>> = s.split('\n').map(cells_of).collect();
         let width = lines.iter().map(Vec::len).max().unwrap_or(0);
         if width == 0 && lines.len() <= 1 {
             return Block::default();
@@ -237,7 +253,13 @@ impl Block {
         let lines: Vec<String> = self
             .rows
             .iter()
-            .map(|r| r.iter().collect::<String>().trim_end().to_owned())
+            .map(|r| {
+                r.iter()
+                    .filter(|c| **c != WIDE_FILL)
+                    .collect::<String>()
+                    .trim_end()
+                    .to_owned()
+            })
             .collect();
         let first = lines.iter().position(|l| !l.is_empty());
         let last = lines.iter().rposition(|l| !l.is_empty());
@@ -1002,19 +1024,20 @@ fn with_rules(
     row
 }
 
-/// Whether a node's scripts go above and below it.
+/// Whether a node's scripts go above and below it, as layout's `op` decides.
 fn stacked(base: &Node<'_>, display: bool) -> bool {
     match &base.kind {
         NodeKind::Op {
             limits,
             always_handle_supsub,
             ..
-        }
-        | NodeKind::OperatorName {
+        } => *limits && (display || *always_handle_supsub),
+        // `\operatornamewithlimits` has no limits of its own; it stacks in display style.
+        NodeKind::OperatorName {
             limits,
             always_handle_supsub,
             ..
-        } => *limits && (display || *always_handle_supsub),
+        } => *always_handle_supsub && (display || *limits),
         NodeKind::HorizBrace { .. } | NodeKind::XArrow { .. } => true,
         _ => false,
     }
@@ -1593,5 +1616,348 @@ mod tests {
         assert_eq!(text(r"x\in A"), "x \u{2208} A");
         assert_eq!(text("f(x,y)"), "f(x, y)");
         assert_eq!(text(r"a\,b\quad c"), "a b  c");
+    }
+
+    /// Each relation `\not` has a negated character for, and the fallbacks: a slash before any
+    /// other single character or a wider body, and a tall body left as it is.
+    #[test]
+    fn not_takes_the_negated_character() {
+        let cases: &[(&str, &str)] = &[
+            (r"\not=", "\u{2260}"),
+            (r"\not<", "\u{226e}"),
+            (r"\not>", "\u{226f}"),
+            (r"\not\in", "\u{2209}"),
+            (r"\not\ni", "\u{220c}"),
+            (r"\not\le", "\u{2270}"),
+            (r"\not\ge", "\u{2271}"),
+            (r"\not\subset", "\u{2284}"),
+            (r"\not\supset", "\u{2285}"),
+            (r"\not\subseteq", "\u{2288}"),
+            (r"\not\supseteq", "\u{2289}"),
+            (r"\not\equiv", "\u{2262}"),
+            (r"\not\sim", "\u{2241}"),
+            (r"\not\approx", "\u{2249}"),
+            (r"\not\simeq", "\u{2244}"),
+            (r"\not\cong", "\u{2247}"),
+            (r"\not\to", "\u{219b}"),
+            (r"\not\gets", "\u{219a}"),
+            (r"\not\Rightarrow", "\u{21cf}"),
+            (r"\not\Leftarrow", "\u{21cd}"),
+            (r"\not\exists", "\u{2204}"),
+            (r"\not\mid", "\u{2224}"),
+            (r"\not\parallel", "\u{2226}"),
+            (r"\not\prec", "\u{2280}"),
+            (r"\not\succ", "\u{2281}"),
+            (r"\not\alpha", "/\u{3b1}"),
+            (r"\not{ab}", "/ab"),
+            (r"\not\frac{a}{b}", " a\n---\n b"),
+        ];
+        let mut bad = String::new();
+        for (src, want) in cases {
+            let got = text(src);
+            if got != *want {
+                bad.push_str(&format!("{src}: {got:?} want {want:?}\n"));
+            }
+        }
+        assert!(bad.is_empty(), "\n{bad}");
+    }
+
+    /// Nodes the main table does not reach: class commands, boxes, sizes, operators with a
+    /// body, rules, character codes, kerns in other units, arrows and brackets of each kind,
+    /// accents with no mark, tall delimiters, and right-aligned columns.
+    #[test]
+    fn more_snapshots() {
+        let cases: &[(&str, bool, &str)] = &[
+            (r"a\mathbin{x}b", false, "a x b"),
+            (r"a\mathrel{x}b", false, "a x b"),
+            (r"a\mathopen{x}b", false, "axb"),
+            (r"a\mathclose{x}b", false, "axb"),
+            (r"a\mathpunct{x}b", false, "ax b"),
+            (r"a\mathinner{x}b", false, "axb"),
+            (r"a\mathord{+}b", false, "a+b"),
+            (
+                r"\left/ \frac{a}{b} \right\backslash",
+                false,
+                "/ a \\\n/---\\\n/ b \\",
+            ),
+            (r"\large x", false, "x"),
+            (r"\pmb{x}", false, "x"),
+            (r"\hbox{ab}", false, "ab"),
+            (r"\mathop{ab} x", false, "ab x"),
+            (
+                r"\rule{2em}{0.5em}",
+                false,
+                "\u{2500}\u{2500}\u{2500}\u{2500}",
+            ),
+            (r"\vcenter{x}", false, "x"),
+            (r"\char`A", false, "A"),
+            (r"\kern10pt x", false, "  x"),
+            (r"x^{}", false, "x"),
+            (r"\hat{}", false, ""),
+            (r"\overgroup{x}", false, "x"),
+            (r"\overleftarrow{x}", false, "\u{2190}\nx"),
+            (r"\overleftrightarrow{x}", false, "\u{2194}\nx"),
+            (r"\underleftarrow{ab}", false, "ab\n\u{2190}\u{2500}"),
+            (r"\xRightarrow{f}", false, " f\n\u{2550}\u{2550}\u{21d2}"),
+            (r"\xLeftarrow{f}", false, " f\n\u{21d0}\u{2550}\u{2550}"),
+            (r"\overbracket{ab}", false, "\u{250c}\u{2510}\nab"),
+            (
+                r"\underbracket{abc}",
+                false,
+                "abc\n\u{2514}\u{2500}\u{2518}",
+            ),
+            (r"\overbrace{ab}", false, "\u{256d}\u{256e}\nab"),
+            (r"\underbrace{x}", false, "x\n\u{2500}"),
+            // As layout sets them: `\operatornamewithlimits` stacks its scripts in display
+            // style only, and `\operatorname` never.
+            (r"\operatornamewithlimits{arg}_{x} y", true, "arg y\n x"),
+            (
+                r"\operatornamewithlimits{arg}_{x} y",
+                false,
+                "arg\u{2093} y",
+            ),
+            (r"\operatorname{f}_{x} y", true, "f\u{2093} y"),
+            (r"\operatorname{f}\limits_{x} y", false, "f\u{2093} y"),
+            (r"\operatornamewithlimits{f}\limits_{x} y", false, "f y\nx"),
+            (
+                r"\left\lceil \frac{a}{b} \right\rceil",
+                false,
+                "\u{23a1} a \u{23a4}\n\u{23a2}---\u{23a5}\n\u{23a2} b \u{23a5}",
+            ),
+            (
+                r"\left\lfloor \frac{a}{b} \right\rfloor",
+                false,
+                "\u{23a2} a \u{23a5}\n\u{23a2}---\u{23a5}\n\u{23a3} b \u{23a6}",
+            ),
+            (
+                r"\left\| \frac{a}{b} \right\|",
+                false,
+                "\u{2551} a \u{2551}\n\u{2551}---\u{2551}\n\u{2551} b \u{2551}",
+            ),
+            (
+                r"\left\{ \frac{\frac{a}{b}}{c} \right\}",
+                false,
+                "\u{23a7}  a  \u{23ab}\n\u{23aa} --- \u{23aa}\n\u{23a8}  b  \u{23ac}\n\u{23aa}-----\u{23aa}\n\u{23a9}  c  \u{23ad}",
+            ),
+            (r"\begin{array}{r} a \\ bb \end{array}", false, " a\nbb"),
+            (
+                r"\begin{array}{c} a \\ b \\ \hline \end{array}",
+                false,
+                "a\nb\n\u{2500}",
+            ),
+            (
+                r"\mathbb{CHNPQZ}",
+                false,
+                "\u{2102}\u{210d}\u{2115}\u{2119}\u{211a}\u{2124}",
+            ),
+            (
+                r"\mathbb{Aaz09+}",
+                false,
+                "\u{1d538}\u{1d552}\u{1d56b}\u{1d7d8}\u{1d7e1}+",
+            ),
+        ];
+        let mut bad = String::new();
+        for (src, is_display, want) in cases {
+            let style = if *is_display {
+                MathStyle::Display
+            } else {
+                MathStyle::Text
+            };
+            let got = ascii_formula(src, style).unwrap_or_else(|e| format!("error: {e}"));
+            if got != *want {
+                bad.push_str(&format!("{src} (display {is_display})\n{got}\n===\n"));
+            }
+        }
+        assert!(bad.is_empty(), "\n{bad}");
+    }
+
+    /// Every character with a super- or subscript form has its own, and the forms of a few
+    /// characters are the ones the renderer has always written.
+    #[test]
+    fn script_characters_are_distinct() {
+        let sup_from = "0123456789+-=()abcdefghijklmnoprstuvwxyzABDEGHIJKLMNOPRTUVW\u{3b2}\u{3b3}\u{3b4}\u{3b8}\u{3c6}\u{3c7}";
+        let sub_from = "0123456789+-=()aehijklmnoprstuvx\u{3b2}\u{3b3}\u{3c1}\u{3c6}\u{3c7}";
+        for (from, map) in [
+            (sup_from, sup_char as fn(char) -> Option<char>),
+            (sub_from, sub_char as fn(char) -> Option<char>),
+        ] {
+            let mut seen = std::collections::BTreeMap::new();
+            for c in from.chars() {
+                let mapped = map(c).unwrap_or_else(|| panic!("no script form for {c:?}"));
+                assert_ne!(mapped, c, "{c:?}");
+                if let Some(other) = seen.insert(mapped, c) {
+                    panic!("{c:?} and {other:?} both map to {mapped:?}");
+                }
+            }
+        }
+        // U+2212 MINUS SIGN reads as a hyphen-minus.
+        assert_eq!(sup_char('\u{2212}'), sup_char('-'));
+        assert_eq!(sub_char('\u{2212}'), sub_char('-'));
+        // Letters with no form.
+        for c in ['q', 'C', 'F', 'Q', 'S', 'X', 'Y', 'Z', '!'] {
+            assert_eq!(sup_char(c), None, "{c:?}");
+        }
+        for c in ['b', 'c', 'd', 'f', 'g', 'q', 'w', 'y', 'z', 'A'] {
+            assert_eq!(sub_char(c), None, "{c:?}");
+        }
+        assert_eq!(text("x^{nm}"), "x\u{207f}\u{1d50}");
+        assert_eq!(text("x_{jv}"), "x\u{2c7c}\u{1d65}");
+        assert_eq!(text(r"x^{\theta}"), "x\u{1dbf}");
+    }
+
+    #[test]
+    fn double_struck_maps_letters_and_digits_only() {
+        assert_eq!(double_struck('R'), '\u{211d}');
+        assert_eq!(double_struck('B'), '\u{1d539}');
+        assert_eq!(double_struck('b'), '\u{1d553}');
+        assert_eq!(double_struck('9'), '\u{1d7e1}');
+        assert_eq!(double_struck('\u{3b1}'), '\u{3b1}');
+        assert_eq!(double_struck(' '), ' ');
+    }
+
+    /// A formula whose rows would pass `MAX_ASCII_CELLS` is an error, not a huge string, and the
+    /// next formula on the thread is drawn as usual.
+    #[test]
+    fn a_formula_too_large_to_draw_is_an_error() {
+        // A rule 40 rows tall beside 5000 kerns of 40 cells: 8M cells.
+        let src = format!(r"\rule{{1em}}{{99em}}{}", r"\kern99em".repeat(5000));
+        let e = ascii_formula(&src, MathStyle::Text).unwrap_err();
+        assert_eq!(e.message, "formula too large to draw as text");
+        assert_eq!(e.span, 0..0);
+        assert_eq!(text("x"), "x");
+        // Narrower, the same formula draws.
+        let src = format!(r"\rule{{1em}}{{99em}}{}", r"\kern99em".repeat(10));
+        assert!(ascii_formula(&src, MathStyle::Text).is_ok());
+    }
+
+    #[test]
+    fn a_filled_block_past_the_cap_is_empty_and_flags_the_render() {
+        OVERSIZE.with(|flag| flag.set(false));
+        let side = limits::MAX_ASCII_CELLS / 1000 + 1;
+        let block = Block::filled('x', side, 1000, 0);
+        assert!(block.is_empty());
+        assert!(OVERSIZE.with(|flag| flag.replace(false)));
+        let block = Block::filled('x', 3, 2, 1);
+        assert_eq!((block.height(), block.width, block.base), (2, 3, 1));
+        assert!(!OVERSIZE.with(std::cell::Cell::get));
+    }
+
+    /// Nodes that no source reaches today, built by hand: the renderer draws an infix command,
+    /// a control word with no table entry, and the spacing symbols by their source or width.
+    #[test]
+    fn hand_built_nodes_draw_from_their_source() {
+        let source = r"\over\nosuch";
+        let renderer = Renderer {
+            source,
+            compact: false,
+        };
+        let node = |kind, span| Node {
+            kind,
+            mode: Mode::Math,
+            span,
+        };
+        let infix = node(
+            NodeKind::Infix {
+                replace_with: "\\frac",
+                size: None,
+            },
+            0..5,
+        );
+        assert_eq!(
+            renderer.node(&infix, false).one_row().as_deref(),
+            Some(r"\over")
+        );
+        let unknown = node(
+            NodeKind::Symbol {
+                group: AtomGroup::MathOrd,
+                name: Name::Control("nosuch"),
+            },
+            5..12,
+        );
+        assert_eq!(
+            renderer.node(&unknown, false).one_row().as_deref(),
+            Some(r"\nosuch")
+        );
+        // A span past the source draws nothing.
+        let outside = node(
+            NodeKind::Infix {
+                replace_with: "\\frac",
+                size: None,
+            },
+            5..99,
+        );
+        assert!(renderer.node(&outside, false).is_empty());
+        // Nodes that only hold an argument for a command draw nothing.
+        assert!(
+            renderer
+                .node(&node(NodeKind::Internal, 0..0), false)
+                .is_empty()
+        );
+        // A symbol of the operator group spaces as an operator.
+        let op = node(
+            NodeKind::Symbol {
+                group: AtomGroup::Op,
+                name: Name::Char("x"),
+            },
+            0..0,
+        );
+        let y = node(
+            NodeKind::Symbol {
+                group: AtomGroup::MathOrd,
+                name: Name::Char("y"),
+            },
+            0..0,
+        );
+        assert_eq!(
+            renderer.line(&[op, y], false).one_row().as_deref(),
+            Some("x y")
+        );
+        for (name, width) in [
+            ("quad", 2),
+            ("enspace", 2),
+            ("qquad", 4),
+            ("!", 0),
+            ("negthinspace", 0),
+            ("negmedspace", 0),
+            ("negthickspace", 0),
+            ("thinspace", 1),
+        ] {
+            let space = node(
+                NodeKind::Symbol {
+                    group: AtomGroup::Spacing,
+                    name: Name::Control(name),
+                },
+                0..0,
+            );
+            assert_eq!(renderer.node(&space, false).width, width, "{name}");
+        }
+    }
+
+    /// `\text` with characters two columns wide: each takes two columns, so the fraction rule
+    /// spans them and the rows line up on screen.
+    #[test]
+    fn wide_characters_take_two_columns() {
+        assert_eq!(text("\\text{\u{65e5}\u{672c}}"), "\u{65e5}\u{672c}");
+        assert_eq!(
+            text("\\frac{\\text{\u{65e5}\u{672c}\u{8a9e}}}{2}"),
+            " \u{65e5}\u{672c}\u{8a9e}\n--------\n   2"
+        );
+        assert_eq!(
+            text("\\overline{\\text{\u{65e5}}} + x"),
+            "\u{af}\u{af}\n\u{65e5} + x"
+        );
+        let (rows, base) = ascii_formula_rows(
+            "\\frac{1}{\\text{\u{65e5}\u{672c}}} = \\frac{\\text{\u{8a9e}}}{2}",
+            MathStyle::Text,
+        )
+        .unwrap();
+        assert_eq!(base, 1);
+        let widths: Vec<usize> = rows
+            .iter()
+            .map(|r| unicode_width::UnicodeWidthStr::width(r.as_str()))
+            .collect();
+        // The relation is at the same column on the baseline as the rule ends above it.
+        assert_eq!(rows[1], "------ = ----", "{rows:?} {widths:?}");
+        assert!(rows.iter().all(|r| !r.contains(WIDE_FILL)), "{rows:?}");
     }
 }
