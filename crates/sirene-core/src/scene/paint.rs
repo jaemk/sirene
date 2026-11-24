@@ -790,6 +790,7 @@ impl Painter<'_> {
         self.push(
             owner,
             Primitive::Path {
+                clip: None,
                 segments,
                 fill,
                 stroke,

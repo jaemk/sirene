@@ -12,6 +12,7 @@ impl Scene {
                 segments,
                 fill,
                 stroke,
+                ..
             } = &e.primitive
             else {
                 return None;

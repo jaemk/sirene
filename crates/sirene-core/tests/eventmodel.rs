@@ -237,6 +237,7 @@ fn drawing() {
                 segments,
                 fill: Some(_),
                 stroke: Some(_),
+                ..
             } => segments.iter().find_map(|g| match g {
                 Segment::Move(p) => Some(p.x),
                 _ => None,

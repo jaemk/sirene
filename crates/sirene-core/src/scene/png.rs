@@ -216,3 +216,65 @@ pub fn write(scene: &Scene, options: Options) -> crate::Result<Vec<u8>> {
     );
     Ok(bytes)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scene::{Color, Element, Owner, Primitive, Pt, Rect, Segment};
+
+    /// A 20x20 scene with a black square over (0,0)-(20,20), clipped to `clip`.
+    fn square(clip: Option<Rect>) -> Scene {
+        let (a, b) = (Pt::new(0.0, 0.0), Pt::new(20.0, 20.0));
+        Scene {
+            width: 20.0,
+            height: 20.0,
+            background: Color::rgb(0xffffff),
+            elements: vec![Element {
+                owner: Owner::Diagram,
+                primitive: Primitive::Path {
+                    segments: vec![
+                        Segment::Move(a),
+                        Segment::Line(Pt::new(b.x, a.y)),
+                        Segment::Line(b),
+                        Segment::Line(Pt::new(a.x, b.y)),
+                        Segment::Close,
+                    ],
+                    fill: Some(Color::rgb(0)),
+                    stroke: None,
+                    clip,
+                },
+            }],
+        }
+    }
+
+    fn dark(pixmap: &Pixmap, x: u32, y: u32) -> bool {
+        pixmap.pixel(x, y).is_some_and(|p| p.red() < 128)
+    }
+
+    fn render(scene: &Scene) -> Pixmap {
+        let bytes = write(scene, Options::default()).unwrap();
+        Pixmap::decode_png(&bytes).unwrap()
+    }
+
+    #[test]
+    fn clipped_path_draws_only_inside_the_clip() {
+        let pixmap = render(&square(Some(Rect::new(5.0, 5.0, 10.0, 10.0))));
+        let scale = Options::default().scale;
+        let at = |v: f32| (v * scale) as u32;
+        assert!(dark(&pixmap, at(10.0), at(10.0)));
+        assert!(dark(&pixmap, at(6.0), at(14.0)));
+        assert!(!dark(&pixmap, at(2.0), at(2.0)));
+        assert!(!dark(&pixmap, at(10.0), at(2.0)));
+        assert!(!dark(&pixmap, at(18.0), at(10.0)));
+        assert!(!dark(&pixmap, at(18.0), at(18.0)));
+    }
+
+    #[test]
+    fn unclipped_path_fills_everywhere() {
+        let pixmap = render(&square(None));
+        let scale = Options::default().scale;
+        let at = |v: f32| (v * scale) as u32;
+        assert!(dark(&pixmap, at(2.0), at(2.0)));
+        assert!(dark(&pixmap, at(18.0), at(18.0)));
+    }
+}

@@ -79,6 +79,21 @@ impl Pt {
     }
 }
 
+/// An axis-aligned rectangle in scene coordinates (pixels, y down).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Rect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+impl Rect {
+    pub const fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self { x, y, w, h }
+    }
+}
+
 /// One step of a path (DISPLA-2).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Segment {
@@ -154,6 +169,8 @@ pub enum Primitive {
         segments: Vec<Segment>,
         fill: Option<Color>,
         stroke: Option<Stroke>,
+        /// The path is drawn only inside this rectangle (same coordinates as `segments`).
+        clip: Option<Rect>,
     },
     /// A run of text on one line, centered on `center` both ways.
     Text {

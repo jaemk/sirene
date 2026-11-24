@@ -17,16 +17,33 @@ pub fn write(scene: &Scene) -> String {
         "<rect width=\"100%\" height=\"100%\"{}/>\n",
         paint("fill", scene.background)
     ));
+    let mut clips = 0usize;
     for e in &scene.elements {
         match &e.primitive {
             Primitive::Path {
                 segments,
                 fill,
                 stroke,
+                clip,
             } => {
+                if let Some(r) = clip {
+                    let _ = writeln!(
+                        out,
+                        "<clipPath id=\"clip{clips}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" \
+                         height=\"{}\"/></clipPath>",
+                        num(r.x),
+                        num(r.y),
+                        num(r.w),
+                        num(r.h)
+                    );
+                }
                 out.push_str("<path d=\"");
                 out.push_str(&path_data(segments));
                 out.push('"');
+                if clip.is_some() {
+                    let _ = write!(out, " clip-path=\"url(#clip{clips})\"");
+                    clips += 1;
+                }
                 match fill {
                     Some(c) => out.push_str(&paint("fill", *c)),
                     None => out.push_str(" fill=\"none\""),
@@ -151,6 +168,52 @@ fn escape(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scene::{Element, Owner, Pt, Rect, Scene};
+
+    fn path(clip: Option<Rect>) -> Element {
+        Element {
+            owner: Owner::Diagram,
+            primitive: Primitive::Path {
+                segments: vec![
+                    Segment::Move(Pt::new(0.0, 0.0)),
+                    Segment::Line(Pt::new(9.0, 9.0)),
+                ],
+                fill: None,
+                stroke: None,
+                clip,
+            },
+        }
+    }
+
+    fn scene(elements: Vec<Element>) -> Scene {
+        Scene {
+            width: 10.0,
+            height: 10.0,
+            background: Color::rgb(0xffffff),
+            elements,
+        }
+    }
+
+    #[test]
+    fn clip_adds_a_clip_path_with_unique_ids() {
+        let r = Rect::new(1.0, 2.5, 3.0, 4.0);
+        let svg = write(&scene(vec![path(Some(r)), path(None), path(Some(r))]));
+        assert_eq!(svg.matches("<clipPath").count(), 2);
+        assert!(svg.contains(
+            "<clipPath id=\"clip0\"><rect x=\"1\" y=\"2.5\" width=\"3\" height=\"4\"/></clipPath>"
+        ));
+        assert!(svg.contains("<clipPath id=\"clip1\">"));
+        assert!(svg.contains("clip-path=\"url(#clip0)\""));
+        assert!(svg.contains("clip-path=\"url(#clip1)\""));
+        assert_eq!(svg.matches("clip-path=").count(), 2);
+    }
+
+    #[test]
+    fn no_clip_adds_nothing() {
+        let svg = write(&scene(vec![path(None)]));
+        assert!(!svg.contains("clip"));
+        assert!(svg.contains("<path d=\"M0 0 L9 9\" fill=\"none\"/>\n</svg>"));
+    }
 
     #[test]
     fn xml_safe() {

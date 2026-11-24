@@ -55,6 +55,7 @@ fn unit(a: Pt, b: Pt) -> Pt {
 impl<M: TextMetrics> Draw<'_, M> {
     fn path(&mut self, segments: Vec<Segment>, fill: Option<Color>, stroke: Option<Stroke>) {
         self.out.push(el(Primitive::Path {
+            clip: None,
             segments,
             fill,
             stroke,

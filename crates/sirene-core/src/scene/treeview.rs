@@ -54,6 +54,7 @@ impl<'a, M: TextMetrics> Draw<'a, M> {
             dash: None,
         };
         self.lines.push(el(Primitive::Path {
+            clip: None,
             segments: vec![
                 Segment::Move(Pt::new(a.x + self.left, a.y)),
                 Segment::Line(Pt::new(b.x + self.left, b.y)),
@@ -144,6 +145,7 @@ impl<'a, M: TextMetrics> Draw<'a, M> {
                     p(0.2, 0.92),
                 ];
                 self.labels.push(el(Primitive::Path {
+                    clip: None,
                     segments: shapes::polygon(&pts),
                     fill: None,
                     stroke: Some(Stroke {
@@ -163,6 +165,7 @@ impl<'a, M: TextMetrics> Draw<'a, M> {
                     p(0.06, 0.84),
                 ];
                 self.labels.push(el(Primitive::Path {
+                    clip: None,
                     segments: shapes::polygon(&pts),
                     fill: Some(ICON),
                     stroke: None,
@@ -230,6 +233,7 @@ pub fn treeview(view: &TreeView, metrics: &impl TextMetrics, theme: &Theme) -> S
             h: h - 2.0,
         };
         highlights.push(el(Primitive::Path {
+            clip: None,
             segments: shapes::rounded(b, 3.0),
             fill: Some(HIGHLIGHT.with_alpha(38)),
             stroke: Some(Stroke {

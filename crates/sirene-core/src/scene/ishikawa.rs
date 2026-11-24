@@ -117,6 +117,7 @@ impl<M: TextMetrics> Draw<'_, M> {
         self.elements.push(Element {
             owner: Owner::Diagram,
             primitive: Primitive::Path {
+                clip: None,
                 segments,
                 fill,
                 stroke,

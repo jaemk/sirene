@@ -31,6 +31,7 @@ fn path(
     Element {
         owner,
         primitive: Primitive::Path {
+            clip: None,
             segments,
             fill,
             stroke,

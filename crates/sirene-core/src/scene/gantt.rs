@@ -40,6 +40,7 @@ impl<M: TextMetrics> Painter<'_, M> {
         self.elements.push(Element {
             owner: self.owner,
             primitive: Primitive::Path {
+                clip: None,
                 segments,
                 fill,
                 stroke,

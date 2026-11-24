@@ -154,6 +154,7 @@ pub fn block(b: &Block, metrics: &impl TextMetrics, theme: &Theme) -> crate::Res
             .map(|points| Element {
                 owner: Owner::Node(i),
                 primitive: Primitive::Path {
+                    clip: None,
                     segments: shapes::polygon(&points),
                     fill: Some(fill),
                     stroke: Some(stroke),

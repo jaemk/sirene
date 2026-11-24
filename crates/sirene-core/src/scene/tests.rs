@@ -782,6 +782,7 @@ fn svg_details() {
             Element {
                 owner: Owner::Diagram,
                 primitive: Primitive::Path {
+                    clip: None,
                     segments: vec![
                         Segment::Move(Pt::new(1.0, 2.0)),
                         Segment::Cubic {
