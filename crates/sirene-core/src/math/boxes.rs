@@ -165,7 +165,8 @@ impl<'a> Bx<'a> {
             italic
         };
         Self {
-            width: Em(width),
+            // KaTeX draws a positive italic correction as a margin after the glyph.
+            width: Em(width + italic.max(0.0)),
             height: Em(height),
             depth: Em(depth),
             kind: BoxKind::Glyph(Glyph {
@@ -371,7 +372,7 @@ mod tests {
             unreachable!("a glyph")
         };
         assert_eq!((g.skew, g.italic, g.color), (Em(0.02778), Em(0.0), None));
-        // Text mode and `\mathit` drop the italic correction; the width stays.
+        // The italic correction widens the glyph; text mode and `\mathit` drop it.
         let italic = |b: &Bx<'_>| match &b.kind {
             BoxKind::Glyph(g) => g.italic.0,
             _ => f64::NAN,
@@ -386,7 +387,8 @@ mod tests {
         );
         assert!(italic(&math) > 0.0);
         assert_eq!((italic(&text), italic(&mathit)), (0.0, 0.0));
-        assert_eq!((text.width, mathit.width), (math.width, math.width));
+        assert_eq!(text.width, mathit.width);
+        assert_eq!(math.width, text.width + Em(italic(&math)));
         // No metrics: no size.
         let unknown = Bx::glyph("\u{1d400}", Face::MainRegular, Mode::Math, &opts());
         assert_eq!(sized(&unknown), (0.0, 0.0, 0.0));
