@@ -874,13 +874,20 @@ mod tests {
         (bx.width.0, bx.height.0, bx.depth.0, drawn)
     }
 
-    /// Every path lies in the formula's box (or its clip does), to five hundredths of an em. A
-    /// glyph's ink can pass its TeX height (the `1` of `\frac12` does), and the radical sign of
-    /// `\sqrt2` reaches 0.04em above the box layout gives it, as KaTeX's svg does.
+    /// Every path's ink lies in the formula's box, to two hundredths of an em: a glyph's ink can
+    /// pass its TeX height and depth by its overshoot (the `1` of `\frac12` does, by 0.015em).
     fn check_inside(src: &str) -> Vec<Primitive> {
+        check_inside_by(src, 0.02)
+    }
+
+    /// Every path's ink (cut to its clip rectangle) lies in the formula's box, give or take
+    /// `slack_em`. The clip rectangle of a radical is taller than its box by the 0.08em that KaTeX
+    /// leaves empty over the sign's line, which is no ink.
+    fn check_inside_by(src: &str, slack_em: f64) -> Vec<Primitive> {
         let (w, h, d, drawn) = laid_out(src);
         assert!(!drawn.is_empty(), "{src}: nothing drawn");
-        let slack = 0.05 * f64::from(SIZE);
+        // Coordinates are single precision pixels.
+        let slack = slack_em * f64::from(SIZE) + 1e-3;
         let left = f64::from(ORIGIN.x) - slack;
         let right = f64::from(ORIGIN.x) + w * f64::from(SIZE) + slack;
         let top = f64::from(ORIGIN.y) - h * f64::from(SIZE) - slack;
@@ -896,16 +903,16 @@ mod tests {
                 unreachable!("only paths: {primitive:?}")
             };
             assert_eq!((*fill, *stroke), (Some(BLACK), None), "{src}");
-            let shape = match clip {
-                // A clipped path shows only its clip rectangle.
-                Some(r) => (
-                    f64::from(r.x),
-                    f64::from(r.y),
-                    f64::from(r.x + r.w),
-                    f64::from(r.y + r.h),
-                ),
-                None => bounds(segments).expect("a shape"),
-            };
+            // The ink, which a clipped path shows only inside its clip rectangle.
+            let mut shape = bounds(segments).expect("a shape");
+            if let Some(r) = clip {
+                shape = (
+                    shape.0.max(f64::from(r.x)),
+                    shape.1.max(f64::from(r.y)),
+                    shape.2.min(f64::from(r.x + r.w)),
+                    shape.3.min(f64::from(r.y + r.h)),
+                );
+            }
             assert!(
                 shape.0 >= left && shape.1 >= top && shape.2 <= right && shape.3 <= bottom,
                 "{src}: {shape:?} outside ({left}, {top}, {right}, {bottom})"
@@ -918,6 +925,15 @@ mod tests {
     fn a_letter_is_one_path_inside_its_box() {
         let drawn = check_inside("x");
         assert_eq!(drawn.len(), 1);
+    }
+
+    #[test]
+    fn a_radical_draws_inside_its_box_to_the_pixel() {
+        // The vinculum's top is the box's top: the empty 0.08em of the sign's view box above it
+        // is clipped away.
+        for src in ["\\sqrt2", "\\sqrt{\\frac12}", "\\sqrt[3]{2}"] {
+            check_inside_by(src, 0.0);
+        }
     }
 
     #[test]
