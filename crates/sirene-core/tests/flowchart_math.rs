@@ -40,6 +40,7 @@ fn a_label_without_a_formula_has_the_same_runs_as_spans() {
         let l = Label {
             text: text.to_owned(),
             markdown: text.contains("**"),
+            ..Label::default()
         };
         assert_eq!(l.runs(), l.spans(), "{text:?}");
         assert!(!l.has_formula(), "{text:?}");
@@ -193,6 +194,7 @@ mod math {
         let l = Label {
             text: "**b** $$x$$".to_owned(),
             markdown: true,
+            ..Label::default()
         };
         let line = &l.runs()[0];
         assert_eq!(line[0].text, "**b** ");

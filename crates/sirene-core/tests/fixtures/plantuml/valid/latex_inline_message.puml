@@ -1,0 +1,6 @@
+@startuml
+participant "<latex>\alpha</latex>" as A
+participant Bob
+Bob -> A : Can you solve: <latex>\frac{a}{b} + x^2</latex>
+A --> Bob : <latex>\neq 0</latex> only
+@enduml

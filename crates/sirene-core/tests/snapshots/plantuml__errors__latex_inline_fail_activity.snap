@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nstart\n:Total <latex>\\bar{</latex>;\n:Total <latex>\\frac{1}{2}</latex>;\nstop\n@enduml\n"
+---
+3:20: error: Unexpected end of input in a macro argument, expected '}'
+
+               ●
+               │
+               ▼
+╭────────────────────────────╮
+│ Total <latex>\bar{</latex> │
+╰──────────────┬─────────────╯
+               │
+               ▼
+         ╭───────────╮
+         │        1  │
+         │ Total --- │
+         │        2  │
+         ╰─────┬─────╯
+               │
+               ▼
+               ◉

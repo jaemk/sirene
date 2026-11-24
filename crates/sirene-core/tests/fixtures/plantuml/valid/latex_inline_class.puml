@@ -1,0 +1,6 @@
+@startuml
+class Order
+class Item
+Order --> Item : <latex>\sum_i p_i</latex>
+note right of Order : cost <latex>\beta</latex>
+@enduml

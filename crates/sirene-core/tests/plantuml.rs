@@ -680,7 +680,7 @@ fn extent(scene: &sirene_core::scene::Scene) -> (f32, f32, f32, f32) {
 fn latex_formula() {
     for (name, src) in fixtures("valid")
         .into_iter()
-        .filter(|(n, _)| n.starts_with("latex_"))
+        .filter(|(n, _)| n.starts_with("latex_") && !n.starts_with("latex_inline_"))
     {
         let (source, d) = equation(&src);
         assert!(d.is_empty(), "{name}: {d:?}");

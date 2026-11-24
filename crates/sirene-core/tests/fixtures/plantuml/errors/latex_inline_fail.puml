@@ -1,0 +1,3 @@
+@startuml
+A -> B : fine <latex>x</latex> then <latex>a + \foo{x}</latex> end
+@enduml

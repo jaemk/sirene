@@ -4,7 +4,9 @@ use std::collections::HashMap;
 
 use rowan::TextRange;
 
+use super::creole;
 use crate::diagnostic::Diagnostic;
+use crate::flowchart::{Delim, formula};
 use crate::lines::{MAX_DEPTH, too_deep};
 use crate::scene::parse_color;
 use crate::sequence::{
@@ -19,6 +21,7 @@ const MAX_SPACE: u32 = 1000;
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Sequence, Vec<Diagnostic>) {
     let mut l = Lower::default();
+    l.seq.math = Some(Delim::Latex);
     for stmt in root.children() {
         // A statement the parser could not read is reported there and skipped here.
         if stmt.descendants().any(|n| n.kind() == ERROR) {
@@ -124,9 +127,13 @@ fn unquote(t: &SyntaxToken) -> String {
     }
 }
 
-/// Display text: split into lines at a literal `\n`, each trimmed.
+/// Display text: split into lines at a literal `\n` (not inside a `<latex>` formula), each
+/// trimmed.
 fn display(s: &str) -> Text {
-    s.split("\\n").map(|l| l.trim().to_owned()).collect()
+    creole::newlines(s)
+        .split('\n')
+        .map(|l| l.trim().to_owned())
+        .collect()
 }
 
 /// The non-trivia tokens of `node`, in order.
@@ -257,6 +264,18 @@ impl Lower {
         self.diagnostics.push(Diagnostic::warning(range, message));
     }
 
+    /// Reports each `<latex>` formula in `text` that does not typeset (LEMB-4, LEMB-5). `token`
+    /// is the source text it came from, when it has one.
+    fn check_math(&mut self, token: Option<&SyntaxToken>, text: &Text, fallback: TextRange) {
+        if !text.iter().any(|l| formula::has(l, Delim::Latex)) {
+            return;
+        }
+        let raw = token.map_or("", |t| t.text());
+        let start = token.map_or(fallback.start(), |t| t.text_range().start());
+        let errors = formula::errors(start, raw, text.iter().cloned(), fallback, Delim::Latex);
+        self.diagnostics.extend(errors);
+    }
+
     fn find(&self, id: &str) -> Option<usize> {
         self.index.get(id).copied()
     }
@@ -339,12 +358,12 @@ impl Lower {
             .collect();
         let Some(first) = names.first() else { return };
         // `X as Y`: the quoted one is the label; otherwise `Y` is the id and `X` the label.
-        let (id, label) = match names.get(1) {
+        let (id, label, label_token) = match names.get(1) {
             Some(second) if second.kind() == STRING && first.kind() != STRING => {
-                (unquote(first), unquote(second))
+                (unquote(first), unquote(second), second)
             }
-            Some(second) => (unquote(second), unquote(first)),
-            None => (unquote(first), unquote(first)),
+            Some(second) => (unquote(second), unquote(first), first),
+            None => (unquote(first), unquote(first), first),
         };
         self.color_warning(token(stmt, STYLE_TEXT), "participant");
         if let Some(s) = token(stmt, STEREOTYPE) {
@@ -363,6 +382,8 @@ impl Lower {
         }
         let group = self.current_group();
         let i = self.ensure(&id);
+        let text = display(&label);
+        self.check_math(Some(label_token), &text, stmt.text_range());
         let p = &mut self.seq.participants[i];
         if keywords
             .iter()
@@ -371,7 +392,7 @@ impl Lower {
         {
             p.kind = kind;
         }
-        p.label = display(&label);
+        p.label = text;
         if group.is_some() {
             p.group = group;
         }
@@ -487,6 +508,7 @@ impl Lower {
         }
         let number = self.number();
         let text = text_of(stmt, TEXT).map_or_else(Vec::new, |t| display(&t));
+        self.check_math(token(stmt, TEXT).as_ref(), &text, stmt.text_range());
         self.seq.events.push(Event::Message(Message {
             from,
             to,
@@ -524,6 +546,9 @@ impl Lower {
             .collect();
         self.color_warning(token(stmt, STYLE_TEXT), "note");
         let text = Self::note_text(stmt);
+        for t in tokens(stmt, TEXT) {
+            self.check_math(Some(&t), &display(t.text()), stmt.text_range());
+        }
         if kw == "ref" {
             self.seq.events.push(Event::Ref {
                 participants: names,

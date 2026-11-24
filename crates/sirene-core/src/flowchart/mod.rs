@@ -18,8 +18,8 @@ use rowan::GreenNode;
 pub use collapse::{Collapsed, Origin};
 pub use graph::Measure;
 pub use model::{
-    Arrow, ClassDef, Click, Compass, Direction, Edge, EdgeOrder, Flowchart, Label, Metadata, Node,
-    Note, NoteSide, RankEnd, Row, Shape, Span, Stroke, Style, Subgraph, clean,
+    Arrow, ClassDef, Click, Compass, Delim, Direction, Edge, EdgeOrder, Flowchart, Label, Metadata,
+    Node, Note, NoteSide, RankEnd, Row, Shape, Span, Stroke, Style, Subgraph, clean,
 };
 
 use crate::diagnostic::Diagnostic;

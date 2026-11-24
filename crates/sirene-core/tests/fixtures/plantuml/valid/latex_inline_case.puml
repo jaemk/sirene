@@ -1,0 +1,3 @@
+@startuml
+A -> B : <LaTeX>\alpha</LaTeX> and <LATEX>\beta</latex>
+@enduml

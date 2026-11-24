@@ -1,0 +1,33 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nstart\n:Compute <latex>\\sqrt{x^2 + y^2}</latex>;\nif (<latex>a \\gt 0</latex>?) then (yes)\n  :plain;\nendif\nstop\n@enduml\n"
+---
+          *
+          |
+          v
+.------------------.
+|          ¯¯¯¯¯¯¯ |
+| Compute √x² + y² |
+'---------+--------'
+          |
+          v
+     /--------\
+     | a > 0? |
+     \--+---+-/
+        |   |
+      +-+   |
+      |     |
+     yes    |
+      |     |
+     ++     ++
+     v       |
+ .-------.   |
+ | plain |   |
+ '---+---'   |
+     |       |
+     +-+     |
+       |     |
+       |     |
+       +-++--+
+         vv
+          @

@@ -5,9 +5,9 @@
 #[cfg(feature = "math")]
 use unicode_width::UnicodeWidthChar;
 
-use crate::flowchart::Label;
 #[cfg(feature = "math")]
 use crate::flowchart::Span;
+use crate::flowchart::{Delim, Label};
 
 /// The rows of `label` when some line holds a formula that renders, else `None` (the label is
 /// its plain lines).
@@ -31,19 +31,19 @@ pub(super) fn rows(_: &Label) -> Option<Vec<String>> {
 /// `lines` of source text as rows, each line with a formula as many rows as the formula has.
 /// Without a formula, or without the `math` feature, the lines are unchanged.
 #[cfg(feature = "math")]
-pub(super) fn text_rows(lines: &[String]) -> Vec<String> {
+pub(super) fn text_rows(lines: &[String], delim: Delim) -> Vec<String> {
     use crate::flowchart::formula;
-    if !lines.iter().any(|l| formula::has(l)) {
+    if !lines.iter().any(|l| formula::has(l, delim)) {
         return lines.to_vec();
     }
     lines
         .iter()
-        .flat_map(|l| line_rows(&formula::runs(l)))
+        .flat_map(|l| line_rows(&formula::runs(l, delim)))
         .collect()
 }
 
 #[cfg(not(feature = "math"))]
-pub(super) fn text_rows(lines: &[String]) -> Vec<String> {
+pub(super) fn text_rows(lines: &[String], _: Delim) -> Vec<String> {
     lines.to_vec()
 }
 
@@ -57,10 +57,11 @@ struct Block {
 
 #[cfg(feature = "math")]
 fn block(span: &Span) -> Block {
-    use crate::math::{MathStyle, ascii_formula_rows};
+    use crate::math::ascii_formula_rows;
     let formula = span
         .formula()
-        .and_then(|f| ascii_formula_rows(&f, MathStyle::Display).ok())
+        .zip(span.delim())
+        .and_then(|(f, d)| ascii_formula_rows(&f, d.style()).ok())
         .filter(|(rows, _)| !rows.is_empty());
     let (rows, base) = formula.unwrap_or_else(|| (vec![span.text.clone()], 0));
     let width = rows.iter().map(|r| width(r)).max().unwrap_or(0);

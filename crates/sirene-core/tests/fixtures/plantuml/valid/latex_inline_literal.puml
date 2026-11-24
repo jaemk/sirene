@@ -1,0 +1,5 @@
+@startuml
+A -> B : <latex>\alpha unclosed
+A -> B : $$x^2$$ stays text
+A -> B : <latex></latex> empty and <math>x</math> literal
+@enduml

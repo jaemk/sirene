@@ -63,7 +63,15 @@ so the typesetter has one input. A `<math>` or `<latex>` tag is read wherever th
 kind already reads Creole text (PCREO-1), not only in the three positions the reference
 shows. An unclosed tag is plain text.
 
-To verify (LEMB-T8): the exact escape rules inside the tags, nesting and multiple tags per line,
+Status (`<latex>`): read in sequence participant names, messages, notes, and `ref` text and in the
+labels of the graph kinds (PCREO-3 lists them and what is not read). The tag is matched in any
+case; several per line; no nesting; the body is verbatim, so a doubled backslash is a TeX line
+break and `\n` inside a closed tag is not a line break. Typeset in text style (inline), not
+Mermaid's display style. `<math>` (AsciiMath) is text until the front end exists. `$$` is text
+in PlantUML, and `<latex>` is text in Mermaid: `flowchart::Delim` says which delimiters a label
+(`Label::delim`) or a sequence (`Sequence::math`) reads.
+
+To verify (LEMB-T8): the escape rules inside the tags (the reference page's doubled backslashes),
 and how PlantUML aligns an inline formula with the text baseline.
 
 ## LEMB-3 Markdown

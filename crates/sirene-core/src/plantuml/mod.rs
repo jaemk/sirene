@@ -5,6 +5,7 @@ mod activity;
 mod chen;
 mod chronology;
 mod class;
+pub(crate) mod creole;
 mod data;
 mod description;
 mod detect;
@@ -58,6 +59,16 @@ pub(crate) fn raw(kind: Kind) -> bool {
     matches!(kind, Kind::Other("dot" | "ebnf" | "regex" | "latex"))
 }
 
+/// A graph whose labels are Creole text: `<latex>` tags in them are formulas (LEMB-2).
+fn creole_graph(
+    mut chart: crate::flowchart::Flowchart,
+    mut diagnostics: Vec<Diagnostic>,
+    root: &SyntaxNode,
+) -> (Diagram, Vec<Diagnostic>) {
+    diagnostics.extend(creole::mark_labels(&mut chart, root));
+    (Diagram::Graph(chart), diagnostics)
+}
+
 /// The result of parsing PlantUML source: a lossless syntax tree plus diagnostics.
 #[derive(Debug, Clone)]
 pub struct Parse {
@@ -88,19 +99,19 @@ impl Parse {
         let (diagram, lowering) = match self.kind {
             Kind::Activity => {
                 let (chart, d) = activity::lower(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::Class => {
                 let (chart, d) = class::lower(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::State => {
                 let (chart, d) = state::lower(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::Description => {
                 let (chart, d) = description::lower(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::Mindmap => {
                 let (map, d) = mindmap::lower_mindmap(&root);
@@ -132,7 +143,7 @@ impl Parse {
             }
             Kind::Other("chen") => {
                 let (chart, d) = chen::lower(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::Other("chronology") => {
                 let (t, d) = chronology::lower(&root);
@@ -140,7 +151,7 @@ impl Parse {
             }
             Kind::Other("nwdiag") => {
                 let (chart, d) = nwdiag::lower(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::Other("regex") => {
                 let (chart, d) = regex::lower(&root);
@@ -156,7 +167,7 @@ impl Parse {
             }
             Kind::Wbs => {
                 let (chart, d) = mindmap::lower_wbs(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::Sequence => {
                 let (seq, d) = lower::lower(&root);

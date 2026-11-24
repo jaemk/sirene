@@ -156,9 +156,10 @@ pub(crate) fn color(s: &str) -> Option<String> {
     crate::dot::lower::color(s).map(crate::dot::lower::hex)
 }
 
-/// `\n` in PlantUML text breaks the line; other escapes are kept as written.
+/// `\n` in PlantUML text breaks the line, except inside a `<latex>` formula; other escapes are
+/// kept as written.
 pub(crate) fn text(s: &str) -> String {
-    s.replace("\\n", "\n")
+    super::creole::newlines(s)
 }
 
 /// A `"quoted"` string's contents, or `s` itself.

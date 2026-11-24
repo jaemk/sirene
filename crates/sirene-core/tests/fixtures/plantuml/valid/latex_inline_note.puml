@@ -1,0 +1,8 @@
+@startuml
+Alice -> Bob : hi
+note over Alice, Bob
+  Given <latex>x^2</latex> and <latex>\sqrt{y}</latex>,
+  plain second line
+end note
+note right of Bob : area <latex>\pi r^2</latex>
+@enduml

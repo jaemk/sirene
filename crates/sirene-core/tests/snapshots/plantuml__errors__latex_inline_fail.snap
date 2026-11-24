@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nA -> B : fine <latex>x</latex> then <latex>a + \\foo{x}</latex> end\n@enduml\n"
+---
+2:48: error: Undefined control sequence: \foo
+
+┌───┐                                       ┌───┐
+│ A │                                       │ B │
+└─┬─┘                                       └─┬─┘
+  │                                           │
+  │fine x then <latex>a + \foo{x}</latex> end │
+  ├──────────────────────────────────────────►│
+  │                                           │
+┌─┴─┐                                       ┌─┴─┐
+│ A │                                       │ B │
+└───┘                                       └───┘

@@ -15,6 +15,7 @@ fn label_spans() {
     let md = |t: &str| Label {
         text: t.into(),
         markdown: true,
+        ..Label::default()
     };
     let show = |l: &Label| -> Vec<String> {
         l.spans()
@@ -239,7 +240,8 @@ e[]
         c.node("b").unwrap().label,
         Label {
             text: "**md**".into(),
-            markdown: true
+            markdown: true,
+            ..Label::default()
         }
     );
     assert_eq!(c.node("c").unwrap().label, plain("line one\nline two"));
@@ -297,7 +299,8 @@ D@{
         a.label,
         Label {
             text: "Store".into(),
-            markdown: true
+            markdown: true,
+            ..Label::default()
         }
     );
     assert_eq!(

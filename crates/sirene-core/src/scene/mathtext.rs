@@ -6,7 +6,7 @@
 //! has no ascent, so the distance is the constant [`BASELINE`].
 
 use super::{Color, Primitive, Pt, TextMetrics, TextStyle, Theme};
-use crate::flowchart::Span;
+use crate::flowchart::{Delim, Span};
 
 /// The text style of a span.
 pub(super) fn style_of(s: &Span) -> TextStyle {
@@ -27,12 +27,12 @@ pub(super) fn span_width(metrics: &(impl TextMetrics + ?Sized), size: f32, s: &S
 
 /// The runs of `lines` when some line holds a formula, else `None` (the lines are plain text).
 /// For diagrams whose text is kept as source lines (sequence diagrams).
-pub(super) fn source_runs(lines: &[String]) -> Option<Vec<Vec<Span>>> {
+pub(super) fn source_runs(lines: &[String], delim: Delim) -> Option<Vec<Vec<Span>>> {
     use crate::flowchart::formula;
-    if !cfg!(feature = "math") || !lines.iter().any(|l| formula::has(l)) {
+    if !cfg!(feature = "math") || !lines.iter().any(|l| formula::has(l, delim)) {
         return None;
     }
-    Some(lines.iter().map(|l| formula::runs(l)).collect())
+    Some(lines.iter().map(|l| formula::runs(l, delim)).collect())
 }
 
 /// The size of `lines` of runs: the widest line and the lines' heights added up.
@@ -78,12 +78,13 @@ pub(super) struct Inline {
     pub descent: f32,
 }
 
-/// The formula of a formula span, typeset in display style as Mermaid does; `None` for a text
-/// span, a formula that does not typeset, and a build without the `math` feature.
+/// The formula of a formula span, typeset in the style of its delimiters (display for Mermaid's
+/// `$$`, text for PlantUML's `<latex>`); `None` for a text span, a formula that does not
+/// typeset, and a build without the `math` feature.
 #[cfg(feature = "math")]
 pub(super) fn inline(span: &Span) -> Option<Inline> {
-    use crate::math::{MathStyle, typeset};
-    let formula = typeset(&span.formula()?, MathStyle::Display).ok()?;
+    use crate::math::typeset;
+    let formula = typeset(&span.formula()?, span.delim()?.style()).ok()?;
     Some(Inline {
         width: formula.width,
         ascent: formula.ascent,
