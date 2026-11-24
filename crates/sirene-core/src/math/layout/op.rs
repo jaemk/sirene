@@ -11,15 +11,16 @@ use std::ops::Range;
 
 use super::{
     Atom, Built, Class, Grouping, build, build_in, cancel_binary_operators, expression,
-    insert_spaces, not_yet, symbol,
+    insert_spaces, symbol,
 };
 use crate::math::{
     MathError,
     ast::{Node, NodeKind, OpContent},
-    boxes::{BoxKind, Bx, Part, Position},
+    boxes::{BoxKind, Bx, Fit, Part, Position},
     metrics_data::Face,
     options::{Em, MathFont, Options},
     style::Style,
+    svg_data,
     symbols::{Mode, Name},
 };
 
@@ -48,12 +49,10 @@ fn operator_base<'t>(
     op: &Operator<'t, '_>,
     options: &Options<'t>,
 ) -> Result<OperatorBase<'t>, MathError> {
+    // The slant of a contour integral, whose oval is laid over the glyph of its integral.
+    let mut oval_slant = None;
     let bx = match op.content {
         OpContent::Name(name) if op.symbol => {
-            if matches!(name.as_str(), "\\oiint" | "\\oiiint") {
-                // KaTeX draws the oval over the integral signs as an SVG path.
-                return Err(not_yet("op", op.span.clone()));
-            }
             // Most symbol operators get larger in display style (rule 13).
             let large = options.style.size() == Style::Display.size() && name != NO_SUCCESSOR;
             let face = if large {
@@ -61,13 +60,46 @@ fn operator_base<'t>(
             } else {
                 Face::Size1Regular
             };
-            let symbol_name = Name::Control(name.strip_prefix('\\').unwrap_or(name));
+            // There is no glyph with the oval yet, so KaTeX takes the one without and draws
+            // the oval over it.
+            let (glyph_name, oval) = match name.as_str() {
+                "\\oiint" => ("\\iint", Some(("oiint", 0.957, 0.499, 1.472, 0.659))),
+                "\\oiiint" => ("\\iiint", Some(("oiiint", 1.304, 0.499, 1.98, 0.659))),
+                other => (other, None),
+            };
+            let symbol_name = Name::Control(glyph_name.strip_prefix('\\').unwrap_or(glyph_name));
             let text = symbol::drawn_text(
                 Some(symbol_name),
                 &symbol::source_text(symbol_name),
                 Mode::Math,
             );
-            Bx::glyph(text, face, Mode::Math, options)
+            let glyph = Bx::glyph(text, face, Mode::Math, options);
+            match oval {
+                Some((stem, small_w, small_h, large_w, large_h)) => {
+                    if let BoxKind::Glyph(g) = &glyph.kind {
+                        oval_slant = Some(g.italic);
+                    }
+                    let (key, w, h) = if large {
+                        (format!("{stem}Size2"), large_w, large_h)
+                    } else {
+                        (format!("{stem}Size1"), small_w, small_h)
+                    };
+                    let data = svg_data::path(&key).ok_or_else(|| {
+                        MathError::new(format!("No SVG data for \"{key}\"."), op.span.clone())
+                    })?;
+                    // The oval is as large as its view box, from its top left corner.
+                    let oval = Bx::path(
+                        data,
+                        [0.0, 0.0, 1000.0 * w, 1000.0 * h],
+                        Fit::Stretch,
+                        (Em(w), Em(h), Em::ZERO),
+                        options,
+                    );
+                    let drop = if large { Em(0.08) } else { Em::ZERO };
+                    Bx::vlist_shifted(vec![(glyph, Em::ZERO, Em::ZERO), (oval, drop, Em::ZERO)])
+                }
+                None => glyph,
+            }
         }
         OpContent::Body(body) => {
             let atoms = expression(body, options, Grouping::Group)?;
@@ -100,11 +132,11 @@ fn operator_base<'t>(
     };
     // A single symbol is centered on the axis (rule 13), unless an `\overset` or `\underset`
     // keeps its base in place. Its slant is its italic correction.
-    let (slant, shift) = match &bx.kind {
-        BoxKind::Glyph(glyph) if op.suppress_base_shift != Some(true) => {
-            let axis = options.metrics().axis_height;
-            (glyph.italic, (bx.height - bx.depth) / 2.0 - Em(axis))
-        }
+    let axis = Em(options.metrics().axis_height);
+    let (slant, shift) = match (&bx.kind, oval_slant) {
+        _ if op.suppress_base_shift == Some(true) => (Em::ZERO, Em::ZERO),
+        (BoxKind::Glyph(glyph), _) => (glyph.italic, (bx.height - bx.depth) / 2.0 - axis),
+        (_, Some(slant)) => (slant, (bx.height - bx.depth) / 2.0 - axis),
         _ => (Em::ZERO, Em::ZERO),
     };
     Ok(OperatorBase { bx, slant, shift })
@@ -616,18 +648,113 @@ mod tests {
         );
     }
 
+    type Oval = ((f64, f64, f64, f64), [f64; 4], String);
+
+    /// The path items of a formula: their rectangle (x, y, width, height), view box, and data.
+    fn ovals(src: &str, display: bool) -> Vec<Oval> {
+        let nodes = parse_with(
+            src,
+            Settings {
+                display_mode: display,
+            },
+        )
+        .unwrap();
+        layout(&nodes, display)
+            .unwrap()
+            .items()
+            .into_iter()
+            .filter_map(|item| match item {
+                Item::Path {
+                    x,
+                    y,
+                    width,
+                    height,
+                    path,
+                    ..
+                } => Some(((x, y, width, height), path.view_box, path.data.into_owned())),
+                _ => None,
+            })
+            .collect()
+    }
+
     #[test]
-    fn oiint_is_not_laid_out_yet() {
-        for src in ["\\oiint", "\\oiiint_a^b"] {
-            let nodes = parse_with(
-                src,
-                Settings {
-                    display_mode: false,
-                },
-            )
-            .unwrap();
-            let err = layout(&nodes, false).unwrap_err();
-            assert_eq!(err.message, "op is not laid out yet", "{src}");
+    fn oiint_overlays_an_oval_on_the_double_integral() {
+        // Text style: the small oval at the glyph's baseline, over the Size1 glyph of `\iint`.
+        let (w, h, d) = sized("\\oiint", false);
+        let (gw, gh, gd, _) = glyph('\u{222c}', Face::Size1Regular);
+        assert!(
+            close(w, gw.max(0.957)) && close(h, gh.max(0.499)) && close(d, gd),
+            "{w} {h} {d}"
+        );
+        let small = ovals("\\oiint", false);
+        let [((x, y, width, height), view_box, data)] = small.as_slice() else {
+            panic!("one oval: {small:?}");
+        };
+        assert!(close(*x, 0.0) && close(*y, -0.499), "{x} {y}");
+        assert!(close(*width, 0.957) && close(*height, 0.499));
+        assert_eq!(*view_box, [0.0, 0.0, 957.0, 499.0]);
+        assert_eq!(data, crate::math::svg_data::path("oiintSize1").unwrap());
+
+        // Display style: the large oval, 0.08em lower, over the Size2 glyph.
+        let (w, h, d) = sized("\\oiint", true);
+        let (gw, gh, gd, _) = glyph('\u{222c}', Face::Size2Regular);
+        assert!(
+            close(w, gw.max(1.472)) && close(h, gh.max(0.659 - 0.08)) && close(d, gd.max(0.08)),
+            "{w} {h} {d}"
+        );
+        let large = ovals("\\oiint", true);
+        let [((_, y, width, height), view_box, data)] = large.as_slice() else {
+            panic!("one oval: {large:?}");
+        };
+        assert!(close(*y, 0.08 - 0.659), "{y}");
+        assert!(close(*width, 1.472) && close(*height, 0.659));
+        assert_eq!(*view_box, [0.0, 0.0, 1472.0, 659.0]);
+        assert_eq!(data, crate::math::svg_data::path("oiintSize2").unwrap());
+    }
+
+    #[test]
+    fn oiiint_overlays_the_wider_oval_on_the_triple_integral() {
+        let small = ovals("\\oiiint", false);
+        let [((_, _, width, height), view_box, data)] = small.as_slice() else {
+            panic!("one oval: {small:?}");
+        };
+        assert!(close(*width, 1.304) && close(*height, 0.499));
+        assert_eq!(*view_box, [0.0, 0.0, 1304.0, 499.0]);
+        assert_eq!(data, crate::math::svg_data::path("oiiintSize1").unwrap());
+        let large = ovals("\\oiiint", true);
+        let [((_, _, width, height), _, data)] = large.as_slice() else {
+            panic!("one oval: {large:?}");
+        };
+        assert!(close(*width, 1.98) && close(*height, 0.659));
+        assert_eq!(data, crate::math::svg_data::path("oiiintSize2").unwrap());
+    }
+
+    #[test]
+    fn oiint_subscripts_tuck_under_the_slant_as_iint_subscripts_do() {
+        // Both subscripts start at the base's right edge less the integral's slant; the oval
+        // makes `\oiint`'s base wider than `\iint`'s.
+        for (display, face) in [(false, Face::Size1Regular), (true, Face::Size2Regular)] {
+            let italic = glyph('\u{222c}', face).3;
+            assert!(italic > 0.0);
+            for name in ["\\iint", "\\oiint"] {
+                let base = sized(name, display).0;
+                let (glyphs, _) = placed(&format!("{name}\\nolimits_a"), display);
+                let a = glyphs
+                    .iter()
+                    .find(|(t, _)| t == "a")
+                    .map(|&(_, x)| x)
+                    .unwrap();
+                assert!(close(a, base - italic), "{name}: {a} vs {base} - {italic}");
+            }
+        }
+    }
+
+    #[test]
+    fn oiint_with_scripts_matches_katex() {
+        // KaTeX's heights and depths for the contour integrals with scripts, from the oracle.
+        for src in ["\\oiint_i^n", "\\oiiint_i^n", "\\oiint\\nolimits_i^n"] {
+            let (_, h, d) = sized(src, false);
+            assert!(close(h, 0.859292) && close(d, 0.3557), "{src}: {h} {d}");
         }
     }
 }

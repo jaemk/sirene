@@ -81,6 +81,8 @@ struct Atom<'t> {
     tight: bool,
     /// A line break (`\\` outside a table), which starts a new line for spacing at the root.
     newline: bool,
+    /// A `\middle` delimiter, which the `\left ... \right` around it resizes.
+    middle: Option<Box<delimiter::Middle<'t>>>,
 }
 
 impl<'t> Atom<'t> {
@@ -91,6 +93,7 @@ impl<'t> Atom<'t> {
             space: false,
             tight: options.style.is_tight(),
             newline: false,
+            middle: None,
         }
     }
 
@@ -609,13 +612,16 @@ mod tests {
     #[test]
     fn unbuilt_nodes_say_so() {
         let nodes = parse_with(
-            "\\sqrt x",
+            "\u{1d400}",
             Settings {
                 display_mode: false,
             },
         )
         .unwrap();
         let err = layout(&nodes, false).unwrap_err();
-        assert_eq!(err.message, "sqrt is not laid out yet");
+        assert_eq!(
+            err.message,
+            "a mathematical alphanumeric character is not laid out yet"
+        );
     }
 }
