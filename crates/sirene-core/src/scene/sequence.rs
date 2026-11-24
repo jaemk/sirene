@@ -1,11 +1,12 @@
 //! Sequence diagram to scene (MSEQ-3, MSEQ-4).
 
+use super::mathtext;
 use super::shapes::{self, BoxF, PAD_X, PAD_Y};
 use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
     parse_color,
 };
-use crate::flowchart::Shape;
+use crate::flowchart::{Shape, Span};
 use crate::sequence::layout::{self, Placed, Sizes, Spacing};
 use crate::sequence::{BlockKind, Event, Head, LineStyle, ParticipantKind, Sequence};
 
@@ -59,6 +60,8 @@ struct Painter<'a, M> {
     /// Who what is drawn next belongs to: participant `i`'s header and lifeline are
     /// `Owner::Node(i)`, the `n`th message `Owner::Edge(n)` (DISPLA-1).
     owner: Owner,
+    /// Whether `$$...$$` in labels, messages, and notes is a formula.
+    math: bool,
 }
 
 fn solid(width: f32, color: Color) -> Stroke {
@@ -103,8 +106,20 @@ impl<M: TextMetrics> Painter<'_, M> {
         self.metrics.styled_width(text, self.theme.font_size, bold)
     }
 
-    /// The width and height of `lines`.
+    /// The runs of `lines` when the diagram reads `$$...$$` as a formula and some line has one.
+    fn runs(&self, lines: &[String]) -> Option<Vec<Vec<Span>>> {
+        if self.math {
+            mathtext::source_runs(lines)
+        } else {
+            None
+        }
+    }
+
+    /// The width and height of `lines`: a line with a tall formula is taller (LEMB-4).
     fn measure(&self, lines: &[String]) -> (f32, f32) {
+        if let Some(runs) = self.runs(lines) {
+            return mathtext::block_size(self.metrics, self.theme, &runs);
+        }
         let w = lines.iter().map(|l| self.width(l)).fold(0.0, f32::max);
         (w, lines.len() as f32 * self.theme.line_height)
     }
@@ -141,6 +156,17 @@ impl<M: TextMetrics> Painter<'_, M> {
     fn lines(&mut self, lines: &[String], cx: f32, top: f32) {
         let lh = self.theme.line_height;
         let color = self.theme.text;
+        if let Some(runs) = self.runs(lines) {
+            let (_, h) = mathtext::block_size(self.metrics, self.theme, &runs);
+            let center = Pt::new(cx, top + h / 2.0);
+            for primitive in mathtext::draw_lines(self.metrics, self.theme, &runs, center, color) {
+                self.elements.push(Element {
+                    owner: self.owner,
+                    primitive,
+                });
+            }
+            return;
+        }
         for (i, l) in lines.iter().enumerate() {
             let center = Pt::new(cx, top + (i as f32 + 0.5) * lh);
             self.text_at(l, center, self.theme.font_size, color, TextStyle::default());
@@ -403,6 +429,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         theme,
         elements: Vec::new(),
         owner: Owner::Diagram,
+        math: seq.math,
     };
     let lh = theme.line_height;
     let title = seq

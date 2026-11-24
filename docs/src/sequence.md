@@ -29,6 +29,7 @@ In the editor a sequence diagram is read-only on the drawing side.
 | `autonumber`, `autonumber 10 5`, `autonumber off` | a numbered badge on each message (`1. ` before the label in text) |
 | `title text`, `accTitle`, `accDescr` | the title above (frontmatter `title` too) |
 | `<br>`, `#59;` | a line break, and entity codes |
+| `$$...$$` in a participant alias, message, or note | a LaTeX formula in display style on the text's baseline; one that does not typeset is drawn as its source with a diagnostic (needs the `math` feature) |
 | `participant A; participant B` | `;` ends a statement as a newline does; write `#59;` for a literal one |
 
 Keywords are matched in any case, so `Note over A` works.

@@ -531,6 +531,7 @@ model: Sequence {
         ),
     ],
     hide_footbox: false,
+    math: false,
 }
 
 === zen_recovery ===
@@ -670,6 +671,7 @@ model: Sequence {
         ),
     ],
     hide_footbox: false,
+    math: false,
 }
 
 === flow_metadata ===

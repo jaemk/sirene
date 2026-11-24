@@ -28,6 +28,25 @@ pub(super) fn rows(_: &Label) -> Option<Vec<String>> {
     None
 }
 
+/// `lines` of source text as rows, each line with a formula as many rows as the formula has.
+/// Without a formula, or without the `math` feature, the lines are unchanged.
+#[cfg(feature = "math")]
+pub(super) fn text_rows(lines: &[String]) -> Vec<String> {
+    use crate::flowchart::formula;
+    if !lines.iter().any(|l| formula::has(l)) {
+        return lines.to_vec();
+    }
+    lines
+        .iter()
+        .flat_map(|l| line_rows(&formula::runs(l)))
+        .collect()
+}
+
+#[cfg(not(feature = "math"))]
+pub(super) fn text_rows(lines: &[String]) -> Vec<String> {
+    lines.to_vec()
+}
+
 /// A rectangle of text with the row its baseline is on.
 #[cfg(feature = "math")]
 struct Block {

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::mathtext;
+use super::mathtext::{self, style_of};
 use super::shapes::{self, BoxF, Outline};
 use super::style::{self, Resolved};
 use super::{
@@ -69,13 +69,6 @@ const WRAP: f32 = 200.0;
 /// One-line labels of diamond-like shapes wider than this wrap to keep the shape compact.
 const SQUARE_WRAP: f32 = 120.0;
 
-fn style_of(s: &Span) -> TextStyle {
-    TextStyle {
-        bold: s.bold,
-        italic: s.italic,
-    }
-}
-
 /// Appends `text` in the style of `like` to `line`, merging it into the last span when the style
 /// matches.
 fn push_span(line: &mut Vec<Span>, text: &str, like: &Span) {
@@ -97,10 +90,7 @@ impl<M: TextMetrics> Px<'_, M> {
 
     /// The width of a span: a formula that typesets is its own width, anything else is text.
     fn span_width(&self, s: &Span) -> f32 {
-        match mathtext::inline(s) {
-            Some(f) if s.math => f.width * self.theme.font_size,
-            _ => self.width(&s.text, style_of(s)),
-        }
+        mathtext::span_width(self.metrics, self.theme.font_size, s)
     }
 
     fn line_width(&self, line: &[Span]) -> f32 {
@@ -904,56 +894,7 @@ impl Painter<'_> {
     /// tall as `mathtext::line_box` says, and the block is centered on `center`. A line with no
     /// formula that typesets is a line height tall with its text on the line's center.
     fn math_lines(&mut self, owner: Owner, lines: &[Vec<Span>], center: Pt, color: Color) {
-        let (lh, size) = (self.theme.line_height, self.theme.font_size);
-        let width = |text: &str, style| self.metrics.styled_width(text, size, style);
-        let boxes: Vec<Option<(f32, f32)>> = lines
-            .iter()
-            .map(|l| mathtext::line_box(self.theme, l))
-            .collect();
-        let height = |b: &Option<(f32, f32)>| b.map_or(lh, |(above, below)| above + below);
-        let mut top = center.y - boxes.iter().map(height).sum::<f32>() / 2.0;
-        let mut out = Vec::new();
-        for (line, b) in lines.iter().zip(&boxes) {
-            let (baseline, mid) = match *b {
-                Some((above, _)) => (top + above, top + above - mathtext::BASELINE * size),
-                None => (top + lh / 2.0, top + lh / 2.0),
-            };
-            let items: Vec<(&Span, Option<mathtext::Inline>)> = line
-                .iter()
-                .map(|s| (s, if s.math { mathtext::inline(s) } else { None }))
-                .collect();
-            let total: f32 = items
-                .iter()
-                .map(|(s, f)| match f {
-                    Some(f) => f.width * size,
-                    None => width(&s.text, style_of(s)),
-                })
-                .sum();
-            let mut x = center.x - total / 2.0;
-            for (span, formula) in &items {
-                if let Some(f) = formula {
-                    out.extend(f.place(Pt::new(x, baseline), size, color));
-                    x += f.width * size;
-                    continue;
-                }
-                let style = style_of(span);
-                let trimmed = span.text.trim();
-                if !trimmed.is_empty() {
-                    let lead = &span.text[..span.text.len() - span.text.trim_start().len()];
-                    let left = x + width(lead, style);
-                    let at = Pt::new(left + width(trimmed, style) / 2.0, mid);
-                    out.push(Primitive::Text {
-                        text: trimmed.to_owned(),
-                        center: at,
-                        size,
-                        color,
-                        style,
-                    });
-                }
-                x += width(&span.text, style);
-            }
-            top += height(b);
-        }
+        let out = mathtext::draw_lines(self.metrics, self.theme, lines, center, color);
         for primitive in out {
             self.push(owner, primitive);
         }

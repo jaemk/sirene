@@ -1,7 +1,7 @@
 //! Sequence diagrams as text (MSEQ-4).
 
 use super::canvas::{Canvas, DOWN, Glyph, Line, UP, glyph};
-use super::{Options, draw_box, draw_lines, width};
+use super::{Options, draw_box, draw_lines, mathtext, width};
 use crate::layout::Rect;
 use crate::sequence::layout::{self, Placed, Sizes, Spacing};
 use crate::sequence::{
@@ -140,20 +140,30 @@ fn header(canvas: &mut Canvas, kind: ParticipantKind, lines: &[String], x: i32, 
 
 /// Renders `seq` as text (MSEQ-4).
 pub fn render(seq: &Sequence, options: &Options) -> String {
+    // A line with a `$$...$$` formula is as many rows as the formula has (LEMB-4).
+    let rows = |lines: &[String]| {
+        if seq.math {
+            mathtext::text_rows(lines)
+        } else {
+            lines.to_vec()
+        }
+    };
+    let names: Vec<Vec<String>> = seq.participants.iter().map(|p| rows(&p.label)).collect();
     let headers: Vec<(i32, i32)> = seq
         .participants
         .iter()
-        .map(|p| header_size(p.kind, &p.label))
+        .zip(&names)
+        .map(|(p, name)| header_size(p.kind, name))
         .collect();
     let labels: Vec<Vec<String>> = seq
         .events
         .iter()
         .map(|e| match e {
-            Event::Message(m) => label(m),
-            Event::Note(n) => n.text.clone(),
+            Event::Message(m) => rows(&label(m)),
+            Event::Note(n) => rows(&n.text),
             Event::Start(kind, l) => vec![tab(*kind, l)],
             Event::Divider(l) => vec![divider(l)],
-            Event::Ref { text, .. } => text.clone(),
+            Event::Ref { text, .. } => rows(text),
             Event::Separator(t) if !t.is_empty() => vec![format!(" {t} ")],
             Event::Delay(Some(t)) if !t.is_empty() => vec![format!(" {t} ")],
             _ => Vec::new(),
@@ -400,7 +410,7 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         header(
             &mut canvas,
             part.kind,
-            &part.label,
+            &names[p],
             x,
             c(l.head_y[p]) + header_h - h,
             w,
@@ -408,7 +418,7 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         if l.destroyed[p] {
             canvas.arrow(c(l.x[p]), c(l.life_end[p]), glyph('×', 'X'));
         } else if !seq.hide_footbox {
-            header(&mut canvas, part.kind, &part.label, x, c(l.footer_y), w);
+            header(&mut canvas, part.kind, &names[p], x, c(l.footer_y), w);
         }
     }
 

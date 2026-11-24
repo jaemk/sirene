@@ -7,7 +7,7 @@ use super::{
     Sequence, Text,
 };
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::text;
+use crate::flowchart::{formula, text};
 use crate::lines::{MAX_DEPTH, too_deep};
 use crate::scene::parse_color;
 use crate::syntax::SyntaxKind::{self, *};
@@ -151,6 +151,18 @@ impl Lower {
         self.diagnostics.push(Diagnostic::warning(range, message));
     }
 
+    /// Reports each `$$...$$` formula in `text` that does not typeset (LEMB-4, LEMB-5). `token`
+    /// is the source text it came from, when it has one.
+    fn check_math(&mut self, token: Option<&SyntaxToken>, text: &Text, fallback: TextRange) {
+        if !text.iter().any(|l| formula::has(l)) {
+            return;
+        }
+        let raw = token.map_or("", |t| t.text());
+        let start = token.map_or(fallback.start(), |t| t.text_range().start());
+        let errors = formula::errors(start, raw, text.iter().cloned(), fallback);
+        self.diagnostics.extend(errors);
+    }
+
     fn find(&self, id: &str) -> Option<usize> {
         self.ids.get(id).copied()
     }
@@ -195,6 +207,7 @@ impl Lower {
             ParticipantKind::Participant
         };
         let mut label = text_of(stmt, TEXT).filter(|s| !s.is_empty());
+        let mut source = token(stmt, TEXT);
         if let Some(body) = token(stmt, META_BODY) {
             let (entries, _) = text::metadata(body.text());
             for (key, value) in entries {
@@ -206,7 +219,10 @@ impl Lower {
                             format!("unknown participant type `{value}`; drawing a box"),
                         ),
                     },
-                    "alias" if label.is_none() => label = Some(value),
+                    "alias" if label.is_none() => {
+                        label = Some(value);
+                        source = Some(body.clone());
+                    }
                     _ => {}
                 }
             }
@@ -229,11 +245,13 @@ impl Lower {
             );
             return;
         }
-        let p = &mut self.seq.participants[i];
-        p.kind = kind;
+        self.seq.participants[i].kind = kind;
         if let Some(label) = label {
-            p.label = display(&label);
+            let text = display(&label);
+            self.check_math(source.as_ref(), &text, stmt.text_range());
+            self.seq.participants[i].label = text;
         }
+        let p = &mut self.seq.participants[i];
         if group.is_some() {
             p.group = group;
         }
@@ -292,6 +310,7 @@ impl Lower {
         self.counter = (n.saturating_add(step), step);
         let number = self.numbering.then_some(n);
         let text = text_of(stmt, TEXT).map_or_else(Vec::new, |t| display(&t));
+        self.check_math(token(stmt, TEXT).as_ref(), &text, stmt.text_range());
         self.messages.push(stmt.text_range());
         self.seq.events.push(Event::Message(Message {
             from,
@@ -323,6 +342,7 @@ impl Lower {
         }
         let participants = names.iter().map(|n| self.ensure(n.text())).collect();
         let text = text_of(stmt, TEXT).map_or_else(Vec::new, |t| display(&t));
+        self.check_math(token(stmt, TEXT).as_ref(), &text, stmt.text_range());
         self.seq.events.push(Event::Note(Note {
             side,
             participants,
@@ -472,6 +492,7 @@ impl Lower {
             }
         }
         self.seq.title = self.title;
+        self.seq.math = true;
         (self.seq, self.diagnostics)
     }
 }
