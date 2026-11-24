@@ -69,7 +69,7 @@ jobs:
           tool: cargo-semver-checks
       - run: cargo semver-checks --package sirene-core --all-features
 
-  # Both fuzz targets (fuzz/, LANGS-11) with cargo-fuzz's sanitizers, on copies of the seed
+  # The four fuzz targets (fuzz/, LANGS-11) with cargo-fuzz's sanitizers, on copies of the seed
   # corpus for a minute. A crash fails the job and uploads its input. cargo-fuzz needs a nightly
   # toolchain, pinned here so a nightly regression can't fail unrelated changes.
   fuzz:
@@ -97,6 +97,16 @@ jobs:
           mkdir fuzz-document-corpus
           cp fuzz/corpus/document/* fuzz-document-corpus/
           cargo +nightly-2026-09-01 fuzz run --target x86_64-unknown-linux-gnu document fuzz-document-corpus -- -max_total_time=60 -max_len=4096
+      - name: fuzz the math typesetter
+        run: |
+          mkdir fuzz-math-corpus
+          cp fuzz/corpus/math/* fuzz-math-corpus/
+          cargo +nightly-2026-09-01 fuzz run --target x86_64-unknown-linux-gnu math fuzz-math-corpus -- -max_total_time=60 -max_len=4096 -rss_limit_mb=2048
+      - name: fuzz the AsciiMath translator
+        run: |
+          mkdir fuzz-asciimath-corpus
+          cp fuzz/corpus/asciimath/* fuzz-asciimath-corpus/
+          cargo +nightly-2026-09-01 fuzz run --target x86_64-unknown-linux-gnu asciimath fuzz-asciimath-corpus -- -max_total_time=60 -max_len=4096 -rss_limit_mb=2048
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
