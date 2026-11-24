@@ -137,13 +137,6 @@ pub(super) fn ord<'t>(
     options: &Options<'t>,
     span: Range<usize>,
 ) -> Result<Built<'t>, MathError> {
-    if text
-        .chars()
-        .next()
-        .is_some_and(|c| ('\u{1d400}'..='\u{1d7ff}').contains(&c))
-    {
-        return Err(not_yet("a mathematical alphanumeric character", span));
-    }
     let drawn = drawn_text(name, &text, mode);
     let one = |face: Face| {
         Built::One(Atom::new(
@@ -152,6 +145,11 @@ pub(super) fn ord<'t>(
             options,
         ))
     };
+    // A mathematical alphanumeric character picks its own font. The table replaces it with its
+    // plain letter or digit, which gives the metrics.
+    if let Some(face) = text.chars().next().and_then(wide_character_face) {
+        return Ok(one(face));
+    }
     let use_font = mode == Mode::Math || options.font.is_some();
     let chosen = if use_font {
         match options.font {
@@ -195,6 +193,39 @@ pub(super) fn ord<'t>(
     };
     let face = text_face(family, options).map_err(|message| MathError::new(message, span))?;
     Ok(one(face))
+}
+
+/// The face of a mathematical alphanumeric character, U+1D400 to U+1D7FF (KaTeX's
+/// `wideCharacterFont`). `None` for the ranges KaTeX has no font for (bold script, bold italic
+/// sans serif, double-struck digits, lowercase script, and Greek) and for other characters.
+pub(super) fn wide_character_face(c: char) -> Option<Face> {
+    let code = u32::from(c);
+    match code {
+        // Latin letters, 26 per row (KaTeX's `wideLatinLetterData`).
+        0x1d400..=0x1d6a3 => match (code - 0x1d400) / 26 {
+            0 | 1 => Some(Face::MainBold),
+            2 | 3 => Some(Face::MathItalic),
+            4 | 5 => Some(Face::MainBoldItalic),
+            6 => Some(Face::ScriptRegular),
+            10 | 11 | 14 | 15 => Some(Face::FrakturRegular),
+            12 | 13 => Some(Face::AmsRegular),
+            16 | 17 => Some(Face::SansSerifRegular),
+            18 | 19 => Some(Face::SansSerifBold),
+            20 | 21 => Some(Face::SansSerifItalic),
+            24 | 25 => Some(Face::TypewriterRegular),
+            _ => None,
+        },
+        // Dotless i and j, in the first row (bold upright).
+        0x1d6a5 | 0x1d6a6 => Some(Face::MainBold),
+        0x1d7ce..=0x1d7ff => match (code - 0x1d7ce) / 10 {
+            0 => Some(Face::MainBold),
+            2 => Some(Face::SansSerifRegular),
+            3 => Some(Face::SansSerifBold),
+            4 => Some(Face::TypewriterRegular),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 /// The face of a math font command (KaTeX's `fontMap`).

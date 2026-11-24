@@ -615,18 +615,59 @@ mod tests {
     }
 
     #[test]
-    fn unbuilt_nodes_say_so() {
-        let nodes = parse_with(
-            "\u{1d400}",
-            Settings {
-                display_mode: false,
-            },
-        )
-        .unwrap();
-        let err = layout(&nodes, false).unwrap_err();
-        assert_eq!(
-            err.message,
-            "a mathematical alphanumeric character is not laid out yet"
-        );
+    fn mathematical_alphanumerics_take_their_font_and_the_plain_letter_metrics() {
+        use crate::math::{metrics, metrics_data::Face, symbols::Mode};
+        let expect = |src: &str, plain: char, face: Face| {
+            let (w, h, d) = laid_out(src, false);
+            let m = metrics::glyph(plain, face, Mode::Math).unwrap();
+            assert!(close(w, m.width + m.italic.max(0.0)), "{src} width {w}");
+            assert!(close(h, m.height), "{src} height {h}");
+            assert!(close(d, m.depth), "{src} depth {d}");
+        };
+        // Bold A: Main-Bold, 0.68611 high.
+        let (w, h, d) = laid_out("\u{1d400}", false);
+        assert!(close(w, 0.86944) && close(h, 0.68611) && close(d, 0.0));
+        expect("\u{1d41a}", 'a', Face::MainBold);
+        expect("\u{1d7ce}", '0', Face::MainBold);
+        expect("\u{1d434}", 'A', Face::MathItalic);
+        expect("\u{1d468}", 'A', Face::MainBoldItalic);
+        expect("\u{1d49c}", 'A', Face::ScriptRegular);
+        expect("\u{1d504}", 'A', Face::FrakturRegular);
+        expect("\u{1d538}", 'A', Face::AmsRegular);
+        expect("\u{1d56c}", 'A', Face::FrakturRegular);
+        expect("\u{1d5a0}", 'A', Face::SansSerifRegular);
+        expect("\u{1d5d4}", 'A', Face::SansSerifBold);
+        expect("\u{1d608}", 'A', Face::SansSerifItalic);
+        expect("\u{1d670}", 'A', Face::TypewriterRegular);
+        expect("\u{1d7f6}", '0', Face::TypewriterRegular);
+        // The same inside `\mathrm` and `\text`: the character's own font wins.
+        expect("\\mathrm{\u{1d41a}}", 'a', Face::MainBold);
+        expect("\\text{\u{1d608}}", 'A', Face::SansSerifItalic);
+    }
+
+    #[test]
+    fn mathematical_alphanumerics_without_a_font_use_the_ordinary_path() {
+        // Bold script, double-struck digits, and Greek have no KaTeX font: no metrics, no size.
+        for src in ["\u{1d4d0}", "\u{1d7d8}", "\u{1d6a8}"] {
+            let (w, h, d) = laid_out(src, false);
+            assert_eq!((w, h, d), (0.0, 0.0, 0.0), "{src}");
+        }
+    }
+
+    #[test]
+    fn wide_character_fonts_follow_katexs_rows() {
+        use super::symbol::wide_character_face as face;
+        use crate::math::metrics_data::Face;
+        assert_eq!(face('\u{1d400}'), Some(Face::MainBold));
+        assert_eq!(face('\u{1d433}'), Some(Face::MainBold));
+        assert_eq!(face('\u{1d6a3}'), Some(Face::TypewriterRegular));
+        assert_eq!(face('\u{1d6a5}'), Some(Face::MainBold));
+        assert_eq!(face('\u{1d49c}'), Some(Face::ScriptRegular));
+        assert_eq!(face('\u{1d4b6}'), None);
+        assert_eq!(face('\u{1d7d8}'), None);
+        assert_eq!(face('\u{1d7ff}'), Some(Face::TypewriterRegular));
+        assert_eq!(face('\u{1d6a8}'), None);
+        assert_eq!(face('a'), None);
+        assert_eq!(face('\u{1d3ff}'), None);
     }
 }

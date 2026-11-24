@@ -1,6 +1,5 @@
 ---
 source: crates/sirene-core/tests/math_snapshots.rs
-assertion_line: 239
 expression: summary
 ---
 Accents: paths=20 ink=[0.04 -1.19 7.16 0.25] box=[7.16 1.17 0.25] svg=3be5ba30a717b2f3
@@ -118,7 +117,7 @@ SupSubCharacterBox: paths=16 ink=[0.03 -0.71 7.98 0.24] box=[8.05 0.69 0.24] svg
 SupSubHorizSpacing: paths=18 ink=[0.03 -1.45 6.94 0.95] box=[7.09 1.45 0.95] svg=0b80b29777c0e497
 SupSubLeftAlignReset: paths=19 ink=[0.01 -0.95 6.75 1.51] box=[6.81 1.05 1.60] svg=706cbe92ac9aa6c9
 SupSubOffsets: paths=22 ink=[0.06 -1.36 10.12 0.97] box=[10.17 1.36 0.97] svg=f20baaed07eade75
-SurrogatePairs: does not typeset
+SurrogatePairs: paths=52 ink=[0.53 -3.13 8.46 2.43] box=[8.97 3.25 2.75] svg=036b0cf3e05e017f
 SvgReset: paths=10 ink=[0.00 -0.95 4.18 0.89] box=[4.15 0.99 0.89] svg=c2d096212ebec093
 Symbols1: paths=10 ink=[0.05 -0.75 6.87 0.06] box=[6.93 0.75 0.08] svg=b45023a4dd880712
 Tag: paths=13 ink=[0.12 -1.51 6.01 0.89] box=[6.11 1.49 0.88] svg=bf7dbd17d7958fc7
