@@ -32,8 +32,9 @@ before typesetting, as Mermaid does. A label with a formula is not read as markd
 
 Status: flowchart node and edge labels are done (`Label::runs`, `scene/mathtext.rs`,
 `ascii/mathtext.rs`; tests in `tests/flowchart_math.rs`). Other kinds that lower to the
-flowchart model share the label type but are not wired: subgraph titles, end labels, and
-compartment titles draw the formula as text. Sequence participant names and aliases, message
+flowchart model share the label type but are not wired for `$$`: subgraph titles, end labels,
+and compartment titles and rows draw the formula as text (PlantUML's tags are read there, see
+LEMB-2). Sequence participant names and aliases, message
 text, and notes are done (`tests/sequence_math.rs`); block, divider, group, and title text and
 the PlantUML-only separators, delays, and `ref` text draw the formula as text. The sequence
 model keeps `Text = Vec<String>` with the source, and `Sequence::math` (set by the Mermaid
@@ -64,7 +65,8 @@ kind already reads Creole text (PCREO-1), not only in the three positions the re
 shows. An unclosed tag is plain text.
 
 Status (`<latex>`): read in sequence participant names, messages, notes, and `ref` text and in the
-labels of the graph kinds (PCREO-3 lists them and what is not read). The tag is matched in any
+labels of the graph kinds, including class and state compartment rows and titles, the labels at
+the ends of an edge, and subgraph titles (PCREO-3 lists them and what is not read). The tag is matched in any
 case; several per line; no nesting; the body is verbatim, so a doubled backslash is a TeX line
 break and `\n` inside a closed tag is not a line break. Typeset in text style (inline), not
 Mermaid's display style. `<math>` (AsciiMath) is read in the same places, translated to TeX by
@@ -134,6 +136,9 @@ as the fallback (`flowchart::formula::errors` is shared with the flowchart lower
   as `Primitive::Path` items (with an optional clip), placed on a baseline shared with the text
   runs of its line (`scene/mathtext.rs`, `ascii/mathtext.rs`); no new display-list item.
 - [ ] LEMB-T5 Per diagram kind: where a label is measured and drawn today, and what must change
-  to take a formula. Done for flowcharts, sequence diagrams, and the PlantUML graph kinds
-  listed in PCREO-3; open for the rest (PlantUML compartment rows, edge end labels, titles,
-  legends, and the other Mermaid kinds of LEMB-T6).
+  to take a formula (a table in this spec). Done for PlantUML's graph kinds: node, edge, end,
+  note, subgraph title, and compartment title and row labels are measured and drawn from
+  `Label::runs` and `Formulas` (`scene/paint.rs`) and `Rows` (`ascii/mod.rs`). Left, for
+  PlantUML: the document `title`, headers, footers, legends, sequence group and divider text,
+  and the kinds without label runs (mindmap, JSON, YAML, Gantt, timing, chronology, DOT). Left,
+  for Mermaid (LEMB-1): subgraph titles, end labels, and compartments, which stay text.

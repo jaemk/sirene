@@ -61,7 +61,7 @@ pub use xychart::render as xychart;
 use unicode_width::UnicodeWidthChar;
 
 use crate::flowchart::{
-    Arrow, Edge, Flowchart, Label, Measure, Node, Row, Shape, Stroke, Subgraph, clean,
+    Arrow, Delim, Edge, Flowchart, Label, Measure, Node, Row, Shape, Stroke, Subgraph, clean,
 };
 use crate::layout::{self, Config, Point, Rect, Size, Spacing};
 use canvas::{Canvas, DOWN, Glyph, LEFT, Line, RIGHT, UP, glyph};
@@ -221,7 +221,7 @@ fn draw_in(chart: &Flowchart, layout: &layout::Layout, options: &Options, rows: 
         draw_lines(&mut canvas, &note_lines, r.x + 1, r.w - 2, r.y + 1);
     }
     for (n, r) in chart.nodes.iter().zip(&layout.nodes) {
-        draw_node_frame(&mut canvas, n, *r);
+        draw_node_frame(&mut canvas, n, *r, rows);
     }
     // An endpoint's rect, and whether it is one character that edges stop short of.
     // Nodes first, so a subgraph wins when both have the id.
@@ -239,13 +239,14 @@ fn draw_in(chart: &Flowchart, layout: &layout::Layout, options: &Options, rows: 
         if let Some(route) = route
             && e.stroke != Stroke::Invisible
         {
-            draw_edge(
+            draw_edge_in(
                 &mut canvas,
                 e,
                 &route.points,
                 rect_of(&e.from),
                 rect_of(&e.to),
                 route.label,
+                rows,
             );
         }
     }
@@ -262,7 +263,10 @@ fn draw_in(chart: &Flowchart, layout: &layout::Layout, options: &Options, rows: 
     }
     for (s, r) in chart.subgraphs.iter().zip(&layout.titles) {
         if let Some(r) = r {
-            canvas.text(r.x, r.y, &format!(" {} ", title(s)));
+            // The first row is on the border; a title with a tall formula goes on below it.
+            for (i, row) in title_rows(rows, s).iter().enumerate() {
+                canvas.text(r.x, r.y + i as i32, &format!(" {row} "));
+            }
         }
     }
 
@@ -315,7 +319,11 @@ impl Measure for CellsIn<'_> {
         let w = lines.iter().map(|l| width(l)).max().unwrap_or(0);
         let h = lines.len() as i32;
         if !node.sections.is_empty() {
-            let rows: Vec<Vec<String>> = node.sections.iter().map(|s| section_lines(s)).collect();
+            let rows: Vec<Vec<String>> = node
+                .sections
+                .iter()
+                .map(|s| section_lines(self.0, node, s))
+                .collect();
             let rw = rows.iter().flatten().map(|l| width(l)).max().unwrap_or(0);
             let rh: i32 = rows.iter().map(|s| s.len() as i32 + 1).sum();
             // An untitled node's first section has no rule of its own: the top border.
@@ -341,11 +349,12 @@ impl Measure for CellsIn<'_> {
 
     /// The title and a space on each side, on the top border.
     fn subgraph_title(&self, subgraph: &Subgraph) -> Size {
-        let t = title(subgraph);
-        if t.is_empty() {
+        let t = title_rows(self.0, subgraph);
+        if t.iter().all(|r| r.is_empty()) {
             Size::default()
         } else {
-            Size::new(width(&t) + 2, 1)
+            let w = t.iter().map(|r| width(r)).max().unwrap_or(0);
+            Size::new(w + 2, t.len() as i32)
         }
     }
 
@@ -363,6 +372,19 @@ impl Measure for CellsIn<'_> {
         }
         let mut y = if node.untitled() { 0 } else { 1 + title as i32 };
         let mut k = row - title;
+        if node.label.delim == Delim::Latex {
+            // A row with a formula is several lines: the port is on its middle one.
+            for section in &node.sections {
+                let blocks = section_blocks(self.0, node, section);
+                if let Some(b) = blocks.get(k) {
+                    let above: usize = blocks[..k].iter().map(Vec::len).sum();
+                    return Some(y + 1 + (above + b.len().saturating_sub(1) / 2) as i32);
+                }
+                k -= section.len();
+                y += 1 + blocks.iter().map(Vec::len).sum::<usize>() as i32;
+            }
+            return None;
+        }
         for section in &node.sections {
             if k < section.len() {
                 return Some(y + 1 + k as i32);
@@ -410,8 +432,47 @@ fn title(s: &Subgraph) -> String {
     s.title.lines().join(" ").trim().to_owned()
 }
 
+/// The rows of a subgraph's title: its text on one row, or, for a PlantUML title with a formula,
+/// the formula's rows.
+fn title_rows(rows: &Rows, s: &Subgraph) -> Vec<String> {
+    if s.title.delim == Delim::Latex && s.title.has_formula() {
+        return lines_in(rows, &s.title);
+    }
+    vec![title(s)]
+}
+
+/// The lines of a label of a position that reads formulas only in PlantUML text (the title of a
+/// compartment node, the ends of an edge): the label's rows when its delimiters are PlantUML's,
+/// else its text lines (LEMB-1).
+fn plantuml_lines(rows: &Rows, label: &Label) -> Vec<String> {
+    if label.delim == Delim::Latex {
+        lines_in(rows, label)
+    } else {
+        label.lines()
+    }
+}
+
+/// A compartment's rows, each as the lines it takes: one, or several for a PlantUML row with a
+/// formula in a cell (LANGS-3).
+fn section_blocks(cache: &Rows, node: &Node, rows: &[Row]) -> Vec<Vec<String>> {
+    if node.label.delim == Delim::Latex
+        && let Some(blocks) = mathtext::section_rows(cache, rows)
+    {
+        return blocks;
+    }
+    text_lines(rows).into_iter().map(|l| vec![l]).collect()
+}
+
+/// The lines of a compartment of `node`.
+fn section_lines(cache: &Rows, node: &Node, rows: &[Row]) -> Vec<String> {
+    section_blocks(cache, node, rows)
+        .into_iter()
+        .flatten()
+        .collect()
+}
+
 /// A compartment's rows with their cells padded into columns (LANGS-3).
-fn section_lines(rows: &[Row]) -> Vec<String> {
+fn text_lines(rows: &[Row]) -> Vec<String> {
     let mut cols: Vec<i32> = Vec::new();
     for row in rows {
         for (k, c) in row.cells.iter().enumerate() {
@@ -529,7 +590,7 @@ const SLANT: [Glyph; 4] = [
 const FORWARD: Glyph = glyph('╱', '/');
 const BACK: Glyph = glyph('╲', '\\');
 
-fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
+fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect, rows: &Rows) {
     let f = frame_of(node);
     match f {
         Frame::Text => return,
@@ -611,13 +672,13 @@ fn draw_node_frame(canvas: &mut Canvas, node: &Node, r: Rect) {
         // No compartments: nothing below uses it.
         r.y + 1
     } else {
-        r.y + 1 + node.label.lines().len() as i32
+        r.y + 1 + title_lines(node, rows).len() as i32
     };
     for (i, section) in node.sections.iter().enumerate() {
         if i > 0 || !node.untitled() {
             canvas.hline(r.x, r.right(), y, Line::Light);
         }
-        y += 1 + section.len() as i32;
+        y += 1 + section_lines(rows, node, section).len() as i32;
     }
 }
 
@@ -629,7 +690,7 @@ fn title_lines(node: &Node, rows: &Rows) -> Vec<String> {
     } else if node.sections.is_empty() {
         lines_in(rows, &node.label)
     } else {
-        node.label.lines()
+        plantuml_lines(rows, &node.label)
     }
 }
 
@@ -647,7 +708,7 @@ fn draw_node_text_in(canvas: &mut Canvas, node: &Node, r: Rect, rows: &Rows) {
             r.y + 2 + lines.len() as i32
         };
         for section in &node.sections {
-            for row in section_lines(section) {
+            for row in section_lines(rows, node, section) {
                 canvas.text(r.x + 2, y, &row);
                 y += 1;
             }
@@ -761,13 +822,27 @@ fn arrow_glyph(arrow: Arrow, toward: u8) -> Glyph {
 
 /// Draws an edge, clipped to the outside of its endpoints and label (ASCIIR-4). A line without
 /// an arrowhead joins its endpoint's border, unless that endpoint is a glyph.
+#[cfg(test)]
 fn draw_edge(
+    canvas: &mut Canvas,
+    edge: &Edge,
+    points: &[Point],
+    from: (Rect, bool),
+    to: (Rect, bool),
+    label: Option<Rect>,
+) {
+    draw_edge_in(canvas, edge, points, from, to, label, &Rows::default());
+}
+
+/// [`draw_edge`] with the formulas of the end labels already set in `rows`.
+fn draw_edge_in(
     canvas: &mut Canvas,
     edge: &Edge,
     points: &[Point],
     (from, from_glyph): (Rect, bool),
     (to, to_glyph): (Rect, bool),
     label: Option<Rect>,
+    rows: &Rows,
 ) {
     let line = match edge.stroke {
         Stroke::Thick => Line::Heavy,
@@ -828,17 +903,26 @@ fn draw_edge(
         let (Some(l), Some(&p)) = (label, path.get(at)) else {
             continue;
         };
-        let text = l.lines().join(" ");
-        let vertical = path.get(next).is_none_or(|q| q.x == p.x);
-        if vertical {
-            canvas.text(p.x + 1, p.y, &text);
+        // One row of text; a PlantUML label with a formula is the formula's rows.
+        let text: Vec<String> = if l.delim == Delim::Latex && l.has_formula() {
+            lines_in(rows, l)
         } else {
-            let x = if path.get(next).is_some_and(|q| q.x < p.x) {
-                p.x - width(&text) + 1
+            vec![l.lines().join(" ")]
+        };
+        let vertical = path.get(next).is_none_or(|q| q.x == p.x);
+        let rows_above = text.len() as i32;
+        for (i, text) in text.iter().enumerate() {
+            if vertical {
+                canvas.text(p.x + 1, p.y + i as i32, text);
             } else {
-                p.x
-            };
-            canvas.text(x, p.y - 1, &text);
+                let x = if path.get(next).is_some_and(|q| q.x < p.x) {
+                    p.x - width(text) + 1
+                } else {
+                    p.x
+                };
+                // Above the line, the last row next to it.
+                canvas.text(x, p.y - rows_above + i as i32, text);
+            }
         }
     }
 }

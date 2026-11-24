@@ -1,0 +1,5 @@
+@startuml
+package "Set <latex>\mathbb{N}</latex> and <latex>\foo</latex>" {
+  class Counter
+}
+@enduml

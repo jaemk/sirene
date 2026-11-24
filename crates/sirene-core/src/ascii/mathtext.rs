@@ -86,6 +86,69 @@ pub(super) fn text_rows(lines: &[String], _: Delim) -> Vec<String> {
     lines.to_vec()
 }
 
+/// The rows of a compartment of a PlantUML node (LANGS-3) when a cell holds a formula, else
+/// `None` (the compartment is its text rows). Each row of the compartment is as many lines as its
+/// tallest formula; its cells are padded into columns by their widths, on a common baseline.
+#[cfg(feature = "math")]
+pub(super) fn section_rows(
+    cache: &Rows,
+    rows: &[crate::flowchart::Row],
+) -> Option<Vec<Vec<String>>> {
+    use crate::flowchart::formula;
+    let cells: Vec<Vec<Vec<Span>>> = rows
+        .iter()
+        .map(|r| {
+            r.cells
+                .iter()
+                .map(|c| formula::runs(&crate::flowchart::clean(c), Delim::Latex))
+                .collect()
+        })
+        .collect();
+    if !cells.iter().flatten().flatten().any(|s| s.math) {
+        return None;
+    }
+    let cell_width = |cell: &[Span]| -> i32 { cell.iter().map(|s| cache.block(s).width).sum() };
+    let mut cols: Vec<i32> = Vec::new();
+    for row in &cells {
+        for (k, cell) in row.iter().enumerate() {
+            let w = cell_width(cell);
+            match cols.get_mut(k) {
+                Some(c) => *c = (*c).max(w),
+                None => cols.push(w),
+            }
+        }
+    }
+    Some(
+        cells
+            .iter()
+            .map(|row| {
+                let mut line: Vec<Span> = Vec::new();
+                for (k, cell) in row.iter().enumerate() {
+                    if cols[k] == 0 {
+                        continue;
+                    }
+                    if !line.is_empty() {
+                        line.push(Span::plain(" "));
+                    }
+                    line.extend(cell.iter().cloned());
+                    let pad = (cols[k] - cell_width(cell)).max(0) as usize;
+                    line.push(Span::plain(" ".repeat(pad)));
+                }
+                line_rows(cache, &line)
+                    .into_iter()
+                    .map(|r| r.trim_end().to_owned())
+                    .collect()
+            })
+            .collect(),
+    )
+}
+
+/// Without the `math` feature a formula is its source: the compartment is its text rows.
+#[cfg(not(feature = "math"))]
+pub(super) fn section_rows(_: &Rows, _: &[crate::flowchart::Row]) -> Option<Vec<Vec<String>>> {
+    None
+}
+
 /// A rectangle of text with the row its baseline is on.
 #[cfg(feature = "math")]
 struct Block {

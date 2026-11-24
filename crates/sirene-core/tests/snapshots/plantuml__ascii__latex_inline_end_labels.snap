@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nclass Order\nclass Item\nOrder \"<latex>\\alpha</latex>\" --> \"<math>n^2</math>\" Item : lines\n@enduml\n"
+---
++-------+
+| Order |
++---+---+
+    |α
+  lines
+    vn²
++------+
+| Item |
++------+

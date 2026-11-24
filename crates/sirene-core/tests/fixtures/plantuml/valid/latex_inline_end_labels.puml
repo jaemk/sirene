@@ -1,0 +1,5 @@
+@startuml
+class Order
+class Item
+Order "<latex>\alpha</latex>" --> "<math>n^2</math>" Item : lines
+@enduml

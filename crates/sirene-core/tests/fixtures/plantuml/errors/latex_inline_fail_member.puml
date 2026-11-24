@@ -1,0 +1,6 @@
+@startuml
+class Sum {
+  +total : <latex>\sum_i x_i</latex>
+  +bad : <latex>a + \foo{x}</latex>
+}
+@enduml

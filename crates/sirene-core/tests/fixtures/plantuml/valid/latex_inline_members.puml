@@ -1,0 +1,9 @@
+@startuml
+class "<latex>\Sigma_n</latex>" as Sum {
+  +total : <latex>\sum_i x_i</latex>
+  -count : int
+  +mean() : <math>(sum x)/n</math>
+}
+class Item
+Sum --> Item
+@enduml

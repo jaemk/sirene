@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nclass Order\nclass Item\nOrder \"<latex>\\alpha</latex>\" --> \"<latex>\\bar{</latex>\" Item\n@enduml\n"
+---
+4:48: error: Unexpected end of input in a macro argument, expected '}'
+
+┌───────┐
+│ Order │
+└───┬───┘
+    │α
+    ▼<lat
+┌──────┐
+│ Item │
+└──────┘

@@ -328,6 +328,21 @@ mod tests {
         assert!(scene.elements.len() > n);
     }
 
+    /// PlantUML rows, titles, and end labels share the render's cache: each formula is typeset
+    /// once to check it when lowering and once to draw it, however often a pass measures it.
+    #[test]
+    fn plantuml_rows_titles_and_ends_typeset_each_formula_once_per_render() {
+        let src = "@startuml\npackage \"<latex>t</latex>\" {\n  class A {\n    +f : <latex>a_1</latex>\n    +g : <latex>a_2</latex>\n  }\n  class B\n}\nA \"<latex>m</latex>\" --> \"<latex>n</latex>\" B\n@enduml\n";
+        crate::equation::count::reset();
+        let lowered = crate::diagram::lower(src);
+        assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+        assert_eq!(crate::equation::count::get(), 5, "lowering checks each");
+        crate::equation::count::reset();
+        let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+        assert_eq!(crate::equation::count::get(), 5, "drawing sets each");
+        assert!(!scene.elements.is_empty());
+    }
+
     #[test]
     fn text_spans_are_never_cached() {
         let cache = Formulas::default();
