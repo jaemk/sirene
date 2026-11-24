@@ -223,16 +223,10 @@ impl Lowerer {
         if !label.has_formula() {
             return;
         }
-        let token = label_token(node);
-        let raw = token.as_ref().map_or("", |t| t.text());
-        let start = token
-            .as_ref()
-            .map_or(node.text_range().start(), |t| t.text_range().start());
-        let lines = label.text.split('\n').map(super::model::clean);
-        self.diagnostics.extend(super::formula::errors(
-            start,
-            raw,
-            lines,
+        let lines: Vec<String> = label.text.split('\n').map(super::model::clean).collect();
+        self.diagnostics.extend(super::formula::check_text(
+            label_token(node).as_ref(),
+            &lines,
             node.text_range(),
             label.delim,
         ));

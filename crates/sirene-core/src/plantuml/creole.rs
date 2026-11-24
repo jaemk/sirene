@@ -23,28 +23,61 @@ const TAGS: [(&str, &str); 2] = [("<latex>", "</latex>"), ("<math>", "</math>")]
 /// tag of the same name (no nesting). An unclosed tag, and a tag with an empty or blank body,
 /// are text.
 pub(crate) fn latex_tags(line: &str) -> Vec<Range<usize>> {
+    /// One tag name's place in the line. Positions only move forward, so each is searched for at
+    /// most once past where it was found, and a name whose closing tag is missing is done: no
+    /// later opening tag of it can close either.
+    struct Tag {
+        open: &'static str,
+        close: &'static str,
+        /// The first opening tag at or after the scan position, once searched for.
+        opener: Option<usize>,
+        /// The first closing tag after the last opening tag used, once searched for.
+        closer: Option<usize>,
+        done: bool,
+    }
     // ASCII lowercasing keeps byte offsets.
     let lower = line.to_ascii_lowercase();
+    let mut tags = TAGS.map(|(open, close)| Tag {
+        open,
+        close,
+        opener: None,
+        closer: None,
+        done: false,
+    });
     let mut out = Vec::new();
     let mut at = 0;
     loop {
+        for t in tags.iter_mut().filter(|t| !t.done) {
+            if t.opener.is_some_and(|o| o >= at) {
+                continue;
+            }
+            match lower[at..].find(t.open) {
+                Some(i) => t.opener = Some(at + i),
+                None => t.done = true,
+            }
+        }
         // The first opening tag from `at`, of either name.
-        let next = TAGS
-            .iter()
-            .filter_map(|&(open, close)| {
-                lower[at..].find(open).map(|i| (at + i, open.len(), close))
-            })
-            .min_by_key(|&(i, ..)| i);
-        let Some((open, open_len, close)) = next else {
+        let next = tags
+            .iter_mut()
+            .filter(|t| !t.done)
+            .filter_map(|t| t.opener.map(|o| (o, t)))
+            .min_by_key(|&(o, _)| o);
+        let Some((open, t)) = next else {
             break;
         };
-        let body = open + open_len;
-        let Some(end) = lower[body..].find(close).map(|i| body + i) else {
+        let body = open + t.open.len();
+        let closer = match t.closer {
+            Some(c) if c >= body => Some(c),
+            _ => lower[body..].find(t.close).map(|i| body + i),
+        };
+        let Some(end) = closer else {
             // No closing tag: this is text, and a tag of the other name may still follow.
+            t.done = true;
             at = body;
             continue;
         };
-        let after = end + close.len();
+        t.closer = Some(end);
+        let after = end + t.close.len();
         if !line[body..end].trim().is_empty() {
             out.push(open..after);
         }
@@ -112,8 +145,10 @@ fn each_label(chart: &mut Flowchart, mut f: impl FnMut(&mut Label, &[TextRange])
     }
 }
 
-#[cfg(feature = "math")]
+/// A diagnostic for each formula in `labels` that does not typeset (and without the `math`
+/// feature, for each formula), on the formula's body where the label's source has it as written.
 fn diagnose(labels: Vec<(Label, Vec<TextRange>)>, root: &SyntaxNode) -> Vec<Diagnostic> {
+    use crate::flowchart::formula;
     use rowan::TextSize;
     use std::collections::HashSet;
     let src = root.text().to_string();
@@ -121,37 +156,36 @@ fn diagnose(labels: Vec<(Label, Vec<TextRange>)>, root: &SyntaxNode) -> Vec<Diag
     let mut out = Vec::new();
     for (label, at) in labels {
         let lines = label.text.split('\n').map(crate::flowchart::clean);
-        for (body, e) in crate::flowchart::formula::failures(lines, Delim::Latex) {
-            // The first place in the label's source that has the body and has no diagnostic.
+        for (text, open, close) in formula::formulas(lines, Delim::Latex) {
+            let Some(issue) = formula::issue(Delim::Latex, &text) else {
+                continue;
+            };
+            // The first place in the label's source that has the formula and has no diagnostic.
             let found = at.iter().find_map(|r| {
-                let text = src.get(usize::from(r.start())..usize::from(r.end()))?;
+                let start = usize::from(r.start());
+                let hay = src.get(start..usize::from(r.end()))?;
                 let mut from = 0;
-                while let Some(i) = text.get(from..)?.find(&body) {
-                    let abs = usize::from(r.start()) + from + i;
-                    if used.insert(abs) {
-                        return Some(abs);
+                while let Some(p) = formula::locate(hay, from, &text, open) {
+                    if used.insert(start + p) {
+                        return Some(start + p);
                     }
-                    from += i + body.chars().next().map_or(1, char::len_utf8);
+                    // Past the first byte of this match (`<`), to look for the next.
+                    from = p - open + 1;
                 }
                 None
             });
             let range = match found {
                 Some(p) => {
-                    let to = e.span.end.clamp(e.span.start, body.len());
-                    let at = |o: usize| TextSize::new((p + o) as u32);
-                    TextRange::new(at(e.span.start.min(body.len())), at(to))
+                    let body = formula::body_of(&text, open, close);
+                    let r = formula::source_range(Delim::Latex, body, p, issue.span.clone());
+                    TextRange::new(TextSize::new(r.start as u32), TextSize::new(r.end as u32))
                 }
                 None => at.first().copied().unwrap_or_else(|| root.text_range()),
             };
-            out.push(Diagnostic::new(range, e.message));
+            out.push(issue.at(range));
         }
     }
     out
-}
-
-#[cfg(not(feature = "math"))]
-fn diagnose(_: Vec<(Label, Vec<TextRange>)>, _: &SyntaxNode) -> Vec<Diagnostic> {
-    Vec::new()
 }
 
 #[cfg(test)]
@@ -236,6 +270,33 @@ mod tests {
         assert!(found("<math>x").is_empty());
         assert!(found("<math></math>").is_empty());
         assert!(found("<math> </math>").is_empty());
+    }
+
+    /// Many unclosed tags are scanned once, not once per tag: this was quadratic (50000 tags
+    /// took over two minutes). The bound is generous; the quadratic scan misses it by far.
+    #[test]
+    fn many_unclosed_tags_are_scanned_in_linear_time() {
+        use std::time::{Duration, Instant};
+        let start = Instant::now();
+        assert!(found(&"<latex>x ".repeat(50_000)).is_empty());
+        assert!(found(&"<math>x ".repeat(50_000)).is_empty());
+        assert!(found(&"<latex>a <math>b ".repeat(50_000)).is_empty());
+        // Another name's formula after the unclosed ones is still found.
+        let line = format!("{}<math>y</math>", "<latex>".repeat(50_000));
+        assert_eq!(found(&line), ["<math>y</math>"]);
+        // Another name's closer does not close a tag.
+        assert!(found(&"<latex>a</math> ".repeat(50_000)).is_empty());
+        assert!(
+            start.elapsed() < Duration::from_secs(10),
+            "took {:?}",
+            start.elapsed()
+        );
+    }
+
+    #[test]
+    fn a_closed_tag_after_many_blank_ones_is_found() {
+        let line = format!("{}<latex>x</latex>", "<latex> </latex>".repeat(1_000));
+        assert_eq!(found(&line), ["<latex>x</latex>"]);
     }
 
     #[test]

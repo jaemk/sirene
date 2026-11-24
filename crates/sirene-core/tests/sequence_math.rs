@@ -441,7 +441,14 @@ mod no_math {
     #[test]
     fn dollars_stay_literal_without_the_math_feature() {
         let (seq, diagnostics) = lower(&fixture("math_fail"));
-        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        // One warning, as `@startlatex` gives, on the formula's body.
+        let src = fixture("math_fail");
+        let [d] = diagnostics.as_slice() else {
+            panic!("one diagnostic, got {diagnostics:?}");
+        };
+        assert_eq!(d.severity, sirene_core::Severity::Warning);
+        let range = usize::from(d.range.start())..usize::from(d.range.end());
+        assert_eq!(&src[range], r"\foo", "{d:?}");
         assert!(texts(&draw(&seq)).contains(&"bad $$\\foo$$"));
         let (seq, _) = lower(&fixture("math_participant"));
         assert!(texts(&draw(&seq)).contains(&r"$$\alpha$$"));

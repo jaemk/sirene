@@ -45,12 +45,25 @@ fn diagnostics(src: &str, lowered: &Lowered) -> String {
     out
 }
 
+/// Whether the fixture has a formula, whose drawing and diagnostics are those of a build with
+/// the `math` feature (`tests/plantuml_math.rs` holds the other build's).
+fn needs_math(src: &str) -> bool {
+    let lower = src.to_ascii_lowercase();
+    !cfg!(feature = "math")
+        && ["latex>", "math>", "@startlatex", "@startmath"]
+            .iter()
+            .any(|t| lower.contains(t))
+}
+
 /// Each fixture's diagnostics and drawing; the tree always holds the source exactly.
 #[test]
 fn snapshots() {
     for dir in ["valid", "errors"] {
         for (name, src) in fixtures(dir) {
             assert_eq!(plantuml::parse(&src).syntax().to_string(), src, "{name}");
+            if needs_math(&src) {
+                continue;
+            }
             assert_eq!(Kind::of(&src), Kind::PlantUml, "{name}");
             let lowered = diagram::lower(&src);
             if dir == "valid" {
@@ -84,6 +97,9 @@ fn snapshots() {
 #[test]
 fn ascii_charset_snapshots() {
     for (name, src) in fixtures("valid") {
+        if needs_math(&src) {
+            continue;
+        }
         let out = diagram::lower(&src)
             .diagram
             .ascii(&Options {
