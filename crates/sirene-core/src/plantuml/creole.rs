@@ -120,6 +120,24 @@ pub(crate) fn mark_labels(chart: &mut Flowchart, root: &SyntaxNode) -> Vec<Diagn
             found.push((label.clone(), at.to_vec()));
         }
     });
+    // Compartment rows (class members, state bodies) are read with their node's label delimiters.
+    // A row has no range of its own, so its formulas are looked for in the whole source, after
+    // the labels have taken the places they are written in.
+    let whole = [root.text_range()];
+    for cell in chart
+        .nodes
+        .iter()
+        .flat_map(|n| n.sections.iter().flatten().flat_map(|r| &r.cells))
+    {
+        let label = Label {
+            text: cell.clone(),
+            markdown: false,
+            delim: Delim::Latex,
+        };
+        if label.has_formula() {
+            found.push((label, whole.to_vec()));
+        }
+    }
     diagnose(found, root)
 }
 

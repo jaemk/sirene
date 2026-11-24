@@ -64,13 +64,27 @@ whose tag picks the language per run (`Span::is_asciimath`). Drawn in:
 
 - sequence participant names (`as` text or a quoted name), message text, notes, and `ref` text;
 - the labels of the kinds lowered to graphs: activity, class, state, description (component,
-  deployment, usecase), WBS, Chen ER, and nwdiag, in node labels, edge labels, subgraph titles,
-  and notes.
+  deployment, usecase), WBS, Chen ER, and nwdiag, in node labels, edge labels, the labels at
+  the ends of an edge (multiplicities and roles), subgraph titles (packages, composite states),
+  and notes;
+- the compartments of the class and state kinds: the title of a compartment node and each cell
+  of a row (class, interface, enum, and object members, state bodies). A row with a formula is
+  as tall as its tallest cell's line box, and in the text renderer as many lines as that, its
+  cells on one baseline. Only nodes of these kinds read PlantUML text (`Label::delim`); a
+  Mermaid `$$` in a title, a row, or an end label is text (LEMB-1).
 
-Not drawn: compartment rows (class and object members, state bodies), the multiplicity labels
-at the ends of an edge, titles, headers and footers, legends, sequence group and divider text,
-participant names only given as ids, mindmap, JSON, YAML, Gantt, timing, chronology, DOT, and
-the other kinds that do not carry label runs. Tags there are text with no diagnostic.
+A row has no range of its own, so a failing formula in one is found by its tags in the whole
+source, after the labels have taken the places they are written in; it is on its place when
+the text is written once there, and each of several equal formulas gets its own place in
+order. A subgraph title is one line (its lines joined by spaces) in the scene and the rows of
+its formulas in the text renderer, the first on the border.
+
+Not drawn: the document `title`, headers and footers, legends (not drawn at all), sequence
+group and divider text, participant names only given as ids, mindmap, JSON, YAML, Gantt,
+timing, chronology, DOT, and the other kinds that do not carry label runs. Tags there are text
+with no diagnostic. In the text renderer an end label is placed beside the line's first or
+last cell and is not reserved room by the layout, so a wide one is clipped at the drawing's
+edge, as a text one is.
 Tests: `latex_inline_*` and `math_inline_*` fixtures and
 `crates/sirene-core/tests/plantuml_math.rs`.
 
@@ -79,3 +93,7 @@ Tests: `latex_inline_*` and `math_inline_*` fixtures and
 - Creole beyond the inline `<latex>` and `<math>` tags (PCREO-1) is not read. The scene and
   the ASCII renderer carry formula runs (`flowchart::Span`) but not other rich text spans, so
   the rest starts with a text-run model in the display list (DISPLA).
+- Formula tags in the document `title` (a graph's `title` is an `Option<String>` drawn as one
+  text run), headers, footers, legends, sequence group and divider text, and the other kinds
+  PCREO-3 lists as not drawn are left: each needs its position drawn from `Span` runs, one
+  painter at a time.

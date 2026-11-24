@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nclass Sum {\n  +total : <latex>\\sum_i x_i</latex>\n  +bad : <latex>a + \\foo{x}</latex>\n}\n@enduml\n"
+---
+4:21: error: Undefined control sequence: \foo
+
+┌───────────────────────────────────┐
+│                Sum                │
+├───────────────────────────────────┤
+│ +total : ∑ᵢ xᵢ                    │
+│ +bad : <latex>a + \foo{x}</latex> │
+├───────────────────────────────────┤
+└───────────────────────────────────┘

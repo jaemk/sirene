@@ -65,7 +65,7 @@ pub fn render(b: &Block, options: &Options) -> String {
                 draw_lines(&mut canvas, &l, r.x + 1, r.w - 2, y);
             }
             None => {
-                draw_node_frame(&mut canvas, n, r);
+                draw_node_frame(&mut canvas, n, r, &super::mathtext::Rows::default());
                 draw_node_text(&mut canvas, n, r);
             }
         }

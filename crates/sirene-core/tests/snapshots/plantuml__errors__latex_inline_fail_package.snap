@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\npackage \"Set <latex>\\mathbb{N}</latex> and <latex>\\foo</latex>\" {\n  class Counter\n}\n@enduml\n"
+---
+2:51: error: Undefined control sequence: \foo
+
+┌─ Set ℕ and <latex>\foo</latex> ─┐
+│                                 │
+│           ┌─────────┐           │
+│           │ Counter │           │
+│           └─────────┘           │
+│                                 │
+└─────────────────────────────────┘

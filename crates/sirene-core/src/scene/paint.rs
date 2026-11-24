@@ -9,8 +9,8 @@ use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
 };
 use crate::flowchart::{
-    Arrow, Edge, Flowchart, Label, Measure, Node, Origin, Row, Shape, Span, Stroke as Line,
-    Subgraph,
+    Arrow, Delim, Edge, Flowchart, Label, Measure, Node, Origin, Row, Shape, Span, Stroke as Line,
+    Subgraph, formula,
 };
 use crate::layout::{self, Config, Layout, Rect, Size, Spacing};
 
@@ -212,7 +212,7 @@ impl<M: TextMetrics> Px<'_, M> {
 impl<M: TextMetrics> Measure for Px<'_, M> {
     fn node(&self, node: &Node) -> Size {
         if !node.sections.is_empty() {
-            let c = Compartments::of(node, self.metrics, self.theme);
+            let c = Compartments::of(node, self.metrics, self.theme, &self.formulas);
             return Size::new(cells(c.width), cells(c.height));
         }
         // An unlabeled diamond, such as a state diagram's choice, is a small square one.
@@ -234,6 +234,10 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
     }
 
     fn subgraph_title(&self, subgraph: &Subgraph) -> Size {
+        if let Some(line) = title_runs(subgraph) {
+            let (tw, th) = self.text_size(&[line]);
+            return Size::new(cells(tw + 12.0), cells(th + 6.0));
+        }
         let t = subgraph_title(subgraph);
         if t.is_empty() {
             return Size::default();
@@ -263,7 +267,7 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
             let height = if node.sections.is_empty() {
                 (self.node(node).h - 1) as f32
             } else {
-                Compartments::title(node, self.theme)
+                Compartments::title(node, self.theme, &self.formulas)
             };
             if node.sections.is_empty() {
                 let lines = node.label.runs();
@@ -280,8 +284,21 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
             let mid = height / 2.0 + (row as f32 - (title as f32 - 1.0) / 2.0) * lh;
             return Some(mid.round() as i32);
         }
-        let mut y = Compartments::title(node, self.theme);
+        let mut y = Compartments::title(node, self.theme, &self.formulas);
         let mut k = row - title;
+        if node.label.delim == Delim::Latex {
+            // Rows with formulas are taller: the row's middle is its box's.
+            let c = Compartments::of(node, self.metrics, self.theme, &self.formulas);
+            for (section, heights) in node.sections.iter().zip(&c.rows) {
+                if let Some(&h) = heights.get(k) {
+                    let above = total_height(&heights[..k], lh);
+                    return Some((y + SECTION_PAD + above + h / 2.0).round() as i32);
+                }
+                k -= section.len();
+                y += total_height(heights, lh) + 2.0 * SECTION_PAD;
+            }
+            return None;
+        }
         for section in &node.sections {
             if k < section.len() {
                 return Some((y + SECTION_PAD + k as f32 * lh + lh / 2.0).round() as i32);
@@ -307,6 +324,28 @@ fn row_style(r: &Row) -> TextStyle {
     }
 }
 
+/// The runs of a compartment cell with a formula (`<latex>` and `<math>` tags in PlantUML
+/// nodes), text in the row's style; `None` for a cell that is text.
+fn cell_runs(node: &Node, row: &Row, cell: &str) -> Option<Vec<Span>> {
+    if node.label.delim != Delim::Latex || !formula::has(cell, Delim::Latex) {
+        return None;
+    }
+    let mut line = formula::runs(cell, Delim::Latex);
+    for s in line.iter_mut().filter(|s| !s.math) {
+        s.italic = row.italic;
+    }
+    Some(line)
+}
+
+/// The sum of `heights`, which are `lh` each for a section of text, as `len * lh` is.
+fn total_height(heights: &[f32], lh: f32) -> f32 {
+    if heights.iter().all(|&h| h == lh) {
+        heights.len() as f32 * lh
+    } else {
+        heights.iter().sum()
+    }
+}
+
 /// The measured parts of a compartment node (LANGS-3).
 struct Compartments {
     width: f32,
@@ -315,62 +354,123 @@ struct Compartments {
     title: f32,
     /// Column widths of each section.
     columns: Vec<Vec<f32>>,
+    /// Height of each row of each section: a line height, or more for a row with a tall formula.
+    rows: Vec<Vec<f32>>,
 }
 
 impl Compartments {
-    fn of(node: &Node, metrics: &(impl TextMetrics + ?Sized), theme: &Theme) -> Self {
+    fn of(
+        node: &Node,
+        metrics: &(impl TextMetrics + ?Sized),
+        theme: &Theme,
+        formulas: &Formulas,
+    ) -> Self {
         let size = theme.font_size;
-        let title_w = node
-            .label
-            .spans()
+        let lh = theme.line_height;
+        let title_w = plantuml_runs(&node.label)
             .iter()
             .map(|l| {
                 l.iter()
-                    .map(|s| metrics.styled_width(&s.text, size, style_of(s)))
+                    .map(|s| mathtext::span_width(metrics, formulas, size, s))
                     .sum::<f32>()
             })
             .fold(0.0, f32::max);
-        let title = Self::title(node, theme);
+        let title = Self::title(node, theme, formulas);
         let mut width = title_w;
         let mut height = title;
         let mut columns = Vec::new();
+        let mut rows = Vec::new();
         for section in &node.sections {
             let mut cols: Vec<f32> = Vec::new();
+            let mut heights = Vec::new();
             for row in section {
+                let mut h = lh;
                 for (k, cell) in row.cells.iter().enumerate() {
-                    let w = metrics.styled_width(cell, size, row_style(row));
+                    let w = match cell_runs(node, row, cell) {
+                        Some(line) => {
+                            h = h.max(
+                                mathtext::line_box(formulas, theme, &line)
+                                    .map_or(lh, |(a, d)| a + d),
+                            );
+                            line.iter()
+                                .map(|s| mathtext::span_width(metrics, formulas, size, s))
+                                .sum()
+                        }
+                        None => metrics.styled_width(cell, size, row_style(row)),
+                    };
                     match cols.get_mut(k) {
                         Some(c) => *c = c.max(w),
                         None => cols.push(w),
                     }
                 }
+                heights.push(h);
             }
             let used = cols.iter().filter(|&&w| w > 0.0).count();
             let w = cols.iter().sum::<f32>() + COLUMN_GAP * used.saturating_sub(1) as f32;
             width = width.max(w);
-            height += section.len() as f32 * theme.line_height + 2.0 * SECTION_PAD;
+            height += total_height(&heights, lh) + 2.0 * SECTION_PAD;
             columns.push(cols);
+            rows.push(heights);
         }
         Compartments {
             width: width + 2.0 * shapes::PAD_X,
             height,
             title,
             columns,
+            rows,
         }
     }
 
     /// Height of `node`'s title area, without measuring its rows.
-    fn title(node: &Node, theme: &Theme) -> f32 {
+    fn title(node: &Node, theme: &Theme, formulas: &Formulas) -> f32 {
         if node.untitled() {
-            0.0
-        } else {
-            node.label.spans().len() as f32 * theme.line_height + 2.0 * shapes::PAD_Y
+            return 0.0;
         }
+        let lines = plantuml_runs(&node.label);
+        let text = if lines.iter().any(|l| l.iter().any(|s| s.math)) {
+            lines
+                .iter()
+                .map(|l| {
+                    mathtext::line_box(formulas, theme, l).map_or(theme.line_height, |(a, d)| a + d)
+                })
+                .sum()
+        } else {
+            lines.len() as f32 * theme.line_height
+        };
+        text + 2.0 * shapes::PAD_Y
     }
 }
 
 fn subgraph_title(s: &Subgraph) -> String {
     s.title.lines().join(" ").trim().to_owned()
+}
+
+/// The lines of a label of a position that reads formulas only in PlantUML text (the title of a
+/// compartment node or subgraph, the ends of an edge): its runs when its delimiters are
+/// PlantUML's, else the styled text. Mermaid's `$$` is a formula in node and edge labels only
+/// (LEMB-1).
+fn plantuml_runs(label: &Label) -> Vec<Vec<Span>> {
+    if label.delim == Delim::Latex {
+        label.runs()
+    } else {
+        label.spans()
+    }
+}
+
+/// A subgraph's title as one line of runs, its lines joined by spaces, when it has a formula;
+/// `None` for a title that is text (`subgraph_title`).
+fn title_runs(s: &Subgraph) -> Option<Vec<Span>> {
+    if s.title.delim != Delim::Latex || !s.title.has_formula() {
+        return None;
+    }
+    let mut line = Vec::new();
+    for (i, part) in s.title.runs().into_iter().enumerate() {
+        if i > 0 {
+            line.push(Span::plain(" "));
+        }
+        line.extend(part);
+    }
+    Some(line)
 }
 
 /// Draws `chart`, measuring text with `metrics` (DISPLA-1).
@@ -509,7 +609,7 @@ fn draw_with(
             let t = at(t);
             p.lines(
                 Owner::Cluster(i),
-                &[vec![Span::plain(subgraph_title(s))]],
+                &[title_runs(s).unwrap_or_else(|| vec![Span::plain(subgraph_title(s))])],
                 t.center(),
                 text_color(&r, theme),
             );
@@ -595,11 +695,11 @@ fn draw_with(
         let mut classes = vec!["default"];
         classes.extend(n.classes.iter().map(String::as_str));
         let s = style::resolve(&[], &classes, &n.styles, &defs);
-        // A compartment node's title is measured as text, so it is drawn as text.
+        // A compartment node's title is measured unwrapped (`Compartments::title`).
         let lines = if n.sections.is_empty() {
             px.label_lines(&n.label, Some(n.shape))
         } else {
-            px.fit_lines(n.label.spans(), Some(n.shape))
+            px.fit_lines(plantuml_runs(&n.label), Some(n.shape))
         };
         let mut o = o;
         if chart.agentflow && n.shape == Shape::Collapsed {
@@ -1024,14 +1124,20 @@ impl Painter<'_> {
         b: BoxF,
     ) {
         let theme = self.theme;
-        let c = Compartments::of(node, self.metrics, theme);
+        let c = Compartments::of(node, self.metrics, theme, &self.formulas);
         let color = text_color(s, theme);
         let rule = stroke(s, theme.node_stroke, 1.0, None);
         let center = Pt::new(b.x + b.w / 2.0, b.y + c.title / 2.0);
         self.lines(owner, title, center, color);
-        let (lh, size) = (theme.line_height, theme.font_size);
+        let size = theme.font_size;
         let mut y = b.y + c.title;
-        for (i, (section, cols)) in node.sections.iter().zip(&c.columns).enumerate() {
+        for (i, ((section, cols), heights)) in node
+            .sections
+            .iter()
+            .zip(&c.columns)
+            .zip(&c.rows)
+            .enumerate()
+        {
             // An untitled node's first section starts at its top border.
             if i > 0 || !node.untitled() {
                 self.path(
@@ -1045,21 +1151,34 @@ impl Painter<'_> {
                 );
             }
             y += SECTION_PAD;
-            for row in section {
+            for (row, &row_h) in section.iter().zip(heights) {
                 let style = row_style(row);
-                let mid = y + lh / 2.0;
+                let mid = y + row_h / 2.0;
                 let mut x = b.x + shapes::PAD_X;
                 for (k, cell) in row.cells.iter().enumerate() {
-                    let w = self.metrics.styled_width(cell, size, style);
+                    let runs = cell_runs(node, row, cell);
+                    let w = match &runs {
+                        Some(line) => line
+                            .iter()
+                            .map(|s| mathtext::span_width(self.metrics, &self.formulas, size, s))
+                            .sum(),
+                        None => self.metrics.styled_width(cell, size, style),
+                    };
                     if !cell.is_empty() {
-                        self.text(
-                            owner,
-                            cell.clone(),
-                            Pt::new(x + w / 2.0, mid),
-                            size,
-                            color,
-                            style,
-                        );
+                        match runs {
+                            // A formula cell: its runs on one baseline, centered on the row.
+                            Some(line) => {
+                                self.math_lines(owner, &[line], Pt::new(x + w / 2.0, mid), color)
+                            }
+                            None => self.text(
+                                owner,
+                                cell.clone(),
+                                Pt::new(x + w / 2.0, mid),
+                                size,
+                                color,
+                                style,
+                            ),
+                        }
                         if row.underline {
                             let under = mid + size * 0.55;
                             self.path(
@@ -1082,7 +1201,7 @@ impl Painter<'_> {
                         x += col + COLUMN_GAP;
                     }
                 }
-                y += lh;
+                y += row_h;
             }
             y += SECTION_PAD;
         }
@@ -1154,21 +1273,9 @@ impl Painter<'_> {
                     tip.x + d.x * 22.0 - d.y * 12.0,
                     tip.y + d.y * 22.0 + d.x * 12.0,
                 );
-                let spans = l.spans();
-                let w = spans
-                    .iter()
-                    .map(|line| {
-                        line.iter()
-                            .map(|s| {
-                                self.metrics.styled_width(
-                                    &s.text,
-                                    self.theme.font_size,
-                                    style_of(s),
-                                )
-                            })
-                            .sum::<f32>()
-                    })
-                    .fold(0.0, f32::max);
+                let spans = plantuml_runs(l);
+                let (w, th) =
+                    mathtext::block_size(self.metrics, &self.formulas, self.theme, &spans);
                 // Clear of the line on the side it leans to.
                 let shift = if d.y.abs() > d.x.abs() {
                     Pt::new(-d.y.signum() * w / 2.0, 0.0)
@@ -1176,7 +1283,11 @@ impl Painter<'_> {
                     Pt::new(0.0, d.x.signum() * self.theme.line_height / 2.0)
                 };
                 let center = Pt::new(at.x + shift.x, at.y + shift.y);
-                let h = spans.len() as f32 * self.theme.line_height;
+                let h = if spans.iter().any(|l| l.iter().any(|s| s.math)) {
+                    th
+                } else {
+                    spans.len() as f32 * self.theme.line_height
+                };
                 reach.add(center, w / 2.0 + Reach::PAD, h / 2.0 + Reach::PAD);
                 self.lines(owner, &spans, center, self.theme.text);
             }

@@ -1,0 +1,5 @@
+@startuml
+class Order
+class Item
+Order "<latex>\alpha</latex>" --> "<latex>\bar{</latex>" Item
+@enduml
