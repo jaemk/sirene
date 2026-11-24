@@ -167,6 +167,7 @@ mod tests {
         found.unwrap_or_else(|| panic!("no glyph {text}"))
     }
 
+    #[cfg(feature = "math")]
     #[test]
     fn a_label_past_the_last_column_widens_the_diagram_but_moves_nothing() {
         let plain = laid_out("\\begin{CD}A\\\\@VVV\\\\B\\end{CD}");
