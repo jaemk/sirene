@@ -48,7 +48,15 @@ pub(crate) fn supported(kind: Kind) -> bool {
             | Kind::Json
             | Kind::Yaml
             | Kind::Other(
-                "dot" | "ebnf" | "files" | "regex" | "chen" | "nwdiag" | "chronology" | "latex"
+                "dot"
+                    | "ebnf"
+                    | "files"
+                    | "regex"
+                    | "chen"
+                    | "nwdiag"
+                    | "chronology"
+                    | "latex"
+                    | "math"
             )
     )
 }
@@ -56,10 +64,14 @@ pub(crate) fn supported(kind: Kind) -> bool {
 /// Whether `kind`'s documents are written in another language, whose lines PlantUML's `'`
 /// comments do not apply to.
 pub(crate) fn raw(kind: Kind) -> bool {
-    matches!(kind, Kind::Other("dot" | "ebnf" | "regex" | "latex"))
+    matches!(
+        kind,
+        Kind::Other("dot" | "ebnf" | "regex" | "latex" | "math")
+    )
 }
 
-/// A graph whose labels are Creole text: `<latex>` tags in them are formulas (LEMB-2).
+/// A graph whose labels are Creole text: `<latex>` and `<math>` tags in them are formulas
+/// (LEMB-2).
 fn creole_graph(
     mut chart: crate::flowchart::Flowchart,
     mut diagnostics: Vec<Diagnostic>,
@@ -157,8 +169,13 @@ impl Parse {
                 let (chart, d) = regex::lower(&root);
                 (Diagram::Railroad(chart), d)
             }
-            Kind::Other("latex") => {
-                let (e, d) = latex::lower(&root);
+            Kind::Other(word @ ("latex" | "math")) => {
+                let flavor = if word == "math" {
+                    crate::equation::Flavor::AsciiMath
+                } else {
+                    crate::equation::Flavor::Tex
+                };
+                let (e, d) = latex::lower(&root, flavor);
                 (Diagram::Equation(e), d)
             }
             Kind::Other("files") => {

@@ -1,0 +1,8 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startmath\nf(t)=(a_0)/2 + sum_(n=1)^ooa_ncos((npit)/L)+sum_(n=1)^oo b_n\\ sin((npit)/L)\n@endmath\n"
+---
+
+        a₀      ∞        ⎛ nπt ⎞     ∞         ⎛ nπt ⎞
+f(t) = ---- +   ∑  aₙcos ⎜-----⎟ +   ∑  bₙ sin ⎜-----⎟
+        2     n = 1      ⎝  L  ⎠   n = 1       ⎝  L  ⎠

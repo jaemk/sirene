@@ -67,8 +67,9 @@ Status (`<latex>`): read in sequence participant names, messages, notes, and `re
 labels of the graph kinds (PCREO-3 lists them and what is not read). The tag is matched in any
 case; several per line; no nesting; the body is verbatim, so a doubled backslash is a TeX line
 break and `\n` inside a closed tag is not a line break. Typeset in text style (inline), not
-Mermaid's display style. `<math>` (AsciiMath) is text until the front end exists. `$$` is text
-in PlantUML, and `<latex>` is text in Mermaid: `flowchart::Delim` says which delimiters a label
+Mermaid's display style. `<math>` (AsciiMath) is read in the same places, translated to TeX by
+`math/asciimath.rs` (PCREO-2) and typeset in text style; `@startmath` is the document form.
+`$$` is text in PlantUML, and `<latex>` is text in Mermaid: `flowchart::Delim` says which delimiters a label
 (`Label::delim`) or a sequence (`Sequence::math`) reads.
 
 To verify (LEMB-T8): the escape rules inside the tags (the reference page's doubled backslashes),

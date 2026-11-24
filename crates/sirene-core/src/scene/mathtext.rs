@@ -83,8 +83,7 @@ pub(super) struct Inline {
 /// typeset, and a build without the `math` feature.
 #[cfg(feature = "math")]
 pub(super) fn inline(span: &Span) -> Option<Inline> {
-    use crate::math::typeset;
-    let formula = typeset(&span.formula()?, span.delim()?.style()).ok()?;
+    let formula = span.typeset()?.ok()?;
     Some(Inline {
         width: formula.width,
         ascent: formula.ascent,

@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nparticipant \"<math>alpha</math>\" as A\nparticipant Bob\nBob -> A : <math>a/b</math> and <latex>\\frac{a}{b}</latex> and <MATH>sqrt x</MATH>\nA --> Bob : literal <math>unclosed\n@enduml\n"
+---
++---+                  +-----+
+| α |                  | Bob |
++-+-+                  +--+--+
+  |                       |
+  |   a       a       ¯   |
+  |  --- and --- and √x   |
+  |   b       b           |
+  |<----------------------+
+  |                       |
+  |literal <math>unclosed |
+  +......................>|
+  |                       |
++-+-+                  +--+--+
+| α |                  | Bob |
++---+                  +-----+

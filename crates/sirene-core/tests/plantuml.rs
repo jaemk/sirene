@@ -654,6 +654,12 @@ fn extent(scene: &sirene_core::scene::Scene) -> (f32, f32, f32, f32) {
     };
     for e in &scene.elements {
         match &e.primitive {
+            // A clipped path (a radical's bar is far wider than its box) shows only its clip
+            // rectangle.
+            Primitive::Path { clip: Some(r), .. } => {
+                add(sirene_core::scene::Pt::new(r.x, r.y));
+                add(sirene_core::scene::Pt::new(r.x + r.w, r.y + r.h));
+            }
             Primitive::Path { segments, .. } => {
                 for s in segments {
                     match *s {
@@ -772,6 +778,142 @@ fn latex_unclosed_and_empty() {
     let lowered = diagram::lower("@startlatex\n@endlatex\n");
     lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
     assert_eq!(lowered.diagram.ascii(&Options::default()).unwrap(), "\n");
+}
+
+/// PCREO-2: `@startmath` is one AsciiMath formula, drawn as the formula its TeX translation
+/// makes, in display style.
+#[cfg(feature = "math")]
+#[test]
+fn math_formula() {
+    use sirene_core::equation::Flavor;
+    for (name, src) in fixtures("valid")
+        .into_iter()
+        .filter(|(n, _)| n.starts_with("math_") && !n.starts_with("math_inline_"))
+    {
+        let (source, d) = equation(&src);
+        assert!(d.is_empty(), "{name}: {d:?}");
+        assert!(!source.is_empty(), "{name}");
+        let Diagram::Equation(e) = diagram::lower(&src).diagram else {
+            panic!("{name}: not an equation");
+        };
+        assert_eq!(e.flavor, Flavor::AsciiMath, "{name}");
+        for theme in [Theme::LIGHT, Theme::DARK] {
+            let scene = diagram::lower(&src).diagram.scene(&Approx, &theme).unwrap();
+            assert!(!scene.elements.is_empty(), "{name}");
+            assert!(
+                scene
+                    .elements
+                    .iter()
+                    .all(|e| matches!(e.primitive, sirene_core::scene::Primitive::Path { .. })),
+                "{name}: a formula draws as paths"
+            );
+            let (x0, y0, x1, y1) = extent(&scene);
+            assert!(
+                x0 >= 0.0 && y0 >= 0.0 && x1 <= scene.width && y1 <= scene.height,
+                "{name}: {:?} not in {}x{}",
+                (x0, y0, x1, y1),
+                scene.width,
+                scene.height
+            );
+        }
+        let ascii = diagram::lower(&src)
+            .diagram
+            .ascii(&Options::default())
+            .unwrap();
+        assert!(ascii.ends_with('\n') && ascii.trim().len() > 3, "{name}");
+    }
+    // The body is joined as `@startlatex` is: lines trimmed, a space between.
+    let (source, d) = equation("@startmath\n  x = (a+b)\n   /c  \n@endmath\n");
+    assert_eq!(source, "x = (a+b) /c");
+    assert!(d.is_empty(), "{d:?}");
+    // The same formula in TeX and in AsciiMath has the same drawing.
+    let tex = diagram::lower("@startlatex\n\\frac{a}{b}\n@endlatex\n")
+        .diagram
+        .scene(&Approx, &Theme::LIGHT)
+        .unwrap();
+    let am = diagram::lower("@startmath\na/b\n@endmath\n")
+        .diagram
+        .scene(&Approx, &Theme::LIGHT)
+        .unwrap();
+    assert_eq!(tex.elements.len(), am.elements.len());
+    assert!(
+        (tex.width - am.width).abs() < 20.0,
+        "{} {}",
+        tex.width,
+        am.width
+    );
+    // A fraction is three rows of text.
+    let rows = diagram::lower("@startmath\na/b\n@endmath\n")
+        .diagram
+        .ascii(&Options::default())
+        .unwrap();
+    assert_eq!(rows.lines().count(), 3, "{rows}");
+}
+
+/// LEMB-5: an AsciiMath formula whose TeX does not typeset is drawn as its source, with one
+/// error on the AsciiMath that made it.
+#[cfg(feature = "math")]
+#[test]
+fn math_error_span() {
+    // `^` after a script is a second superscript on the same base, which TeX refuses.
+    let src = "@startmath\na +\n x^1^2 + c\n@endmath\n";
+    let lowered = diagram::lower(src);
+    assert_eq!(lowered.diagnostics.len(), 1, "{:?}", lowered.diagnostics);
+    let d = &lowered.diagnostics[0];
+    assert_eq!(d.severity, Severity::Error);
+    assert!(d.message.contains("Double superscript"), "{}", d.message);
+    let at = &src[usize::from(d.range.start())..usize::from(d.range.end())];
+    assert_eq!(at, "^", "{at:?}");
+    assert_eq!(d.line_col(src), (3, 5));
+    let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+    let [e] = &scene.elements[..] else {
+        panic!("{:?}", scene.elements)
+    };
+    let sirene_core::scene::Primitive::Text { text, .. } = &e.primitive else {
+        panic!("{e:?}")
+    };
+    assert_eq!(text, "a + x^1^2 + c");
+    let ascii = lowered.diagram.ascii(&Options::default()).unwrap();
+    assert_eq!(ascii, "a + x^1^2 + c\n");
+}
+
+/// PCREO-2: a missing `@endmath` is a warning that names it, and the formula still draws.
+#[test]
+fn math_unclosed_and_empty() {
+    let (source, d) = equation("@startmath\nx^2\n");
+    assert_eq!(source, "x^2");
+    let missing: Vec<_> = d
+        .iter()
+        .filter(|d| d.message.starts_with("missing `@endmath`"))
+        .collect();
+    assert_eq!(missing.len(), 1, "{d:?}");
+    assert_eq!(missing[0].severity, Severity::Warning);
+    #[cfg(feature = "math")]
+    assert_eq!(d.len(), 1, "{d:?}");
+    let (source, d) = equation("@startmath\n@endmath\n");
+    assert_eq!(source, "");
+    assert!(d.is_empty(), "{d:?}");
+    let lowered = diagram::lower("@startmath\n@endmath\n");
+    lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+    assert_eq!(lowered.diagram.ascii(&Options::default()).unwrap(), "\n");
+    // `@endlatex` does not end a `@startmath` document.
+    let (source, _) = equation("@startmath\nx\n@endlatex\n");
+    assert_eq!(source, "x");
+}
+
+/// With math support off an AsciiMath document draws its source as text, with one warning.
+#[cfg(not(feature = "math"))]
+#[test]
+fn math_without_math_support() {
+    let src = "@startmath\na/b\n@endmath\n";
+    let (source, d) = equation(src);
+    assert_eq!(source, "a/b");
+    assert_eq!(d.len(), 1, "{d:?}");
+    assert!(d[0].message.contains("math support is off"), "{d:?}");
+    let lowered = diagram::lower(src);
+    let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+    assert_eq!(scene.elements.len(), 1);
+    assert_eq!(lowered.diagram.ascii(&Options::default()).unwrap(), "a/b\n");
 }
 
 /// With math support off the document draws its source as text, with one warning.

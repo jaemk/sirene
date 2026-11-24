@@ -57,11 +57,9 @@ struct Block {
 
 #[cfg(feature = "math")]
 fn block(span: &Span) -> Block {
-    use crate::math::ascii_formula_rows;
     let formula = span
-        .formula()
-        .zip(span.delim())
-        .and_then(|(f, d)| ascii_formula_rows(&f, d.style()).ok())
+        .ascii_rows()
+        .and_then(Result::ok)
         .filter(|(rows, _)| !rows.is_empty());
     let (rows, base) = formula.unwrap_or_else(|| (vec![span.text.clone()], 0));
     let width = rows.iter().map(|r| width(r)).max().unwrap_or(0);

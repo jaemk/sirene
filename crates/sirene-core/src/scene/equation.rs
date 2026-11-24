@@ -1,5 +1,5 @@
-//! A `@startlatex` document to scene (PCREO-3): the formula as paths, or its source as text
-//! when it does not typeset or math support is off.
+//! A `@startlatex` or `@startmath` document to scene (PCREO-3): the formula as paths, or its
+//! source as text when it does not typeset or math support is off.
 
 use super::{Element, Owner, Primitive, Pt, Scene, TextMetrics, TextStyle, Theme};
 use crate::equation::Equation;
@@ -33,8 +33,7 @@ pub fn equation(equation: &Equation, metrics: &impl TextMetrics, theme: &Theme) 
 
 #[cfg(feature = "math")]
 fn formula(equation: &Equation, theme: &Theme) -> Option<Scene> {
-    use crate::math::{MathStyle, typeset};
-    let f = typeset(&equation.source, MathStyle::Display).ok()?;
+    let f = equation.typeset().ok()?;
     let size = theme.font_size;
     let mut scene = Scene {
         width: f.width * size + 2.0 * MARGIN,

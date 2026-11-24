@@ -309,10 +309,10 @@ impl Parser<'_> {
         if self.at_eof() {
             if started {
                 let at = self.pos;
-                let end = if self.kind == Kind::Other("latex") {
-                    "@endlatex"
-                } else {
-                    "@enduml"
+                let end = match self.kind {
+                    Kind::Other("latex") => "@endlatex",
+                    Kind::Other("math") => "@endmath",
+                    _ => "@enduml",
                 };
                 self.warn(
                     at,

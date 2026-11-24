@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\n:<math>int_0^1f(x)dx</math>;\n:<math>x^2+y_1+z_12^34</math>;\nnote right\nTry also\n<math>d/dxf(x)=(f(x+h)-f(x))/h</math>\n<math>P(y|bb\"x\") or f(bb\"x\")+epsilon</math>\nend note\n@enduml\n"
+---
+   .-----------.
+   | ∫₀¹f(x)dx |
+   '-----+-----'
+         |
+         |
+         |           +------------------------------.
+         v           |           Try also           |
+.-----------------.  |  d          f(x + h) − f(x)  |
+| x² + y₁ + z₁₂³⁴ |..| ----f(x) = ----------------- |
+'-----------------'  |  dx                h         |
+                     |     P(y∣x)  or  f(x) + ϵ     |
+                     +------------------------------+

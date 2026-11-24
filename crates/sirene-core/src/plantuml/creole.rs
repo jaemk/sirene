@@ -1,9 +1,10 @@
-//! The part of PlantUML's Creole that sirene reads (PCREO-4): `<latex>...</latex>` formulas
-//! inside label text, the `\n` line breaks around them, and the labels of a lowered graph.
+//! The part of PlantUML's Creole that sirene reads (PCREO-4): `<latex>...</latex>` (TeX) and
+//! `<math>...</math>` (AsciiMath) formulas inside label text, the `\n` line breaks around them,
+//! and the labels of a lowered graph.
 //!
 //! A formula is an inline run of a label line, so its source is a [`Span`] with `math` set and
-//! its tags kept in the text, as `$$...$$` formulas of Mermaid labels are (LEMB-2). `<math>` is
-//! AsciiMath and stays literal text until that front end exists.
+//! its tags kept in the text, as `$$...$$` formulas of Mermaid labels are (LEMB-2); the tag says
+//! the language ([`Span::is_asciimath`]).
 
 use std::ops::Range;
 
@@ -13,27 +14,41 @@ use crate::diagnostic::Diagnostic;
 use crate::flowchart::{Delim, Flowchart, Label, Span};
 use crate::syntax::SyntaxNode;
 
-const OPEN: &str = "<latex>";
-const CLOSE: &str = "</latex>";
+/// The formula tags: the opening tag and its closing tag, lowercase. `<latex>` holds TeX and
+/// `<math>` AsciiMath.
+const TAGS: [(&str, &str); 2] = [("<latex>", "</latex>"), ("<math>", "</math>")];
 
-/// The byte ranges of the `<latex>...</latex>` formulas in one line, tags included. The tags are
-/// matched in any case and the body is opaque up to the first closing tag (no nesting). An
-/// unclosed tag, and a tag with an empty or blank body, are text.
+/// The byte ranges of the `<latex>...</latex>` and `<math>...</math>` formulas in one line, tags
+/// included. The tags are matched in any case and the body is opaque up to the first closing
+/// tag of the same name (no nesting). An unclosed tag, and a tag with an empty or blank body,
+/// are text.
 pub(crate) fn latex_tags(line: &str) -> Vec<Range<usize>> {
     // ASCII lowercasing keeps byte offsets.
     let lower = line.to_ascii_lowercase();
     let mut out = Vec::new();
     let mut at = 0;
-    while let Some(open) = lower[at..].find(OPEN).map(|i| at + i) {
-        let body = open + OPEN.len();
-        let Some(close) = lower[body..].find(CLOSE).map(|i| body + i) else {
+    loop {
+        // The first opening tag from `at`, of either name.
+        let next = TAGS
+            .iter()
+            .filter_map(|&(open, close)| {
+                lower[at..].find(open).map(|i| (at + i, open.len(), close))
+            })
+            .min_by_key(|&(i, ..)| i);
+        let Some((open, open_len, close)) = next else {
             break;
         };
-        let end = close + CLOSE.len();
-        if !line[body..close].trim().is_empty() {
-            out.push(open..end);
+        let body = open + open_len;
+        let Some(end) = lower[body..].find(close).map(|i| body + i) else {
+            // No closing tag: this is text, and a tag of the other name may still follow.
+            at = body;
+            continue;
+        };
+        let after = end + close.len();
+        if !line[body..end].trim().is_empty() {
+            out.push(open..after);
         }
-        at = end;
+        at = after;
     }
     out
 }
@@ -186,8 +201,41 @@ mod tests {
     }
 
     #[test]
-    fn other_tags_and_math_are_text() {
-        assert!(found("<b>x</b> <math>x</math> <i>y</i>").is_empty());
+    fn other_tags_are_text() {
+        assert!(found("<b>x</b> <i>y</i> <mathx>z</mathx>").is_empty());
+    }
+
+    #[test]
+    fn math_tags_are_formulas() {
+        assert_eq!(
+            found("a <math>x^2</math> b <MATH>y</Math>"),
+            ["<math>x^2</math>", "<MATH>y</Math>"]
+        );
+        assert_eq!(
+            found("<latex>a</latex><math>b</math>"),
+            ["<latex>a</latex>", "<math>b</math>"]
+        );
+    }
+
+    #[test]
+    fn each_tag_closes_with_its_own_name() {
+        // The body is opaque up to the closing tag of the same name.
+        assert_eq!(
+            found("<math>a</latex>b</math>"),
+            ["<math>a</latex>b</math>"]
+        );
+        assert_eq!(
+            found("<latex>a</math>b</latex>"),
+            ["<latex>a</math>b</latex>"]
+        );
+    }
+
+    #[test]
+    fn an_unclosed_tag_leaves_the_other_name_alone() {
+        assert_eq!(found("<latex>x <math>y</math>"), ["<math>y</math>"]);
+        assert!(found("<math>x").is_empty());
+        assert!(found("<math></math>").is_empty());
+        assert!(found("<math> </math>").is_empty());
     }
 
     #[test]
@@ -223,6 +271,16 @@ mod tests {
         assert!(!r[0].math);
     }
 
+    #[cfg(feature = "math")]
+    #[test]
+    fn math_runs_are_asciimath() {
+        let r = runs("a <math>x^2</math> <latex>y</latex>");
+        assert_eq!(r[1].formula().as_deref(), Some("x^2"));
+        assert!(r[1].is_asciimath());
+        assert!(!r[3].is_asciimath());
+        assert!(r[1].typeset().unwrap().is_ok());
+    }
+
     #[test]
     fn backslash_n_breaks_lines_outside_formulas() {
         assert_eq!(newlines("a\\nb"), "a\nb");
@@ -231,6 +289,10 @@ mod tests {
             "a\n<latex>x \\neq y</latex>\nb"
         );
         assert_eq!(newlines("<latex>a\\nb"), "<latex>a\nb");
+        assert_eq!(
+            newlines("a\\n<math>x \\n y</math>"),
+            "a\n<math>x \\n y</math>"
+        );
         assert_eq!(newlines("plain"), "plain");
     }
 }

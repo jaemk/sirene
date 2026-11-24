@@ -1,7 +1,7 @@
-//! `<latex>...</latex>` formulas in PlantUML label text (LEMB-2, PCREO-4): inline runs on a
-//! common baseline in sequence participants, messages, and notes and in the labels of the
-//! graph-lowered kinds, typeset in text style; `$$` and `<math>` stay text, and a formula that
-//! does not typeset is drawn as its source with one diagnostic on its body.
+//! `<latex>...</latex>` (TeX) and `<math>...</math>` (AsciiMath) formulas in PlantUML label text
+//! (LEMB-2, PCREO-4): inline runs on a common baseline in sequence participants, messages, and
+//! notes and in the labels of the graph-lowered kinds, typeset in text style; `$$` stays text,
+//! and a formula that does not typeset is drawn as its source with one diagnostic on its body.
 
 use std::fs;
 use std::path::Path;
@@ -58,14 +58,17 @@ fn texts(scene: &Scene) -> Vec<&str> {
         .collect()
 }
 
-/// The documents with no formula that draw the same as text: `$$` and `<math>` are not
-/// formulas in PlantUML, and neither is an unclosed or empty `<latex>` tag.
+/// The documents with no formula that draw the same as text: `$$` is not a formula in
+/// PlantUML, and neither is an unclosed or empty `<latex>` or `<math>` tag.
 #[test]
 fn text_without_a_latex_tag_is_unchanged() {
     for text in [
         "plain",
         "$$x^2$$",
-        "<math>x</math>",
+        "<math>unclosed",
+        "<math></math>",
+        "<math>  </math>",
+        "<mathx>x</mathx>",
         "<latex>unclosed",
         "<latex></latex>",
         "a <b>bold</b> c",
@@ -271,6 +274,164 @@ mod math {
     }
 
     #[test]
+    fn well_formed_math_fixtures_have_no_diagnostics() {
+        for name in [
+            "math_inline_message",
+            "math_inline_activity",
+            "math_inline_mixed",
+            "math_fraction",
+            "math_sum",
+            "math_matrix",
+            "math_lines",
+        ] {
+            let d = diagram::lower(&valid(name)).diagnostics;
+            assert!(d.is_empty(), "{name}: {d:?}");
+        }
+    }
+
+    /// PCREO-2: a `<math>` tag is AsciiMath, a `<latex>` tag TeX, in the same line and label.
+    #[test]
+    fn a_math_tag_is_an_asciimath_run_beside_tex_runs() {
+        let (seq, _) = sequence(&valid("math_inline_mixed"));
+        assert_eq!(seq.math, Some(Delim::Latex));
+        assert_eq!(seq.participants[0].label, ["<math>alpha</math>"]);
+        let m = seq.messages().next().unwrap();
+        let runs = formula::runs(&m.text[0], Delim::Latex);
+        let shape: Vec<(&str, bool, bool)> = runs
+            .iter()
+            .map(|s| (s.text.as_str(), s.math, s.is_asciimath()))
+            .collect();
+        assert_eq!(
+            shape,
+            [
+                ("<math>a/b</math>", true, true),
+                (" and ", false, false),
+                (r"<latex>\frac{a}{b}</latex>", true, false),
+                (" and ", false, false),
+                ("<MATH>sqrt x</MATH>", true, true),
+            ]
+        );
+        assert_eq!(runs[0].formula().as_deref(), Some("a/b"));
+        assert_eq!(runs[4].formula().as_deref(), Some("sqrt x"));
+        // An unclosed tag is text.
+        let m = seq.messages().nth(1).unwrap();
+        assert!(!formula::has(&m.text[0], Delim::Latex), "{:?}", m.text);
+        // `<math>` is nothing in Mermaid's `$$` mode.
+        assert!(!formula::has("<math>x</math>", Delim::Dollar));
+    }
+
+    /// The AsciiMath `a/b` and the TeX `\frac{a}{b}` are the same formula, so they take the same
+    /// room, and neither leaves its tags in the text.
+    #[test]
+    fn asciimath_and_tex_runs_set_alike() {
+        let size = |tag: &str, body: &str| {
+            let src = format!("@startuml\nA -> B : <{tag}>{body}</{tag}>\n@enduml\n");
+            let (seq, d) = sequence(&src);
+            assert!(d.is_empty(), "{d:?}");
+            let scene = draw_sequence(&seq);
+            no_markup(&scene, tag);
+            assert!(
+                texts(&scene).iter().all(|t| !t.contains("math>")),
+                "{:?}",
+                texts(&scene)
+            );
+            (scene.width, scene.height)
+        };
+        let (aw, ah) = size("math", "a/b");
+        let (tw, th) = size("latex", r"\frac{a}{b}");
+        assert!(
+            (aw - tw).abs() < 0.5 && (ah - th).abs() < 0.5,
+            "{aw}x{ah} {tw}x{th}"
+        );
+        // A formula is taller than the text line it replaces.
+        let (_, plain) = size("b", "a b");
+        assert!(ah > plain, "{ah} {plain}");
+    }
+
+    #[test]
+    fn math_formulas_draw_in_notes_and_graph_labels() {
+        let (chart, d) = graph(&valid("math_inline_activity"));
+        assert!(d.is_empty(), "{d:?}");
+        let scene = draw_graph(&chart);
+        let formula_nodes: Vec<usize> = chart
+            .nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| n.label.has_formula())
+            .map(|(i, _)| i)
+            .collect();
+        assert!(formula_nodes.len() >= 2, "{formula_nodes:?}");
+        // The node's shape and the filled formula paths after it. The note beside the last node
+        // draws its formulas as part of that node's paths, so only the first node is held to
+        // contain all of them; the others to contain the first.
+        for (k, &i) in formula_nodes.iter().enumerate() {
+            let found = boxes(&scene, Owner::Node(i), Theme::LIGHT.node_fill);
+            let [(shape, formulas)] = &found[..] else {
+                panic!("node {i}: {found:?}");
+            };
+            let held = if k == 0 { formulas.len() } else { 1 };
+            assert_inside(
+                *shape,
+                &formulas[..held],
+                &format!("activity node {i} {:?}", chart.nodes[i].label.text),
+            );
+        }
+        let t = texts(&scene);
+        assert!(t.iter().all(|x| !x.contains("math>")), "{t:?}");
+        assert!(t.iter().any(|x| x.contains("Try also")), "{t:?}");
+    }
+
+    /// LEMB-5: a failing `<math>` formula is drawn as its source, with one diagnostic on the
+    /// AsciiMath that made the TeX fail.
+    #[test]
+    fn a_failing_math_formula_has_one_diagnostic_on_its_source() {
+        let src = fixture("errors", "math_inline_fail");
+        let lowered = diagram::lower(&src);
+        assert_eq!(lowered.diagnostics.len(), 1, "{:?}", lowered.diagnostics);
+        let d = &lowered.diagnostics[0];
+        assert_eq!(d.severity, Severity::Error);
+        assert!(d.message.contains("Double superscript"), "{}", d.message);
+        let (from, to) = (usize::from(d.range.start()), usize::from(d.range.end()));
+        assert_eq!(&src[from..to], "^");
+        // The second `^` of `x^1^2`.
+        assert_eq!(&src[from - 3..from + 2], "x^1^2");
+        let Diagram::Sequence(seq) = lowered.diagram else {
+            panic!("not a sequence diagram");
+        };
+        let scene = draw_sequence(&seq);
+        assert!(
+            texts(&scene).contains(&"<math>a + x^1^2 + c</math>"),
+            "{:?}",
+            texts(&scene)
+        );
+        // The formula that does typeset is not diagnosed.
+        assert!(!texts(&scene).iter().any(|t| t.contains("ok <math>")));
+    }
+
+    #[test]
+    fn math_rows_are_aligned_in_text() {
+        let out = diagram::lower(&valid("math_inline_message"))
+            .diagram
+            .ascii(&Options {
+                charset: Charset::Unicode,
+            })
+            .unwrap();
+        assert!(out.contains("ax\u{b2} + bx + c = 0"), "{out}");
+        assert!(
+            out.contains("\u{2212}b \u{b1} \u{221a}b\u{b2} \u{2212} 4ac"),
+            "{out}"
+        );
+        assert!(!out.contains("math>"), "{out}");
+        // The fraction is three rows: its bar sits between the numerator and the denominator.
+        let rows: Vec<&str> = out.lines().collect();
+        let bar = rows.iter().position(|r| r.contains("x = ---")).unwrap();
+        assert!(
+            rows[bar - 1].contains('\u{2212}') && rows[bar + 1].contains("2a"),
+            "{out}"
+        );
+    }
+
+    #[test]
     fn the_model_keeps_the_source_text_and_runs_split_it() {
         let (seq, _) = sequence(&valid("latex_inline_message"));
         assert_eq!(seq.participants[0].label, [r"<latex>\alpha</latex>"]);
@@ -435,7 +596,7 @@ mod math {
         for want in [
             r"<latex>\alpha unclosed",
             "$$x^2$$ stays text",
-            "<latex></latex> empty and <math>x</math> literal",
+            "<latex></latex> empty and <math>x unclosed",
         ] {
             assert!(t.contains(&want), "{want} in {t:?}");
         }

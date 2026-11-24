@@ -1,0 +1,4 @@
+@startuml
+Bob -> Alice : ok <math>x^2</math>
+Alice --> Bob : bad <math>a + x^1^2 + c</math> done
+@enduml

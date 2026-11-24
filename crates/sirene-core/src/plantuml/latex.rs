@@ -1,31 +1,32 @@
-//! PlantUML `@startlatex` (PCREO-3): the body between the markers is one formula, set in
-//! display style. Its lines are trimmed and joined with a space each, and `'` starts no comment.
+//! PlantUML `@startlatex` and `@startmath` (PCREO-3): the body between the markers is one
+//! formula, in TeX or AsciiMath, set in display style. Its lines are trimmed and joined with a
+//! space each, and `'` starts no comment.
 
 use rowan::TextRange;
 
 use super::lines;
 use crate::diagnostic::Diagnostic;
-use crate::equation::Equation;
+use crate::equation::{Equation, Flavor};
 use crate::syntax::SyntaxNode;
 
-pub(crate) fn lower(root: &SyntaxNode) -> (Equation, Vec<Diagnostic>) {
+pub(crate) fn lower(root: &SyntaxNode, flavor: Flavor) -> (Equation, Vec<Diagnostic>) {
     let body = lines::read(root);
     let source = body
         .iter()
         .map(|l| l.text.as_str())
         .collect::<Vec<_>>()
         .join(" ");
+    let equation = Equation { source, flavor };
     let mut d = Vec::new();
     if let (Some(first), Some(last)) = (body.first(), body.last()) {
-        diagnose(&body, &source, first.range.cover(last.range), &mut d);
+        diagnose(&body, &equation, first.range.cover(last.range), &mut d);
     }
-    (Equation { source }, d)
+    (equation, d)
 }
 
 #[cfg(feature = "math")]
-fn diagnose(body: &[lines::Line], source: &str, _: TextRange, d: &mut Vec<Diagnostic>) {
-    use crate::math::{MathStyle, typeset};
-    if let Err(e) = typeset(source, MathStyle::Display) {
+fn diagnose(body: &[lines::Line], equation: &Equation, _: TextRange, d: &mut Vec<Diagnostic>) {
+    if let Err(e) = equation.typeset() {
         let range = TextRange::new(
             position(body, e.span.start, false),
             position(body, e.span.end, true),
@@ -35,7 +36,7 @@ fn diagnose(body: &[lines::Line], source: &str, _: TextRange, d: &mut Vec<Diagno
 }
 
 #[cfg(not(feature = "math"))]
-fn diagnose(_: &[lines::Line], _: &str, whole: TextRange, d: &mut Vec<Diagnostic>) {
+fn diagnose(_: &[lines::Line], _: &Equation, whole: TextRange, d: &mut Vec<Diagnostic>) {
     d.push(Diagnostic::warning(
         whole,
         "math support is off in this build; the formula is drawn as its source",

@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startmath\nx^2 + y\n"
+---
+3:1: warning: missing `@endmath`; the diagram runs to the end of the file
+
+x² + y

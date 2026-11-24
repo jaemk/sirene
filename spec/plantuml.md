@@ -87,7 +87,7 @@ What is not drawn or read yet, by value and cost. Each has its own spec and feat
 | Skinparam | `plantuml-skinparam.md` | research | medium | A subset maps onto the graph model's `Style` and theme fields. |
 | Salt | `plantuml-salt.md` | pending | large | New wireframe model, layout, scene, and ASCII renderer. |
 | Creole | `plantuml-creole-and-math.md` | research | medium | Needs a rich text run model in the display list first. |
-| Math, LaTeX | `plantuml-creole-and-math.md`, `latex-math.md` | partial | large | `@startlatex` and inline `<latex>` tags are drawn (PCREO-3); `@startmath` (AsciiMath) and inline `<math>` tags are not. |
+| Math, LaTeX | `plantuml-creole-and-math.md`, `latex-math.md` | partial | large | `@startlatex`, `@startmath` (AsciiMath), and inline `<latex>` and `<math>` tags are drawn (PCREO-2, PCREO-3). |
 | Ditaa | `plantuml-ditaa.md` | research | medium | Rectangles and orthogonal lines first. |
 | Wire, board | `plantuml-wire-and-board.md` | research | unknown | Beta in PlantUML, grammar only in its sources. |
 | `@startdef` | `plantuml-preprocessor.md` | research | small | Draws nothing; goes with `!includedef`. |
