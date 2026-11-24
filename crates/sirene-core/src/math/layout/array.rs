@@ -590,7 +590,10 @@ mod tests {
         // A custom tag is set after the table, as wide as it is.
         let plain = laid_out("\\begin{gather*} a \\\\ b \\end{gather*}", true);
         let tagged = laid_out("\\begin{gather*} a \\tag{xyz} \\\\ b \\end{gather*}", true);
-        assert!(close(tagged.width.0, plain.width.0 + width("\\text{(xyz)}")));
+        assert!(close(
+            tagged.width.0,
+            plain.width.0 + width("\\text{(xyz)}")
+        ));
         assert!(close(tagged.height.0, plain.height.0));
     }
 
