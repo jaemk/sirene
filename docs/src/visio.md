@@ -52,5 +52,5 @@ for what is verified.
 ## In a web page and the library
 
 `render` in `sirene-wasm.js` takes a `Uint8Array` source with `lang: "visio"` and a `page` from 0;
-see [Web pages](embedding.md). In Rust, `sirene_core::diagram::lower_bytes` reads the package
+see [JavaScript library](embedding.md#a-visio-drawing). In Rust, `sirene_core::diagram::lower_bytes` reads the package
 bytes; see [Rust library](library.md).

@@ -2,7 +2,9 @@
 
 sirene is a local WYSIWYG editor and viewer for [Mermaid](https://mermaid.js.org),
 [PlantUML](plantuml.md), and [Graphviz DOT](dot.md) diagrams, with SVG, PNG, and terminal ASCII
-output. It is one Rust binary, and renders offline without a browser, Node, or Java.
+output. It is one Rust binary, and renders offline without a browser, Node, or Java. The same
+renderer is a [Rust library](library.md) and, compiled to WebAssembly, a
+[JavaScript library](embedding.md) for web pages and Node.
 
 ```
 $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
@@ -54,5 +56,8 @@ object, state, use case, component, deployment, timing, network, mindmap, WBS, g
 YAML, EBNF, regular expression, Chen ER, chronology, and file tree diagrams.
 
 [Graphviz DOT](dot.md) (`digraph` and `graph`): records, HTML table labels, clusters, and ports.
+
+[LaTeX formulas](cli.md#latex-formulas) (one per `.tex` file, and `$...$`, `$$...$$`, and `math`
+blocks in Markdown) and [Visio drawings](visio.md) (`.vsdx`, read-only) are drawn too.
 
 Start with [Install](install.md) and the [Quickstart](quickstart.md).

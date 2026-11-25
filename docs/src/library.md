@@ -55,4 +55,4 @@ fn main() -> sirene_core::Result<()> {
   diagram into minimal source edits; the editor uses them.
 - Errors are `sirene_core::Error`; `error.report()` formats the full chain of causes.
 - `sirene-core` builds for `wasm32-unknown-unknown`. For web pages, use the prebuilt module
-  instead: see [Web pages](embedding.md).
+  instead: see [JavaScript library](embedding.md).

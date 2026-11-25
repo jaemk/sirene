@@ -36,6 +36,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `Equation::formula`, `diagram::lower_formula`, `equation::MATH`, and the web module's
   `LANG_LATEX`.
 - A "Visio drawings" page in the book, and Visio entries in the command line and library pages.
+- The landing page has a "Use it from JavaScript" section with web page and Node examples, and
+  a nav link.
+- The web pages guide is now "JavaScript library", with examples (live preview, formulas, Visio
+  from a file input, a Node script, text output) and a reference for `load`, `render`, and
+  `renderAll`; the README and quickstart show the JavaScript API.
 
 ### Changed
 
