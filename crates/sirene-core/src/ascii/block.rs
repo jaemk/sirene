@@ -2,8 +2,9 @@
 //! border, and the edges listed below, since edges go straight between blocks.
 
 use super::canvas::{Canvas, Line, glyph};
-use super::{Cells, Options, clean, draw_box, draw_lines, draw_node_frame, draw_node_text, lines};
-use super::{title as subgraph_title, width};
+use super::mathtext::Rows;
+use super::{CellsIn, Options, clean, draw_box, draw_lines, draw_node_frame, draw_node_text_in};
+use super::{lines, lines_in, title as subgraph_title, width};
 use crate::block::layout::{self, Sizes};
 use crate::block::{Block, Heading};
 use crate::flowchart::{Arrow, Edge, Measure, Stroke};
@@ -11,12 +12,14 @@ use crate::layout::Rect;
 
 pub fn render(b: &Block, options: &Options) -> String {
     let chart = &b.chart;
+    // The formulas set to size the layout are the ones drawn.
+    let rows = Rows::default();
     let node = |i: usize| -> (f64, f64) {
-        let s = Cells.node(&chart.nodes[i]);
+        let s = CellsIn(&rows).node(&chart.nodes[i]);
         match &b.arrows[i] {
             // A box with the heads on its sides.
             Some(_) => {
-                let w = lines(&chart.nodes[i].label)
+                let w = lines_in(&rows, &chart.nodes[i].label)
                     .iter()
                     .map(|l| width(l))
                     .max()
@@ -60,13 +63,13 @@ pub fn render(b: &Block, options: &Options) -> String {
             Some(dirs) => {
                 draw_box(&mut canvas, r, Line::Light);
                 draw_heads(&mut canvas, r, dirs);
-                let l = lines(&n.label);
+                let l = lines_in(&rows, &n.label);
                 let y = r.y + (r.h - l.len() as i32) / 2;
                 draw_lines(&mut canvas, &l, r.x + 1, r.w - 2, y);
             }
             None => {
-                draw_node_frame(&mut canvas, n, r, &super::mathtext::Rows::default());
-                draw_node_text(&mut canvas, n, r);
+                draw_node_frame(&mut canvas, n, r, &rows);
+                draw_node_text_in(&mut canvas, n, r, &rows);
             }
         }
     }

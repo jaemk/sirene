@@ -288,6 +288,35 @@ mod tests {
         assert!(!out.contains("$$"), "{out}");
     }
 
+    /// Lowers `src`, renders it as text, and returns the text and how many formulas were set.
+    fn counted(src: &str) -> (String, usize) {
+        use crate::diagram::{self, Diagram};
+        let options = super::super::Options::default();
+        crate::equation::count::reset();
+        let out = match diagram::lower(src).diagram {
+            Diagram::Block(b) => super::super::block::render(&b, &options),
+            Diagram::C4(c) => super::super::c4::render(&c, &options),
+            Diagram::Architecture(a) => super::super::architecture::render(&a, &options),
+            _ => String::new(),
+        };
+        (out, crate::equation::count::get())
+    }
+
+    /// The block, C4, and architecture renderers measure and draw with one cache, so a formula is
+    /// set once per render, not once per call.
+    #[test]
+    fn block_c4_and_architecture_set_each_formula_once_per_render() {
+        for src in [
+            "block-beta\n    a[\"$$x^2$$\"] b\n    a --> b\n",
+            "C4Context\n    Person(p, \"$$y^2$$\")\n    System(s, \"S\")\n    Rel(p, s, \"uses\")\n",
+            "architecture-beta\n    service a(server)[\"$$z^2$$\"]\n    service b[B]\n    a:R --> L:b\n",
+        ] {
+            let (out, sets) = counted(src);
+            assert_eq!(sets, 1, "{src}\n{out}");
+            assert!(!out.contains("$$"), "{src}\n{out}");
+        }
+    }
+
     #[test]
     fn an_empty_formula_label_draws_no_source() {
         for src in [r#"A["$$$$"]"#, r#"A["$$\phantom{x}$$"]"#, r#"A["$$\,$$"]"#] {

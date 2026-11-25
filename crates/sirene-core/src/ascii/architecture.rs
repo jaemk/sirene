@@ -2,7 +2,8 @@
 //! junctions as a dot, groups as boxes titled on the top border, and edges with right-angle
 //! turns, placed by the same grid as the drawing.
 
-use super::{Cells, Options, draw};
+use super::mathtext::Rows;
+use super::{CellsIn, Options, draw_in};
 use crate::architecture::layout::{self, Sizes};
 use crate::architecture::{Architecture, Item, Side};
 use crate::flowchart::{Label, Measure, Shape};
@@ -49,12 +50,15 @@ pub fn render(a: &Architecture, options: &Options) -> String {
             };
         }
     }
+    // The formulas set to size the layout are the ones drawn.
+    let rows = Rows::default();
+    let cells = CellsIn(&rows);
     let node = |i: usize| {
-        let s = Cells.node(&chart.nodes[i]);
+        let s = cells.node(&chart.nodes[i]);
         ((f64::from(s.w), f64::from(s.h)), (0.0, 0.0))
     };
     let title = |g: usize| {
-        let s = Cells.subgraph_title(&chart.subgraphs[g]);
+        let s = cells.subgraph_title(&chart.subgraphs[g]);
         (f64::from(s.w + 2), 0.0)
     };
     let placed = layout::layout(
@@ -77,7 +81,7 @@ pub fn render(a: &Architecture, options: &Options) -> String {
     let clusters: Vec<Rect> = placed.groups.iter().map(|&r| rect(r)).collect();
     let titles = (0..chart.subgraphs.len())
         .map(|g| {
-            let s = Cells.subgraph_title(&chart.subgraphs[g]);
+            let s = cells.subgraph_title(&chart.subgraphs[g]);
             (s.w > 0).then(|| Rect {
                 x: clusters[g].x + 1,
                 y: clusters[g].y,
@@ -123,7 +127,7 @@ pub fn render(a: &Architecture, options: &Options) -> String {
             } else {
                 pts[1].x = pts[0].x;
             }
-            let label = e.label.as_ref().and_then(|l| Cells.edge_label(l)).map(|s| {
+            let label = e.label.as_ref().and_then(|l| cells.edge_label(l)).map(|s| {
                 let m = Point::new(mid.0.floor() as i32, mid.1.floor() as i32);
                 Rect {
                     x: m.x - s.w / 2,
@@ -143,7 +147,7 @@ pub fn render(a: &Architecture, options: &Options) -> String {
         edges,
         notes: Vec::new(),
     };
-    draw(&chart, &layout, options)
+    draw_in(&chart, &layout, options, &rows)
 }
 
 #[cfg(test)]

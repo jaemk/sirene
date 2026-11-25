@@ -187,12 +187,7 @@ fn guillemets_to_ascii(chart: &Flowchart) -> Option<Flowchart> {
     Some(chart)
 }
 
-/// Draws `chart` placed by `layout`, in cells.
-fn draw(chart: &Flowchart, layout: &layout::Layout, options: &Options) -> String {
-    draw_in(chart, layout, options, &Rows::default())
-}
-
-/// [`draw`] with the formulas already set in `rows`.
+/// Draws `chart` placed by `layout`, in cells, with the formulas already set in `rows`.
 fn draw_in(chart: &Flowchart, layout: &layout::Layout, options: &Options, rows: &Rows) -> String {
     let mut canvas = Canvas::new(layout.size.w, layout.size.h);
 
@@ -283,35 +278,9 @@ fn draw_in(chart: &Flowchart, layout: &layout::Layout, options: &Options, rows: 
     }
 }
 
-/// Sizes in terminal cells.
-struct Cells;
-
 /// Sizes in terminal cells, with the formulas set so far in `Rows`, for the one render that
 /// measures and then draws.
 struct CellsIn<'a>(&'a Rows);
-
-/// Sizes without a cache of formulas: each call sets its own.
-impl Measure for Cells {
-    fn node(&self, node: &Node) -> Size {
-        CellsIn(&Rows::default()).node(node)
-    }
-
-    fn edge_label(&self, label: &Label) -> Option<Size> {
-        CellsIn(&Rows::default()).edge_label(label)
-    }
-
-    fn subgraph_title(&self, subgraph: &Subgraph) -> Size {
-        CellsIn(&Rows::default()).subgraph_title(subgraph)
-    }
-
-    fn note(&self, label: &Label) -> Size {
-        CellsIn(&Rows::default()).note(label)
-    }
-
-    fn row(&self, node: &Node, row: usize) -> Option<i32> {
-        CellsIn(&Rows::default()).row(node, row)
-    }
-}
 
 impl Measure for CellsIn<'_> {
     fn node(&self, node: &Node) -> Size {
@@ -692,10 +661,6 @@ fn title_lines(node: &Node, rows: &Rows) -> Vec<String> {
     } else {
         plantuml_lines(rows, &node.label)
     }
-}
-
-fn draw_node_text(canvas: &mut Canvas, node: &Node, r: Rect) {
-    draw_node_text_in(canvas, node, r, &Rows::default());
 }
 
 fn draw_node_text_in(canvas: &mut Canvas, node: &Node, r: Rect, rows: &Rows) {

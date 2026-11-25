@@ -6,6 +6,7 @@
 //! its tags kept in the text, as `$$...$$` formulas of Mermaid labels are (LEMB-2); the tag says
 //! the language ([`Span::is_asciimath`]).
 
+use std::collections::HashSet;
 use std::ops::Range;
 
 use rowan::TextRange;
@@ -166,42 +167,19 @@ fn each_label(chart: &mut Flowchart, mut f: impl FnMut(&mut Label, &[TextRange])
 /// A diagnostic for each formula in `labels` that does not typeset (and without the `math`
 /// feature, for each formula), on the formula's body where the label's source has it as written.
 fn diagnose(labels: Vec<(Label, Vec<TextRange>)>, root: &SyntaxNode) -> Vec<Diagnostic> {
-    use crate::flowchart::formula;
-    use rowan::TextSize;
-    use std::collections::HashSet;
     let src = root.text().to_string();
     let mut used = HashSet::new();
     let mut out = Vec::new();
     for (label, at) in labels {
         let lines = label.text.split('\n').map(crate::flowchart::clean);
-        for (text, open, close) in formula::formulas(lines, Delim::Latex) {
-            let Some(issue) = formula::issue(Delim::Latex, &text) else {
-                continue;
-            };
-            // The first place in the label's source that has the formula and has no diagnostic.
-            let found = at.iter().find_map(|r| {
-                let start = usize::from(r.start());
-                let hay = src.get(start..usize::from(r.end()))?;
-                let mut from = 0;
-                while let Some(p) = formula::locate(hay, from, &text, open) {
-                    if used.insert(start + p) {
-                        return Some(start + p);
-                    }
-                    // Past the first byte of this match (`<`), to look for the next.
-                    from = p - open + 1;
-                }
-                None
-            });
-            let range = match found {
-                Some(p) => {
-                    let body = formula::body_of(&text, open, close);
-                    let r = formula::source_range(Delim::Latex, body, p, issue.span.clone());
-                    TextRange::new(TextSize::new(r.start as u32), TextSize::new(r.end as u32))
-                }
-                None => at.first().copied().unwrap_or_else(|| root.text_range()),
-            };
-            out.push(issue.at(range));
-        }
+        out.extend(crate::flowchart::formula::errors_among(
+            &src,
+            lines,
+            &at,
+            &mut used,
+            root.text_range(),
+            Delim::Latex,
+        ));
     }
     out
 }

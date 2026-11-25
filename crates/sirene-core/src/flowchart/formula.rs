@@ -3,6 +3,7 @@
 //! a formula `$$...$$` and PlantUML `<latex>...</latex>` (TeX) or `<math>...</math>`
 //! (AsciiMath): a [`Delim`] says which.
 
+use std::collections::HashSet;
 use std::ops::Range;
 
 use rowan::{TextRange, TextSize};
@@ -166,12 +167,66 @@ pub(crate) fn errors(
             continue;
         };
         let range = match found {
-            Some(p) => {
-                let r = source_range(delim, body, p, issue.span.clone());
-                let at = |o: usize| start + TextSize::new(o as u32);
-                TextRange::new(at(r.start), at(r.end))
-            }
+            Some(p) => body_range(start, delim, body, p, issue.span.clone()),
             None => fallback,
+        };
+        out.push(issue.at(range));
+    }
+    out
+}
+
+/// The range of the failing `span` of the formula whose body `body` starts at byte `p` of the
+/// source text that starts at `start` (see [`source_range`]).
+fn body_range(
+    start: TextSize,
+    delim: Delim,
+    body: &str,
+    p: usize,
+    span: Range<usize>,
+) -> TextRange {
+    let r = source_range(delim, body, p, span);
+    let at = |o: usize| start + TextSize::new(o as u32);
+    TextRange::new(at(r.start), at(r.end))
+}
+
+/// A diagnostic for each formula in `lines` that does not typeset, in order, found in `src` (the
+/// whole source text) inside the `candidates` it may be written in.
+///
+/// Each formula takes the first place in a candidate, in order, that has it as written and is not
+/// in `used` (offsets in `src` of formula bodies already taken, which this adds to). One not found
+/// is reported on the first candidate, or on `fallback` with none.
+pub(crate) fn errors_among(
+    src: &str,
+    lines: impl IntoIterator<Item = String>,
+    candidates: &[TextRange],
+    used: &mut HashSet<usize>,
+    fallback: TextRange,
+    delim: Delim,
+) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for (text, open, close) in formulas(lines, delim) {
+        let Some(issue) = issue(delim, &text) else {
+            continue;
+        };
+        let found = candidates.iter().find_map(|r| {
+            let start = usize::from(r.start());
+            let hay = src.get(start..usize::from(r.end()))?;
+            let mut from = 0;
+            while let Some(p) = locate(hay, from, &text, open) {
+                if used.insert(start + p) {
+                    return Some(start + p);
+                }
+                // Past the first byte of this match, to look for the next.
+                from = p - open + 1;
+            }
+            None
+        });
+        let range = match found {
+            Some(p) => {
+                let body = body_of(&text, open, close);
+                body_range(TextSize::new(0), delim, body, p, issue.span.clone())
+            }
+            None => candidates.first().copied().unwrap_or(fallback),
         };
         out.push(issue.at(range));
     }
@@ -314,6 +369,28 @@ mod tests {
         let starts: Vec<usize> = d.iter().map(|d| usize::from(d.range.start())).collect();
         assert_eq!(starts, [2, 15]);
         assert!(d.iter().all(|d| at(raw, d) == r"\foo"));
+    }
+
+    #[cfg(feature = "math")]
+    #[test]
+    fn equal_formulas_take_the_places_of_their_candidates_in_order() {
+        let src = r"<latex>\foo</latex> <latex>\foo</latex> <latex>\foo</latex>";
+        let (a, b) = (TextRange::new(0.into(), 19.into()), whole(src));
+        let mut used = HashSet::new();
+        let one = lines(&[r"<latex>\foo</latex>"]);
+        let mut starts = Vec::new();
+        for _ in 0..3 {
+            let d = errors_among(src, one.clone(), &[a, b], &mut used, b, Delim::Latex);
+            starts.push(usize::from(d[0].range.start()));
+        }
+        assert_eq!(starts, [7, 27, 47]);
+        // All places taken: reported on the first candidate.
+        let d = errors_among(src, one.clone(), &[a, b], &mut used, b, Delim::Latex);
+        assert_eq!(d[0].range, a);
+        // No candidates: the fallback.
+        let fallback = TextRange::new(1.into(), 2.into());
+        let d = errors_among(src, one, &[], &mut used, fallback, Delim::Latex);
+        assert_eq!(d[0].range, fallback);
     }
 
     #[cfg(feature = "math")]
