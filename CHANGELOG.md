@@ -6,6 +6,19 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `--charset unicode-math` and `Charset::UnicodeMath`: formulas in the text renderer with the
+  full math glyph set (radical, overline, minus, script forms, sum, integral, bracket pieces).
+
+### Changed
+
+- `Charset` is `#[non_exhaustive]`, and `ascii_formula`, `ascii_formula_rows`, `ascii_asciimath`
+  and `ascii_asciimath_rows` take a `Charset`. Formulas in the text renderer follow the charset:
+  `ascii` draws printable ASCII only (`\/` over `_` for a radical, `alpha`, `<=`, `sum`, `+/-`,
+  `^2`), and the default `unicode` draws only characters that common monospace fonts draw one
+  cell wide (Latin-1 operators, Greek, box drawing). The previous output is `unicode-math`.
+
 ## [0.6.4] - 2026-11-22
 
 ### Added

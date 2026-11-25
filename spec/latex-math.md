@@ -43,9 +43,22 @@ dependency.
 SVG and PNG draw glyphs as paths taken from the font's outlines, so a drawing does not depend on
 the viewer having the math font (as with the bundled text font, DISPLA-4). A formula is one
 scene item with its baseline, so a diagram can align it to its label. The ASCII renderer draws a
-formula in text rows: a fraction is a numerator, a rule of `-`, and a denominator, scripts use
-Unicode super- and subscript characters where they exist and `^`/`_` forms where not, and a
-radical is a radical sign (U+221A) with an overline. ASCII is lossy by nature; the SVG is the reference.
+formula in text rows: a fraction is a numerator, a rule of `-`, and a denominator. The character
+set follows `--charset` (LMATH-4 glyph policy, `math/glyphs.rs`, one `ALLOWED` table):
+
+- `ascii`: printable ASCII only. A radical is `\/` under a `_` overline with the index before it
+  (`3\/`, `(n)\/`), scripts are `^2`, `^(n+1)`, `_i`, `_(i,j)`, a minus is `-`, `\pm` is `+/-`,
+  Greek and symbols are named (`alpha`, `pi`, `inf`, `<=`, `!=`, `->`, `sum`, `int`), and
+  delimiters are built from `/ \ | [ ] < >`. A character with no form is `?`.
+- `unicode` (default): the same forms, keeping only characters that common monospace fonts draw
+  one cell wide: ASCII, the Latin-1 signs for plus-minus, middle dot, times, divide, degree, and
+  the superscripts 1 to 3, Greek letters (U+0391..03C9), and box drawing. The
+  radical, overline, minus, scripts, sum, integral, arrows, and relations take their ASCII form.
+- `unicode-math`: the symbol table's own characters (radical sign U+221A, overline, super- and
+  subscripts, sum and integral signs, bracket pieces). Many fonts draw these wider than a cell, which shifts
+  rows.
+
+ASCII is lossy by nature; the SVG is the reference.
 
 ## LMATH-5 Compatibility
 

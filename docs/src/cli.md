@@ -41,8 +41,10 @@ This exits with status 2, and no window opens.
 ## `sirene ascii`
 
 Prints the diagram with box-drawing characters. `--charset ascii` uses only ASCII
-(`+`, `-`, `|`, `>`), and writes stereotypes as `<<interface>>` rather than `«interface»`. A
-Markdown file prints each diagram block, with a blank line between
+(`+`, `-`, `|`, `>`), including in formulas (`\/` for a radical, `alpha`, `<=`), and writes
+stereotypes as `<<interface>>` rather than `«interface»`. The default `unicode` keeps formulas to
+characters monospace fonts draw one cell wide; `--charset unicode-math` draws them with the full
+math glyphs (radical sign, sum sign, superscript digits), which some fonts draw wider than a cell. A Markdown file prints each diagram block, with a blank line between
 them.
 
 ```

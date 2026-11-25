@@ -99,7 +99,9 @@ each side of the baseline (a formula's ascent and descent in pixels plus 1 px), 
 a line height. A formula is one unbreakable piece when a label wraps. The model keeps the
 formula's source (`Span::formula`), not a `Formula`; the painter typesets for measuring and
 drawing. In the text renderer a line is as many rows as its tallest formula (`ascii_formula_rows`),
-text and formulas aligned on the baseline row, every row of a line the same width.
+text and formulas aligned on the baseline row, every row of a line the same width. The
+charset of the render (`Options::charset`, held by `Rows`) picks the formula's characters when the
+block is built, so widths are those of the characters drawn (see LMATH-4 in `latex-math.md`).
 
 Status (sequence): the same runs and baseline rule (`scene/mathtext.rs` `draw_lines`,
 `block_size`; shared with the flowchart painter). A header, message label, or note is as tall
