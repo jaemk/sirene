@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "kanban\n  todo[Area $$\\fooa$$]\n    a[Solve $$x^2$$]@{ ticket: '$$\\foob$$', assigned: '$$\\fooc$$' }\n    b[Plain]@{ label: 'Meta $$\\food$$' }\n  done[Done]\n    c[$$\\fooe$$ and $$y$$]\n"
+---
+2:15: error: Undefined control sequence: \fooa [\fooa]
+3:35: error: Undefined control sequence: \foob [\foob]
+3:58: error: Undefined control sequence: \fooc [\fooc]
+4:31: error: Undefined control sequence: \food [\food]
+6:9: error: Undefined control sequence: \fooe [\fooe]
+
+┌───────────────────────────┐ ┌─ Done ────────────────────┐
+│ Area $$\fooa$$            │ │ ╭───────────────────────╮ │
+│ ╭───────────────────────╮ │ │ │ $$\fooe$$ and y       │ │
+│ │ Solve x^2             │ │ │ ╰───────────────────────╯ │
+│ │ $$\foob$$  @$$\fooc$$ │ │ │                           │
+│ ╰───────────────────────╯ │ │                           │
+│ ╭───────────────────────╮ │ │                           │
+│ │ Meta $$\food$$        │ │ │                           │
+│ ╰───────────────────────╯ │ │                           │
+└───────────────────────────┘ └───────────────────────────┘

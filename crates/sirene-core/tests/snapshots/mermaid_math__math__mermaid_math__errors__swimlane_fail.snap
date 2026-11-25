@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "swimlane-beta LR\n  subgraph lane1[\"Lane $$\\fooa$$\"]\n    a[\"Start $$\\foob$$\"]\n  end\n\n  subgraph lane2[\"Lane two\"]\n    b[\"End $$x$$\"]\n  end\n\n  a -->|\"$$\\fooc$$\"| b\n"
+---
+2:26: error: Undefined control sequence: \fooa [\fooa]
+3:16: error: Undefined control sequence: \foob [\foob]
+10:12: error: Undefined control sequence: \fooc [\fooc]
+
+┌─ Lane $$\fooa$$ ─────────────────────────────┐
+│  ┌─────────────────┐                         │
+│  │ Start $$\foob$$ ├─┐                       │
+│  └─────────────────┘ │                       │
+├─ Lane two ───────────┼───────────────────────┤
+│                      │            ┌───────┐  │
+│                      └─$$\fooc$$─►│ End x │  │
+│                                   └───────┘  │
+└──────────────────────────────────────────────┘

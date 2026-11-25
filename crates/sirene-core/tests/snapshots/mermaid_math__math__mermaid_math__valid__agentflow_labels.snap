@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "agentflow-beta LR\n  flow plan[\"Plan $$\\alpha$$\"]\n    goal@{ shape: input, label: 'Goal $$\\gamma$$' }\n    split{\"Split $$\\frac{a}{b}$$?\"}\n  end\n\n  goal --> split\n  split -->|\"$$e^{i\\pi}$$\"| goal\n"
+---
+
+┌─ Plan α ──────────────────────────────┐
+│  ┌────────┐           ╱────────────╲  │
+│  ╱ Goal γ ├──────────►│        a   │  │
+│  ╱        ╱◄┐         │ Split ---? │  │
+│  └────────┘ └─e^(iπ)──┤        b   │  │
+│                       ╲────────────╱  │
+└───────────────────────────────────────┘

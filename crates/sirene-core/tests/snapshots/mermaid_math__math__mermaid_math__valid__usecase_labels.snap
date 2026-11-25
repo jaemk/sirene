@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "usecase-beta\nactor Customer(\"Customer $$\\alpha$$\")\nBrowse(\"Browse $$\\gamma$$\")\nsystemBoundary shop[\"Shop $$\\pi$$\"]\n  Pay(\"Pay $$\\frac{a}{b}$$\")\nend\nCustomer --> Browse\nCustomer -- \"$$e^{i\\pi}$$\" --> Pay\n"
+---
+
+┌────────────┐              ╭──────────╮
+│ Customer α ├─────────────►( Browse γ )
+│            ├─┐            ╰──────────╯
+└────────────┘ │
+               │          ┌─ Shop π ──────┐
+               └─e^(iπ)─┐ │  ╭─────────╮  │
+                        │ │  (      a  )  │
+                        └─┼─►( Pay --- )  │
+                          │  (      b  )  │
+                          │  ╰─────────╯  │
+                          └───────────────┘

@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "swimlane-beta LR\n  subgraph lane1[\"Lane $$\\alpha$$\"]\n    a[\"Start $$\\gamma$$\"]\n  end\n\n  subgraph lane2[\"Lane two\"]\n    b[\"End $$\\frac{a}{b}$$\"]\n  end\n\n  a -->|\"$$e^{i\\pi}$$\"| b\n"
+---
+
+┌─ Lane α ────────────────────────────┐
+│  ┌─────────┐                        │
+│  │ Start γ ├─┐                      │
+│  └─────────┘ │                      │
+├─ Lane two ───┼──────────────────────┤
+│              │         ┌─────────┐  │
+│              │         │      a  │  │
+│              └─e^(iπ)─►│ End --- │  │
+│                        │      b  │  │
+│                        └─────────┘  │
+└─────────────────────────────────────┘

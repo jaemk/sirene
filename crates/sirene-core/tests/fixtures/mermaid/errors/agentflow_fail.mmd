@@ -1,0 +1,8 @@
+agentflow-beta LR
+  flow plan["Plan $$\fooa$$"]
+    goal@{ shape: input, label: 'Goal $$\foob$$' }
+    split{"Split $$x$$?"}
+  end
+
+  goal --> split
+  split -->|"$$\fooc$$"| goal

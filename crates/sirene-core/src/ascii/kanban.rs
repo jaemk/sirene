@@ -2,7 +2,9 @@
 //! a box per card.
 
 use super::canvas::{Canvas, Line};
+use super::mathtext::{self, Rows};
 use super::{Charset, Options, ROUND, draw_box, width};
+use crate::flowchart::Label;
 use crate::kanban::{Card, Kanban, Priority};
 use crate::layout::Rect;
 
@@ -66,48 +68,128 @@ fn details(card: &Card, charset: Charset) -> String {
     parts.join("  ")
 }
 
+/// One source line of a label as rows: a formula's rows (LEMB-4), which are not wrapped, or its
+/// text.
+struct Source {
+    rows: Vec<String>,
+    math: bool,
+}
+
+/// The lines of `label`, each as the rows it is drawn in, formulas set in `formulas` (once each).
+fn sources(label: &Label, formulas: &Rows) -> Vec<Source> {
+    label
+        .text
+        .split('\n')
+        .map(|line| {
+            let one = Label {
+                text: line.to_owned(),
+                ..label.clone()
+            };
+            match mathtext::rows(formulas, &one) {
+                Some(rows) => Source { rows, math: true },
+                None => Source {
+                    rows: one.lines(),
+                    math: false,
+                },
+            }
+        })
+        .collect()
+}
+
+/// `sources` drawn at most `max` wide: text wrapped, a formula's rows as they are.
+fn fitted(sources: &[Source], max: i32) -> Vec<String> {
+    sources
+        .iter()
+        .flat_map(|s| {
+            if s.math {
+                s.rows.clone()
+            } else {
+                s.rows.iter().flat_map(|l| wrap(l, max)).collect()
+            }
+        })
+        .collect()
+}
+
+/// The widest text and the widest formula row of `sources`.
+fn widths(sources: &[Source]) -> (i32, i32) {
+    let (mut text, mut math) = (0, 0);
+    for s in sources {
+        let w = s.rows.iter().map(|r| width(r)).max().unwrap_or(0);
+        if s.math {
+            math = math.max(w);
+        } else {
+            text = text.max(w);
+        }
+    }
+    (text, math)
+}
+
+/// A card's label and details as rows.
+type CardSource = (Vec<Source>, Vec<Source>);
+
 /// Renders `board` as text (MKAN-4).
 pub fn render(board: &Kanban, options: &Options) -> String {
     let charset = options.charset;
-    // Each column's title and each card's lines, for the text width that fits them.
-    let natural = board
-        .columns
-        .iter()
-        .flat_map(|c| {
-            c.cards
-                .iter()
-                .flat_map(|card| {
-                    card.label
-                        .lines()
-                        .into_iter()
-                        .chain([details(card, charset)])
-                })
-                .map(|l| width(&l))
-                .chain([width(&c.label.lines().join(" ")) - 2])
-        })
-        .max()
-        .unwrap_or(0);
-    let text_w = natural.clamp(MIN_TEXT, MAX_TEXT);
-    // A card is `│ text │`; a column holds cards with a space either side.
-    let card_w = text_w + 4;
-    let col_w = card_w + 4;
-    let cards: Vec<Vec<Vec<String>>> = board
+    let formulas = Rows::new(charset);
+    // Each card's label and details as rows, and each column's title: a title with a formula is
+    // rows inside the column, under its top border, which holds only a title of text.
+    let card_src: Vec<Vec<CardSource>> = board
         .columns
         .iter()
         .map(|c| {
             c.cards
                 .iter()
                 .map(|card| {
-                    let mut lines: Vec<String> = card
-                        .label
-                        .lines()
-                        .iter()
-                        .flat_map(|l| wrap(l, text_w))
-                        .collect();
                     let d = details(card, charset);
-                    if !d.is_empty() {
-                        lines.extend(wrap(&d, text_w));
-                    }
+                    let details = if d.is_empty() {
+                        Vec::new()
+                    } else {
+                        sources(&Label::plain(d), &formulas)
+                    };
+                    (sources(&card.label, &formulas), details)
+                })
+                .collect()
+        })
+        .collect();
+    let heads: Vec<Option<Vec<String>>> = board
+        .columns
+        .iter()
+        .map(|c| {
+            c.label
+                .has_formula()
+                .then(|| fitted(&sources(&c.label, &formulas), i32::MAX))
+        })
+        .collect();
+    // The text width that fits each column's title and each card's lines, and the widest formula.
+    let mut natural = 0;
+    let mut formula_w = 0;
+    for (c, head) in board.columns.iter().zip(&heads) {
+        match head {
+            // A title row starts two cells in, and the column is four wider than the text.
+            Some(rows) => {
+                let w = rows.iter().map(|r| width(r)).max().unwrap_or(0);
+                formula_w = formula_w.max(w - 4);
+            }
+            None => natural = natural.max(width(&c.label.lines().join(" ")) - 2),
+        }
+    }
+    for (label, details) in card_src.iter().flatten() {
+        for (text, math) in [widths(label), widths(details)] {
+            natural = natural.max(text);
+            formula_w = formula_w.max(math);
+        }
+    }
+    let text_w = natural.clamp(MIN_TEXT, MAX_TEXT).max(formula_w);
+    // A card is `│ text │`; a column holds cards with a space either side.
+    let card_w = text_w + 4;
+    let col_w = card_w + 4;
+    let cards: Vec<Vec<Vec<String>>> = card_src
+        .iter()
+        .map(|cs| {
+            cs.iter()
+                .map(|(label, details)| {
+                    let mut lines = fitted(label, text_w);
+                    lines.extend(fitted(details, text_w));
                     lines
                 })
                 .collect()
@@ -115,7 +197,11 @@ pub fn render(board: &Kanban, options: &Options) -> String {
         .collect();
     let body = cards
         .iter()
-        .map(|cs| cs.iter().map(|l| l.len() as i32 + 2).sum::<i32>())
+        .zip(&heads)
+        .map(|(cs, head)| {
+            head.as_ref().map_or(0, |h| h.len() as i32)
+                + cs.iter().map(|l| l.len() as i32 + 2).sum::<i32>()
+        })
         .max()
         .unwrap_or(0)
         .max(1);
@@ -123,15 +209,25 @@ pub fn render(board: &Kanban, options: &Options) -> String {
     let n = board.columns.len() as i32;
     let total_w = (n * col_w + (n - 1).max(0)).max(0);
     let mut canvas = Canvas::new(total_w, if n > 0 { col_h } else { 0 });
-    for (i, (column, cs)) in board.columns.iter().zip(&cards).enumerate() {
+    for (i, ((column, cs), head)) in board.columns.iter().zip(&cards).zip(&heads).enumerate() {
         let x = i as i32 * (col_w + 1);
         draw_box(&mut canvas, Rect::new(x, 0, col_w, col_h), Line::Light);
-        let mut title = column.label.lines().join(" ");
-        while width(&title) > col_w - 4 {
-            title.pop();
-        }
-        canvas.text(x + 2, 0, &format!(" {title} "));
         let mut y = 1;
+        match head {
+            Some(rows) => {
+                for r in rows {
+                    canvas.text(x + 2, y, r);
+                    y += 1;
+                }
+            }
+            None => {
+                let mut title = column.label.lines().join(" ");
+                while width(&title) > col_w - 4 {
+                    title.pop();
+                }
+                canvas.text(x + 2, 0, &format!(" {title} "));
+            }
+        }
         for lines in cs {
             let r = Rect::new(x + 2, y, card_w, lines.len() as i32 + 2);
             draw_box(&mut canvas, r, Line::Light);

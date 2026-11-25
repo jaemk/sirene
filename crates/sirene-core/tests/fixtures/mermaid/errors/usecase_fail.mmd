@@ -1,0 +1,8 @@
+usecase-beta
+actor Customer("Customer $$\fooa$$")
+Browse("Browse $$x$$")
+systemBoundary shop["Shop $$\foob$$"]
+  Pay("Pay $$\fooc$$")
+end
+Customer --> Browse
+Customer -- "$$\food$$" --> Pay
