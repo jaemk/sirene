@@ -226,14 +226,14 @@ const CASES: &[(&str, [Lines; 3])] = &[
     (
         r"\sum_{i=1}^{n} x_i^2",
         [
-            &["  n", " sum  x^2_i", "i = 1"],
-            &["  n", " sum  x^2_i", "i = 1"],
+            &["  n", " sum  x_i^2", "i = 1"],
+            &["  n", " sum  x_i^2", "i = 1"],
             &["  n", "  ∑   xᵢ²", "i = 1"],
         ],
     ),
     (
         r"\int_0^1 f(x)\,dx",
-        [&["int^1_0 f(x) dx"], &["int^1_0 f(x) dx"], &["∫₀¹ f(x) dx"]],
+        [&["int_0^1 f(x) dx"], &["int_0^1 f(x) dx"], &["∫₀¹ f(x) dx"]],
     ),
     (
         r"\begin{pmatrix}a&b\\c&d\end{pmatrix}",
@@ -313,7 +313,7 @@ const CASES: &[(&str, [Lines; 3])] = &[
     ),
     (
         r"x^{n+1}_{i,j}",
-        [&["x^(n+1)_(i,j)"], &["x^(n+1)_(i,j)"], &["xⁿ⁺¹_(i,j)"]],
+        [&["x_(i,j)^(n+1)"], &["x_(i,j)^(n+1)"], &["x_(i,j)ⁿ⁺¹"]],
     ),
     (
         r"f'(x)=\infty",

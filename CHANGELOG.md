@@ -28,6 +28,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ascii` draws printable ASCII only (`\/` over `_` for a radical, `alpha`, `<=`, `sum`, `+/-`,
   `^2`), and the default `unicode` draws only characters that common monospace fonts draw one
   cell wide (Latin-1 operators, Greek, box drawing). The previous output is `unicode-math`.
+- The text renderer writes the subscript before the superscript when a script is not in Unicode
+  characters: `x_i^2` and `int_0^1`, not `x^2_i` and `int^1_0`.
 
 ## [0.6.4] - 2026-11-22
 

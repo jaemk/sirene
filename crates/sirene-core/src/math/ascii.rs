@@ -843,11 +843,9 @@ impl Renderer<'_> {
         };
         let sup = sup.map(|s| script(small.node(s, false), true, self.charset));
         let sub = sub.map(|s| script(small.node(s, false), false, self.charset));
-        // Unicode scripts read as `x_i^2`; the `^` and `_` forms as `x^2_i`.
-        let all_unicode = sup.iter().chain(&sub).all(|(_, unicode)| *unicode);
+        // The subscript comes first in every form (`x_i^2`, `int_0^1`), as in AsciiMath.
         let mut parts = vec![base_block];
-        let (first, second) = if all_unicode { (sub, sup) } else { (sup, sub) };
-        parts.extend(first.into_iter().chain(second).map(|(b, _)| b));
+        parts.extend(sub.into_iter().chain(sup).map(|(b, _)| b));
         Block::hcat(parts)
     }
 
@@ -1790,7 +1788,7 @@ mod tests {
         ("a_{n+1}", false, "a\u{2099}\u{208a}\u{2081}"),
         ("x^{a+b}", false, "x\u{1d43}\u{207a}\u{1d47}"),
         ("x^q", false, "x^q"),
-        ("x_{ab}^{qr}", false, "x^(qr)_(ab)"),
+        ("x_{ab}^{qr}", false, "x_(ab)^(qr)"),
         ("e^{-x^2}", false, "e^(\u{2212}x\u{b2})"),
         ("f'(x)", false, "f\u{2032}(x)"),
         (r"x^{\frac{1}{2}}", false, "    1\nx^(---)\n    2"),

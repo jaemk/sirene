@@ -2,7 +2,7 @@
 source: crates/sirene-core/tests/plantuml.rs
 expression: "@startuml\ntitle Graph <latex>x^2</latex> and <math>sum_(i=1)^n i</math>\nclass A\nA --> B\n@enduml\n"
 ---
-Graph x^2 and sum^n_(i=1)i
+Graph x^2 and sum_(i=1)^ni
 
 +---+
 | A |

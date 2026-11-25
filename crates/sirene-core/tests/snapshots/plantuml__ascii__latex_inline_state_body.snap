@@ -9,7 +9,7 @@ expression: "@startuml\n[*] --> Idle\nIdle : entry / <latex>x_0 + 1</latex>\nIdl
 |       Idle        |
 +-------------------+
 | entry / x_0 + 1   |
-| do / sum^n_(i=1)i |
+| do / sum_(i=1)^ni |
 '---------+---------'
           |
           v
