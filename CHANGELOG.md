@@ -29,7 +29,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `^2`), and the default `unicode` draws only characters that common monospace fonts draw one
   cell wide (Latin-1 operators, Greek, box drawing). The previous output is `unicode-math`.
 - The text renderer writes the subscript before the superscript when a script is not in Unicode
-  characters: `x_i^2` and `int_0^1`, not `x^2_i` and `int^1_0`.
+  characters: `x_i^2` and `int_0^1`, not `x^2_i` and `int^1_0`. A space follows such a script
+  before a letter (`int_0^n i`, not `int_0^ni`).
 
 ## [0.6.4] - 2026-11-22
 
