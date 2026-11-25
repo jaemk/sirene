@@ -31,12 +31,14 @@ pub fn equation(equation: &Equation, metrics: &impl TextMetrics, theme: &Theme) 
     }
 }
 
-/// The left, top, right, and bottom of the paths of `primitives`, control points included.
+/// The left, top, right, and bottom of the paths of `primitives`, control points included. A
+/// clipped path counts only inside its clip rectangle (a stretchy arrow's path is far wider than
+/// the part it shows).
 #[cfg(feature = "math")]
-fn ink(primitives: &[Primitive]) -> Option<(f32, f32, f32, f32)> {
+pub(super) fn ink(primitives: &[Primitive]) -> Option<(f32, f32, f32, f32)> {
     let mut b: Option<(f32, f32, f32, f32)> = None;
     for p in primitives {
-        let Primitive::Path { segments, .. } = p else {
+        let Primitive::Path { segments, clip, .. } = p else {
             continue;
         };
         for s in segments {
@@ -45,6 +47,13 @@ fn ink(primitives: &[Primitive]) -> Option<(f32, f32, f32, f32)> {
                 .iter()
                 .filter(|p| p.x.is_finite() && p.y.is_finite())
             {
+                let p = match clip {
+                    Some(r) => super::Pt::new(
+                        p.x.clamp(r.x, r.x + r.w.max(0.0)),
+                        p.y.clamp(r.y, r.y + r.h.max(0.0)),
+                    ),
+                    None => *p,
+                };
                 b = Some(match b {
                     None => (p.x, p.y, p.x, p.y),
                     Some((l, t, r, d)) => (l.min(p.x), t.min(p.y), r.max(p.x), d.max(p.y)),
@@ -106,24 +115,21 @@ mod tests {
     fn assert_ink_inside(s: &Scene) {
         let (mut seen, slack) = (0, 0.01);
         for e in &s.elements {
-            let Primitive::Path { segments, .. } = &e.primitive else {
+            // A clipped path shows only inside its clip rectangle.
+            let Some((l, t, r, d)) = ink(std::slice::from_ref(&e.primitive)) else {
                 continue;
             };
-            for seg in segments {
-                for p in seg.points() {
-                    seen += 1;
-                    assert!(
-                        p.x >= -slack && p.y >= -slack,
-                        "{p:?} is above or left of the scene"
-                    );
-                    assert!(
-                        p.x <= s.width + slack && p.y <= s.height + slack,
-                        "{p:?} is outside {}x{}",
-                        s.width,
-                        s.height
-                    );
-                }
-            }
+            seen += 1;
+            assert!(
+                l >= -slack && t >= -slack,
+                "{l},{t} is above or left of the scene"
+            );
+            assert!(
+                r <= s.width + slack && d <= s.height + slack,
+                "{r},{d} is outside {}x{}",
+                s.width,
+                s.height
+            );
         }
         assert!(seen > 0, "nothing was drawn");
     }
@@ -154,6 +160,28 @@ mod tests {
             );
             assert!(s.height.is_finite() && s.height >= 2.0 * MARGIN, "{src}");
             assert_ink_inside(&s);
+        }
+    }
+
+    #[test]
+    fn a_cd_label_overhanging_left_is_inside_the_scene_with_its_margin() {
+        for src in [
+            r"\begin{CD} A \\ @V{\text{a very long label}}VV \\ B \end{CD}",
+            r"\begin{CD} A @<{\text{a very long label}}<< B \end{CD}",
+            r"\begin{CD} A @>{\text{a very long label}}>> B \end{CD}",
+        ] {
+            let s = scene(src, Flavor::Tex);
+            assert_ink_inside(&s);
+            let left = s
+                .elements
+                .iter()
+                .filter_map(|e| match &e.primitive {
+                    Primitive::Path { .. } => Some(e.primitive.clone()),
+                    Primitive::Text { .. } => None,
+                })
+                .collect::<Vec<_>>();
+            let left = ink(&left).expect("ink").0;
+            assert!(left >= MARGIN - 0.01, "{src}: {left}");
         }
     }
 

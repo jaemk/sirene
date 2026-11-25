@@ -103,6 +103,9 @@ pub(super) const BASELINE: f32 = 0.35;
 const PAD: f32 = 1.0;
 
 /// A typeset formula run and its size in em.
+///
+/// `width` is the formula's box widened by the ink that reaches left of it (`Formula::left`), and
+/// `place` moves the formula right by that much, so the ink lies inside the run's box.
 #[cfg(feature = "math")]
 pub(super) struct Inline {
     pub width: f32,
@@ -126,7 +129,7 @@ pub(super) struct Inline {
 fn typeset(span: &Span) -> Option<Inline> {
     let formula = span.typeset()?.ok()?;
     Some(Inline {
-        width: formula.width,
+        width: formula.left + formula.width,
         ascent: formula.ascent,
         descent: formula.descent.max(0.0),
         formula,
@@ -140,14 +143,15 @@ fn typeset(_: &Span) -> Option<Inline> {
 
 #[cfg(feature = "math")]
 impl Inline {
-    /// The formula's primitives, its left edge on the baseline at `origin`.
+    /// The formula's primitives, the left edge of its ink on the baseline at `origin`.
     pub(super) fn place(
         &self,
         origin: super::Pt,
         size: f32,
         color: super::Color,
     ) -> Vec<super::Primitive> {
-        self.formula.place(origin, size, color)
+        let at = super::Pt::new(origin.x + self.formula.left * size, origin.y);
+        self.formula.place(at, size, color)
     }
 }
 
@@ -341,6 +345,94 @@ mod tests {
         let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
         assert_eq!(crate::equation::count::get(), 5, "drawing sets each");
         assert!(!scene.elements.is_empty());
+    }
+
+    /// The left of the ink of `prims` (a clipped path counts inside its clip), `None` with none.
+    fn left_of(prims: impl IntoIterator<Item = Primitive>) -> Option<f32> {
+        super::super::equation::ink(&prims.into_iter().collect::<Vec<_>>()).map(|b| b.0)
+    }
+
+    /// A diagram whose left label of a first-column arrow reaches left of its formula's box.
+    const WIDE_LEFT: &str = r"$$\begin{CD} A \\ @V{\text{a very long label}}VV \\ B \end{CD}$$";
+
+    #[test]
+    fn a_formula_overhanging_left_keeps_its_ink_in_its_run() {
+        let cache = Formulas::default();
+        let theme = Theme::LIGHT;
+        let span = formula(WIDE_LEFT);
+        let f = cache.inline(&span).expect("typesets");
+        let size = theme.font_size;
+        let line = vec![Span::plain("p"), span.clone()];
+        let center = Pt::new(200.0, 100.0);
+        let prims = draw_lines(
+            &Approx,
+            &cache,
+            &theme,
+            std::slice::from_ref(&line),
+            center,
+            theme.text,
+        );
+        let total = f.width * size + Approx.styled_width("p", size, TextStyle::default());
+        let line_left = center.x - total / 2.0;
+        let ink = left_of(prims).expect("ink");
+        // Control points may pass the glyph's outline by a pixel.
+        assert!(ink >= line_left - 1.0, "{ink} {line_left}");
+        let plain = cache.inline(&formula("$$A$$")).expect("typesets");
+        assert!(f.width > plain.width + 1.0, "the run holds the overhang");
+    }
+
+    #[test]
+    fn a_formula_with_no_overhang_is_placed_as_before() {
+        let cache = Formulas::default();
+        let f = cache.inline(&formula("$$x^2$$")).expect("typesets");
+        assert_eq!(f.formula.left, 0.0);
+        assert_eq!(f.width, f.formula.width);
+        let origin = Pt::new(7.0, 20.0);
+        assert_eq!(
+            f.place(origin, 16.0, Theme::LIGHT.text),
+            f.formula.place(origin, 16.0, Theme::LIGHT.text)
+        );
+    }
+
+    #[test]
+    fn a_flowchart_node_holds_a_left_overhanging_label() {
+        for label in [
+            WIDE_LEFT,
+            r"$$\begin{CD} A @<{\text{a very long label}}<< B \end{CD}$$",
+            r"$$\begin{CD} A @>{\text{a very long label}}>> B \end{CD}$$",
+        ] {
+            let src = format!("flowchart LR\n    N[\"{label}\"]\n");
+            let chart = crate::flowchart::parse(&src).lower().flowchart;
+            let scene = super::super::flowchart(&chart, &Approx, &Theme::LIGHT).unwrap();
+            let outline = left_of(
+                scene
+                    .elements
+                    .iter()
+                    .filter(|e| {
+                        matches!(
+                            &e.primitive,
+                            Primitive::Path {
+                                stroke: Some(_),
+                                ..
+                            }
+                        )
+                    })
+                    .map(|e| e.primitive.clone()),
+            )
+            .expect("an outline");
+            let ink = left_of(
+                scene
+                    .elements
+                    .iter()
+                    .filter(|e| matches!(&e.primitive, Primitive::Path { stroke: None, .. }))
+                    .map(|e| e.primitive.clone()),
+            )
+            .expect("ink");
+            assert!(
+                ink >= 0.0 && ink >= outline - 1.0,
+                "{label}: {ink} {outline}"
+            );
+        }
     }
 
     #[test]
