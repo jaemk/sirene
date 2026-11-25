@@ -121,7 +121,8 @@ only given as ids (an id has no tags), and the kinds that keep their text as pla
 their own painters, in the positions not listed above: mindmap (its painter is not read yet),
 the timing diagram's axis ticks, the chronology's date labels (dates), and DOT (`@startdot` is
 Graphviz's language, which has no tags, so its labels are Graphviz's, not Creole). Tags there
-are text with no diagnostic. In the text renderer an end label is placed beside the line's
+are text with no diagnostic; a DOT label reads `$$` instead, as a sirene extension (DOT-3,
+LEMB-1). In the text renderer an end label is placed beside the line's
 first or last cell and is not reserved room by the layout, so a wide one is clipped at the
 drawing's edge, as a text one is.
 Tests: `latex_inline_*` and `math_inline_*` fixtures,
@@ -137,7 +138,7 @@ typeset-once count.
 - Creole beyond the inline `<latex>` and `<math>` tags (PCREO-1) is not read. The scene and
   the ASCII renderer carry formula runs (`flowchart::Span`) but not other rich text spans, so
   the rest starts with a text-run model in the display list (DISPLA).
-- Formula tags in headers, footers, captions, and legends (none is drawn), in mindmap text, in
-  and in DOT labels are left (PCREO-3 says
-  why): each needs its position drawn from `Span` runs, one painter at a time. Title
-  formulas are set at one size (1.2 times the text), not mixed with bold text.
+- Formula tags in headers, footers, captions, and legends (none is drawn) and in mindmap text
+  are left (PCREO-3 says why): each needs its position drawn from `Span` runs, one painter at a
+  time. Title formulas are set at one size (1.2 times the text), not mixed with bold text. DOT
+  labels read `$$`, not tags (DOT-3).

@@ -693,6 +693,12 @@ mod tests {
                 include_str!("../../tests/fixtures/plantuml/valid/latex_inline_timing_all.puml"),
                 13,
             ),
+            // Every label position of a DOT graph: the graph, nodes, record fields, edge and end
+            // labels, and a cluster.
+            (
+                include_str!("../../tests/fixtures/dot/math/math_labels.dot"),
+                10,
+            ),
         ];
         for (src, formulas) in sources {
             crate::equation::count::reset();

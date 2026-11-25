@@ -16,6 +16,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Markdown files draw formulas as blocks beside the diagrams: `math`, `latex`, and `tex` fences,
   `$$...$$`, and inline `$...$`. `svg`, `png`, `ascii`, and `check` take them in source order, so
   `STEM-N` counts them.
+- PlantUML timing diagrams read `<latex>` and `<math>` formulas in signal names, state labels,
+  change notes, notes, and message, constraint, and highlight labels, each row growing to fit.
+- DOT reads `$$...$$` formulas (a sirene extension) in node, edge, `headlabel`, `taillabel`,
+  cluster, and graph labels, with a diagnostic per failing formula.
 - `sirene_core::markdown::{parts, Part, MathBlock, MathKind}`, `Block::range`, `Equation::tex`,
   `Equation::formula`, `diagram::lower_formula`, `equation::MATH`, and the web module's
   `LANG_LATEX`.

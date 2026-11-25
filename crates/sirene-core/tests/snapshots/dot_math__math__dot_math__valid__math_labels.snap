@@ -1,0 +1,32 @@
+---
+source: crates/sirene-core/tests/dot_math.rs
+expression: "digraph G {\n  label=\"Graph $$\\sum_{i}^{n} i$$\"\n  node [shape=box]\n  a [label=\"Node $$\\frac{a}{b}$$\"]\n  b [label=\"$$\\pi r^2$$ two\"]\n  n [label=\"$$a \\neq b$$\"]\n  r [shape=record, label=\"$$\\rho$$ | { $$\\sigma$$ | z }\"]\n  a -> b [label=\"Edge $$\\alpha+\\beta$$\", taillabel=\"$$\\tau$$\", headlabel=\"$$\\eta$$\"]\n  subgraph cluster_0 {\n    label=\"Cluster $$\\gamma$$\"\n    c\n  }\n  b -> c\n  n -> r\n}\n"
+---
+
+              n   
+       Graph sum i
+              i   
+
+┌──────────┐
+│       a  │   ┌────────┐
+│ Node --- │   │ a != b │
+│       b  │   └────┬───┘
+└─────┬────┘        │
+      │τ            │
+ Edge α + β         │
+      │             ▼
+      ▼η          ┌───┐
+┌──────────┐      │ ρ │
+│ πr^2 two │      ├───┤
+└─────┬────┘      │ σ │
+      │           │ z │
+      │           └───┘
+      │
+      │
+  ┌───┼─── Cluster γ ─┐
+  │   ▼               │
+  │ ┌───┐             │
+  │ │ c │             │
+  │ └───┘             │
+  │                   │
+  └───────────────────┘

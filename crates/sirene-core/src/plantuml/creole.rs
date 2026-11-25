@@ -405,7 +405,7 @@ mod tests {
     #[test]
     fn statement_punctuation_in_a_formula_is_not_the_statements() {
         assert_eq!(find_outside("a -> b", "->"), Some(2));
-        assert_eq!(find_outside("<math>a->b</math> -> c", "->"), Some(19));
+        assert_eq!(find_outside("<math>a->b</math> -> c", "->"), Some(18));
         assert_eq!(find_outside("<math>a->b</math>", "->"), None);
         // An unclosed tag is text.
         assert_eq!(find_outside("<math>a->b", "->"), Some(7));

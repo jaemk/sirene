@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/dot_math.rs
+expression: "digraph G {\n  label=\"Graph $$\\foo$$\"\n  node [shape=box]\n  a [label=\"Node $$\\foo$$\"]\n  r [shape=record, label=\"$$\\foo$$ | z\"]\n  a -> b [label=\"Edge $$\\foo$$\", taillabel=\"$$\\foo$$\", headlabel=\"$$\\foo$$\"]\n  subgraph cluster_0 {\n    label=\"Cluster $$\\foo$$\"\n    c\n  }\n}\n"
+---
+2:18: error: Undefined control sequence: \foo [\foo]
+4:20: error: Undefined control sequence: \foo [\foo]
+5:29: error: Undefined control sequence: \foo [\foo]
+6:25: error: Undefined control sequence: \foo [\foo]
+6:47: error: Undefined control sequence: \foo [\foo]
+6:69: error: Undefined control sequence: \foo [\foo]
+8:22: error: Undefined control sequence: \foo [\foo]
+
+                     Graph $$\foo$$
+
+                                   ┌─ Cluster $$\foo$$ ─┐
+                    ┌──────────┐   │                    │
+┌───────────────┐   │ $$\foo$$ │   │        ┌───┐       │
+│ Node $$\foo$$ │   ├──────────┤   │        │ c │       │
+└───────┬───────┘   │ z        │   │        └───┘       │
+        │$$\foo$$   └──────────┘   │                    │
+        │                          └────────────────────┘
+        │
+  Edge $$\foo$$
+        ▼$$\foo$$
+      ┌───┐
+      │ b │
+      └───┘

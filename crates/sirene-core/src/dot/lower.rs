@@ -7,9 +7,10 @@ use rowan::TextRange;
 use super::parser;
 use super::x11::X11;
 use crate::diagnostic::Diagnostic;
+use crate::flowchart::formula;
 use crate::flowchart::text::decode_html_entities;
 use crate::flowchart::{
-    Arrow, Compass, Direction, Edge, EdgeOrder, Flowchart, Label, Node, RankEnd, Row, Shape,
+    Arrow, Compass, Delim, Direction, Edge, EdgeOrder, Flowchart, Label, Node, RankEnd, Row, Shape,
     Stroke, Style, Subgraph,
 };
 use crate::scene::{Color, parse_color};
@@ -24,7 +25,10 @@ pub(crate) struct Output {
 }
 
 pub(crate) fn lower(root: &SyntaxNode) -> Output {
-    let mut l = Lowerer::default();
+    let mut l = Lowerer {
+        src: root.text().to_string(),
+        ..Lowerer::default()
+    };
     let mut graphs = root.children().filter(|n| n.kind() == DOT_GRAPH);
     if let Some(g) = graphs.next() {
         l.graph(&g);
@@ -287,6 +291,22 @@ struct Lowerer {
     horizontal: bool,
     /// Names already warned about, so each is reported once per file.
     warned: HashSet<String>,
+    /// The source text, to find each formula in as written.
+    src: String,
+    /// The `label` attributes (by range) whose formulas are queued, so a default that applies to
+    /// many nodes is checked once.
+    checked: HashSet<TextRange>,
+    /// Each queued label's lines, with the attribute they are written in.
+    formulas: Vec<(Vec<String>, TextRange)>,
+}
+
+/// A DOT label: `$$...$$` is a formula, set as written (a sirene extension, LEMB-1).
+fn label_of(text: impl Into<String>) -> Label {
+    Label {
+        text: text.into(),
+        markdown: false,
+        delim: Delim::DollarRaw,
+    }
 }
 
 fn tokens(node: &SyntaxNode) -> impl Iterator<Item = SyntaxToken> {
@@ -382,7 +402,43 @@ fn value(id: &SyntaxNode) -> Value {
 /// graph's, `\E` the edge's, `\T` and `\H` its tail and head, and `\x` is `x`. A name's own
 /// escapes are read too, as Graphviz does: the node `"a\nb"` is labeled on two lines. HTML
 /// entities are decoded after the names are put in and before the line breaks are read.
+///
+/// A `$$...$$` formula (a sirene extension, LEMB-1) is kept as written: no escape in it is read,
+/// so `\frac` and `\neq` are TeX, not a break or a dropped backslash.
 fn escape(text: &str, names: &Names) -> String {
+    let mut out = if has_formula(text) {
+        let mut out = String::new();
+        for (i, line) in text.split('\n').enumerate() {
+            if i > 0 {
+                out.push('\n');
+            }
+            let mut from = 0;
+            for r in Delim::DollarRaw.ranges(line) {
+                out.push_str(&escape_text(&line[from..r.start], names));
+                out.push_str(&line[r.clone()]);
+                from = r.end;
+            }
+            out.push_str(&escape_text(&line[from..], names));
+        }
+        out
+    } else {
+        escape_text(text, names)
+    };
+    // A final `\l` or `\n` ends the last line rather than starting another.
+    if out.ends_with('\n') {
+        out.pop();
+    }
+    out
+}
+
+/// Whether `text` has a `$$...$$` formula.
+fn has_formula(text: &str) -> bool {
+    text.split('\n')
+        .any(|l| !Delim::DollarRaw.ranges(l).is_empty())
+}
+
+/// [`escape`] for text outside a formula, without its last-line rule.
+fn escape_text(text: &str, names: &Names) -> String {
     let mut named = String::new();
     let mut chars = text.chars();
     while let Some(c) = chars.next() {
@@ -416,10 +472,6 @@ fn escape(text: &str, names: &Names) -> String {
             Some(c) => out.push(c),
             None => out.push('\\'),
         }
-    }
-    // A final `\l` or `\n` ends the last line rather than starting another.
-    if out.ends_with('\n') {
-        out.pop();
     }
     out
 }
@@ -786,6 +838,30 @@ fn arrow(name: &str) -> Option<Option<Arrow>> {
 impl Lowerer {
     fn warning(&mut self, range: TextRange, message: impl Into<String>) {
         self.diagnostics.push(Diagnostic::warning(range, message));
+    }
+
+    /// Queues the formulas of a label's `lines`, written in the attribute at `at`, to be checked
+    /// when the graph is lowered. An attribute is queued once.
+    fn queue_formulas<'a>(&mut self, lines: impl IntoIterator<Item = &'a str>, at: TextRange) {
+        let lines: Vec<String> = lines
+            .into_iter()
+            .flat_map(|t| t.split('\n'))
+            .map(crate::flowchart::clean)
+            .collect();
+        if lines.iter().any(|l| formula::has(l, Delim::DollarRaw)) && self.checked.insert(at) {
+            self.formulas.push((lines, at));
+        }
+    }
+
+    /// A diagnostic for each queued formula that does not typeset (and without the `math` feature,
+    /// for each formula), on its body as written.
+    fn check_formulas(&mut self) {
+        let mut used = HashSet::new();
+        for (lines, at) in std::mem::take(&mut self.formulas) {
+            let found =
+                formula::errors_among(&self.src, lines, &[at], &mut used, at, Delim::DollarRaw);
+            self.diagnostics.extend(found);
+        }
     }
 
     /// Warns once per file under `key`.
@@ -1235,8 +1311,12 @@ impl Lowerer {
         self.horizontal = matches!(chart.direction, Direction::LeftRight | Direction::RightLeft);
         if let Some(a) = get(&root, "label") {
             let title = self.label_text(&a.value.clone(), &graph, "");
+            self.queue_formulas([title.as_str()], a.range);
             chart.title = Some(title).filter(|t| !t.trim().is_empty());
         }
+        // The graph's `label` reads `$$` as a node's does.
+        chart.title_delim = Delim::DollarRaw;
+        chart.title_math = true;
         let background = get(&root, "bgcolor")
             .cloned()
             .and_then(|a| self.color_of(&a));
@@ -1309,6 +1389,7 @@ impl Lowerer {
                 Some(end) => chart.end_ranks.push((end, ids)),
             }
         }
+        self.check_formulas();
         Output {
             flowchart: chart,
             diagnostics: self.diagnostics,
@@ -1556,9 +1637,16 @@ impl Lowerer {
             shape = Shape::Rounded;
         }
         let styles = self.shape_styles(&attrs, &words, false);
+        if let Some(at) = get(&attrs, "label").map(|a| a.range) {
+            let cells = sections.iter().flatten().flat_map(|r| &r.cells);
+            self.queue_formulas(
+                std::iter::once(label.as_str()).chain(cells.map(String::as_str)),
+                at,
+            );
+        }
         Node {
             id,
-            label: Label::plain(label),
+            label: label_of(label),
             shape,
             sections,
             classes: Vec::new(),
@@ -1762,15 +1850,19 @@ impl Lowerer {
         };
         let label = |key: &str| {
             get(attrs, key).map(|a| {
-                Label::plain(if a.value.html {
+                let text = if a.value.html {
                     html_text(&a.value.text)
                 } else {
                     escape(&a.value.text, &names)
-                })
+                };
+                (label_of(text), a.range)
             })
         };
-        let (label, start_label, end_label) =
-            (label("label"), label("taillabel"), label("headlabel"));
+        let labels = [label("label"), label("taillabel"), label("headlabel")];
+        for (l, at) in labels.iter().flatten() {
+            self.queue_formulas([l.text.as_str()], *at);
+        }
+        let [label, start_label, end_label] = labels.map(|l| l.map(|(l, _)| l));
 
         let words = Self::styles_of(attrs);
         self.check_styles(
@@ -1850,8 +1942,12 @@ impl Lowerer {
         let attrs = std::mem::take(&mut self.clusters[c].attrs);
         let name = self.clusters[c].name.clone();
         let title = get(&attrs, "label")
-            .map(|a| a.value.clone())
-            .map(|v| self.label_text(&v, &name, ""))
+            .map(|a| (a.value.clone(), a.range))
+            .map(|(v, at)| (self.label_text(&v, &name, ""), at))
+            .map(|(t, at)| {
+                self.queue_formulas([t.as_str()], at);
+                t
+            })
             .unwrap_or_default();
         let words = Self::styles_of(&attrs);
         // Clusters have no rounded corners.
@@ -1863,7 +1959,7 @@ impl Lowerer {
         let styles = self.shape_styles(&attrs, &words, true);
         Subgraph {
             id: self.clusters[c].id.clone(),
-            title: Label::plain(title),
+            title: label_of(title),
             direction: None,
             members,
             classes: Vec::new(),

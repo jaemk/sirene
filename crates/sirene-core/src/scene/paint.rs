@@ -9,7 +9,7 @@ use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
 };
 use crate::flowchart::{
-    Arrow, Delim, Edge, Flowchart, Label, Measure, Node, Origin, Row, Shape, Span, Stroke as Line,
+    Arrow, Edge, Flowchart, Label, Measure, Node, Origin, Row, Shape, Span, Stroke as Line,
     Subgraph, formula,
 };
 use crate::layout::{self, Config, Layout, Rect, Size, Spacing};
@@ -544,9 +544,9 @@ pub(super) fn draw_with(
     };
     let title_line = title
         .as_deref()
-        .filter(|_| chart.title_delim == Delim::Latex)
-        .and_then(|t| {
-            let line = crate::flowchart::formula::runs(t, Delim::Latex);
+        .zip(chart.title_formulas())
+        .and_then(|(t, delim)| {
+            let line = crate::flowchart::formula::runs(t, delim);
             line.iter().any(|s| s.math).then_some(line)
         });
     let title_size = title_line

@@ -65,7 +65,10 @@ and assignee with a formula are one unbreakable line (not cut with `...`), and i
 column title with a formula is rows under the column's top border. The diagram `title` of every
 kind stays text (Mermaid never renders math in a title). DOT, C4, and architecture build
 the same `Label` and so also read `$$` in these positions; Mermaid's C4 and architecture draw it
-as text (known difference). Sequence participant names and aliases, message
+as text (known difference). DOT reading `$$` is a sirene extension, not Graphviz behavior: node,
+edge, end (`headlabel`, `taillabel`), and cluster labels and the graph's `label` (the one
+title that reads it, `Flowchart::title_math`), as `Delim::DollarRaw`, with diagnostics and
+typeset-once (DOT-3; `tests/dot_math.rs`). Sequence participant names and aliases, message
 text, notes, and the labels of `loop`, `alt`, `opt`, `par`, `critical`, and `break` blocks and
 of their `else`, `and`, and `option` sections are done (`tests/sequence_math.rs`); `box` and
 diagram titles draw the formula as text, as Mermaid does, and a `rect` label is a color. The
@@ -108,7 +111,7 @@ case; several per line; no nesting; the body is verbatim, so a doubled backslash
 break and `\n` inside a closed tag is not a line break. Typeset in text style (inline), not
 Mermaid's display style. `<math>` (AsciiMath) is read in the same places, translated to TeX by
 `math/asciimath.rs` (PCREO-2) and typeset in text style; `@startmath` is the document form.
-`$$` is text in PlantUML, and `<latex>` is text in Mermaid: `flowchart::Delim` says which delimiters a label
+`$$` is text in PlantUML, except in a `@startdot` graph (DOT's extension, LEMB-1), and `<latex>` is text in Mermaid and DOT: `flowchart::Delim` says which delimiters a label
 (`Label::delim`) or a sequence (`Sequence::math`) reads.
 
 PlantUML v1.2026.10 (LEMB-T8): the tag is `<latex>(.+?)</latex>` (and `<math>`), case-insensitive,
@@ -233,8 +236,10 @@ flowchart lowering). Without the `math` feature each formula gets one warning on
   notes, notes, constraints, highlights, and messages, each with a row that grows to its formula
   (`scene/gantt.rs`, `scene/timeline.rs`, `scene/timing.rs`, and their `ascii` twins, drawn from
   `tag_runs` and `tag_rows`). Left, for PlantUML: headers, footers, captions, and legends (not
-  drawn at all, so none is added); the timing axis ticks (moments, not text); the chronology's
-  date labels; and DOT (`@startdot` is Graphviz's language, with no tags; PCREO-3).
+  drawn at all, so none is added); the timing axis ticks (moments, not text); and the
+  chronology's date labels. DOT (`@startdot` too) reads `$$` as a sirene extension, in node,
+  edge, end, cluster, and graph labels (LEMB-1, DOT-3); its labels are not Creole, so no tags
+  (PCREO-3), and `xlabel` is not drawn.
   Done, for Mermaid (LEMB-1): flowchart subgraph titles; state names, descriptions, notes,
   composite titles, and transition labels; class names, members, notes, namespace titles,
   relation labels, and cardinalities; ER entity names, attributes, and relationship labels;
