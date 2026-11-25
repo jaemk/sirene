@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    par first\n        A->>B: one\n    and $$\\frac{1}{2}$$\n        B->>A: two\n    end\n"
+---
+252.0 x 280.1
+formula paths: 5
+texts: ["par", "[first]", "[", "]", "one", "two", "A", "A", "B", "B"]

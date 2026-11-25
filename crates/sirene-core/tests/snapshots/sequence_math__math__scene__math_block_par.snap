@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    par $$\\sqrt{n}$$ workers\n        A->>B: one\n    and other\n        B->>A: two\n    end\n"
+---
+252.0 x 270.0
+formula paths: 4
+texts: ["par", "[", "workers]", "[other]", "one", "two", "A", "A", "B", "B"]

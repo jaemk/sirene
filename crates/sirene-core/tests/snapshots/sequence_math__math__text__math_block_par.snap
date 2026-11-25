@@ -1,0 +1,21 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    par $$\\sqrt{n}$$ workers\n        A->>B: one\n    and other\n        B->>A: two\n    end\n"
+---
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+┌─       _         ──┐
+│ par [\/n workers]  │
+│ │  one  │          │
+│ ├──────►│          │
+│ │       │          │
+├┄[other]┄┼┄┄┄┄┄┄┄┄┄┄┤
+│ │  two  │          │
+│ │◄──────┤          │
+│ │       │          │
+└─┼───────┼──────────┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    alt ok\n        A->>B: yes\n    else $$\\frac{a}{b}$$\n        B->>A: no\n    end\n"
+---
+252.0 x 277.1
+formula paths: 5
+texts: ["alt", "[ok]", "[", "]", "yes", "no", "A", "A", "B", "B"]

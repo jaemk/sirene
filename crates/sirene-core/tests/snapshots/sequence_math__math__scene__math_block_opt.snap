@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    opt $$\\alpha + \\beta$$\n        A->>B: maybe\n    end\n"
+---
+252.0 x 202.0
+formula paths: 4
+texts: ["opt", "[", "]", "maybe", "A", "A", "B", "B"]

@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    alt $$x^2 > 1$$\n        A->>B: yes\n    else no\n        B->>A: no\n    end\n"
+---
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+┌─alt [x^2 > 1]──┐
+│ │  yes  │      │
+│ ├──────►│      │
+│ │       │      │
+├┄[no]┄┄┄┄┼┄┄┄┄┄┄┤
+│ │  no   │      │
+│ │◄──────┤      │
+│ │       │      │
+└─┼───────┼──────┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

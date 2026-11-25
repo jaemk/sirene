@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant A
+    participant B
+    critical lock
+        A->>B: lock
+    option $$\pi r^2$$
+        B->>A: busy
+    end

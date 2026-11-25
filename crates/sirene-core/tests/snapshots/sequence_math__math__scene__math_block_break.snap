@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    break $$e^{i\\pi}$$\n        A->>B: stop\n    end\n"
+---
+252.0 x 202.0
+formula paths: 4
+texts: ["break", "[", "]", "stop", "A", "A", "B", "B"]

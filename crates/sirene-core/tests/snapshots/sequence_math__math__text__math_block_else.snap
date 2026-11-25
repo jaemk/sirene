@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    alt ok\n        A->>B: yes\n    else $$\\frac{a}{b}$$\n        B->>A: no\n    end\n"
+---
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+┌─alt [ok]┼─┐
+│ │  yes  │ │
+│ ├──────►│ │
+│ │       │ │
+├┄  a  ┄┄┄┼┄┤
+│ [---]   │ │
+│   b     │ │
+│ │  no   │ │
+│ │◄──────┤ │
+│ │       │ │
+└─┼───────┼─┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

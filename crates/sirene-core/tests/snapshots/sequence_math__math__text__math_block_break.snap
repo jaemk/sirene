@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    break $$e^{i\\pi}$$\n        A->>B: stop\n    end\n"
+---
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+┌─break [e^(iπ)]──┐
+│ │ stop  │       │
+│ ├──────►│       │
+│ │       │       │
+└─┼───────┼───────┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

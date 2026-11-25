@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant A
+    participant B
+    loop $$\foo1$$
+        A->>B: ping
+    end
+    alt $$\foo2$$
+        A->>B: yes
+    else $$\foo3$$
+        B->>A: no
+    end
+    opt $$\foo4$$
+        A->>B: maybe
+    end
+    par $$\foo5$$
+        A->>B: one
+    and $$\foo6$$
+        B->>A: two
+    end
+    critical $$\foo7$$
+        A->>B: lock
+    option $$\foo8$$
+        B->>A: busy
+    end
+    break $$\foo9$$
+        A->>B: stop
+    end

@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    opt $$\\alpha + \\beta$$\n        A->>B: maybe\n    end\n"
+---
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+┌─opt [α + β]──┐
+│ │ maybe │    │
+│ ├──────►│    │
+│ │       │    │
+└─┼───────┼────┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘
