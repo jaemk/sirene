@@ -12,17 +12,18 @@
   load("hero.txt", document.getElementById("ascii"));
 
   // A tab group: buttons with `data-<key>` select the element with the same `data-<target>`.
-  function tabs(buttonSel, key, targetSel, target) {
-    var buttons = document.querySelectorAll(buttonSel);
-    buttons.forEach(function (button) {
+  // Each group is scoped to its own container, so several groups can share a page.
+  function tabs(buttonSel, key, targetSel, target, scopeOf) {
+    document.querySelectorAll(buttonSel).forEach(function (button) {
       button.addEventListener("click", function () {
+        var scope = scopeOf(button);
         var name = button.dataset[key];
-        buttons.forEach(function (b) {
+        scope.querySelectorAll(buttonSel).forEach(function (b) {
           var on = b === button;
           b.classList.toggle("is-active", on);
           b.setAttribute("aria-selected", on ? "true" : "false");
         });
-        document.querySelectorAll(targetSel).forEach(function (p) {
+        scope.querySelectorAll(targetSel).forEach(function (p) {
           var on = p.dataset[target] === name;
           p.classList.toggle("is-active", on);
           p.hidden = !on;
@@ -30,8 +31,9 @@
       });
     });
   }
-  tabs(".tab", "tab", ".panel", "panel");
-  tabs(".view", "view", ".pane", "pane");
+  // The tab buttons sit in a `.tabs` row; its parent holds the panels.
+  tabs(".tab", "tab", ".panel", "panel", function (b) { return b.closest(".tabs").parentNode; });
+  tabs(".view", "view", ".pane", "pane", function () { return document; });
 
   document.querySelectorAll("button.copy").forEach(function (button) {
     button.addEventListener("click", function () {

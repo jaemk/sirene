@@ -59,4 +59,23 @@ sirene ascii hello.puml
 printf 'digraph { a -> b -> c }\n' | sirene ascii
 ```
 
-See [PlantUML](plantuml.md) and [Graphviz DOT](dot.md).
+See [PlantUML](plantuml.md) and [Graphviz DOT](dot.md). A Visio `.vsdx` drawing renders to SVG
+and PNG too (`sirene png plan.vsdx`); see [Visio drawings](visio.md).
+
+## From JavaScript
+
+```
+npm install @jaemk/sirene
+```
+
+```js
+const { readFileSync } = require("node:fs");
+const SireneWasm = require("@jaemk/sirene");
+
+const sirene = await SireneWasm.load(readFileSync(require.resolve("@jaemk/sirene/sirene.wasm")));
+const r = sirene.render("flowchart LR\n  A --> B\n", { format: "svg", theme: "light" });
+console.log(r.output);
+```
+
+In a web page, `sirene.renderAll(document)` replaces each diagram code block with its drawing.
+See [JavaScript library](embedding.md) for examples.

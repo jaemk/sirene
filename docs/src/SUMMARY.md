@@ -16,7 +16,7 @@
 - [Settings](settings.md)
 - [Agents](agents.md)
 - [Rust library](library.md)
-- [Web pages](embedding.md)
+- [JavaScript library](embedding.md)
 
 # Flowcharts
 
@@ -65,6 +65,7 @@
 
 - [Graphviz DOT](dot.md)
 - [PlantUML](plantuml.md)
+- [Visio drawings](visio.md)
 
 # Project
 

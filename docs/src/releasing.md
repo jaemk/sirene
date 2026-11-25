@@ -28,7 +28,7 @@ To release `X.Y.Z`:
 `.github/workflows/release.yml` then runs CI and the RustSec audit, builds the binaries and
 `Sirene.app`. The `sign` job builds `xtask` before exposing the secret, decodes the key with
 `umask 077`, and signs the tarballs before their attestations and `SHA256SUMS` are generated.
-The `wasm` job builds `sirene-wasm-X.Y.Z.tar.gz` ([Web pages](embedding.md)) and attests it,
+The `wasm` job builds `sirene-wasm-X.Y.Z.tar.gz` ([JavaScript library](embedding.md)) and attests it,
 and packs the `@jaemk/sirene` npm package.
 The `linux` job packages the GNU binaries and attests each RPM, AppImage, and AppImage
 runtime source archive. The Linux packaging workflow uses the same commands to build and

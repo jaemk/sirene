@@ -1,7 +1,8 @@
 # sirene
 
 A local editor and viewer for Mermaid, PlantUML, and Graphviz DOT diagrams. Edit the source or
-the drawing, and export SVG, PNG, or text for the terminal.
+the drawing, and export SVG, PNG, or text for the terminal. Also a Rust library and a JavaScript
+library (WebAssembly) for web pages and Node.
 
 **[Try it in the browser](https://jaemk.github.io/sirene/guide/playground.html)**: the
 playground draws Mermaid, PlantUML, or DOT as you type, with the same renderer.
@@ -91,7 +92,7 @@ A file's language comes from its extension (`.mmd`, `.puml`, `.dot`, ...), its M
 Mermaid's, PlantUML's, and Graphviz's. Each kind's page in the docs lists what is read and what
 is not drawn; `spec/README.md` has the feature status table.
 
-## Library and web pages
+## Library
 
 `sirene-core` renders without the CLI, from Rust:
 
@@ -101,10 +102,25 @@ let svg = lowered.svg(&sirene_core::scene::Theme::LIGHT)?;
 ```
 
 See [Rust library](https://jaemk.github.io/sirene/guide/library.html) and
-[docs.rs](https://docs.rs/sirene-core). In web pages and Node, the
-[`@jaemk/sirene`](https://www.npmjs.com/package/@jaemk/sirene) npm package (also each release's
-`sirene-wasm-X.Y.Z.tar.gz`) draws diagram blocks in the browser; see
-[Web pages](https://jaemk.github.io/sirene/guide/embedding.html) and `examples/web/index.html`.
+[docs.rs](https://docs.rs/sirene-core).
+
+## JavaScript library
+
+The [`@jaemk/sirene`](https://www.npmjs.com/package/@jaemk/sirene) npm package (also each
+release's `sirene-wasm-X.Y.Z.tar.gz`) is the renderer compiled to WebAssembly, for web pages and
+Node. It draws Mermaid, PlantUML, DOT, LaTeX formulas, and Visio `.vsdx` drawings as SVG or text:
+
+```js
+const SireneWasm = require("@jaemk/sirene");
+const wasm = fs.readFileSync(require.resolve("@jaemk/sirene/sirene.wasm"));
+const sirene = await SireneWasm.load(wasm);
+const r = sirene.render("flowchart LR\n  A --> B\n", { theme: "light" });
+// r.ok, r.output (the SVG), r.diagnostics
+```
+
+In a page, `sirene.renderAll(document)` replaces each diagram code block with its drawing. See
+[JavaScript library](https://jaemk.github.io/sirene/guide/embedding.html) for examples and every
+option, and `examples/web/index.html` for a complete page.
 
 ## Agents
 

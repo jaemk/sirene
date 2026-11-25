@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>sirene - Mermaid, PlantUML, and DOT diagram editor</title>
-  <meta name="description" content="A local WYSIWYG editor and viewer for Mermaid, PlantUML, and Graphviz DOT diagrams, with SVG, PNG, and terminal ASCII output." />
+  <meta name="description" content="A local WYSIWYG editor and viewer for Mermaid, PlantUML, and Graphviz DOT diagrams, with SVG, PNG, and terminal ASCII output, and a JavaScript library (WebAssembly) for browsers and Node." />
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,6 +21,7 @@
       <a href="guide/">Docs</a>
       <a href="guide/quickstart.html">Quickstart</a>
       <a href="guide/playground.html">Playground</a>
+      <a href="guide/embedding.html">JavaScript</a>
       <a href="https://github.com/jaemk/sirene">GitHub</a>
     </nav>
   </header>
@@ -31,7 +32,8 @@
       <p class="tagline">
         A local editor and viewer for Mermaid, PlantUML, and Graphviz DOT diagrams. Edit the
         source or the drawing, and
-        render SVG, PNG, or text from the command line. One binary, no browser.
+        render SVG, PNG, or text from the command line. One binary, no browser. Also a
+        JavaScript library: the same renderer, compiled to WebAssembly, for web pages and Node.
       </p>
       <div class="actions">
         <a class="button primary" href="guide/playground.html">Try it in the browser</a>
@@ -125,6 +127,44 @@ brew install sirene">Copy</button>
            Over 30 Mermaid diagram kinds, 20 PlantUML kinds, and Graphviz DOT are drawn.</p>
         <a href="guide/introduction.html#diagrams">Diagrams</a>
       </article>
+    </section>
+
+    <section class="library" id="javascript">
+      <div class="library-text">
+        <h2>Use it from JavaScript</h2>
+        <p><code>@jaemk/sirene</code> is the same renderer compiled to WebAssembly: about 0.9 MB
+           gzipped, no server, no dependencies. It draws Mermaid, PlantUML, DOT, LaTeX formulas,
+           and Visio <code>.vsdx</code> drawings as SVG or text, in a page or in Node.</p>
+        <div class="cmd">
+          <code><span class="prompt">$</span> npm install @jaemk/sirene</code>
+          <button class="copy" type="button" aria-label="Copy npm install command" data-copy="npm install @jaemk/sirene">Copy</button>
+        </div>
+        <a class="more" href="guide/embedding.html">JavaScript library docs</a>
+      </div>
+      <div class="library-code">
+        <div class="tabs" role="tablist" aria-label="JavaScript example">
+          <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="web">Web page</button>
+          <button class="tab" type="button" role="tab" aria-selected="false" data-tab="node">Node</button>
+        </div>
+        <div class="panel is-active" role="tabpanel" data-panel="web">
+<pre class="code"><code>&lt;pre&gt;&lt;code class="language-mermaid"&gt;flowchart LR
+  A --&gt; B&lt;/code&gt;&lt;/pre&gt;
+
+&lt;script src="https://cdn.jsdelivr.net/npm/@jaemk/sirene/sirene-wasm.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  SireneWasm.load(fetch("https://cdn.jsdelivr.net/npm/@jaemk/sirene/sirene.wasm"))
+    .then((sirene) =&gt; sirene.renderAll(document));
+&lt;/script&gt;</code></pre>
+        </div>
+        <div class="panel" role="tabpanel" data-panel="node" hidden>
+<pre class="code"><code>const SireneWasm = require("@jaemk/sirene");
+const wasm = fs.readFileSync(require.resolve("@jaemk/sirene/sirene.wasm"));
+const sirene = await SireneWasm.load(wasm);
+
+const r = sirene.render("flowchart LR\n  A --&gt; B\n", { theme: "light" });
+// r.ok, r.output (the SVG), r.diagnostics: [{ severity, line, column, message }]</code></pre>
+        </div>
+      </div>
     </section>
   </main>
 
