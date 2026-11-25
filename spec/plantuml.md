@@ -82,23 +82,39 @@ own drawing. A diagram with none is not wrapped. Of each kind the last statement
 - `caption text` (or `caption: text`): centered under the diagram, above the footer.
 - `legend [top|bottom] [left|right|center]` and the lines up to `end legend` or `endlegend`: a
   bordered box at that edge or corner of the diagram, default bottom center. The text in the box
-  is left aligned. A `legend` with text on its own line is not read: a warning.
+  is left aligned. `legend [top|bottom] [left|right|center] [:] text` is a one-line legend.
 - `\n` in a line breaks it, except inside a `<latex>` or `<math>` tag. Text is Creole as far as
-  `decor::lines` reads it: `**bold**`, `//italic//`, `<b>`, `<i>`, `<color:...>`, `== heading`
-  (bold), bullet (`*`, `**`) and numbered (`#`, `##`) lists, and formulas (LEMB-2). Underline,
-  strikethrough, monospace, `<size>`, `<back>`, tables, rules, and images are text.
+  `decor::lines` reads it, with the run reader in `plantuml/creole.rs` (`creole::styled`):
+  `**bold**`, `//italic//`, `__underline__` (`<u>`), `--strike--` (`<s>`), `""monospace""`,
+  `<b>`, `<i>`, `<color:...>`, `<size:N>`, `<back:color>`, `== heading` (bold), bullet (`*`,
+  `**`) and numbered (`#`, `##`) lists, `----` (`====`, `____`, `....`) rules, `|a|b|` tables
+  (`|= x` is a bold heading cell), and formulas (LEMB-2). A marker with no closing marker later
+  in the line, or followed by a space, is text (`A --> B`). Monospace is read but drawn in the
+  normal font (a scene text has no font family), and images, `<font>`, `~~wave~~`, and
+  `<#color>` table cells are text.
 - From the top: header, a top legend, the diagram, a bottom legend, caption, footer; each is
-  set apart by 8 px (a blank row in text). In text, bold, italic, and color are not drawn, a
-  bullet is `*` in the ASCII set and a bullet character otherwise, and a legend is boxed with
-  the set's line characters.
+  set apart by 8 px (a blank row in text). The scene draws underline and strike as lines, a
+  background as a filled rectangle, a size as the font size (the row grows with it), a rule as a
+  line across the block, and a table as bordered cells. In text, bold, italic, color, size,
+  underline, strike, and background are not drawn, a bullet is `*` in the ASCII set and a bullet
+  character otherwise, a legend is boxed with the set's line characters, a rule is a row of its
+  character, and a table is a grid of the set's line characters.
 - A formula that does not typeset has one error on its body in the source; without the `math`
   feature each formula has one warning. A replaced statement is not checked.
 
 Drawn for every kind that reads the shared statements: sequence, activity, class, state,
 description (use case, component, deployment), mindmap, WBS, Gantt, timing, Chen, nwdiag, files,
-and chronology. Not drawn: JSON and YAML, DOT, EBNF, and regex (their lines are read by another
-reader, so `header` and the others are its text or an error as before), `@startlatex` and
-`@startmath`, and `hide`, `scale`, `skinparam`, `mainframe`, `newpage` (warnings). Tests:
+and chronology; and for JSON, YAML, DOT, and EBNF, whose bodies are read by another reader:
+`plantuml/decor.rs` `claim` reads the statements first and blanks their lines, so the reader
+sees only its own syntax. A line that is that syntax is not a statement: in YAML `header: x` is
+a mapping and an indented line continues a value, in DOT a line with a brace, bracket, `;`,
+`=`, or `->` is a graph's, and in EBNF `header = ...` is a rule. A regex document reads only a
+block (`header` or `legend` to its closer, which must be present), because every other line,
+`header x` and `caption x` included, is a valid regex and a regex has no way to tell the two
+apart. Not drawn: `@startlatex` and `@startmath` (PlantUML draws neither, and every line there
+is TeX or AsciiMath, so `header x` is formula text; the model could wrap an equation but the
+statements are not read), and `hide`, `scale`, `skinparam`, `mainframe`, `newpage`
+(warnings). Tests:
 `crates/sirene-core/tests/plantuml_decor.rs` (parser, scene, text, and formula tests),
 `decor_*` and `latex_inline_decor_*` fixtures and snapshots, the unit tests in `decor.rs`,
 `plantuml/decor.rs`, and `scene/decor.rs` (typeset once).

@@ -144,5 +144,9 @@ typeset-once count.
   the ASCII renderer carry formula runs (`flowchart::Span`) but not other rich text spans, so
   the rest starts with a text-run model in the display list (DISPLA).
 - Title formulas are set at one size (1.2 times the text), not mixed with bold text. DOT labels
-  read `$$`, not tags (DOT-3). The Creole of a header, footer, caption, or legend is read by
-  `decor::lines` (bold, italic, `<color>`, lists; PCOM-1), not yet elsewhere.
+  read `$$`, not tags (DOT-3). The Creole
+  of a header, footer, caption, or legend is read by `decor::lines` with the run reader in
+  `plantuml/creole.rs` (`creole::styled`: bold, italic, underline, strike, monospace,
+  `<color>`, `<size>`, `<back>`; lists, rules, tables; PCOM-1), not yet elsewhere. The scene
+  text primitive has no font family (monospace is drawn in the normal font) and the text
+  renderer draws none of the styles.
