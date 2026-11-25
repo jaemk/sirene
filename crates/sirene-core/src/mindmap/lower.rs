@@ -2,7 +2,7 @@
 
 use super::{Mindmap, Node, Shape};
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::text;
+use crate::flowchart::{formula, text};
 use crate::lines::{self, MAX_DEPTH};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
@@ -77,6 +77,11 @@ pub(crate) fn lower_ranges(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>, Vec<
                     node.depth = p.depth + 1;
                     node.section = p.section.or(Some(p.children.len()));
                 }
+                diagnostics.extend(formula::check_label(
+                    label_token(&stmt).as_ref(),
+                    &node.label,
+                    stmt.text_range(),
+                ));
                 let i = map.nodes.len();
                 if let Some(p) = node.parent {
                     map.nodes[p].children.push(i);
@@ -122,6 +127,15 @@ pub(crate) fn lower_ranges(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>, Vec<
     (map, diagnostics, statements)
 }
 
+/// The token a node line's label is read from, which a formula's diagnostic is found in.
+pub(crate) fn label_token(stmt: &SyntaxNode) -> Option<SyntaxToken> {
+    let shape = stmt.children().find(|n| n.kind() == SHAPE)?;
+    shape
+        .children_with_tokens()
+        .filter_map(|e| e.into_token())
+        .find(|t| matches!(t.kind(), MD_STRING | STRING | TEXT))
+}
+
 /// A node line's id, shape, and label.
 pub(crate) fn node(stmt: &SyntaxNode) -> Node {
     let id = text_of(stmt, IDENT).filter(|s| !s.is_empty());
@@ -130,15 +144,10 @@ pub(crate) fn node(stmt: &SyntaxNode) -> Node {
         .as_ref()
         .and_then(|s| token(s, SHAPE_OPEN))
         .map_or(Shape::Default, |t| Shape::of(t.text()));
-    let label = shape_node.as_ref().and_then(|s| {
-        s.children_with_tokens()
-            .filter_map(|e| e.into_token())
-            .find_map(|t| match t.kind() {
-                MD_STRING => Some(text::label(text::unquote(t.text()), true)),
-                STRING => Some(text::label(text::unquote(t.text()), false)),
-                TEXT => Some(text::label(t.text(), false)),
-                _ => None,
-            })
+    let label = label_token(stmt).map(|t| match t.kind() {
+        MD_STRING => text::label(text::unquote(t.text()), true),
+        STRING => text::label(text::unquote(t.text()), false),
+        _ => text::label(t.text(), false),
     });
     let label = match label {
         Some(l) if !l.text.is_empty() => l,

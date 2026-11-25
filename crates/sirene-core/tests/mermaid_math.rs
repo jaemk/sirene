@@ -1,6 +1,7 @@
-//! `$$...$$` formulas in the labels of Mermaid flowchart subgraph titles and of the kinds that
-//! lower to the flowchart model: state, class, ER, requirement, and block (LEMB-1, LEMB-4,
-//! LEMB-5, LEMB-T5). Each position draws its formulas in the scene and as rows in text, a failing
+//! `$$...$$` formulas in the labels of Mermaid flowchart subgraph titles, of the kinds that
+//! lower to the flowchart model (state, class, ER, requirement, block, agentflow, swimlane, and
+//! use case), and of the mindmap and kanban kinds, which have models of their own (LEMB-1,
+//! LEMB-4, LEMB-5, LEMB-T5, LEMB-T9). Each position draws its formulas in the scene and as rows in text, a failing
 //! formula is drawn as its source with one diagnostic on its span, and with the `math` feature
 //! off each formula is one warning.
 
@@ -34,23 +35,33 @@ fn fixtures(dir: &str) -> Vec<(String, String)> {
 }
 
 /// The formulas of each valid fixture: one per position it wires.
-const FORMULAS: [(&str, usize); 6] = [
+const FORMULAS: [(&str, usize); 11] = [
+    ("agentflow_labels", 4),
     ("block_labels", 5),
     ("class_labels", 7),
     ("er_labels", 3),
     ("flowchart_subgraph", 3),
+    ("kanban_labels", 6),
+    ("mindmap_labels", 5),
     ("requirement_labels", 4),
     ("state_labels", 6),
+    ("swimlane_labels", 4),
+    ("usecase_labels", 5),
 ];
 
 /// The formulas that do not typeset in each error fixture.
-const FAILING: [(&str, usize); 6] = [
+const FAILING: [(&str, usize); 11] = [
+    ("agentflow_fail", 3),
     ("block_fail", 3),
     ("class_fail", 5),
     ("er_fail", 3),
     ("flowchart_subgraph_fail", 1),
+    ("kanban_fail", 5),
+    ("mindmap_fail", 3),
     ("requirement_fail", 2),
     ("state_fail", 4),
+    ("swimlane_fail", 3),
+    ("usecase_fail", 4),
 ];
 
 fn lower(src: &str) -> Lowered {
@@ -81,7 +92,9 @@ fn texts(scene: &Scene) -> Vec<&str> {
         .collect()
 }
 
-/// How many filled paths of the scene are in the text color: formula glyphs, and arrowheads.
+/// How many filled paths without a stroke the scene has: formula glyphs, and shapes and
+/// arrowheads, which a formula does not change the number of (a mindmap's text is not in the theme's
+/// text color, so the color is not tested).
 #[cfg(feature = "math")]
 fn filled(scene: &Scene) -> usize {
     scene
@@ -90,7 +103,11 @@ fn filled(scene: &Scene) -> usize {
         .filter(|e| {
             matches!(
                 &e.primitive,
-                Primitive::Path { fill: Some(f), stroke: None, .. } if *f == Theme::LIGHT.text
+                Primitive::Path {
+                    fill: Some(_),
+                    stroke: None,
+                    ..
+                }
             )
         })
         .count()
@@ -259,6 +276,36 @@ mod math {
         let plain = src.replace("$$", "");
         assert_eq!(filled(&scene(src)), filled(&scene(&plain)));
         assert!(texts(&scene(src)).iter().any(|t| t.contains("x^2")));
+    }
+
+    /// A mindmap's and a kanban board's `title` is text, as in Mermaid, and an unclosed `$$` in
+    /// a node, card, or column is text.
+    #[test]
+    fn mindmap_and_kanban_titles_and_unclosed_delimiters_stay_text() {
+        for src in [
+            "---\ntitle: $$x^2$$\n---\nmindmap\n  root[open $$x]\n    a[b]\n",
+            "---\ntitle: $$x^2$$\n---\nkanban\n  todo[open $$x]\n    a[b $$y]\n",
+        ] {
+            let lowered = lower(src);
+            assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+            let plain = src.replace("$$", "");
+            assert_eq!(filled(&scene(src)), filled(&scene(&plain)), "{src}");
+            assert!(texts(&scene(src)).iter().any(|t| t.contains("$$x^2$$")));
+            assert!(ascii(src).contains("open $$x"), "{}", ascii(src));
+        }
+    }
+
+    /// A card's ticket and assignee are read for formulas, and a formula in one is not cut to
+    /// fit the card's width.
+    #[test]
+    fn a_kanban_ticket_and_assignee_formula_is_drawn_whole() {
+        let src = "kanban\n  todo[T]\n    a[Card]@{ ticket: '$$\\alpha+\\beta+\\gamma+\\delta+\\lambda$$', assigned: '$$\\sum_i x_i+\\theta+\\mu$$' }\n";
+        let lowered = lower(src);
+        assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+        let plain = src.replace("$$", "");
+        assert!(filled(&scene(src)) > filled(&scene(&plain)));
+        assert!(!ascii(src).contains("..."), "{}", ascii(src));
+        assert!(!ascii(src).contains("$$"), "{}", ascii(src));
     }
 
     /// Labels of a PlantUML source keep reading their tags, and `$$` stays text there.

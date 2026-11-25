@@ -1,0 +1,11 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "mindmap\n  root((\"Energy $$\\fooa$$\"))\n    sq[Area $$\\foob$$ and $$x$$]\n      leaf[$$\\fooc$$ ratio]\n"
+---
+2:19: error: Undefined control sequence: \fooa [\fooa]
+3:15: error: Undefined control sequence: \foob [\foob]
+4:14: error: Undefined control sequence: \fooc [\fooc]
+
+((Energy $$\fooa$$))
+└── [Area $$\foob$$ and x]
+    └── [$$\fooc$$ ratio]

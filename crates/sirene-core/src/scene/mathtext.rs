@@ -362,9 +362,31 @@ mod tests {
         assert!(!scene.elements.is_empty());
     }
 
-    /// The Mermaid fixtures with a formula in each label position that lowers to the flowchart
-    /// model, and how many formulas each has (all distinct).
-    const MERMAID: [(&str, &str, usize); 6] = [
+    /// A PlantUML mindmap's node text shares the render's cache: each formula is typeset once to
+    /// check it when lowering and once to draw it, in the scene and as text.
+    #[test]
+    fn plantuml_mindmap_typesets_each_formula_once_per_render() {
+        let src = "@startmindmap\n* a <latex>a_1</latex>\n** b <latex>b_2</latex>\n*** <math>c</math> and <latex>d_4</latex>\n@endmindmap\n";
+        crate::equation::count::reset();
+        let lowered = crate::diagram::lower(src);
+        assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+        assert_eq!(crate::equation::count::get(), 4, "lowering checks each");
+        crate::equation::count::reset();
+        let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+        assert_eq!(crate::equation::count::get(), 4, "drawing sets each");
+        assert!(!scene.elements.is_empty());
+        crate::equation::count::reset();
+        let text = lowered
+            .diagram
+            .ascii(&crate::ascii::Options::default())
+            .unwrap();
+        assert_eq!(crate::equation::count::get(), 4, "text sets each");
+        assert!(!text.contains("<latex>"), "{text}");
+    }
+
+    /// The Mermaid fixtures with a formula in each label position of the kinds that read `$$`, and
+    /// how many formulas each has (all distinct).
+    const MERMAID: [(&str, &str, usize); 11] = [
         (
             "flowchart subgraph",
             include_str!("../../tests/fixtures/mermaid/valid/flowchart_subgraph.mmd"),
@@ -395,9 +417,34 @@ mod tests {
             include_str!("../../tests/fixtures/mermaid/valid/block_labels.mmd"),
             5,
         ),
+        (
+            "mindmap",
+            include_str!("../../tests/fixtures/mermaid/valid/mindmap_labels.mmd"),
+            5,
+        ),
+        (
+            "kanban",
+            include_str!("../../tests/fixtures/mermaid/valid/kanban_labels.mmd"),
+            6,
+        ),
+        (
+            "agentflow",
+            include_str!("../../tests/fixtures/mermaid/valid/agentflow_labels.mmd"),
+            4,
+        ),
+        (
+            "swimlane",
+            include_str!("../../tests/fixtures/mermaid/valid/swimlane_labels.mmd"),
+            4,
+        ),
+        (
+            "use case",
+            include_str!("../../tests/fixtures/mermaid/valid/usecase_labels.mmd"),
+            5,
+        ),
     ];
 
-    /// Mermaid labels of every kind that lowers to the flowchart model: each formula is typeset
+    /// Mermaid labels of every kind that reads `$$` besides sequence: each formula is typeset
     /// once to check it when lowering and once to draw it, in the scene and as text.
     #[test]
     fn mermaid_labels_typeset_each_formula_once_per_render() {

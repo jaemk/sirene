@@ -156,7 +156,7 @@ pub fn mindmap(mindmap: &Mindmap, metrics: &impl TextMetrics, theme: &Theme) -> 
     let nodes = &mindmap.nodes;
     let lines: Vec<Vec<Vec<Span>>> = nodes
         .iter()
-        .map(|n| px.wrap(&n.label.spans(), WRAP))
+        .map(|n| px.wrap(&n.label.runs(), WRAP))
         .collect();
     let sizes: Vec<(f32, f32)> = nodes
         .iter()
@@ -244,6 +244,8 @@ pub fn mindmap(mindmap: &Mindmap, metrics: &impl TextMetrics, theme: &Theme) -> 
     let height = bottom + MARGIN;
 
     let mut p = Painter::new(theme, metrics);
+    // The formulas typeset to size the nodes are the ones drawn.
+    p.formulas = px.formulas.clone();
     if let Some(t) = title {
         p.elements.push(Element {
             owner: Owner::Diagram,

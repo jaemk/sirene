@@ -7,11 +7,11 @@ use rowan::TextRange;
 use super::json;
 use super::parser::{Op, op};
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::text;
 use crate::flowchart::{
     Arrow, ClassDef, Direction, Edge, Flowchart, Label, Node, Note, NoteSide, Row, Shape, Stroke,
     Style, Subgraph,
 };
+use crate::flowchart::{Delim, formula, text};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -28,7 +28,47 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
     for stmt in root.children() {
         l.statement(&stmt, None);
     }
-    l.finish()
+    let (chart, mut diagnostics) = l.finish();
+    diagnostics.extend(formula_diagnostics(&chart, root));
+    (chart, diagnostics)
+}
+
+/// The diagnostics for each `$$...$$` formula of the lowered labels that does not typeset (LEMB-5).
+/// A label has no range of its own once lowered, so each formula is found in the whole source, as
+/// written, and takes the first place no earlier formula has.
+fn formula_diagnostics(chart: &Flowchart, root: &SyntaxNode) -> Vec<Diagnostic> {
+    let src = root.text().to_string();
+    let whole = [root.text_range()];
+    let mut used = std::collections::HashSet::new();
+    let labels = chart
+        .nodes
+        .iter()
+        .flat_map(|n| {
+            std::iter::once(&n.label.text).chain(n.sections.iter().flatten().flat_map(|r| &r.cells))
+        })
+        .chain(chart.edges.iter().flat_map(|e| {
+            [&e.label, &e.start_label, &e.end_label]
+                .into_iter()
+                .flatten()
+                .map(|l| &l.text)
+        }))
+        .chain(chart.subgraphs.iter().map(|s| &s.title.text))
+        .chain(chart.notes.iter().map(|n| &n.label.text));
+    let mut out = Vec::new();
+    for text in labels {
+        if !text.contains("$$") {
+            continue;
+        }
+        out.extend(formula::errors_among(
+            &src,
+            text.split('\n').map(crate::flowchart::clean),
+            &whole,
+            &mut used,
+            root.text_range(),
+            Delim::Dollar,
+        ));
+    }
+    out
 }
 
 fn child(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxNode> {

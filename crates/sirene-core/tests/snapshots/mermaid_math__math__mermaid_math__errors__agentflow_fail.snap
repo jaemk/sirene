@@ -1,0 +1,14 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "agentflow-beta LR\n  flow plan[\"Plan $$\\fooa$$\"]\n    goal@{ shape: input, label: 'Goal $$\\foob$$' }\n    split{\"Split $$x$$?\"}\n  end\n\n  goal --> split\n  split -->|\"$$\\fooc$$\"| goal\n"
+---
+2:21: error: Undefined control sequence: \fooa [\fooa]
+3:41: error: Undefined control sequence: \foob [\foob]
+8:16: error: Undefined control sequence: \fooc [\fooc]
+
+┌─ Plan $$\fooa$$ ────────────────────────────────┐
+│  ┌────────────────┐               ╱──────────╲  │
+│  ╱ Goal $$\foob$$ ├──────────────►│ Split x? │  │
+│  ╱                ╱◄┐           ┌─┤          │  │
+│  └────────────────┘ └─$$\fooc$$─┘ ╲──────────╱  │
+└─────────────────────────────────────────────────┘

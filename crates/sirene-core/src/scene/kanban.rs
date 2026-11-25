@@ -5,7 +5,7 @@ use super::Theme;
 use super::paint::{Painter, Px};
 use super::shapes::{self, BoxF};
 use super::{Color, Element, Owner, Primitive, Pt, Scene, Stroke, TextMetrics, TextStyle};
-use crate::flowchart::Span;
+use crate::flowchart::{Delim, Span, formula};
 use crate::kanban::{Kanban, Priority};
 
 const MARGIN: f32 = 16.0;
@@ -50,12 +50,20 @@ fn fit(metrics: &impl TextMetrics, s: &str, size: f32, max: f32) -> String {
     }
 }
 
+/// A card's ticket or assignee: text cut to fit in small type, or, with a formula (LEMB-1), one
+/// line of runs at the normal size, which is not cut.
+enum Meta {
+    Text(String),
+    Math(Vec<Span>),
+}
+
 /// A card as laid out: its label's lines, its ticket and assignee (cut to share the card's
-/// width), and its height.
+/// width), the height of their line, and its height.
 struct CardBox {
     lines: Vec<Vec<Span>>,
-    ticket: Option<String>,
-    assigned: Option<String>,
+    ticket: Option<Meta>,
+    assigned: Option<Meta>,
+    meta_h: f32,
     priority: Option<Priority>,
     h: f32,
 }
@@ -81,9 +89,9 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
         .map(|c| {
             let bold: Vec<Vec<Span>> = c
                 .label
-                .spans()
+                .runs()
                 .into_iter()
-                .map(|l| l.into_iter().map(|s| Span { bold: true, ..s }).collect())
+                .map(|l| l.into_iter().map(|s| Span { bold: !s.math, ..s }).collect())
                 .collect();
             px.wrap(&bold, COL_W - 2.0 * COL_PAD)
         })
@@ -96,11 +104,8 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
             c.cards
                 .iter()
                 .map(|card| {
-                    let lines = px.wrap(&card.label.spans(), text_w);
+                    let lines = px.wrap(&card.label.runs(), text_w);
                     let meta = card.ticket.is_some() || card.assigned.is_some();
-                    let h = 2.0 * CARD_PAD
-                        + px.text_size(&lines).1
-                        + if meta { 4.0 + small_lh } else { 0.0 };
                     // The ticket takes up to half the width when there is an assignee, which
                     // takes the rest after a gap.
                     let half = if card.assigned.is_some() {
@@ -108,18 +113,37 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
                     } else {
                         text_w
                     };
-                    let ticket = card.ticket.as_deref().map(|t| fit(metrics, t, small, half));
-                    let used = ticket
-                        .as_deref()
-                        .map_or(0.0, |t| metrics.width(t, small) + 8.0);
-                    let assigned = card
-                        .assigned
-                        .as_deref()
-                        .map(|a| fit(metrics, a, small, text_w - used));
+                    let one = |m: &Meta| match m {
+                        Meta::Text(t) => metrics.width(t, small),
+                        Meta::Math(l) => px.text_size(std::slice::from_ref(l)).0,
+                    };
+                    let meta_of = |t: &str, max: f32| {
+                        if formula::has(t, Delim::Dollar) {
+                            Meta::Math(formula::runs(t, Delim::Dollar))
+                        } else {
+                            Meta::Text(fit(metrics, t, small, max))
+                        }
+                    };
+                    let ticket = card.ticket.as_deref().map(|t| meta_of(t, half));
+                    let used = ticket.as_ref().map_or(0.0, |m| one(m) + 8.0);
+                    let assigned = card.assigned.as_deref().map(|a| meta_of(a, text_w - used));
+                    // A formula makes its line taller than the small type's.
+                    let meta_h = [&ticket, &assigned]
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|m| match m {
+                            Meta::Math(l) => Some(px.text_size(std::slice::from_ref(l)).1),
+                            Meta::Text(_) => None,
+                        })
+                        .fold(small_lh, f32::max);
+                    let h = 2.0 * CARD_PAD
+                        + px.text_size(&lines).1
+                        + if meta { 4.0 + meta_h } else { 0.0 };
                     CardBox {
                         lines,
                         ticket,
                         assigned,
+                        meta_h,
                         priority: card.priority,
                         h,
                     }
@@ -144,6 +168,8 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
     };
 
     let mut p = Painter::new(theme, metrics);
+    // The formulas typeset to size the board are the ones drawn.
+    p.formulas = px.formulas.clone();
     let text = |p: &mut Painter, owner: Owner, s: &str, center: Pt, size: f32| {
         p.elements.push(Element {
             owner,
@@ -226,32 +252,37 @@ pub fn kanban(board: &Kanban, metrics: &impl TextMetrics, theme: &Theme) -> Scen
             }
             // Each line on its own, so the text is aligned left.
             let th = px.text_size(&c.lines).1;
-            for (k, line) in c.lines.iter().enumerate() {
+            let mut line_top = b.y + CARD_PAD;
+            for line in &c.lines {
                 let one = std::slice::from_ref(line);
-                let w = px.text_size(one).0;
-                let y = b.y + CARD_PAD + (k as f32 + 0.5) * lh;
+                let (w, h) = px.text_size(one);
+                let y = line_top + h / 2.0;
                 p.lines(owner, one, Pt::new(b.x + CARD_PAD + w / 2.0, y), theme.text);
+                line_top += h;
             }
-            let meta_y = b.y + CARD_PAD + th + 4.0 + small_lh / 2.0;
-            if let Some(t) = c.ticket.as_deref() {
-                let w = metrics.width(t, small);
-                text(
-                    &mut p,
-                    owner,
-                    t,
-                    Pt::new(b.x + CARD_PAD + w / 2.0, meta_y),
-                    small,
-                );
-            }
-            if let Some(a) = c.assigned.as_deref() {
-                let w = metrics.width(a, small);
-                text(
-                    &mut p,
-                    owner,
-                    a,
-                    Pt::new(b.right() - CARD_PAD - w / 2.0, meta_y),
-                    small,
-                );
+            let meta_y = b.y + CARD_PAD + th + 4.0 + c.meta_h / 2.0;
+            for (m, right) in [(&c.ticket, false), (&c.assigned, true)] {
+                let Some(m) = m else { continue };
+                let w = match m {
+                    Meta::Text(t) => metrics.width(t, small),
+                    Meta::Math(l) => px.text_size(std::slice::from_ref(l)).0,
+                };
+                let x = if right {
+                    b.right() - CARD_PAD - w / 2.0
+                } else {
+                    b.x + CARD_PAD + w / 2.0
+                };
+                match m {
+                    Meta::Text(t) => text(&mut p, owner, t, Pt::new(x, meta_y), small),
+                    Meta::Math(l) => {
+                        p.lines(
+                            owner,
+                            std::slice::from_ref(l),
+                            Pt::new(x, meta_y),
+                            theme.text,
+                        );
+                    }
+                }
             }
             y += c.h + CARD_GAP;
         }

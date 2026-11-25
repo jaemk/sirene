@@ -63,6 +63,7 @@ runs are `flowchart::Span`s with `math` set, read with `Delim::Latex` (`flowchar
 whose tag picks the language per run (`Span::is_asciimath`). Drawn in:
 
 - sequence participant names (`as` text or a quoted name), message text, notes, and `ref` text;
+- mindmap node text (the Mermaid mindmap model, read with `<latex>` and `<math>`, not `$$`);
 - the labels of the kinds lowered to graphs: activity, class, state, description (component,
   deployment, usecase), WBS, Chen ER, and nwdiag, in node labels, edge labels, the labels at
   the ends of an edge (multiplicities and roles), subgraph titles (packages, composite states),

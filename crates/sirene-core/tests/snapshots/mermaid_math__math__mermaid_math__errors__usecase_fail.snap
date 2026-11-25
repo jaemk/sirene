@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "usecase-beta\nactor Customer(\"Customer $$\\fooa$$\")\nBrowse(\"Browse $$x$$\")\nsystemBoundary shop[\"Shop $$\\foob$$\"]\n  Pay(\"Pay $$\\fooc$$\")\nend\nCustomer --> Browse\nCustomer -- \"$$\\food$$\" --> Pay\n"
+---
+2:28: error: Undefined control sequence: \fooa [\fooa]
+4:29: error: Undefined control sequence: \foob [\foob]
+5:14: error: Undefined control sequence: \fooc [\fooc]
+8:16: error: Undefined control sequence: \food [\food]
+
+                                          ╭──────────╮
+┌────────────────────┐             ┌─────►( Browse x )
+│ Customer $$\fooa$$ ├─────────────┘      ╰──────────╯
+│                    ├─┐
+└────────────────────┘ │             ┌─ Shop $$\foob$$ ────┐
+                       └─$$\food$$─┐ │  ╭───────────────╮  │
+                                   └─┼─►( Pay $$\fooc$$ )  │
+                                     │  ╰───────────────╯  │
+                                     └─────────────────────┘

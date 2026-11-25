@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "mindmap\n  root((\"Energy $$E=\\lambda$$\"))\n    sq[Area $$\\pi r^2$$]\n      leaf[Ratio $$\\frac{a}{b}$$ and $$\\sqrt{2}$$]\n    cl)Sum $$\\sum_{i} x_i$$(\n"
+---
+
+((Energy E = λ))
+├── [Area πr^2]
+│   └── [       a        _
+│        Ratio --- and \/2
+│               b         ]
+└── )Sum sum x_i
+          i     (

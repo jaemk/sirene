@@ -1,6 +1,7 @@
 //! Mindmaps as text (MMIND-4): an outline of the tree, each node in its shape's delimiters.
 
-use super::{Charset, Options, width};
+use super::mathtext::Rows;
+use super::{Charset, Options, lines_in, width};
 use crate::mindmap::{Mindmap, Node};
 
 /// The branch, last branch, continuing, and blank prefixes.
@@ -12,9 +13,9 @@ fn glyphs(charset: Charset) -> [&'static str; 4] {
 }
 
 /// A node's display lines, the first opened and the last closed by its shape's delimiters.
-fn label(node: &Node) -> Vec<String> {
+fn label(node: &Node, rows: &Rows) -> Vec<String> {
     let (open, close) = node.shape.delimiters();
-    let mut lines = node.label.lines();
+    let mut lines = lines_in(rows, &node.label);
     if lines.is_empty() {
         lines.push(String::new());
     }
@@ -40,9 +41,10 @@ fn label(node: &Node) -> Vec<String> {
 /// Renders `mindmap` as text (MMIND-4).
 pub fn render(mindmap: &Mindmap, options: &Options) -> String {
     let [branch, last, through, blank] = glyphs(options.charset);
+    let formulas = Rows::new(options.charset);
     let mut rows: Vec<String> = Vec::new();
     if let Some(root) = mindmap.nodes.first() {
-        rows.extend(label(root));
+        rows.extend(label(root, &formulas));
         // Depth-first: each entry is a node and the prefix of its line.
         let mut stack: Vec<(usize, usize, String)> = Vec::new();
         let push_kids = |stack: &mut Vec<(usize, usize, String)>, i: usize, prefix: &str| {
@@ -61,7 +63,7 @@ pub fn render(mindmap: &Mindmap, options: &Options) -> String {
             };
             // Continuation lines line up with the first, under the node's own prefix.
             let child_prefix = format!("{prefix}{rest}");
-            for (k, l) in label(node).into_iter().enumerate() {
+            for (k, l) in label(node, &formulas).into_iter().enumerate() {
                 if k == 0 {
                     rows.push(format!("{prefix}{head}{l}"));
                 } else {

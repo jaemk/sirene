@@ -500,7 +500,7 @@ impl Lowerer {
             self.chart.nodes[i].classes.push(class.text().to_owned());
         }
         if let (Some(entries), Some(m)) = (meta, child(syntax, METADATA)) {
-            self.node_metadata(i, entries, m.text_range());
+            self.node_metadata(i, entries, &m);
         }
         Some(id)
     }
@@ -561,7 +561,8 @@ impl Lowerer {
         }
     }
 
-    fn node_metadata(&mut self, i: usize, entries: Metadata, range: TextRange) {
+    fn node_metadata(&mut self, i: usize, entries: Metadata, meta: &SyntaxNode) {
+        let range = meta.text_range();
         let get = |key: &str| {
             entries
                 .iter()
@@ -581,6 +582,11 @@ impl Lowerer {
         let label = get("label")
             .filter(|l| !l.is_empty())
             .map(|l| text::label(l, markdown));
+        if let Some(label) = &label {
+            let body = token(meta, META_BODY);
+            self.diagnostics
+                .extend(super::formula::check_label(body.as_ref(), label, range));
+        }
         let node = &mut self.chart.nodes[i];
         if let Some(label) = label {
             node.label = label;

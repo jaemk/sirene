@@ -2,7 +2,7 @@
 
 use super::{Card, Column, Kanban, Priority};
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::text;
+use crate::flowchart::{Delim, formula, text};
 use crate::mindmap;
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
@@ -49,6 +49,9 @@ pub(crate) fn lower_statements(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>, V
                 let level = src[line_start..start].chars().count();
                 let node = mindmap::lower::node(&stmt);
                 let meta = metadata(&stmt, &mut diagnostics);
+                let body = meta_body(&stmt);
+                // Where the label was read from, for a failing formula's diagnostic.
+                let mut from = (mindmap::lower::label_token(&stmt), stmt.text_range());
                 let at = *column_level.get_or_insert(level);
                 if level == at {
                     let mut column = Column {
@@ -58,13 +61,21 @@ pub(crate) fn lower_statements(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>, V
                     };
                     for (k, v, range) in meta {
                         match k.as_str() {
-                            "label" => column.label = text::label(&v, false),
+                            "label" => {
+                                column.label = text::label(&v, false);
+                                from = (body.clone(), range);
+                            }
                             _ => diagnostics.push(Diagnostic::warning(
                                 range,
                                 format!("ignoring `{k}`: a column's metadata is `label`"),
                             )),
                         }
                     }
+                    diagnostics.extend(formula::check_label(
+                        from.0.as_ref(),
+                        &column.label,
+                        from.1,
+                    ));
                     board.columns.push(column);
                     statements.push(stmt.clone());
                     last = Some(Last::Column(board.columns.len() - 1));
@@ -76,9 +87,18 @@ pub(crate) fn lower_statements(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>, V
                     };
                     for (k, v, range) in meta {
                         match k.as_str() {
-                            "label" => card.label = text::label(&v, false),
-                            "assigned" => card.assigned = Some(v),
-                            "ticket" => card.ticket = Some(v),
+                            "label" => {
+                                card.label = text::label(&v, false);
+                                from = (body.clone(), range);
+                            }
+                            "assigned" => {
+                                diagnostics.extend(check_value(body.as_ref(), &v, range));
+                                card.assigned = Some(v);
+                            }
+                            "ticket" => {
+                                diagnostics.extend(check_value(body.as_ref(), &v, range));
+                                card.ticket = Some(v);
+                            }
                             "icon" => {
                                 diagnostics.push(icon_warning(range, &v));
                                 card.icon = Some(v);
@@ -102,6 +122,7 @@ pub(crate) fn lower_statements(root: &SyntaxNode) -> (Kanban, Vec<Diagnostic>, V
                             )),
                         }
                     }
+                    diagnostics.extend(formula::check_label(from.0.as_ref(), &card.label, from.1));
                     let c = board.columns.len() - 1;
                     board.columns[c].cards.push(card);
                     statements.push(stmt.clone());
@@ -190,6 +211,20 @@ fn metadata(
         .into_iter()
         .map(|(k, v)| (k, v, m.text_range()))
         .collect()
+}
+
+/// The body of a node line's `@{ ... }` metadata, when it is closed.
+fn meta_body(stmt: &SyntaxNode) -> Option<SyntaxToken> {
+    let m = stmt
+        .children()
+        .find(|n| n.kind() == METADATA)
+        .filter(|m| token(m, META_CLOSE).is_some())?;
+    token(&m, META_BODY)
+}
+
+/// The diagnostics for the formulas of the metadata value `v`, read from `body`.
+fn check_value(body: Option<&SyntaxToken>, v: &str, range: rowan::TextRange) -> Vec<Diagnostic> {
+    formula::check_text(body, &[v.to_owned()], range, Delim::Dollar)
 }
 
 fn token(node: &SyntaxNode, kind: SyntaxKind) -> Option<SyntaxToken> {

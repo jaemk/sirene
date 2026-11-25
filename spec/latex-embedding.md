@@ -41,8 +41,8 @@ Not checked against a live render: `\\` in the reference's own `cases` examples,
 math label, and the error diagram.
 
 Decisions: sirene reads `$$...$$` in the flowchart and sequence label positions above and in
-the label positions of the kinds that lower to the flowchart model (Status), and nowhere else in
-Mermaid (LEMB-T5 lists what is left). An unclosed `$$` is plain text. A
+the label positions of the kinds that lower to the flowchart model and of mindmap and kanban
+(Status), and nowhere else in Mermaid (LEMB-T5 lists what is left). An unclosed `$$` is plain text. A
 formula that fails to parse is drawn as its source with a diagnostic (LEMB-4). A formula is set
 in display style at the theme font size in the label's text color. `\\` is read as `\` before
 typesetting in flowchart-model labels and kept in sequence text, as Mermaid does. A label with a
@@ -55,9 +55,15 @@ flowchart model reads `$$` in the positions that model draws, in both renderers,
 class namespace titles, block groups), edge end labels (class cardinalities), compartment titles
 (class and ER names, requirement names) and rows (class members, ER attributes, requirement
 fields), notes, and state names, descriptions, and transition labels. Tests:
-`tests/mermaid_math.rs` and `scene::mathtext` (one typeset per formula per render). Not read,
-because the kind has its own model and painter: mindmap node text, kanban cards, and the diagram
-`title` of every kind (Mermaid never renders math in a title). DOT, C4, and architecture build
+`tests/mermaid_math.rs` and `scene::mathtext` (one typeset per formula per render). Agentflow,
+swimlane, and use case diagrams lower to the flowchart model (agentflow and swimlane share the
+flowchart lowering, use case has its own), so they read `$$` in the same positions, with
+fixtures in `tests/mermaid_math.rs`. Mindmap node text, and kanban card text, ticket, and
+assignee and column titles, are read too, though those kinds have their own models and painters:
+the painters take `Label::runs` and share the render's `Formulas` and `Rows`, a card's ticket
+and assignee with a formula are one unbreakable line (not cut with `...`), and in text a kanban
+column title with a formula is rows under the column's top border. The diagram `title` of every
+kind stays text (Mermaid never renders math in a title). DOT, C4, and architecture build
 the same `Label` and so also read `$$` in these positions; Mermaid's C4 and architecture draw it
 as text (known difference). Sequence participant names and aliases, message
 text, notes, and the labels of `loop`, `alt`, `opt`, `par`, `critical`, and `break` blocks and
@@ -184,6 +190,13 @@ failing formula of a label on the offending command in its token (`flowchart::fo
 the token's range as the fallback; one error per failing formula, and without the `math`
 feature one warning per formula. Tests: `tests/mermaid_math.rs`.
 
+Status (mindmap, kanban, agentflow, swimlane, use case): one error per failing formula on its span,
+and without the `math` feature one warning per formula, for mindmap node text (`mindmap::lower`),
+kanban card text and column titles (the token or the `@{ ... }` body they are read from) and
+`ticket`, `assigned`, and `label` metadata, flowchart-model node `label` metadata (agentflow
+`@{ label: ... }`), and use case labels, which have no range of their own once lowered and are
+found in the source as written. Tests: `tests/mermaid_math.rs`.
+
 Status (sequence): the lowering reports each failing formula of a participant alias (`as` text
 or a metadata `alias`), message, note, block label, or section title on the offending command,
 with the statement's range as the fallback (`flowchart::formula::errors` is shared with the
@@ -197,7 +210,7 @@ flowchart lowering). Without the `math` feature each formula gets one warning on
   (12.3.0), against its source, and extend LEMB-1. Not checked against a live render.
 - [x] LEMB-T7 Read Mermaid's source for the `$$` rules; they are in LEMB-1.
 - [x] LEMB-T8 Read PlantUML's source for the escape and alignment rules; they are in LEMB-2.
-- [ ] LEMB-T9 Read `$$` in mindmap node text, kanban cards, and the agentflow, usecase, and
+- [x] LEMB-T9 Read `$$` in mindmap node text, kanban cards, and the agentflow, usecase, and
   swimlane types.
 - [ ] LEMB-T10 Confirm JLaTeXMath's `\\` outside an environment and AsciiMath's backslash
   handling, and the Mermaid live-render items at the end of the LEMB-1 rules.
@@ -213,12 +226,14 @@ flowchart lowering). Without the `math` feature each formula gets one warning on
   and YAML values (`scene/sequence.rs`, `ascii/sequence.rs`, `Flowchart::title_delim`); and, for
   Mermaid sequence diagrams, block labels and section titles (the same code). Left,
   for PlantUML: headers, footers, captions, and legends (not drawn at all), and the kinds that
-  keep plain strings with their own painters (mindmap, Gantt, timing, chronology, DOT; PCREO-3).
+  keep plain strings with their own painters (Gantt, timing, chronology, DOT; PCREO-3). PlantUML mindmap node text is done: it shares the
+  Mermaid mindmap model and reads `<latex>` and `<math>`.
   Done, for Mermaid (LEMB-1): flowchart subgraph titles; state names, descriptions, notes,
   composite titles, and transition labels; class names, members, notes, namespace titles,
   relation labels, and cardinalities; ER entity names, attributes, and relationship labels;
   requirement names and fields; block labels, group titles, and edge labels (all measured and
-  drawn from `Label::runs`, `Formulas`, and `Rows`). Left, for Mermaid: mindmap node text and
-  kanban cards (their own models and painters keep `Label` text drawn through `spans()`),
-  and requirement relationship labels (always the fixed `<<kind>>` text). Diagram titles stay
+  drawn from `Label::runs`, `Formulas`, and `Rows`). Also done, for Mermaid: mindmap node text;
+  kanban card text, ticket, and assignee and column titles; and agentflow, swimlane, and use case
+  labels (the same painters as the flowchart). Left, for Mermaid: requirement relationship labels
+  (always the fixed `<<kind>>` text). Diagram titles stay
   text, as in Mermaid. Mermaid sequence `box` and diagram titles stay text by design.

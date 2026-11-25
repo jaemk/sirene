@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "kanban\n  todo[Area $$\\pi r^2$$]\n    a[Solve $$\\gamma+1$$]@{ ticket: '$$\\theta$$', assigned: '$$\\alpha$$', priority: 'High' }\n    b[Plain]@{ label: 'Meta $$\\beta$$' }\n  done[Done]\n    c[Ratio $$\\frac{a}{b}$$]\n"
+---
+
+┌───────────────────┐ ┌─ Done ────────────┐
+│ Area πr^2         │ │ ╭───────────────╮ │
+│ ╭───────────────╮ │ │ │        a      │ │
+│ │ Solve γ + 1   │ │ │ │ Ratio ---     │ │
+│ │ ▲ High  θ  @α │ │ │ │        b      │ │
+│ ╰───────────────╯ │ │ ╰───────────────╯ │
+│ ╭───────────────╮ │ │                   │
+│ │ Meta β        │ │ │                   │
+│ ╰───────────────╯ │ │                   │
+└───────────────────┘ └───────────────────┘
