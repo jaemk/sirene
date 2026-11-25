@@ -34,6 +34,9 @@ pub const LANG_DOT: u32 = 2;
 pub const LANG_PLANTUML: u32 = 3;
 /// One TeX formula (LEMB-3).
 pub const LANG_LATEX: u32 = 4;
+/// A Visio `.vsdx` package, as bytes (VISIO-12); drawn as its first page. Detected too when the
+/// source starts with `PK\x03\x04` and the language is `LANG_DETECT`.
+pub const LANG_VISIO: u32 = 5;
 
 pub const THEME_LIGHT: u32 = 0;
 pub const THEME_DARK: u32 = 1;
@@ -99,12 +102,15 @@ pub extern "C" fn diagnostics_len() -> usize {
 }
 
 /// Reads and draws `src`: the drawing or an error message, and the diagnostics as JSON.
-pub fn draw(src: &[u8], format: u32, lang: u32, theme: u32) -> (Result<Vec<u8>, String>, String) {
-    let Ok(src) = std::str::from_utf8(src) else {
+pub fn draw(bytes: &[u8], format: u32, lang: u32, theme: u32) -> (Result<Vec<u8>, String>, String) {
+    let package = lang == LANG_VISIO || (lang == LANG_DETECT && bytes.starts_with(b"PK\x03\x04"));
+    let text = std::str::from_utf8(bytes);
+    if !package && text.is_err() {
         return (Err("the source is not UTF-8".to_owned()), "[]".to_owned());
-    };
+    }
+    let src = if package { "" } else { text.unwrap_or("") };
     let lang = match lang {
-        LANG_DETECT => None,
+        LANG_DETECT | LANG_VISIO => None,
         LANG_MERMAID => Some(Lang::Mermaid),
         LANG_DOT => Some(Lang::Dot),
         LANG_PLANTUML => Some(Lang::PlantUml),
@@ -121,7 +127,11 @@ pub fn draw(src: &[u8], format: u32, lang: u32, theme: u32) -> (Result<Vec<u8>, 
         THEME_DARK => Theme::DARK,
         _ => return (Err(format!("unknown theme code {theme}")), "[]".to_owned()),
     };
-    let lowered = diagram::lower_as(src, lang);
+    let lowered = if package {
+        diagram::lower_bytes(bytes, Some(Lang::Visio))
+    } else {
+        diagram::lower_as(src, lang)
+    };
     let diagnostics = diagnostics_json(src, &lowered);
     let drawn = match format {
         FORMAT_SVG => lowered.svg(&theme).map(String::into_bytes),
@@ -167,9 +177,16 @@ fn json_string(s: &str) -> String {
     out
 }
 
+/// The test-only `.vsdx` package writer, shared with `sirene-core`'s tests.
+#[cfg(test)]
+#[path = "../../crates/sirene-core/src/visio/testpkg.rs"]
+mod testpkg;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::testpkg::{Builder, rect_geometry, shape, xform};
 
     fn text(r: Result<Vec<u8>, String>) -> String {
         String::from_utf8(r.unwrap()).unwrap()
@@ -197,6 +214,30 @@ mod tests {
         let (svg, diagnostics) = draw(b"$$ x^2 $$", FORMAT_SVG, LANG_LATEX, THEME_LIGHT);
         assert!(text(svg).starts_with("<svg"));
         assert_eq!(diagnostics, "[]");
+    }
+
+    #[test]
+    fn draws_a_visio_package_from_bytes() {
+        let sh = shape(
+            1,
+            "",
+            &format!("{}{}", xform(1.0, 1.0, 2.0, 1.0), rect_geometry(2.0, 1.0)),
+        );
+        let pkg = Builder::new().page(6.0, 4.0, &sh).build();
+        for lang in [LANG_DETECT, LANG_VISIO] {
+            let (svg, diagnostics) = draw(&pkg, FORMAT_SVG, lang, THEME_LIGHT);
+            let svg = text(svg);
+            assert!(svg.starts_with("<svg") && svg.contains("<path"), "{svg}");
+            assert_eq!(diagnostics, "[]");
+        }
+        let (ascii, _) = draw(&pkg, FORMAT_ASCII, LANG_DETECT, THEME_LIGHT);
+        assert_eq!(ascii.unwrap_err(), "a Visio drawing has no text form");
+        let (svg, diagnostics) = draw(b"PK\x03\x04 junk", FORMAT_SVG, LANG_DETECT, THEME_LIGHT);
+        assert!(svg.is_ok());
+        assert!(
+            diagnostics.contains(r#""severity":"error""#),
+            "{diagnostics}"
+        );
     }
 
     #[test]

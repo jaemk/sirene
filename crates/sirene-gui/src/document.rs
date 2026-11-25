@@ -302,6 +302,7 @@ impl Document {
             Kind::Agentflow => Some("drawing edits are not supported for agentflow diagrams yet"),
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Latex => Some("a formula has nothing to edit in the drawing"),
+            Kind::Visio => Some("a Visio drawing is read-only"),
             Kind::Dot => Some(DOT_EDITS),
             Kind::PlantUml if plantuml::edit::editable(&self.source) => Some(PLANTUML_EDITS),
             Kind::PlantUml => Some("drawing edits are not supported for PlantUML yet"),

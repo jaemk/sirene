@@ -13,6 +13,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   top|bottom left|right|center`, a one-line `legend text`, Creole bold, italic, underline,
   strike, monospace, `<color>`, `<size>`, `<back>`, lists, rules, and tables, and `<latex>` and
   `<math>` formulas; `Diagram::Decorated` and `sirene_core::decor`.
+- Visio `.vsdx` drawings: `sirene svg` and `sirene png` draw a package's pages (`--page N`, or
+  `STEM-N` files with `--output`), `--lang visio`, `Lang::Visio`, `Kind::Visio`,
+  `diagram::lower_bytes`, and a `visio` fuzz target. `sirene ascii` refuses them. The `render`
+  export of `sirene-wasm` reads a package as bytes (`LANG_VISIO`, or the `PK` magic).
 - `--charset unicode-math` and `Charset::UnicodeMath`: formulas in the text renderer with the
   full math glyph set (radical, overline, minus, script forms, sum, integral, bracket pieces).
 - `.tex` and `.latex` files, and `--lang latex` (also `tex`), read one formula: bare, wrapped in

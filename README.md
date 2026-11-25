@@ -84,9 +84,10 @@ try: `sirene examples/architecture.mmd`.
 | PlantUML | sequence, activity, class, object, state, use case, component, deployment, timing, network, mindmap, WBS, gantt, JSON, YAML, DOT, EBNF, regex, Chen ER, chronology, file trees |
 | Graphviz | DOT graphs (`digraph`, `graph`), with records, clusters, and compass ports |
 | LaTeX | one formula per `.tex` file, and `$...$`, `$$...$$`, and `math` blocks in Markdown |
+| Visio | `.vsdx` drawings (shapes, masters, text, connectors), to SVG and PNG with `--page N`; not `.vsd`, and not editable |
 
 A file's language comes from its extension (`.mmd`, `.puml`, `.dot`, ...), its Markdown block
-(`mermaid`, `plantuml`, `dot`), or `--lang` (`mermaid`, `dot`, `plantuml`, `latex`). Layouts are sirene's own, so drawings differ from
+(`mermaid`, `plantuml`, `dot`), or `--lang` (`mermaid`, `dot`, `plantuml`, `latex`, `visio`). Layouts are sirene's own, so drawings differ from
 Mermaid's, PlantUML's, and Graphviz's. Each kind's page in the docs lists what is read and what
 is not drawn; `spec/README.md` has the feature status table.
 

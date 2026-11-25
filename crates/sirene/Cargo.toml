@@ -46,6 +46,8 @@ workspace = true
 [dev-dependencies]
 assert_cmd = "2.2.2"
 predicates = "3.1.4"
+# The test-only .vsdx package writer (shared with sirene-core's tests) deflates parts.
+miniz_oxide = { version = "0.9.1", default-features = false, features = ["with-alloc"] }
 
 # The release `.rpm` (LINUXP-4): `cargo generate-rpm -p crates/sirene` packs the binary and the
 # files `cargo xtask linux` writes under target/linux/AppDir. Requires come from the binary's

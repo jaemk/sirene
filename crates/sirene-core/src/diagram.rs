@@ -33,9 +33,11 @@ use crate::timing::Timing;
 use crate::treemap::{self, Treemap};
 use crate::treeview::{self, TreeView};
 use crate::venn::{self, Venn};
+use crate::visio::Visio;
 use crate::wardley::{self, Wardley};
 use crate::xychart::{self, XyChart};
 use crate::{class, dot, er, plantuml, requirement, state, usecase, zenuml};
+use rowan::TextRange;
 
 /// A Mermaid diagram type sirene draws, picked by the header keyword (LANGS-1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -83,6 +85,8 @@ pub enum Kind {
     PlantUml,
     /// One TeX formula (LEMB-3), from a `.tex` file or `--lang latex`.
     Latex,
+    /// A Visio `.vsdx` drawing (VISIO-12), read from bytes.
+    Visio,
 }
 
 /// A diagram language (LANGS-1).
@@ -95,12 +99,15 @@ pub enum Lang {
     PlantUml,
     /// One TeX formula, drawn as an equation (LEMB-3).
     Latex,
+    /// A Visio `.vsdx` drawing, read from bytes (VISIO-12).
+    Visio,
 }
 
 impl Lang {
     /// The language a diagram file's extension names: `.mmd` or `.mermaid` for Mermaid, `.dot`
     /// or `.gv` for DOT, `.puml`, `.plantuml`, `.pu`, or `.iuml` for PlantUML, and `.tex` or
-    /// `.latex` for one TeX formula, in any case (DOT-5, PSEQ-7, LEMB-3).
+    /// `.latex` for one TeX formula, and `.vsdx` for a Visio drawing, in any case (DOT-5, PSEQ-7,
+    /// LEMB-3, VISIO-12).
     pub fn of_path(path: &std::path::Path) -> Option<Lang> {
         let ext = path.extension()?.to_str()?.to_ascii_lowercase();
         match ext.as_str() {
@@ -108,6 +115,7 @@ impl Lang {
             "dot" | "gv" => Some(Lang::Dot),
             "puml" | "plantuml" | "pu" | "iuml" => Some(Lang::PlantUml),
             "tex" | "latex" => Some(Lang::Latex),
+            "vsdx" => Some(Lang::Visio),
             _ => None,
         }
     }
@@ -164,6 +172,7 @@ impl Kind {
         Kind::Dot,
         Kind::PlantUml,
         Kind::Latex,
+        Kind::Visio,
     ];
 
     /// The language this type is written in.
@@ -172,6 +181,7 @@ impl Kind {
             Kind::Dot => Lang::Dot,
             Kind::PlantUml => Lang::PlantUml,
             Kind::Latex => Lang::Latex,
+            Kind::Visio => Lang::Visio,
             _ => Lang::Mermaid,
         }
     }
@@ -216,6 +226,7 @@ impl Kind {
             Kind::Dot => "DOT graph",
             Kind::PlantUml => "PlantUML diagram",
             Kind::Latex => "LaTeX formula",
+            Kind::Visio => "Visio drawing",
         }
     }
 
@@ -310,6 +321,9 @@ impl Kind {
 pub const DRAWN: &str = "flowchart, sequence, state, class, ER, git graph, timeline, pie, gantt, \
      mindmap, journey, quadrant, XY, requirement, kanban, packet, radar, sankey, treemap, block, architecture, C4, ZenUML, info, ishikawa, venn, Wardley, tree view, use case, railroad, swimlane, Cynefin, event modeling, and agentflow diagrams";
 
+/// Why a Visio drawing is not drawn as text (VISIO-12).
+pub const NO_TEXT_FORM: &str = "a Visio drawing has no text form";
+
 /// A lowered diagram of any type (LANGS-2).
 #[derive(Debug, Clone, PartialEq)]
 pub enum Diagram {
@@ -346,6 +360,8 @@ pub enum Diagram {
     Equation(Equation),
     /// A PlantUML diagram with a `header`, `footer`, `caption`, or `legend` (PCOM-1).
     Decorated(Box<Decorated>),
+    /// A Visio drawing and the page drawn (VISIO-11).
+    Visio(Visio),
 }
 
 impl Default for Diagram {
@@ -406,6 +422,7 @@ impl Diagram {
             Diagram::Timing(t) => scene::timing(t, metrics, theme),
             Diagram::Equation(e) => scene::equation(e, metrics, theme),
             Diagram::Decorated(d) => return scene::decorated(d, metrics, theme),
+            Diagram::Visio(v) => return scene::visio(v, metrics, theme),
         })
     }
 
@@ -442,6 +459,7 @@ impl Diagram {
             Diagram::Timing(t) => ascii::timing(t, options),
             Diagram::Equation(e) => ascii::equation(e, options),
             Diagram::Decorated(d) => return ascii::decorated(d, options),
+            Diagram::Visio(_) => return Err(crate::Error::new(NO_TEXT_FORM)),
         })
     }
 }
@@ -458,6 +476,26 @@ pub struct Lowered {
 }
 
 impl Lowered {
+    /// The number of pages the drawing has as outputs (VISIO-11): one for every type but a Visio
+    /// drawing, which has each of its non-background pages.
+    pub fn page_count(&self) -> usize {
+        match &self.diagram {
+            Diagram::Visio(v) => v.page_count(),
+            _ => 1,
+        }
+    }
+
+    /// This drawing showing output page `n` (0-based), or `None` when there is no such page.
+    pub fn with_page(&self, n: usize) -> Option<Lowered> {
+        match &self.diagram {
+            Diagram::Visio(v) => Some(Lowered {
+                diagram: Diagram::Visio(v.with_page(n)?),
+                ..self.clone()
+            }),
+            _ => (n == 0).then(|| self.clone()),
+        }
+    }
+
     /// The drawing in `theme` with the diagram's own theme settings applied over it, as
     /// `sirene svg` and `sirene png` draw it.
     pub fn scene(&self, metrics: &impl TextMetrics, theme: &Theme) -> crate::Result<Scene> {
@@ -517,6 +555,7 @@ fn prepare(src: &str, lang: Option<Lang>) -> (Kind, Cow<'_, str>) {
         Some(Lang::Dot) => return (Kind::Dot, Cow::Borrowed(src)),
         Some(Lang::PlantUml) => return (Kind::PlantUml, Cow::Borrowed(src)),
         Some(Lang::Latex) => return (Kind::Latex, Cow::Borrowed(src)),
+        Some(Lang::Visio) => return (Kind::Visio, Cow::Borrowed(src)),
         None if dot::is_dot(src) => return (Kind::Dot, Cow::Borrowed(src)),
         _ => {}
     }
@@ -538,11 +577,12 @@ fn prepare(src: &str, lang: Option<Lang>) -> (Kind, Cow<'_, str>) {
 // The same kind-to-parser mapping drives model lowering and syntax-only theme extraction.
 // Graph parsers use their existing Lowered conversion. Others name their Diagram variant.
 macro_rules! dispatch {
-    ($kind:expr, $mermaid:ident, $dot:expr, $plantuml:expr, $latex:expr) => {
+    ($kind:expr, $mermaid:ident, $dot:expr, $plantuml:expr, $latex:expr, $visio:expr) => {
         match $kind {
             Kind::Dot => $dot,
             Kind::PlantUml => $plantuml,
             Kind::Latex => $latex,
+            Kind::Visio => $visio,
             Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => $mermaid!(flowchart),
             Kind::State => $mermaid!(state),
             Kind::Class => $mermaid!(class),
@@ -641,6 +681,7 @@ pub(crate) fn read_theme(src: &str) -> ThemeConfig {
         read,
         ThemeConfig::default(),
         ThemeConfig::default(),
+        ThemeConfig::default(),
         ThemeConfig::default()
     )
 }
@@ -698,7 +739,15 @@ fn lower_prepared(src: &str, kind: Kind) -> Lowered {
                 ..Default::default()
             }
         },
-        lowered_equation(Equation::tex(src))
+        lowered_equation(Equation::tex(src)),
+        Lowered {
+            diagnostics: vec![Diagnostic::new(
+                TextRange::default(),
+                "a Visio drawing is read from bytes, not text",
+            )],
+            kind: Kind::Visio,
+            ..Default::default()
+        }
     )
 }
 
@@ -709,6 +758,51 @@ fn lowered_equation((equation, diagnostics): (Equation, Vec<Diagnostic>)) -> Low
         diagnostics,
         theme: ThemeConfig::default(),
         kind: Kind::Latex,
+    }
+}
+
+/// Reads `bytes` as `lang` when given, else as a Visio package when they start with the ZIP
+/// magic `PK\x03\x04`, else as UTF-8 text in its detected language (VISIO-12). A package that
+/// cannot be read is one error diagnostic and an empty drawing; the drawing is the first page,
+/// and [`Lowered::with_page`] picks another.
+pub fn lower_bytes(bytes: &[u8], lang: Option<Lang>) -> Lowered {
+    let visio = lang == Some(Lang::Visio) || (lang.is_none() && bytes.starts_with(b"PK\x03\x04"));
+    if !visio {
+        return match std::str::from_utf8(bytes) {
+            Ok(src) => lower_as(src, lang),
+            Err(e) => Lowered {
+                diagnostics: vec![Diagnostic::new(
+                    TextRange::default(),
+                    format!(
+                        "not UTF-8 text (invalid byte at offset {})",
+                        e.valid_up_to()
+                    ),
+                )],
+                ..Default::default()
+            },
+        };
+    }
+    let _phase = crate::profile::Phase::start("lower");
+    match crate::visio::read(bytes) {
+        Ok((v, mut diagnostics)) => {
+            for d in v.problems() {
+                if !diagnostics.contains(&d) {
+                    diagnostics.push(d);
+                }
+            }
+            cap(&mut diagnostics);
+            Lowered {
+                diagram: Diagram::Visio(v),
+                diagnostics,
+                theme: ThemeConfig::default(),
+                kind: Kind::Visio,
+            }
+        }
+        Err(e) => Lowered {
+            diagnostics: vec![Diagnostic::new(TextRange::default(), e.report())],
+            kind: Kind::Visio,
+            ..Default::default()
+        },
     }
 }
 

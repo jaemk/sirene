@@ -1084,6 +1084,101 @@ fn a_shape_with_too_many_rows_is_an_error() {
     assert!(read_err(&page(&sh).build()).contains("geometry rows"));
 }
 
+// ---- diagram integration (VISIO-12) ----
+
+mod lowered {
+    use super::*;
+    use sirene_core::diagram::{self, Kind, Lang};
+    use sirene_core::scene::Theme;
+
+    fn rect() -> String {
+        rect_shape(1, "", (1.0, 1.0), (2.0, 1.0))
+    }
+
+    #[test]
+    fn bytes_are_a_visio_drawing_by_lang_or_magic() {
+        let bytes = page(&rect()).build();
+        for lang in [None, Some(Lang::Visio)] {
+            let l = diagram::lower_bytes(&bytes, lang);
+            assert_eq!(l.kind, Kind::Visio);
+            assert!(l.diagnostics.is_empty(), "{:?}", l.diagnostics);
+            assert!(l.svg(&Theme::LIGHT).unwrap().contains("<path"));
+        }
+        assert_eq!(Kind::Visio.name(), "Visio drawing");
+        assert_eq!(Kind::Visio.lang(), Lang::Visio);
+        assert_eq!(Lang::of_path("a.VSDX".as_ref()), Some(Lang::Visio));
+    }
+
+    #[test]
+    fn text_bytes_are_read_as_text() {
+        let l = diagram::lower_bytes(b"flowchart LR\nA --> B\n", None);
+        assert_eq!(l.kind, Kind::Flowchart);
+        let l = diagram::lower_bytes(b"\xff\xfe", None);
+        assert_eq!(l.diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn a_bad_package_is_one_error_and_an_empty_drawing() {
+        let l = diagram::lower_bytes(b"PK\x03\x04 not a zip", None);
+        assert_eq!(l.kind, Kind::Visio);
+        assert_eq!(l.diagnostics.len(), 1);
+        assert_eq!(
+            l.diagnostics[0].severity,
+            sirene_core::diagnostic::Severity::Error
+        );
+        assert_eq!(l.page_count(), 1);
+    }
+
+    #[test]
+    fn a_drawing_has_no_text_form() {
+        let l = diagram::lower_bytes(&page(&rect()).build(), None);
+        let e = l.ascii(&Default::default()).unwrap_err();
+        assert_eq!(e.report(), "a Visio drawing has no text form");
+        // Source text cannot name a package.
+        let l = diagram::lower_as("anything", Some(Lang::Visio));
+        assert_eq!(l.diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn pages_are_selected_with_page() {
+        let bytes = page(&rect()).page(3.0, 2.0, &rect()).build();
+        let l = diagram::lower_bytes(&bytes, None);
+        assert_eq!(l.page_count(), 2);
+        let second = l.with_page(1).unwrap();
+        assert!(second.svg(&Theme::LIGHT).unwrap().contains("width=\"288\""));
+        assert!(l.with_page(2).is_none());
+    }
+}
+
+// ---- fuzz seeds ----
+
+/// The seed corpus of the `visio` fuzz target (`fuzz/fuzz_targets/visio.rs`) is built here: a
+/// missing seed is written, an existing one must equal what is built, so the files cannot drift
+/// from the writer. Every seed reads without error.
+#[test]
+fn fuzz_seeds_are_current_and_read() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fuzz/corpus/visio");
+    std::fs::create_dir_all(&dir).unwrap();
+    let rect = rect_shape(1, "", (1.0, 1.0), (2.0, 1.0));
+    let mut deflated = page(&rect).page(3.0, 2.0, &rect);
+    deflated.deflate = true;
+    let seeds = [
+        ("one-page", page(&rect).build()),
+        ("two-pages-deflated", deflated.build()),
+        ("empty", Vec::new()),
+        ("truncated", page(&rect).build()[..40].to_vec()),
+    ];
+    for (name, bytes) in seeds {
+        let path = dir.join(name);
+        match std::fs::read(&path) {
+            Ok(have) => assert_eq!(have, bytes, "{name} is stale; delete it to rewrite"),
+            Err(_) => std::fs::write(&path, &bytes).unwrap(),
+        }
+        let ok = !bytes.is_empty() && name != "truncated";
+        assert_eq!(visio::read(&bytes).is_ok(), ok, "{name}");
+    }
+}
+
 // ---- property test ----
 
 mod props {

@@ -39,4 +39,11 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "visio"
+path = "fuzz_targets/visio.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]

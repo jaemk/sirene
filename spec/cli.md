@@ -109,7 +109,7 @@ are resolved for collision checks. An output that would replace any
 discovered input (including a symlink's target) is skipped with an error; a final output symlink
 is replaced rather than followed. A source or output path that cannot be resolved is reported.
 These are errors that render nothing: a DIR with no diagrams (`error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml,
-.pu, or .iuml files in DIR`), a DIR that
+.pu, .iuml, or .vsdx files in DIR`), a DIR that
 cannot be listed (`error: cannot read DIR: REASON`), an OUTDIR that exists and is not a directory
 (`error: OUTDIR is not a directory; a DIR renders into one`), and a directory given to
 `sirene ascii` (`error: DIR is a directory; ascii reads one file`). Tests: `directories`,
@@ -133,7 +133,7 @@ Watching stdin is an error
 `sirene check FILE...` (at least one) reads each FILE, draws nothing, writes nothing to stdout,
 and prints diagnostics as in CLI-3. A FILE may be a diagram, `-` for stdin, a directory (each
 diagram file under it, as in CLI-9; none is `error: no .mmd, .mermaid, .dot, .gv, .puml,
-.plantuml, .pu, or .iuml files in DIR`), or a Markdown file (`.md` or `.markdown`), whose diagram blocks (MARKDO-1) are checked with
+.plantuml, .pu, .iuml, or .vsdx files in DIR`), or a Markdown file (`.md` or `.markdown`), whose diagram blocks (MARKDO-1) are checked with
 positions in the Markdown file. Every FILE is checked. The exit status is 1 when any FILE cannot be read or has an error, else 0. A mistyped
 `check` is suggested as in CLI-1. Tests: `check` in `crates/sirene/tests/cli.rs`.
 
@@ -206,3 +206,14 @@ object per diagnostic in the order the text form prints them: `{"file", "line", 
 and `column` null and the error chain as `message`; a Markdown file without diagram blocks is a
 `warning` with `line` and `column` null. No diagnostics print `[]`. The exit status is as
 without `--json`. Test: `check_json` in `crates/sirene/tests/cli.rs`.
+
+## CLI-17 Visio drawings
+
+A `.vsdx` file, or any input starting with the ZIP magic `PK\x03\x04`, or any input under
+`--lang visio` (alias `vsdx`), is read as bytes and drawn as a Visio package (VISIO-12). `svg` and
+`png` take `--page N` (from 1) to write one page. Without it a drawing of several pages needs
+`--output`, and writes `STEM-N.EXT` beside it; to stdout it is `error: the drawing has N pages;
+...`. A page past the last is `error: --page N is out of range; ...`. `ascii` is
+`error: a Visio drawing has no text form`, exit 1. A package that cannot be read is printed as
+`FILE: error: MESSAGE` (no line or column) and fails the run. A DIR scan includes `.vsdx` files.
+Tests: `crates/sirene/tests/visio.rs`.

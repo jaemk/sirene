@@ -256,11 +256,13 @@ picks one.
   file has no source text); a package error is one error diagnostic and an empty drawing.
 - `sirene svg` and `sirene png` write each page; `sirene check` reads the package and prints
   diagnostics as `FILE: error: MESSAGE` (no line or column); `sirene ascii` fails with `error:
-  FILE: a Visio drawing has no text form` and exit 1 (free-form drawings have no text layout).
+  a Visio drawing has no text form` and exit 1 (free-form drawings have no text layout).
   `--page N` is an option of `svg` and `png`. Directory scans pick up `.vsdx` files.
-- wasm: `render_bytes(bytes, lang, theme)` next to the string entry points. GUI: opens `.vsdx`
-  read-only like other decorated diagrams. Packaging adds the `application/vnd.ms-visio.drawing`
-  MIME type and the `.vsdx` glob.
+- wasm: `render` reads its input as a package when `lang` is `LANG_VISIO` (5), or `LANG_DETECT`
+  and the bytes start with `PK\x03\x04`; it draws the first page, and the diagnostics have line
+  and column 1. The GUI's edit-support table marks `Kind::Visio` read-only; opening a `.vsdx` in
+  the GUI and packaging (the `application/vnd.ms-visio.drawing` MIME type and `.vsdx` glob) are
+  not done (VISIO-T6).
 - The fuzz target `visio` feeds arbitrary bytes to `lower_bytes` and draws the result.
 
 ## VISIO-13 Limits and failure
@@ -327,8 +329,10 @@ real Visio files.
 | Text | done |
 | Inheritance (master, style sheets) | done |
 | Connectors, layers, backgrounds, Foreign placeholders | done |
-| CLI, wasm, GUI, packaging | pending |
-| Fuzz target | pending |
+| `Lang`/`Kind`/`Diagram`, `lower_bytes`, CLI (`svg`, `png`, `check`, `ascii` refusal, `--page`) | done |
+| wasm bytes entry (`LANG_VISIO`, first page) | done |
+| GUI open, packaging MIME types and file association | pending |
+| Fuzz target | done |
 
 ## VISIO-T Tasks
 
@@ -338,3 +342,5 @@ real Visio files.
 - [ ] VISIO-T3 Rotate text with the shape (needs a rotation field on the text item).
 - [ ] VISIO-T4 Draw embedded images (needs an image item in the display list).
 - [ ] VISIO-T5 Fill patterns, gradients, and multi-dash line patterns.
+- [ ] VISIO-T6 Open `.vsdx` in the GUI (read-only, bytes), register the MIME type and file
+  association in the Linux, macOS, and Windows packaging, and pin them in `xtask` tests.

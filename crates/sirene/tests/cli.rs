@@ -816,7 +816,7 @@ fn directories() {
         .assert()
         .failure()
         .stderr(format!(
-            "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, or .iuml files in {}\n",
+            "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, .iuml, or .vsdx files in {}\n",
             empty.display()
         ));
     sirene()
@@ -1132,7 +1132,7 @@ fn check() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, or .iuml files in",
+            "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, .iuml, or .vsdx files in",
         ));
     // Stdin.
     sirene()
