@@ -125,7 +125,8 @@ pub fn block(b: &Block, metrics: &impl TextMetrics, theme: &Theme) -> crate::Res
         edges,
         notes: Vec::new(),
     };
-    let (mut scene, off) = paint::draw(chart, &layout, metrics, theme)?;
+    // The formulas typeset to size the grid are the ones drawn.
+    let (mut scene, off) = paint::draw_with(chart, &layout, metrics, theme, px.formulas.clone())?;
 
     // Block arrows go under their labels: before their node's first element, or last.
     let mut arrows: Vec<Option<Vec<Element>>> = vec![None; b.arrows.len()];

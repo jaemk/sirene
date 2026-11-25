@@ -286,7 +286,13 @@ impl<M: TextMetrics> Measure for Px<'_, M> {
         }
         let mut y = Compartments::title(node, self.theme, &self.formulas);
         let mut k = row - title;
-        if node.label.delim == Delim::Latex {
+        let delim = node.label.delim;
+        if node
+            .sections
+            .iter()
+            .flatten()
+            .any(|r| r.cells.iter().any(|c| formula::has(c, delim)))
+        {
             // Rows with formulas are taller: the row's middle is its box's.
             let c = Compartments::of(node, self.metrics, self.theme, &self.formulas);
             for (section, heights) in node.sections.iter().zip(&c.rows) {
@@ -327,10 +333,11 @@ fn row_style(r: &Row) -> TextStyle {
 /// The runs of a compartment cell with a formula (`<latex>` and `<math>` tags in PlantUML
 /// nodes), text in the row's style; `None` for a cell that is text.
 fn cell_runs(node: &Node, row: &Row, cell: &str) -> Option<Vec<Span>> {
-    if node.label.delim != Delim::Latex || !formula::has(cell, Delim::Latex) {
+    let delim = node.label.delim;
+    if !formula::has(cell, delim) {
         return None;
     }
-    let mut line = formula::runs(cell, Delim::Latex);
+    let mut line = formula::runs(cell, delim);
     for s in line.iter_mut().filter(|s| !s.math) {
         s.italic = row.italic;
     }
@@ -445,22 +452,16 @@ fn subgraph_title(s: &Subgraph) -> String {
     s.title.lines().join(" ").trim().to_owned()
 }
 
-/// The lines of a label of a position that reads formulas only in PlantUML text (the title of a
-/// compartment node or subgraph, the ends of an edge): its runs when its delimiters are
-/// PlantUML's, else the styled text. Mermaid's `$$` is a formula in node and edge labels only
-/// (LEMB-1).
+/// The lines of a label of a compartment node's title or an end of an edge: its runs, whose
+/// formulas are in the label's delimiters (LEMB-1, LEMB-2).
 fn plantuml_runs(label: &Label) -> Vec<Vec<Span>> {
-    if label.delim == Delim::Latex {
-        label.runs()
-    } else {
-        label.spans()
-    }
+    label.runs()
 }
 
 /// A subgraph's title as one line of runs, its lines joined by spaces, when it has a formula;
 /// `None` for a title that is text (`subgraph_title`).
 fn title_runs(s: &Subgraph) -> Option<Vec<Span>> {
-    if s.title.delim != Delim::Latex || !s.title.has_formula() {
+    if !s.title.has_formula() {
         return None;
     }
     let mut line = Vec::new();
@@ -517,7 +518,7 @@ pub(super) fn draw(
 }
 
 /// [`draw`] with the formulas already typeset in `formulas` (the layout's measuring).
-fn draw_with(
+pub(super) fn draw_with(
     chart: &Flowchart,
     layout: &Layout,
     metrics: &impl TextMetrics,

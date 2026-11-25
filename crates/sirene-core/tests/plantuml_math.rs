@@ -760,29 +760,29 @@ mod math {
     }
 
     #[test]
-    fn mermaid_dollars_stay_text_in_titles_and_end_labels() {
+    fn mermaid_dollars_are_formulas_in_titles_and_end_labels() {
         let lowered =
             diagram::lower("flowchart TD\n    subgraph S[\"$$x^2$$\"]\n        A\n    end\n");
         let Diagram::Graph(chart) = lowered.diagram else {
             panic!("not a graph");
         };
         let scene = draw_graph(&chart);
-        assert!(texts(&scene).contains(&"$$x^2$$"), "{:?}", texts(&scene));
-        assert!(formula_paths(&scene, Owner::Cluster(0)).is_empty());
+        assert!(!texts(&scene).contains(&"$$x^2$$"), "{:?}", texts(&scene));
+        assert!(!formula_paths(&scene, Owner::Cluster(0)).is_empty());
         let lowered = diagram::lower("classDiagram\n    A \"$$n$$\" --> \"1\" B\n");
         let Diagram::Graph(chart) = lowered.diagram else {
             panic!("not a graph");
         };
         let scene = draw_graph(&chart);
-        assert!(texts(&scene).contains(&"$$n$$"), "{:?}", texts(&scene));
-        // The same paths as with plain text there (an arrowhead is one).
+        assert!(!texts(&scene).contains(&"$$n$$"), "{:?}", texts(&scene));
+        // More paths than with plain text there (an arrowhead is one).
         let plain = diagram::lower("classDiagram\n    A \"n\" --> \"1\" B\n");
         let Diagram::Graph(plain) = plain.diagram else {
             panic!("not a graph");
         };
-        assert_eq!(
-            formula_paths(&scene, Owner::Edge(0)).len(),
-            formula_paths(&draw_graph(&plain), Owner::Edge(0)).len()
+        assert!(
+            formula_paths(&scene, Owner::Edge(0)).len()
+                > formula_paths(&draw_graph(&plain), Owner::Edge(0)).len()
         );
     }
 

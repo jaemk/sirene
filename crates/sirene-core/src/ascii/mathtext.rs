@@ -115,6 +115,7 @@ pub(super) fn text_rows(lines: &[String], _: Delim, _: Charset) -> Vec<String> {
 pub(super) fn section_rows(
     cache: &Rows,
     rows: &[crate::flowchart::Row],
+    delim: Delim,
 ) -> Option<Vec<Vec<String>>> {
     use crate::flowchart::formula;
     let cells: Vec<Vec<Vec<Span>>> = rows
@@ -122,7 +123,7 @@ pub(super) fn section_rows(
         .map(|r| {
             r.cells
                 .iter()
-                .map(|c| formula::runs(&crate::flowchart::clean(c), Delim::Latex))
+                .map(|c| formula::runs(&crate::flowchart::clean(c), delim))
                 .collect()
         })
         .collect();
@@ -167,7 +168,11 @@ pub(super) fn section_rows(
 
 /// Without the `math` feature a formula is its source: the compartment is its text rows.
 #[cfg(not(feature = "math"))]
-pub(super) fn section_rows(_: &Rows, _: &[crate::flowchart::Row]) -> Option<Vec<Vec<String>>> {
+pub(super) fn section_rows(
+    _: &Rows,
+    _: &[crate::flowchart::Row],
+    _: Delim,
+) -> Option<Vec<Vec<String>>> {
     None
 }
 
@@ -334,8 +339,10 @@ mod tests {
     fn counted(src: &str) -> (String, usize) {
         use crate::diagram::{self, Diagram};
         let options = super::super::Options::default();
+        // Lowering checks the formulas of some kinds; the render sets them.
+        let lowered = diagram::lower(src);
         crate::equation::count::reset();
-        let out = match diagram::lower(src).diagram {
+        let out = match lowered.diagram {
             Diagram::Block(b) => super::super::block::render(&b, &options),
             Diagram::C4(c) => super::super::c4::render(&c, &options),
             Diagram::Architecture(a) => super::super::architecture::render(&a, &options),

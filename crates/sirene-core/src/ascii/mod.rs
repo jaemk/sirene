@@ -359,7 +359,12 @@ impl Measure for CellsIn<'_> {
         }
         let mut y = if node.untitled() { 0 } else { 1 + title as i32 };
         let mut k = row - title;
-        if node.label.delim == Delim::Latex {
+        let delim = node.label.delim;
+        if node.sections.iter().flatten().any(|r| {
+            r.cells
+                .iter()
+                .any(|c| crate::flowchart::formula::has(&clean(c), delim))
+        }) {
             // A row with a formula is several lines: the port is on its middle one.
             for section in &node.sections {
                 let blocks = section_blocks(self.0, node, section);
@@ -414,32 +419,25 @@ fn title(s: &Subgraph) -> String {
     s.title.lines().join(" ").trim().to_owned()
 }
 
-/// The rows of a subgraph's title: its text on one row, or, for a PlantUML title with a formula,
-/// the formula's rows.
+/// The rows of a subgraph's title: its text on one row, or, for a title with a formula, the
+/// formula's rows.
 fn title_rows(rows: &Rows, s: &Subgraph) -> Vec<String> {
-    if s.title.delim == Delim::Latex && s.title.has_formula() {
+    if s.title.has_formula() {
         return lines_in(rows, &s.title);
     }
     vec![title(s)]
 }
 
-/// The lines of a label of a position that reads formulas only in PlantUML text (the title of a
-/// compartment node, the ends of an edge): the label's rows when its delimiters are PlantUML's,
-/// else its text lines (LEMB-1).
+/// The lines of a compartment node's title or an end of an edge: the label's rows when it has a
+/// formula, else its text lines (LEMB-1, LEMB-2).
 fn plantuml_lines(rows: &Rows, label: &Label) -> Vec<String> {
-    if label.delim == Delim::Latex {
-        lines_in(rows, label)
-    } else {
-        label.lines()
-    }
+    lines_in(rows, label)
 }
 
 /// A compartment's rows, each as the lines it takes: one, or several for a PlantUML row with a
 /// formula in a cell (LANGS-3).
 fn section_blocks(cache: &Rows, node: &Node, rows: &[Row]) -> Vec<Vec<String>> {
-    if node.label.delim == Delim::Latex
-        && let Some(blocks) = mathtext::section_rows(cache, rows)
-    {
+    if let Some(blocks) = mathtext::section_rows(cache, rows, node.label.delim) {
         return blocks;
     }
     text_lines(rows).into_iter().map(|l| vec![l]).collect()
@@ -882,7 +880,7 @@ fn draw_edge_in(
             continue;
         };
         // One row of text; a PlantUML label with a formula is the formula's rows.
-        let text: Vec<String> = if l.delim == Delim::Latex && l.has_formula() {
+        let text: Vec<String> = if l.has_formula() {
             lines_in(rows, l)
         } else {
             vec![l.lines().join(" ")]
