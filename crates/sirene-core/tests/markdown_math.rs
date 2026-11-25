@@ -159,6 +159,8 @@ fn inline_formulas_follow_githubs_rules() {
         // A formula stays on its line.
         ("$a\nb$", &[]),
         ("$a\n$b$", &["b"]),
+        ("$a $b$", &["a $b"]),
+        ("$a $b\n$c$", &["c"]),
         // Code spans.
         ("`$x$`", &[]),
         ("`` $x$ `` and $y$", &["y"]),
@@ -176,6 +178,22 @@ fn inline_formulas_follow_githubs_rules() {
         );
         assert_eq!(sources(src), *expected, "{src:?}");
         assert_well_formed(src);
+    }
+}
+
+#[test]
+fn unmatched_dollar_signs_are_read_in_linear_time() {
+    // Each `$` opens a search for a closer; a search per `$` over one line is quadratic. 60,000
+    // bytes took 10 seconds that way.
+    for unit in ["$a ", "$`a "] {
+        let src = unit.repeat(40_000);
+        let start = std::time::Instant::now();
+        assert!(math(&src).is_empty());
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(5),
+            "{unit:?}: {:?}",
+            start.elapsed()
+        );
     }
 }
 

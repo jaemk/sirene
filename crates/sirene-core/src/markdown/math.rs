@@ -232,6 +232,8 @@ fn scan(para: &[Line], out: &mut Vec<Part>) {
     }
     let b = text.as_bytes();
     let mut p = 0;
+    // The byte before which no inline formula opens: a scan for a closer ended there.
+    let mut dead = 0;
     while p < b.len() {
         match b[p] {
             b'\\' => p += if escapes(b, p) { 2 } else { 1 },
@@ -252,19 +254,27 @@ fn scan(para: &[Line], out: &mut Vec<Part>) {
                         out,
                     );
                     p = q + 2;
-                } else if n == 1
-                    && let Some(q) = inline_close(&text, p)
-                {
-                    emit(
-                        MathKind::Inline,
-                        para,
-                        &starts,
-                        &text,
-                        p..q + 1,
-                        p + 1..q,
-                        out,
-                    );
-                    p = q + 1;
+                } else if n == 1 && p >= dead {
+                    match inline_close(&text, p) {
+                        Ok(q) => {
+                            emit(
+                                MathKind::Inline,
+                                para,
+                                &starts,
+                                &text,
+                                p..q + 1,
+                                p + 1..q,
+                                out,
+                            );
+                            p = q + 1;
+                        }
+                        Err(scanned) => {
+                            // A closer valid for a later `$` is valid for this one, so no `$`
+                            // before where this scan ended has one (a scan per `$` is quadratic).
+                            dead = scanned.unwrap_or(dead);
+                            p += n;
+                        }
+                    }
                 } else {
                     p += n;
                 }
@@ -321,21 +331,24 @@ fn display_close(b: &[u8], from: usize) -> Option<usize> {
 /// The position of the `$` that closes the inline formula opened by the one at `open`, by
 /// GitHub's rules: the opening `$` is not followed by whitespace, the closing one is not
 /// preceded by whitespace nor followed by a digit, and the formula stays on one line.
-fn inline_close(text: &str, open: usize) -> Option<usize> {
+///
+/// An error is `None` when `open` cannot open a formula, and otherwise the byte the search ended at
+/// (the end of the line) without finding a closer.
+fn inline_close(text: &str, open: usize) -> Result<usize, Option<usize>> {
     let b = text.as_bytes();
     if text[open + 1..]
         .chars()
         .next()
         .is_none_or(char::is_whitespace)
     {
-        return None;
+        return Err(None);
     }
     let mut q = open + 1;
     while q < b.len() {
         match b[q] {
             b'\\' => q += if escapes(b, q) { 2 } else { 1 },
             b'`' => q = skip_code(b, q),
-            b'\n' => return None,
+            b'\n' => return Err(Some(q)),
             b'$' => {
                 let before = text[..q]
                     .chars()
@@ -343,14 +356,14 @@ fn inline_close(text: &str, open: usize) -> Option<usize> {
                     .is_some_and(|c| !c.is_whitespace());
                 let digit = b.get(q + 1).is_some_and(u8::is_ascii_digit);
                 if before && !digit {
-                    return Some(q);
+                    return Ok(q);
                 }
                 q += 1;
             }
             _ => q += 1,
         }
     }
-    None
+    Err(Some(b.len()))
 }
 
 /// The paragraph line that holds byte `at` of the joined text.
