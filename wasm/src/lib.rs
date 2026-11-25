@@ -32,6 +32,8 @@ pub const LANG_DETECT: u32 = 0;
 pub const LANG_MERMAID: u32 = 1;
 pub const LANG_DOT: u32 = 2;
 pub const LANG_PLANTUML: u32 = 3;
+/// One TeX formula (LEMB-3).
+pub const LANG_LATEX: u32 = 4;
 
 pub const THEME_LIGHT: u32 = 0;
 pub const THEME_DARK: u32 = 1;
@@ -106,6 +108,7 @@ pub fn draw(src: &[u8], format: u32, lang: u32, theme: u32) -> (Result<Vec<u8>, 
         LANG_MERMAID => Some(Lang::Mermaid),
         LANG_DOT => Some(Lang::Dot),
         LANG_PLANTUML => Some(Lang::PlantUml),
+        LANG_LATEX => Some(Lang::Latex),
         _ => {
             return (
                 Err(format!("unknown language code {lang}")),
@@ -191,6 +194,9 @@ mod tests {
         let puml = b"@startuml\nAlice -> Bob: hi\n@enduml\n";
         let (svg, _) = draw(puml, FORMAT_SVG, LANG_PLANTUML, THEME_LIGHT);
         assert!(text(svg).starts_with("<svg"));
+        let (svg, diagnostics) = draw(b"$$ x^2 $$", FORMAT_SVG, LANG_LATEX, THEME_LIGHT);
+        assert!(text(svg).starts_with("<svg"));
+        assert_eq!(diagnostics, "[]");
     }
 
     #[test]

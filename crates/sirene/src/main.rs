@@ -50,6 +50,9 @@ enum LangArg {
     Dot,
     /// PlantUML.
     Plantuml,
+    /// One TeX formula (`.tex`, `.latex`).
+    #[value(alias = "tex")]
+    Latex,
 }
 
 /// The language `--lang` forces, set once at startup (DOT-5).
@@ -245,6 +248,7 @@ fn main() -> ExitCode {
         LangArg::Mermaid => Lang::Mermaid,
         LangArg::Dot => Lang::Dot,
         LangArg::Plantuml => Lang::PlantUml,
+        LangArg::Latex => Lang::Latex,
     }));
     log::debug!(
         "sirene {} ({}, {}): {:?}",
@@ -853,6 +857,12 @@ fn stamp(path: &Path) -> Option<Stamp> {
     Some((meta.modified().ok()?, meta.len()))
 }
 
+/// Whether `path` names a diagram file a directory scan picks up. A `.tex` file is read when
+/// named, but not found in a directory, where it is most likely a whole LaTeX document (LEMB-3).
+fn is_diagram_file(path: &Path) -> bool {
+    Lang::of_path(path).is_some_and(|lang| lang != Lang::Latex)
+}
+
 /// The message for a directory with no diagram files.
 pub(crate) fn no_diagrams(dir: &Path) -> String {
     format!(
@@ -900,7 +910,7 @@ fn directory_entries(dir: &Path) -> Result<Vec<Result<(PathBuf, EntryKind)>>> {
             } else if kind.is_symlink() {
                 // Only diagram-named links can be inputs. Avoid inspecting unrelated links,
                 // whose targets may be missing or inaccessible.
-                if Lang::of_path(&path).is_none() {
+                if !is_diagram_file(&path) {
                     return Ok((path, EntryKind::Other));
                 }
                 // Follow file symlinks, but never recurse into directory symlinks.
@@ -961,7 +971,7 @@ fn scan_with(
             }
             match kind {
                 EntryKind::Directory => stack.push(path),
-                EntryKind::File if Lang::of_path(&path).is_some() => match path.strip_prefix(dir) {
+                EntryKind::File if is_diagram_file(&path) => match path.strip_prefix(dir) {
                     Ok(rel) => {
                         let target = out.join(rel).with_extension(ext);
                         scan.found.push((path, target));
