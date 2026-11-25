@@ -23,8 +23,10 @@ PlantUML sequence diagrams lower to the same model (PUML-3). Reference:
 - Blocks: `loop`, `alt` / `else`, `opt`, `par` / `and`, `critical` / `option`, `break`, `rect`,
   each closed by `end`, nested.
 - Comments, `accTitle`, `accDescr`; `link` and `links` are warnings (LANGS-6).
-- `$$...$$` in a participant alias, message text, or note is a formula (LEMB-1). The model keeps
-  the source in `Text`; `Sequence::math` is set by this lowering.
+- `$$...$$` in a participant alias, message text, note, block label (`loop`, `alt`, `opt`,
+  `par`, `critical`, `break`), or section title (`else`, `and`, `option`) is a formula (LEMB-1).
+  `box` and diagram titles stay text. `\\` is kept as written. The model keeps the source in
+  `Text`; `Sequence::math` is set by this lowering.
 
 ## MSEQ-2 Model
 
