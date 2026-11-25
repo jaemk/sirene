@@ -178,10 +178,13 @@ enum Command {
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum CharsetArg {
-    /// Box-drawing characters.
+    /// Box-drawing characters; formulas use only characters most monospace fonts draw in one cell.
     Unicode,
-    /// Printable ASCII only.
+    /// Printable ASCII only, formulas included.
     Ascii,
+    /// As unicode, with mathematical symbols, script letters, and bracket pieces in formulas,
+    /// which some fonts draw wider than a cell.
+    UnicodeMath,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -358,6 +361,7 @@ fn run(cli: Cli) -> ExitCode {
             let charset = match charset {
                 CharsetArg::Unicode => Charset::Unicode,
                 CharsetArg::Ascii => Charset::Ascii,
+                CharsetArg::UnicodeMath => Charset::UnicodeMath,
             };
             let stdin = PathBuf::from("-");
             let md = if markdown {
