@@ -1,0 +1,28 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startnwdiag\ntitle Office\nheader Draft\nfooter Page 1\ncaption Networks\nlegend top right\nTwo networks\nend legend\nnwdiag {\n  network dmz {\n    router [address = \"210.x.x.1\"];\n    web01 [address = \"210.x.x.2\"];\n  }\n}\n@endnwdiag\n"
+---
+
+                 Draft
+
+      ┌──────────────┐
+      │ Two networks │
+      └──────────────┘
+
+        Office
+
+        ┌─────┐
+        │ dmz │
+        └─┬─┬─┘
+          │ │
+     ┌────┘ └────┐
+     │           │
+ 210.x.x.1   210.x.x.2
+     │           │
+┌────┴───┐   ┌───┴───┐
+│ router │   │ web01 │
+└────────┘   └───────┘
+
+       Networks
+
+        Page 1

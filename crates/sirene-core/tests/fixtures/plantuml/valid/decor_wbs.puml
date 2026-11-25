@@ -1,0 +1,11 @@
+@startwbs
+header Draft
+footer Page 1
+caption Work breakdown
+legend bottom left
+Tasks of the project
+end legend
+* Project
+** Design
+** Code
+@endwbs

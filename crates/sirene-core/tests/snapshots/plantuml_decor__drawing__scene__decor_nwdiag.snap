@@ -1,0 +1,23 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startnwdiag\ntitle Office\nheader Draft\nfooter Page 1\ncaption Networks\nlegend top right\nTwo networks\nend legend\nnwdiag {\n  network dmz {\n    router [address = \"210.x.x.1\"];\n    web01 [address = \"210.x.x.2\"];\n  }\n}\n@endnwdiag\n"
+---
+231.0 x 363.0
+text "Draft" (194.0, 18.0) #333333
+path 4 points (98.2, 44.0)-(215.0, 80.0) fill stroke
+text "Two networks" (156.6, 62.0) #333333
+text "Office" (115.5, 114.0) #333333
+path 6 points (58.0, 172.0)-(107.0, 239.0) stroke
+path 6 points (123.0, 172.0)-(173.0, 239.0) stroke
+path 4 points (90.0, 136.0)-(140.0, 172.0) fill stroke
+text "dmz" (115.0, 154.0) #333333
+path 4 points (20.0, 239.0)-(95.0, 275.0) fill stroke
+text "router" (57.5, 257.0) #333333
+path 4 points (140.0, 239.0)-(206.0, 275.0) fill stroke
+text "web01" (173.0, 257.0) #333333
+path 4 points (16.0, 194.0)-(100.0, 218.0) fill
+text "210.x.x.1" (58.0, 206.0) #333333
+path 4 points (131.0, 194.0)-(215.0, 218.0) fill
+text "210.x.x.2" (173.0, 206.0) #333333
+text "Networks" (115.5, 309.0) #333333
+text "Page 1" (115.5, 345.0) #333333

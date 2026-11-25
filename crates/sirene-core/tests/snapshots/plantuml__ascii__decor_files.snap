@@ -1,0 +1,21 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startfiles\ntitle Layout\nheader Draft\nfooter Page 1\ncaption Source tree\nlegend bottom\nFiles of the repository\nend legend\n/sirene/Cargo.toml\n/sirene/crates/sirene-core/src/lib.rs\n@endfiles\n"
+---
+                      Draft
+
+/
+`-- sirene/
+    |-- Cargo.toml
+    `-- crates/
+        `-- sirene-core/
+            `-- src/
+                `-- lib.rs
+
++-------------------------+
+| Files of the repository |
++-------------------------+
+
+        Source tree
+
+          Page 1

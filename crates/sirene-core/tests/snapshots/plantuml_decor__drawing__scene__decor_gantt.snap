@@ -1,0 +1,34 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startgantt\ntitle Release plan\nheader Draft\nfooter Page 1\ncaption Schedule\nlegend right\nBars are tasks\nend legend\nProject starts 2026-01-05\n[Design] lasts 3 days\nthen [Code] lasts 5 days\n@endgantt\n"
+---
+862.7 x 298.0
+text "Draft" (825.7, 18.0) #333333
+text "Release plan" (431.4, 62.0) #333333
+path 4 points (16.0, 88.0)-(811.0, 136.0) fill
+path 2 points (91.0, 88.0)-(91.0, 136.0) stroke
+text "2026-01-05" (91.0, 147.0) #333333
+path 2 points (181.0, 88.0)-(181.0, 136.0) stroke
+text "2026-01-06" (181.0, 147.0) #333333
+path 2 points (271.0, 88.0)-(271.0, 136.0) stroke
+text "2026-01-07" (271.0, 147.0) #333333
+path 2 points (361.0, 88.0)-(361.0, 136.0) stroke
+text "2026-01-08" (361.0, 147.0) #333333
+path 2 points (451.0, 88.0)-(451.0, 136.0) stroke
+text "2026-01-09" (451.0, 147.0) #333333
+path 2 points (541.0, 88.0)-(541.0, 136.0) stroke
+text "2026-01-10" (541.0, 147.0) #333333
+path 2 points (631.0, 88.0)-(631.0, 136.0) stroke
+text "2026-01-11" (631.0, 147.0) #333333
+path 2 points (721.0, 88.0)-(721.0, 136.0) stroke
+text "2026-01-12" (721.0, 147.0) #333333
+path 2 points (811.0, 88.0)-(811.0, 136.0) stroke
+text "2026-01-13" (811.0, 147.0) #333333
+path 9 points (91.0, 90.0)-(361.0, 110.0) fill stroke
+text "Design" (226.0, 100.0) #ffffff
+path 9 points (361.0, 114.0)-(811.0, 134.0) fill stroke
+text "Code" (586.0, 124.0) #ffffff
+path 4 points (713.1, 182.0)-(846.7, 218.0) fill stroke
+text "Bars are tasks" (779.9, 200.0) #333333
+text "Schedule" (431.4, 244.0) #333333
+text "Page 1" (431.4, 280.0) #333333

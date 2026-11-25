@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startuml\nheader Architecture\nfooter Page 3\ncaption Two parts\nlegend left\nParts talk over **HTTP**\nend legend\ncomponent Web\ncomponent Api\nWeb --> Api\n@enduml\n"
+---
+216.0 x 305.0
+text "Architecture" (149.6, 18.0) #333333
+path 3 points (103.5, 120.0)-(112.5, 129.0) fill
+path 2 points (108.0, 88.0)-(108.0, 121.0) stroke
+path 4 points (83.0, 52.0)-(133.0, 88.0) fill stroke
+text "Web" (108.0, 70.0) #333333
+path 4 points (83.0, 129.0)-(133.0, 165.0) fill stroke
+text "Api" (108.0, 147.0) #333333
+path 4 points (16.0, 189.0)-(200.0, 225.0) fill stroke
+text "Parts talk over" (87.0, 207.0) #333333
+text "HTTP" (175.2, 207.0) bold #333333
+text "Two parts" (108.0, 251.0) #333333
+text "Page 3" (108.0, 287.0) #333333

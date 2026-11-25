@@ -1,0 +1,15 @@
+@startnwdiag
+title Office
+header Draft
+footer Page 1
+caption Networks
+legend top right
+Two networks
+end legend
+nwdiag {
+  network dmz {
+    router [address = "210.x.x.1"];
+    web01 [address = "210.x.x.2"];
+  }
+}
+@endnwdiag

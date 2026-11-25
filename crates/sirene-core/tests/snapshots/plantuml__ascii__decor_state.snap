@@ -1,0 +1,30 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nheader Draft\nfooter left Page 2\ncaption Door states\nlegend top\nClosed or open\nend legend\n[*] --> Closed\nClosed --> Open : push\nOpen --> Closed : pull\n@enduml\n"
+---
+             Draft
+
++----------------+
+| Closed or open |
++----------------+
+
+        *
+        |
+        v
+   .--------.
+   | Closed |
+   '--+-----'
+      |   ^
+     ++   +-+
+     |      |
+   push   pull
+     |      |
+     +-+  +-+
+       v  |
+     .----+-.
+     | Open |
+     '------'
+
+   Door states
+
+   left Page 2

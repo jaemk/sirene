@@ -1,0 +1,12 @@
+@startuml
+header Area <latex>x^2</latex>
+footer
+Sum <math>sum_(i=1)^n i</math>
+end footer
+caption <latex>\frac{a}{b}</latex> over two\nlines of <latex>\alpha</latex>
+legend left
+* item <latex>\beta</latex>
+* **bold** plain
+end legend
+A -> B : go
+@enduml

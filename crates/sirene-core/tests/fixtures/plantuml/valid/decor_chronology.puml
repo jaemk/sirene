@@ -1,0 +1,11 @@
+@startchronology
+title Release
+header Draft
+footer Page 1
+caption Dates
+legend left
+Events of the release
+end legend
+[Freeze] happens on 2024-01-15
+[Ship] happens on 2024-02-01
+@endchronology

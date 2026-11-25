@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startmindmap\ntitle Plan\nheader Draft\nfooter Page 1\ncaption Roadmap\nlegend right\nBranches are goals\nend legend\n* Plan\n** Build\n** Ship\n@endmindmap\n"
+---
+329.2 x 264.0
+text "Draft" (292.2, 18.0) #333333
+text "Plan" (164.6, 62.0) #333333
+path 2 points (195.2, 106.0)-(235.2, 106.0) stroke
+path 2 points (85.6, 106.0)-(125.6, 106.0) stroke
+path 9 points (125.6, 88.0)-(195.2, 124.0) fill
+text "Plan" (160.4, 106.0) #ffffff
+path 9 points (235.2, 88.0)-(313.2, 124.0) fill
+text "Build" (274.2, 106.0) #ffffff
+path 9 points (16.0, 88.0)-(85.6, 124.0) fill
+text "Ship" (50.8, 106.0) #ffffff
+path 4 points (146.0, 148.0)-(313.2, 184.0) fill stroke
+text "Branches are goals" (229.6, 166.0) #333333
+text "Roadmap" (164.6, 210.0) #333333
+text "Page 1" (164.6, 246.0) #333333

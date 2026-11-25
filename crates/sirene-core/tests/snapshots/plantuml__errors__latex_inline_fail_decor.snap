@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nheader Bad <latex>\\foo</latex>\nfooter ok <latex>x</latex> and <latex>\\bar</latex>\ncaption <latex>\\baz{x}</latex>\nlegend\na <latex>\\qux</latex>\nend legend\nclass A\n@enduml\n"
+---
+2:19: error: Undefined control sequence: \foo
+3:43: error: Unexpected end of input in a macro argument, expected '}'
+4:16: error: Undefined control sequence: \baz
+6:10: error: Undefined control sequence: \qux
+
+     Bad <latex>\foo</latex>
+
+           ┌───┐
+           │ A │
+           └───┘
+
+ ┌───────────────────────┐
+ │ a <latex>\qux</latex> │
+ └───────────────────────┘
+
+   <latex>\baz{x}</latex>
+
+ok x and <latex>\bar</latex>

@@ -1,0 +1,35 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startfiles\ntitle Layout\nheader Draft\nfooter Page 1\ncaption Source tree\nlegend bottom\nFiles of the repository\nend legend\n/sirene/Cargo.toml\n/sirene/crates/sirene-core/src/lib.rs\n@endfiles\n"
+---
+241.2 x 358.8
+text "Draft" (204.2, 18.0) #333333
+path 2 points (36.8, 78.6)-(46.8, 78.6) stroke
+path 2 points (51.8, 107.0)-(61.8, 107.0) stroke
+path 2 points (51.8, 135.4)-(61.8, 135.4) stroke
+path 2 points (66.8, 163.8)-(76.8, 163.8) stroke
+path 2 points (81.8, 192.2)-(91.8, 192.2) stroke
+path 2 points (96.8, 220.6)-(106.8, 220.6) stroke
+path 2 points (96.8, 206.4)-(96.8, 221.1) stroke
+path 2 points (81.8, 178.0)-(81.8, 192.7) stroke
+path 2 points (66.8, 149.6)-(66.8, 164.3) stroke
+path 2 points (51.8, 92.8)-(51.8, 135.9) stroke
+path 2 points (36.8, 64.4)-(36.8, 79.1) stroke
+path 6 points (37.6, 43.8)-(50.0, 52.8) fill
+text "/" (59.6, 50.2) bold #333333
+path 6 points (52.6, 72.2)-(65.0, 81.2) fill
+text "sirene" (98.6, 78.6) bold #333333
+path 5 points (69.6, 98.9)-(78.3, 110.7) stroke
+text "Cargo.toml" (132.8, 107.0) #333333
+path 6 points (67.6, 129.0)-(80.0, 138.0) fill
+text "crates" (113.6, 135.4) bold #333333
+path 6 points (82.6, 157.4)-(95.0, 166.4) fill
+text "sirene-core" (152.6, 163.8) bold #333333
+path 6 points (97.6, 185.8)-(110.0, 194.8) fill
+text "src" (129.2, 192.2) bold #333333
+path 5 points (114.6, 212.5)-(123.3, 224.3) stroke
+text "lib.rs" (158.6, 220.6) #333333
+path 4 points (16.0, 242.8)-(225.2, 278.8) fill stroke
+text "Files of the repository" (120.6, 260.8) #333333
+text "Source tree" (120.6, 304.8) #333333
+text "Page 1" (120.6, 340.8) #333333

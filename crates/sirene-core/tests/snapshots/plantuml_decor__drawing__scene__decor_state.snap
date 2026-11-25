@@ -1,0 +1,25 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startuml\nheader Draft\nfooter left Page 2\ncaption Door states\nlegend top\nClosed or open\nend legend\n[*] --> Closed\nClosed --> Open : push\nOpen --> Closed : pull\n@enduml\n"
+---
+165.6 x 387.0
+text "Draft" (128.6, 18.0) #333333
+path 4 points (16.0, 44.0)-(149.6, 80.0) fill stroke
+text "Closed or open" (82.8, 62.0) #333333
+path 3 points (77.8, 150.0)-(86.8, 159.0) fill
+path 2 points (82.3, 118.0)-(82.3, 151.0) stroke
+path 3 points (67.8, 254.0)-(76.8, 263.0) fill
+path 8 points (46.3, 195.0)-(72.3, 255.0) stroke
+path 3 points (91.8, 195.0)-(100.8, 204.0) fill
+path 8 points (92.3, 203.0)-(119.3, 263.0) stroke
+path 3 points (75.3, 111.0)-(89.3, 111.0) fill
+path 9 points (44.3, 159.0)-(119.3, 195.0) fill stroke
+text "Closed" (81.8, 177.0) #333333
+path 9 points (53.3, 263.0)-(111.3, 299.0) fill stroke
+text "Open" (82.3, 281.0) #333333
+path 4 points (25.3, 217.0)-(67.3, 241.0) fill
+text "push" (46.3, 229.0) #333333
+path 4 points (98.3, 217.0)-(140.3, 241.0) fill
+text "pull" (119.3, 229.0) #333333
+text "Door states" (82.8, 333.0) #333333
+text "left Page 2" (82.8, 369.0) #333333

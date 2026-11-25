@@ -1,0 +1,11 @@
+@startuml
+header Draft
+footer left Page 2
+caption Door states
+legend top
+Closed or open
+end legend
+[*] --> Closed
+Closed --> Open : push
+Open --> Closed : pull
+@enduml

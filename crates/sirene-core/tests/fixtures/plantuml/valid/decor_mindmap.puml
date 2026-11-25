@@ -1,0 +1,12 @@
+@startmindmap
+title Plan
+header Draft
+footer Page 1
+caption Roadmap
+legend right
+Branches are goals
+end legend
+* Plan
+** Build
+** Ship
+@endmindmap
