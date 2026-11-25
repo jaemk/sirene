@@ -38,6 +38,8 @@ AppImage integration tools. Each file opens in a window (CLI-1).
 `sirene.xml` is a shared-mime-info package declaring, each a subclass of `text/plain`, the file
 types of MACOSP-3 with the same descriptions and extensions (`xtask::DOCUMENT_TYPES`):
 `text/x-mermaid`, `text/vnd.graphviz`, and `text/x-plantuml` (`xtask::linux::MIME_TYPES`).
+The Visio type, `application/vnd.ms-visio.drawing` with glob `*.vsdx`, is a subclass of
+`application/zip` instead (VISIO-12).
 
 ## LINUXP-4 RPM
 

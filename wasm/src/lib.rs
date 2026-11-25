@@ -14,7 +14,7 @@
 //!
 //! A panic traps; the caller drops the instance and starts a new one.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use sirene_core::diagnostic::{LineIndex, Severity};
 use sirene_core::diagram::{self, Lang, Lowered};
@@ -45,6 +45,26 @@ thread_local! {
     static INPUT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     static OUTPUT: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     static DIAGNOSTICS: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+    /// The page `render` draws of a Visio drawing, from 0 (`set_page`).
+    static PAGE: Cell<u32> = const { Cell::new(0) };
+    /// The pages the last `render`ed source has (`page_count`).
+    static PAGES: Cell<u32> = const { Cell::new(0) };
+}
+
+/// Chooses the page `render` draws of a Visio drawing, from 0, until changed. Other languages
+/// have one page (VISIO-11).
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn set_page(page: u32) {
+    PAGE.set(page);
+}
+
+/// The pages of the source the last `render` read: the drawing's pages for a Visio package, else 1
+/// (0 before any render).
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn page_count() -> u32 {
+    PAGES.get()
 }
 
 /// Makes room for `len` bytes of source, zeroed, and returns where they start.
@@ -63,7 +83,9 @@ pub extern "C" fn input(len: usize) -> *mut u8 {
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "C" fn render(format: u32, lang: u32, theme: u32) -> u32 {
-    let (result, diagnostics) = INPUT.with_borrow(|src| draw(src, format, lang, theme));
+    let (result, diagnostics, pages) =
+        INPUT.with_borrow(|src| draw_page(src, format, lang, theme, PAGE.get() as usize));
+    PAGES.set(pages as u32);
     DIAGNOSTICS.set(diagnostics.into_bytes());
     match result {
         Ok(bytes) => {
@@ -103,10 +125,24 @@ pub extern "C" fn diagnostics_len() -> usize {
 
 /// Reads and draws `src`: the drawing or an error message, and the diagnostics as JSON.
 pub fn draw(bytes: &[u8], format: u32, lang: u32, theme: u32) -> (Result<Vec<u8>, String>, String) {
+    let (drawn, diagnostics, _) = draw_page(bytes, format, lang, theme, 0);
+    (drawn, diagnostics)
+}
+
+/// [`draw`] showing page `page` (from 0) of a Visio drawing, and the number of pages the source
+/// has (0 when it could not be read at all).
+pub fn draw_page(
+    bytes: &[u8],
+    format: u32,
+    lang: u32,
+    theme: u32,
+    page: usize,
+) -> (Result<Vec<u8>, String>, String, usize) {
+    let none = |e: String| (Err(e), "[]".to_owned(), 0);
     let package = lang == LANG_VISIO || (lang == LANG_DETECT && bytes.starts_with(b"PK\x03\x04"));
     let text = std::str::from_utf8(bytes);
     if !package && text.is_err() {
-        return (Err("the source is not UTF-8".to_owned()), "[]".to_owned());
+        return none("the source is not UTF-8".to_owned());
     }
     let src = if package { "" } else { text.unwrap_or("") };
     let lang = match lang {
@@ -115,17 +151,12 @@ pub fn draw(bytes: &[u8], format: u32, lang: u32, theme: u32) -> (Result<Vec<u8>
         LANG_DOT => Some(Lang::Dot),
         LANG_PLANTUML => Some(Lang::PlantUml),
         LANG_LATEX => Some(Lang::Latex),
-        _ => {
-            return (
-                Err(format!("unknown language code {lang}")),
-                "[]".to_owned(),
-            );
-        }
+        _ => return none(format!("unknown language code {lang}")),
     };
     let theme = match theme {
         THEME_LIGHT => Theme::LIGHT,
         THEME_DARK => Theme::DARK,
-        _ => return (Err(format!("unknown theme code {theme}")), "[]".to_owned()),
+        _ => return none(format!("unknown theme code {theme}")),
     };
     let lowered = if package {
         diagram::lower_bytes(bytes, Some(Lang::Visio))
@@ -133,14 +164,25 @@ pub fn draw(bytes: &[u8], format: u32, lang: u32, theme: u32) -> (Result<Vec<u8>
         diagram::lower_as(src, lang)
     };
     let diagnostics = diagnostics_json(src, &lowered);
+    let pages = lowered.page_count();
+    let Some(lowered) = lowered.with_page(page) else {
+        let message = format!("page {page} is out of range; the drawing has {pages} pages");
+        return (Err(message), diagnostics, pages);
+    };
     let drawn = match format {
         FORMAT_SVG => lowered.svg(&theme).map(String::into_bytes),
         FORMAT_ASCII => lowered.ascii(&Default::default()).map(String::into_bytes),
         #[cfg(feature = "png")]
         FORMAT_PNG => lowered.png(&theme, sirene_core::scene::png::Quality::Draft, None),
-        _ => return (Err(format!("unknown format code {format}")), diagnostics),
+        _ => {
+            return (
+                Err(format!("unknown format code {format}")),
+                diagnostics,
+                pages,
+            );
+        }
     };
-    (drawn.map_err(|e| e.report()), diagnostics)
+    (drawn.map_err(|e| e.report()), diagnostics, pages)
 }
 
 fn diagnostics_json(src: &str, lowered: &Lowered) -> String {
@@ -238,6 +280,35 @@ mod tests {
             diagnostics.contains(r#""severity":"error""#),
             "{diagnostics}"
         );
+    }
+
+    #[test]
+    fn chooses_a_page_of_a_visio_package() {
+        let sh = shape(
+            1,
+            "",
+            &format!("{}{}", xform(1.0, 1.0, 2.0, 1.0), rect_geometry(2.0, 1.0)),
+        );
+        let pkg = Builder::new()
+            .page(6.0, 4.0, &sh)
+            .page(3.0, 2.0, &sh)
+            .build();
+        let (svg, _, pages) = draw_page(&pkg, FORMAT_SVG, LANG_VISIO, THEME_LIGHT, 1);
+        assert!(text(svg).contains("width=\"288\""));
+        assert_eq!(pages, 2);
+        let (err, _, pages) = draw_page(&pkg, FORMAT_SVG, LANG_VISIO, THEME_LIGHT, 2);
+        assert!(err.unwrap_err().contains("out of range"));
+        assert_eq!(pages, 2);
+        // Through the exports: the page and its count.
+        INPUT.with_borrow_mut(|i| *i = pkg.clone());
+        set_page(1);
+        assert_eq!(render(FORMAT_SVG, LANG_VISIO, THEME_LIGHT), 0);
+        assert_eq!(page_count(), 2);
+        set_page(0);
+        // Text sources have one page.
+        INPUT.with_borrow_mut(|i| *i = b"flowchart LR\nA-->B\n".to_vec());
+        assert_eq!(render(FORMAT_SVG, LANG_DETECT, THEME_LIGHT), 0);
+        assert_eq!(page_count(), 1);
     }
 
     #[test]

@@ -40,6 +40,18 @@ for (const [name, lang, src] of sources) {
   check(name, "png", sig === "\x89PNG", png.error);
 }
 
+// A Visio package (the fuzz seed, two pages) is drawn from bytes, by `lang` or by its magic, and
+// `page` picks one of its pages.
+const vsdx = readFileSync("fuzz/corpus/visio/two-pages-deflated");
+for (const options of [{ lang: "visio" }, {}]) {
+  const first = sirene.render(vsdx, { format: "svg", ...options });
+  check("vsdx", "svg", first.ok && first.output.startsWith("<svg") && first.pages === 2, first.error);
+  const second = sirene.render(vsdx, { format: "svg", page: 1, ...options });
+  check("vsdx", "page 2", second.ok && second.output !== first.output, second.error);
+}
+check("vsdx", "page range", !sirene.render(vsdx, { format: "svg", page: 5 }).ok, "drew page 5");
+check("vsdx", "ascii", !sirene.render(vsdx, { format: "ascii" }).ok, "drew text");
+
 // Diagnostics carry their 1-based line and column.
 const bad = sirene.render("flowchart LR\n  a --> \n", { format: "svg" });
 check("bad", "diagnostics", bad.diagnostics[0]?.line === 2, JSON.stringify(bad.diagnostics));

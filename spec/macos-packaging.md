@@ -39,8 +39,12 @@ LANGS-1 that the app draws:
 | `io.github.jaemk.sirene.mermaid` | Mermaid diagram | `mmd`, `mermaid` |
 | `io.github.jaemk.sirene.dot` | Graphviz DOT graph | `dot`, `gv` |
 | `io.github.jaemk.sirene.plantuml` | PlantUML diagram | `puml`, `plantuml`, `pu`, `iuml` |
+| `io.github.jaemk.sirene.visio` | Visio drawing | `vsdx` |
 
-`CFBundleDocumentTypes` lists each with role `Editor` and handler rank `Default`, and Markdown
+The Visio type conforms to `public.zip-archive` instead, since a `.vsdx` is a package (VISIO-12).
+`CFBundleDocumentTypes` lists the Visio type with role `Viewer` and rank `Alternate` (the app
+only draws it, and Visio keeps its files), and each other with role `Editor` and handler rank
+`Default`, and Markdown
 (`net.daringfireball.markdown`, WYSIWY-20) with rank `Alternate`, so Finder offers the app for
 those files and opens them through GUISHE-1. `xtask::DOCUMENT_TYPES` holds the table.
 

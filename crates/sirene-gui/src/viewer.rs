@@ -324,7 +324,12 @@ impl Viewer {
                 .items_center()
                 .gap_1()
                 .child(step("previous-diagram", "<", true))
-                .child(format!("Diagram {n} of {count} (line {line})"))
+                .child(if line == 0 {
+                    // A Visio drawing's pages have no line.
+                    format!("Page {n} of {count}")
+                } else {
+                    format!("Diagram {n} of {count} (line {line})")
+                })
                 .child(step("next-diagram", ">", false)),
         )
     }

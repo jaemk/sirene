@@ -7150,6 +7150,7 @@ dependencies = [
  "futures",
  "gpui-kit",
  "log",
+ "miniz_oxide 0.9.1",
  "sirene-core",
  "tempfile",
 ]

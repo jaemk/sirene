@@ -85,7 +85,8 @@ for (const d of r.diagnostics) {
 | Option | Values |
 | --- | --- |
 | `format` | `svg` (default), `ascii` |
-| `lang` | `detect` (default, from the source's header), `mermaid`, `plantuml` or `puml`, `dot` or `graphviz`, `latex` or `tex` (one formula) |
+| `lang` | `detect` (default, from the source's header), `mermaid`, `plantuml` or `puml`, `dot` or `graphviz`, `latex` or `tex` (one formula), `visio` or `vsdx` (a `.vsdx` package, given as a `Uint8Array`; also detected by its `PK` magic) |
+| `page` | For a Visio drawing, the page to draw, from 0 (default 0); `r.pages` is the page count |
 | `theme` | `dark` (default), `light`; a diagram's own `theme` setting applies over it |
 
 `render` is synchronous. A source that crashes the module returns `ok: false` and the next call

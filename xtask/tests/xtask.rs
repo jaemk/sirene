@@ -131,8 +131,13 @@ fn info_plist() {
         .iter()
         .map(|doc| {
             let doc = doc.as_dictionary().unwrap();
-            assert_eq!(doc["CFBundleTypeRole"].as_string(), Some("Editor"));
             let types = doc["LSItemContentTypes"].as_array().unwrap();
+            let role = if types[0].as_string() == Some("io.github.jaemk.sirene.visio") {
+                "Viewer"
+            } else {
+                "Editor"
+            };
+            assert_eq!(doc["CFBundleTypeRole"].as_string(), Some(role));
             assert_eq!(types.len(), 1);
             (
                 types[0].as_string().unwrap().to_owned(),
@@ -152,6 +157,7 @@ fn info_plist() {
             ("io.github.jaemk.sirene.mermaid", "Default"),
             ("io.github.jaemk.sirene.dot", "Default"),
             ("io.github.jaemk.sirene.plantuml", "Default"),
+            ("io.github.jaemk.sirene.visio", "Alternate"),
             ("net.daringfireball.markdown", "Alternate"),
         ])
     );
@@ -161,10 +167,13 @@ fn info_plist() {
         .iter()
         .map(|uti| {
             let uti = uti.as_dictionary().unwrap();
-            assert_eq!(
-                uti["UTTypeConformsTo"],
-                Value::Array(vec!["public.plain-text".into()])
-            );
+            let conforms =
+                if uti["UTTypeIdentifier"].as_string() == Some("io.github.jaemk.sirene.visio") {
+                    "public.zip-archive"
+                } else {
+                    "public.plain-text"
+                };
+            assert_eq!(uti["UTTypeConformsTo"], Value::Array(vec![conforms.into()]));
             let tags = uti["UTTypeTagSpecification"].as_dictionary().unwrap();
             (
                 uti["UTTypeIdentifier"].as_string().unwrap().to_owned(),
@@ -191,6 +200,11 @@ fn info_plist() {
                 "io.github.jaemk.sirene.plantuml".to_owned(),
                 "PlantUML diagram".to_owned(),
                 exts(&["puml", "plantuml", "pu", "iuml"]),
+            ),
+            (
+                "io.github.jaemk.sirene.visio".to_owned(),
+                "Visio drawing".to_owned(),
+                exts(&["vsdx"]),
             ),
         ]
     );

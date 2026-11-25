@@ -5,11 +5,11 @@
 //
 //   var sirene = await SireneWasm.load(fetch("sirene.wasm"));
 //   var r = sirene.render(source, { format: "svg", lang: "mermaid", theme: "dark" });
-//   // r.ok, r.output (a string, or a Uint8Array for "png"), r.error, r.diagnostics
+//   // r.ok, r.output (a string, or a Uint8Array for "png"), r.error, r.diagnostics, r.pages
 //   sirene.renderAll(); // replaces each diagram block on the page with its drawing
 (function (root) {
   var FORMATS = { svg: 0, ascii: 1, png: 2 };
-  var LANGS = { detect: 0, mermaid: 1, dot: 2, graphviz: 2, plantuml: 3, puml: 3, latex: 4, tex: 4 };
+  var LANGS = { detect: 0, mermaid: 1, dot: 2, graphviz: 2, plantuml: 3, puml: 3, latex: 4, tex: 4, visio: 5, vsdx: 5 };
   var THEMES = { light: 0, dark: 1 };
 
   function code(table, name, what) {
@@ -34,13 +34,18 @@
     var format = code(FORMATS, options.format || "svg", "format");
     var lang = code(LANGS, options.lang || "detect", "language");
     var theme = code(THEMES, options.theme || "dark", "theme");
-    var bytes = new TextEncoder().encode(source);
+    // A Visio .vsdx is binary: pass its bytes (a Uint8Array) with lang "visio", or let the
+    // "PK" magic detect it. `page` (from 0) picks one of its pages; `pages` is the count.
+    var bytes = typeof source === "string" ? new TextEncoder().encode(source) : new Uint8Array(source);
     var x = this.exports();
     var status;
+    var pages;
     try {
       var at = x.input(bytes.length);
       new Uint8Array(x.memory.buffer, at, bytes.length).set(bytes);
+      x.set_page(options.page || 0);
       status = x.render(format, lang, theme);
+      pages = x.page_count();
     } catch (e) {
       // A panic traps and may leave the instance's state half-written: start a new one.
       this.instance = null;
@@ -57,6 +62,7 @@
       output: status === 0 ? (text === null ? out : text) : null,
       error: status === 0 ? null : text,
       diagnostics: diagnostics,
+      pages: pages,
     };
   };
 

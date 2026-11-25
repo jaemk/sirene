@@ -19,8 +19,11 @@ const { readFileSync } = require("node:fs");
 const SireneWasm = require("@jaemk/sirene");
 const sirene = await SireneWasm.load(readFileSync(require.resolve("@jaemk/sirene/sirene.wasm")));
 const r = sirene.render("flowchart LR\n  a --> b\n", { format: "svg", theme: "light" });
-// r.ok, r.output, r.error, r.diagnostics
+// r.ok, r.output, r.error, r.diagnostics, r.pages
 ```
+
+A Visio `.vsdx` is drawn from its bytes: `sirene.render(bytes, { lang: "visio", page: 0 })`,
+where `bytes` is a `Uint8Array` and `page` (from 0, default 0) picks a page of `r.pages`.
 
 See [Web pages](https://jaemk.github.io/sirene/guide/embedding.html) for every option and
 [`examples/web/index.html`](https://github.com/jaemk/sirene/blob/main/examples/web/index.html)

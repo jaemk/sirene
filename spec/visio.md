@@ -259,10 +259,20 @@ picks one.
   a Visio drawing has no text form` and exit 1 (free-form drawings have no text layout).
   `--page N` is an option of `svg` and `png`. Directory scans pick up `.vsdx` files.
 - wasm: `render` reads its input as a package when `lang` is `LANG_VISIO` (5), or `LANG_DETECT`
-  and the bytes start with `PK\x03\x04`; it draws the first page, and the diagnostics have line
-  and column 1. The GUI's edit-support table marks `Kind::Visio` read-only; opening a `.vsdx` in
-  the GUI and packaging (the `application/vnd.ms-visio.drawing` MIME type and `.vsdx` glob) are
-  not done (VISIO-T6).
+  and the bytes start with `PK\x03\x04`. The diagnostics have line and column 1. `set_page(n)`
+  (from 0, kept until changed) picks the page and `page_count()` returns the pages of the last
+  `render`; a page past the last is an error. `sirene-wasm.js` takes a `Uint8Array` source, `lang:
+  "visio"`, and `page`, and returns `pages`.
+- GUI: a `.vsdx` opens as bytes and is drawn read-only (`Document::read_only`); its pages are
+  shown with the Markdown block switcher as `Page N of M`, and exports name them `STEM-N`. It is
+  never edited or saved, `Save` and `Save As` fail with `a Visio drawing is read-only`, and a
+  changed file is reloaded on page 1. Problems from the page-1 read are listed; page changes do
+  not recompute them.
+- Packaging: macOS declares `io.github.jaemk.sirene.visio` (`vsdx`, conforming to
+  `public.zip-archive`, role `Viewer`, rank `Alternate`); Linux declares
+  `application/vnd.ms-visio.drawing` (`*.vsdx`, a subclass of `application/zip`) in the MIME
+  package and the desktop entry. There is no Windows packaging to change. Tests: `xtask` and
+  `crates/sirene-gui/src/document.rs` (`a_vsdx_opens_read_only_with_pages`).
 - The fuzz target `visio` feeds arbitrary bytes to `lower_bytes` and draws the result.
 
 ## VISIO-13 Limits and failure
@@ -330,8 +340,9 @@ real Visio files.
 | Inheritance (master, style sheets) | done |
 | Connectors, layers, backgrounds, Foreign placeholders | done |
 | `Lang`/`Kind`/`Diagram`, `lower_bytes`, CLI (`svg`, `png`, `check`, `ascii` refusal, `--page`) | done |
-| wasm bytes entry (`LANG_VISIO`, first page) | done |
-| GUI open, packaging MIME types and file association | pending |
+| wasm bytes entry (`LANG_VISIO`, `set_page`, `page_count`) | done |
+| GUI open (read-only, page switcher) | done |
+| Packaging MIME types and file association (macOS, Linux) | done |
 | Fuzz target | done |
 
 ## VISIO-T Tasks
@@ -342,5 +353,8 @@ real Visio files.
 - [ ] VISIO-T3 Rotate text with the shape (needs a rotation field on the text item).
 - [ ] VISIO-T4 Draw embedded images (needs an image item in the display list).
 - [ ] VISIO-T5 Fill patterns, gradients, and multi-dash line patterns.
-- [ ] VISIO-T6 Open `.vsdx` in the GUI (read-only, bytes), register the MIME type and file
-  association in the Linux, macOS, and Windows packaging, and pin them in `xtask` tests.
+- [x] VISIO-T6 Open `.vsdx` in the GUI, register the MIME type and file association, and pin
+  them in `xtask` tests.
+- [ ] VISIO-T7 Recompute a page's own problems when the GUI changes page, and check the GUI's
+  page switcher and file association by hand on each platform (only the document model and the
+  packaging tables are tested).

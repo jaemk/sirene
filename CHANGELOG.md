@@ -16,7 +16,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Visio `.vsdx` drawings: `sirene svg` and `sirene png` draw a package's pages (`--page N`, or
   `STEM-N` files with `--output`), `--lang visio`, `Lang::Visio`, `Kind::Visio`,
   `diagram::lower_bytes`, and a `visio` fuzz target. `sirene ascii` refuses them. The `render`
-  export of `sirene-wasm` reads a package as bytes (`LANG_VISIO`, or the `PK` magic).
+  export of `sirene-wasm` reads a package as bytes (`LANG_VISIO`, or the `PK` magic), with
+  `set_page` and `page_count`, and `sirene-wasm.js` takes a `Uint8Array`, `lang: "visio"`, and
+  `page`. The GUI opens a `.vsdx` read-only with a page switcher, and the macOS bundle and Linux
+  MIME package and desktop entry register `.vsdx`.
 - `--charset unicode-math` and `Charset::UnicodeMath`: formulas in the text renderer with the
   full math glyph set (radical, overline, minus, script forms, sum, integral, bracket pieces).
 - `.tex` and `.latex` files, and `--lang latex` (also `tex`), read one formula: bare, wrapped in
