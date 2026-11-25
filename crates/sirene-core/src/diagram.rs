@@ -7,6 +7,7 @@ use crate::ascii::{self, Options};
 use crate::block::{self, Block};
 use crate::c4::{self, C4};
 use crate::cynefin::{self, Cynefin};
+use crate::decor::Decorated;
 use crate::diagnostic::{Diagnostic, Severity};
 use crate::equation::Equation;
 use crate::eventmodel::{self, EventModel};
@@ -343,6 +344,8 @@ pub enum Diagram {
     /// One formula: a PlantUML `@startlatex` document (PCREO-3), a TeX file, or a Markdown
     /// formula (LEMB-3).
     Equation(Equation),
+    /// A PlantUML diagram with a `header`, `footer`, `caption`, or `legend` (PCOM-1).
+    Decorated(Box<Decorated>),
 }
 
 impl Default for Diagram {
@@ -356,6 +359,7 @@ impl Diagram {
     pub fn graph(&self) -> Option<&Flowchart> {
         match self {
             Diagram::Graph(f) => Some(f),
+            Diagram::Decorated(d) => d.diagram.graph(),
             _ => None,
         }
     }
@@ -364,6 +368,7 @@ impl Diagram {
     pub fn into_graph(self) -> Flowchart {
         match self {
             Diagram::Graph(f) => f,
+            Diagram::Decorated(d) => d.diagram.into_graph(),
             _ => Flowchart::default(),
         }
     }
@@ -400,6 +405,7 @@ impl Diagram {
             Diagram::EventModel(c) => scene::eventmodel(c, metrics, theme),
             Diagram::Timing(t) => scene::timing(t, metrics, theme),
             Diagram::Equation(e) => scene::equation(e, metrics, theme),
+            Diagram::Decorated(d) => return scene::decorated(d, metrics, theme),
         })
     }
 
@@ -435,6 +441,7 @@ impl Diagram {
             Diagram::EventModel(c) => ascii::eventmodel(c, options),
             Diagram::Timing(t) => ascii::timing(t, options),
             Diagram::Equation(e) => ascii::equation(e, options),
+            Diagram::Decorated(d) => return ascii::decorated(d, options),
         })
     }
 }

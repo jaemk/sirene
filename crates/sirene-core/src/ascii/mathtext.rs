@@ -108,6 +108,22 @@ pub(super) fn text_rows(lines: &[String], _: Delim, _: Charset) -> Vec<String> {
     lines.to_vec()
 }
 
+/// `lines` of runs as rows, each line as many rows as its tallest formula, the formulas set once
+/// each. Without the `math` feature a line is its text.
+#[cfg(feature = "math")]
+pub(super) fn run_rows(lines: &[Vec<Span>], charset: Charset) -> Vec<String> {
+    let cache = Rows::new(charset);
+    lines.iter().flat_map(|l| line_rows(&cache, l)).collect()
+}
+
+#[cfg(not(feature = "math"))]
+pub(super) fn run_rows(lines: &[Vec<crate::flowchart::Span>], _: Charset) -> Vec<String> {
+    lines
+        .iter()
+        .map(|l| l.iter().map(|s| s.text.as_str()).collect())
+        .collect()
+}
+
 /// The rows of a compartment of a PlantUML node (LANGS-3) when a cell holds a formula, else
 /// `None` (the compartment is its text rows). Each row of the compartment is as many lines as its
 /// tallest formula; its cells are padded into columns by their widths, on a common baseline.
