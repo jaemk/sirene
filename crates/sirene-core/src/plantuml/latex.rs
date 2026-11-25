@@ -16,7 +16,11 @@ pub(crate) fn lower(root: &SyntaxNode, flavor: Flavor) -> (Equation, Vec<Diagnos
         .map(|l| l.text.as_str())
         .collect::<Vec<_>>()
         .join(" ");
-    let equation = Equation { source, flavor };
+    let equation = Equation {
+        source,
+        flavor,
+        inline: false,
+    };
     let mut d = Vec::new();
     if let (Some(first), Some(last)) = (body.first(), body.last()) {
         diagnose(&body, &equation, first.range.cover(last.range), &mut d);

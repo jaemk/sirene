@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "\\documentclass{article}\n\\begin{document}\nSome text and a formula $x$.\n\\end{document}\n"
+---
+"\\documentclass{article} \\begin{document} Some text and a formula $x$. \\end{document}"
+[
+    Diagnostic {
+        range: 0..23,
+        message: "full LaTeX documents are not supported; give one formula",
+        severity: Error,
+    },
+]

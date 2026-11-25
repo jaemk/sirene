@@ -1,5 +1,13 @@
 //! The model of a document that is one formula: PlantUML `@startlatex` and `@startmath`
-//! (PCREO-3).
+//! (PCREO-3), a TeX file, and a formula in Markdown (LEMB-3).
+
+use crate::diagnostic::Diagnostic;
+
+mod tex;
+
+/// Whether this build typesets formulas (the `math` feature); without it a formula is drawn as
+/// its source with one warning.
+pub const MATH: bool = cfg!(feature = "math");
 
 /// The language an equation is written in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -18,6 +26,24 @@ pub struct Equation {
     pub source: String,
     /// The language `source` is in.
     pub flavor: Flavor,
+    /// Set in text style (a Markdown `$...$` formula) rather than display style.
+    pub inline: bool,
+}
+
+impl Equation {
+    /// The formula of a TeX document (LEMB-3): a bare formula, one wrapped in `$$`, `$`, `\[`,
+    /// `\(`, or a `displaymath` or `math` environment, or the one math block of a
+    /// `\begin{document}`. `source` is the formula without its wrapper. The diagnostics' ranges
+    /// are in `src`, and a full document is refused with one error on its first line.
+    pub fn tex(src: &str) -> (Equation, Vec<Diagnostic>) {
+        tex::lower(src)
+    }
+
+    /// A formula `src` as written, in text style when `inline`. The diagnostics' ranges are in
+    /// `src`.
+    pub fn formula(src: &str, inline: bool) -> (Equation, Vec<Diagnostic>) {
+        tex::bare(src, inline)
+    }
 }
 
 /// The one place a formula is read in its language: every consumer (labels, equations, ascii)
@@ -69,19 +95,25 @@ impl Flavor {
 
 #[cfg(feature = "math")]
 impl Equation {
-    /// The formula typeset in display style.
-    pub(crate) fn typeset(&self) -> Result<crate::math::Formula, crate::math::MathError> {
-        self.flavor
-            .typeset(&self.source, crate::math::MathStyle::Display)
+    fn style(&self) -> crate::math::MathStyle {
+        if self.inline {
+            crate::math::MathStyle::Text
+        } else {
+            crate::math::MathStyle::Display
+        }
     }
 
-    /// The formula as text, in display style, drawn with `charset`.
+    /// The formula typeset in its style.
+    pub(crate) fn typeset(&self) -> Result<crate::math::Formula, crate::math::MathError> {
+        self.flavor.typeset(&self.source, self.style())
+    }
+
+    /// The formula as text, in its style, drawn with `charset`.
     pub(crate) fn ascii(
         &self,
         charset: crate::ascii::Charset,
     ) -> Result<String, crate::math::MathError> {
-        self.flavor
-            .ascii(&self.source, crate::math::MathStyle::Display, charset)
+        self.flavor.ascii(&self.source, self.style(), charset)
     }
 }
 

@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "\\begin{align}\n  a &= b + c \\\\\n  d &= e\n\\end{align}\n"
+---
+"\\begin{align}\n  a &= b + c \\\\\n  d &= e\n\\end{align}"
+Tex
+[]

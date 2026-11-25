@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "% the Gaussian integral\n$$ \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx % the integrand\n   = \\sqrt{\\pi} $$ % done\n"
+---
+" \\int_{-\\infty}^{\\infty} e^{-x^2} \\, dx % the integrand\n   = \\sqrt{\\pi} "
+Tex
+[]

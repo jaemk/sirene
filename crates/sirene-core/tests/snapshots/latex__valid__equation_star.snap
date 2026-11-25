@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "\\begin{equation*}\n  E = mc^2\n\\end{equation*}\n"
+---
+"\\begin{equation*}\n  E = mc^2\n\\end{equation*}"
+Tex
+[]

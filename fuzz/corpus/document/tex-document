@@ -1,0 +1,8 @@
+\documentclass{article}
+\usepackage{amsmath}
+\begin{document}
+% one formula only
+\[
+  \frac{1}{2} + \frac{1}{3}
+\]
+\end{document}

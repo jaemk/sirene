@@ -1,4 +1,5 @@
-//! A `@startlatex` or `@startmath` document to scene (PCREO-3): the formula as paths, or its
+//! A `@startlatex` or `@startmath` document, TeX file, or Markdown formula to scene (PCREO-3,
+//! LEMB-3): the formula as paths, or its
 //! source as text when it does not typeset or math support is off.
 
 use super::{Element, Owner, Primitive, Pt, Scene, TextMetrics, TextStyle, Theme};
@@ -6,7 +7,7 @@ use crate::equation::Equation;
 
 const MARGIN: f32 = 16.0;
 
-/// Draws `equation` in display style, one em being the theme's font size.
+/// Draws `equation` in its style, one em being the theme's font size.
 pub fn equation(equation: &Equation, metrics: &impl TextMetrics, theme: &Theme) -> Scene {
     if let Some(scene) = formula(equation, theme) {
         return scene;
@@ -107,6 +108,7 @@ mod tests {
         let e = Equation {
             source: source.to_owned(),
             flavor,
+            inline: false,
         };
         equation(&e, &Approx, &Theme::LIGHT)
     }

@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "$$\\sum_{i=1}^n i = \\frac{n(n+1)}{2}$$\n"
+---
+"\\sum_{i=1}^n i = \\frac{n(n+1)}{2}"
+Tex
+[]

@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "$e^{i\\pi} + 1 = 0$\n"
+---
+"e^{i\\pi} + 1 = 0"
+Tex
+[]
