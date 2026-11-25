@@ -80,8 +80,28 @@ and how PlantUML aligns an inline formula with the text baseline.
 
 ## LEMB-3 Markdown
 
-Open (LEMB-T3). Whether MARKDO renders `$...$` and `$$...$$` outside diagram fences. Not
-decided; a Markdown file's prose is not drawn by sirene today.
+Decided (LEMB-T3). A Markdown file's formulas are blocks beside its diagram blocks (MARKDO-5),
+numbered and drawn like them; sirene draws no prose. They are:
+
+- fenced blocks named `math`, `latex`, or `tex`, read as a TeX file (below), in display style;
+- `$$...$$`, in display style, not across a blank line;
+- inline `$...$` by GitHub's rules, in text style: the opening `$` is not followed by whitespace,
+  the closing one is not preceded by whitespace or followed by a digit, the body is not empty,
+  `\$` is a literal dollar sign, and the formula stays on one line.
+
+Nothing is read in a fenced block of any other language (so not in a diagram), an indented code
+block, or a code span. A diagnostic lands on the offending command in the Markdown file. Without
+the `math` feature a formula is skipped with one warning per file.
+
+A TeX file (`.tex`, `.latex`, `--lang latex` or `tex`) is one formula, `Equation::tex`: a bare
+formula, or one wrapped in `$$...$$`, `$...$`, `\[...\]`, `\(...\)`, or a `displaymath` or `math`
+environment (taken off); an `equation`, `align`, `gather`, or other math environment is passed to
+the typesetter whole. `%` comments around the wrapper are skipped. A source with `\documentclass`
+or `\begin{document}` is read only when the text between `\begin{document}` and
+`\end{document}` is one such block; otherwise it gets one error on its first line, `full LaTeX
+documents are not supported; give one formula`, and is drawn as its source. It lowers to
+`Equation` with `Flavor::Tex`, so every output path and LEMB-4 apply. Directory scans do not pick
+up `.tex` files. Tests: `crates/sirene-core/tests/latex.rs` and `markdown_math.rs`.
 
 ## LEMB-4 One interface
 
@@ -134,7 +154,7 @@ as the fallback (`flowchart::formula::errors` is shared with the flowchart lower
   against its source and a live render, and extend LEMB-1.
 - [ ] LEMB-T7 Read Mermaid's source for the `$$` rules listed at the end of LEMB-1.
 - [ ] LEMB-T8 Read PlantUML's source or run it for the escape and alignment rules in LEMB-2.
-- [ ] LEMB-T3 Decide LEMB-3 with the Markdown spec.
+- [x] LEMB-T3 Decide LEMB-3 with the Markdown spec.
 - [x] LEMB-T4 Define `Formula` and the inline-label item in the display list. A formula is drawn
   as `Primitive::Path` items (with an optional clip), placed on a baseline shared with the text
   runs of its line (`scene/mathtext.rs`, `ascii/mathtext.rs`); no new display-list item.

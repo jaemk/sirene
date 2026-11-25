@@ -18,7 +18,7 @@ fn main() -> sirene_core::Result<()> {
     let path = Path::new("login.mmd");
     // UTF-8 of at most 64 MiB, with errors naming the file.
     let src = &sirene_core::source::read(path)?;
-    // The extension picks DOT (`.dot`, `.gv`) or PlantUML (`.puml`, ...); otherwise the
+    // The extension picks DOT (`.dot`, `.gv`) or PlantUML (`.puml`, ...), or `.tex` one formula; otherwise the
     // source's header picks the diagram type.
     let lowered = diagram::lower_as(src, Lang::of_path(path));
     for d in &lowered.diagnostics {

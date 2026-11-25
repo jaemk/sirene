@@ -1,0 +1,26 @@
+---
+source: crates/sirene-core/tests/markdown_math.rs
+expression: "# Notes\n\nInline $x^2$ and a price of $5 and $6 here, and \\$7 stays. Code `$y$` too.\n\n$$\n\\int_0^1 x\\,dx\n$$\n\n```mermaid\nflowchart LR\n  A[\"$$x^2$$\"] --> B\n```\n\n```math\n\\frac{a}{b}\n```\n\n- item with $a+b$\n  and display $$c$$ inline\n\n> quote with $q$\n>\n> $$\n> r^2\n> $$\n\n```rust\nlet s = \"$not math$\";\n```\n\n    $indented$\n\n```latex\n$$ \\sqrt{2} $$\n```\n\n```dot\ndigraph { a -> b }\n```\n\nFinal $$ z $$ here.\n"
+---
+1: Inline line 3 source "x^2"
+   range 16..21 "$x^2$"
+2: Display line 5 source "\n\\int_0^1 x\\,dx\n"
+   range 85..105 "$$\n\\int_0^1 x\\,dx\n$$"
+3: diagram Mermaid line 10
+   range 107..156 "```mermaid\nflowchart LR\n  A[\"$$x^2$$\"] --> B\n```\n"
+4: Fenced line 15 source "\\frac{a}{b}\n"
+   range 157..181 "```math\n\\frac{a}{b}\n```\n"
+5: Inline line 18 source "a+b"
+   range 194..199 "$a+b$"
+6: Display line 19 source "c"
+   range 214..219 "$$c$$"
+7: Inline line 21 source "q"
+   range 241..244 "$q$"
+8: Display line 23 source "\nr^2\n"
+   range 249..262 "$$\n> r^2\n> $$"
+9: Fenced line 34 source "$$ \\sqrt{2} $$\n"
+   range 315..343 "```latex\n$$ \\sqrt{2} $$\n```\n"
+10: diagram Dot line 38
+   range 344..374 "```dot\ndigraph { a -> b }\n```\n"
+11: Display line 41 source " z "
+   range 381..388 "$$ z $$"

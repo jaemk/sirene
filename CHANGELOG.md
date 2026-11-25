@@ -10,9 +10,19 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `--charset unicode-math` and `Charset::UnicodeMath`: formulas in the text renderer with the
   full math glyph set (radical, overline, minus, script forms, sum, integral, bracket pieces).
+- `.tex` and `.latex` files, and `--lang latex` (also `tex`), read one formula: bare, wrapped in
+  `$$`, `$`, `\[`, `\(`, or a math environment, or the one math block of a `\begin{document}`
+  (LEMB-3).
+- Markdown files draw formulas as blocks beside the diagrams: `math`, `latex`, and `tex` fences,
+  `$$...$$`, and inline `$...$`. `svg`, `png`, `ascii`, and `check` take them in source order, so
+  `STEM-N` counts them.
+- `sirene_core::markdown::{parts, Part, MathBlock, MathKind}`, `Block::range`, `Equation::tex`,
+  `Equation::formula`, `diagram::lower_formula`, `equation::MATH`, and the web module's
+  `LANG_LATEX`.
 
 ### Changed
 
+- Breaking: `Lang::Latex` and `Kind::Latex` are new variants, and `Equation` has an `inline` field.
 - `Charset` is `#[non_exhaustive]`, and `ascii_formula`, `ascii_formula_rows`, `ascii_asciimath`
   and `ascii_asciimath_rows` take a `Charset`. Formulas in the text renderer follow the charset:
   `ascii` draws printable ASCII only (`\/` over `_` for a radical, `alpha`, `<=`, `sum`, `+/-`,

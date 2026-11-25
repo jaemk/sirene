@@ -80,6 +80,8 @@ pub enum Kind {
     Dot,
     /// A PlantUML sequence diagram (PSEQ-1), detected by its `@start` line (LANGS-1).
     PlantUml,
+    /// One TeX formula (LEMB-3), from a `.tex` file or `--lang latex`.
+    Latex,
 }
 
 /// A diagram language (LANGS-1).
@@ -90,18 +92,21 @@ pub enum Lang {
     Dot,
     /// PlantUML (PSEQ-7).
     PlantUml,
+    /// One TeX formula, drawn as an equation (LEMB-3).
+    Latex,
 }
 
 impl Lang {
     /// The language a diagram file's extension names: `.mmd` or `.mermaid` for Mermaid, `.dot`
-    /// or `.gv` for DOT, and `.puml`, `.plantuml`, `.pu`, or `.iuml` for PlantUML, in any case
-    /// (DOT-5, PSEQ-7).
+    /// or `.gv` for DOT, `.puml`, `.plantuml`, `.pu`, or `.iuml` for PlantUML, and `.tex` or
+    /// `.latex` for one TeX formula, in any case (DOT-5, PSEQ-7, LEMB-3).
     pub fn of_path(path: &std::path::Path) -> Option<Lang> {
         let ext = path.extension()?.to_str()?.to_ascii_lowercase();
         match ext.as_str() {
             "mmd" | "mermaid" => Some(Lang::Mermaid),
             "dot" | "gv" => Some(Lang::Dot),
             "puml" | "plantuml" | "pu" | "iuml" => Some(Lang::PlantUml),
+            "tex" | "latex" => Some(Lang::Latex),
             _ => None,
         }
     }
@@ -157,6 +162,7 @@ impl Kind {
         Kind::Agentflow,
         Kind::Dot,
         Kind::PlantUml,
+        Kind::Latex,
     ];
 
     /// The language this type is written in.
@@ -164,6 +170,7 @@ impl Kind {
         match self {
             Kind::Dot => Lang::Dot,
             Kind::PlantUml => Lang::PlantUml,
+            Kind::Latex => Lang::Latex,
             _ => Lang::Mermaid,
         }
     }
@@ -207,6 +214,7 @@ impl Kind {
             Kind::Agentflow => "agentflow diagram",
             Kind::Dot => "DOT graph",
             Kind::PlantUml => "PlantUML diagram",
+            Kind::Latex => "LaTeX formula",
         }
     }
 
@@ -332,7 +340,8 @@ pub enum Diagram {
     Cynefin(Cynefin),
     EventModel(EventModel),
     Timing(Timing),
-    /// A PlantUML `@startlatex` document: one formula (PCREO-3).
+    /// One formula: a PlantUML `@startlatex` document (PCREO-3), a TeX file, or a Markdown
+    /// formula (LEMB-3).
     Equation(Equation),
 }
 
@@ -500,6 +509,7 @@ fn prepare(src: &str, lang: Option<Lang>) -> (Kind, Cow<'_, str>) {
     match lang {
         Some(Lang::Dot) => return (Kind::Dot, Cow::Borrowed(src)),
         Some(Lang::PlantUml) => return (Kind::PlantUml, Cow::Borrowed(src)),
+        Some(Lang::Latex) => return (Kind::Latex, Cow::Borrowed(src)),
         None if dot::is_dot(src) => return (Kind::Dot, Cow::Borrowed(src)),
         _ => {}
     }
@@ -521,10 +531,11 @@ fn prepare(src: &str, lang: Option<Lang>) -> (Kind, Cow<'_, str>) {
 // The same kind-to-parser mapping drives model lowering and syntax-only theme extraction.
 // Graph parsers use their existing Lowered conversion. Others name their Diagram variant.
 macro_rules! dispatch {
-    ($kind:expr, $mermaid:ident, $dot:expr, $plantuml:expr) => {
+    ($kind:expr, $mermaid:ident, $dot:expr, $plantuml:expr, $latex:expr) => {
         match $kind {
             Kind::Dot => $dot,
             Kind::PlantUml => $plantuml,
+            Kind::Latex => $latex,
             Kind::Flowchart | Kind::Swimlane | Kind::Agentflow => $mermaid!(flowchart),
             Kind::State => $mermaid!(state),
             Kind::Class => $mermaid!(class),
@@ -618,7 +629,13 @@ pub(crate) fn read_theme(src: &str) -> ThemeConfig {
             ThemeConfig::from_syntax(&$module::parse(&src).syntax())
         };
     }
-    dispatch!(kind, read, ThemeConfig::default(), ThemeConfig::default())
+    dispatch!(
+        kind,
+        read,
+        ThemeConfig::default(),
+        ThemeConfig::default(),
+        ThemeConfig::default()
+    )
 }
 
 /// A DOT graph (DOT-2), its `bgcolor` as the theme's background.
@@ -662,14 +679,42 @@ fn lower_prepared(src: &str, kind: Kind) -> Lowered {
         }};
     }
 
-    dispatch!(kind, lower, lower_dot(src), {
-        let (diagram, diagnostics) = plantuml::parse(src).lower();
-        Lowered {
-            diagram,
-            diagnostics,
+    dispatch!(
+        kind,
+        lower,
+        lower_dot(src),
+        {
+            let (diagram, diagnostics) = plantuml::parse(src).lower();
+            Lowered {
+                diagram,
+                diagnostics,
+                ..Default::default()
+            }
+        },
+        lowered_equation(Equation::tex(src))
+    )
+}
+
+/// An equation read from TeX, as a lowered diagram.
+fn lowered_equation((equation, diagnostics): (Equation, Vec<Diagnostic>)) -> Lowered {
+    Lowered {
+        diagram: Diagram::Equation(equation),
+        diagnostics,
+        theme: ThemeConfig::default(),
+        kind: Kind::Latex,
+    }
+}
+
+/// The formula `src` as written (a Markdown `$...$` or `$$...$$` body), in text style when
+/// `inline`, otherwise display style (LEMB-3). Diagnostics are positioned in `src`.
+pub fn lower_formula(src: &str, inline: bool) -> Lowered {
+    if let Some(diagnostic) = crate::lines::source_limit(src, u32::MAX as usize) {
+        return Lowered {
+            diagnostics: vec![diagnostic],
             ..Default::default()
-        }
-    })
+        };
+    }
+    lowered_equation(Equation::formula(src, inline))
 }
 
 #[cfg(test)]
@@ -1095,6 +1140,7 @@ mod tests {
         }
         assert_eq!(Kind::Dot.lang(), Lang::Dot);
         assert_eq!(Kind::PlantUml.lang(), Lang::PlantUml);
+        assert_eq!(Kind::Latex.lang(), Lang::Latex);
         assert_eq!(Kind::Gantt.lang(), Lang::Mermaid);
         // A source over the limit is not read as anything but the default.
         assert_eq!(lower_as_with_limit("pie\n", None, 1).kind, Kind::Flowchart);

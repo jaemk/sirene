@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "\\begin{gather*}\n  a = b \\\\\n  c = d\n\\end{gather*}\n"
+---
+"\\begin{gather*}\n  a = b \\\\\n  c = d\n\\end{gather*}"
+Tex
+[]

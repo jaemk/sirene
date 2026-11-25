@@ -1,6 +1,9 @@
-//! Diagram code blocks in Markdown (MARKDO-1).
+//! Diagram code blocks and formulas in Markdown (MARKDO-1, MARKDO-5).
 
 use crate::diagram::Lang;
+
+mod math;
+pub use math::{MathBlock, MathKind, Part, parts};
 
 /// A fenced code block whose info string names a diagram language (`mermaid`, `dot`,
 /// `graphviz`, `plantuml`, or `puml`; see [`info_lang`]), at the top level or inside
@@ -37,6 +40,11 @@ pub struct Block {
 }
 
 impl Block {
+    /// The block's byte range: from its opening fence to just after its closing fence's line.
+    pub fn range(&self) -> std::ops::Range<usize> {
+        self.fences.0..self.end
+    }
+
     /// Where a position in [`Block::code`] (line and column from 1) is in the Markdown.
     pub fn position(&self, line: usize, col: usize) -> (usize, usize) {
         let strip = self.strips.get(line - 1).copied().unwrap_or(self.indent);
@@ -244,6 +252,11 @@ fn opening(line: &str) -> Option<Opening> {
 /// any `{` (`mermaid{...}`), or the first class or bare word in braces (Pandoc's `{.mermaid}`,
 /// MyST's `{mermaid}`); in any case.
 pub fn info_lang(info: &str) -> Option<Lang> {
+    Lang::of_info(&info_word(info)?)
+}
+
+/// The first word of an info string, as [`info_lang`] reads it, in lowercase.
+fn info_word(info: &str) -> Option<String> {
     let word = match info.strip_prefix('{') {
         Some(attrs) => {
             let attrs = attrs.split('}').next().unwrap_or("");
@@ -256,12 +269,14 @@ pub fn info_lang(info: &str) -> Option<Lang> {
             word.split('{').next().unwrap_or("")
         }
     };
-    Lang::of_info(&word.to_ascii_lowercase())
+    Some(word.to_ascii_lowercase())
 }
 
 /// A fenced block of any language, found by [`fenced`].
 struct Fenced {
     lang: Option<Lang>,
+    /// The opening fence's info string.
+    info: String,
     /// The index of the opening fence's line.
     open: usize,
     /// The index of the closing fence's line, if any.
@@ -328,6 +343,7 @@ fn fenced(src: &str) -> Vec<Fenced> {
         }
         blocks.push(Fenced {
             lang,
+            info: rest[base + rel + len..].trim().to_owned(),
             open: i,
             close: close.map(|_| j),
             stop,
@@ -384,27 +400,37 @@ pub fn mermaid_blocks(src: &str) -> Vec<Block> {
     let offset = |i: usize| lines.get(i).map_or(src.len(), |(at, _)| *at);
     fenced(src)
         .into_iter()
-        .filter_map(|b| {
-            let lang = b.lang?;
-            let start = offset(b.open + 1);
-            let (stop, end) = match b.close {
-                Some(j) => (offset(j), offset(j + 1)),
-                None => (offset(b.stop), offset(b.stop)),
-            };
-            Some(Block {
-                code: b.code,
-                lang,
-                line: b.open + 2,
-                quote: b.quote,
-                indent: b.indent,
-                strips: b.strips,
-                end,
-                closed: b.close.is_some(),
-                body: start..stop.max(start),
-                fences: (b.runs.0, b.runs.1, b.c, b.len),
-            })
-        })
+        .filter_map(|b| diagram_block(b, &offset))
         .collect()
+}
+
+/// The diagram block for a fenced block that names a diagram language; `offset` is the byte
+/// offset of the start of a line.
+fn diagram_block(b: Fenced, offset: &impl Fn(usize) -> usize) -> Option<Block> {
+    let lang = b.lang?;
+    let start = offset(b.open + 1);
+    let (stop, end) = fence_end(&b, offset);
+    Some(Block {
+        code: b.code,
+        lang,
+        line: b.open + 2,
+        quote: b.quote,
+        indent: b.indent,
+        strips: b.strips,
+        end,
+        closed: b.close.is_some(),
+        body: start..stop.max(start),
+        fences: (b.runs.0, b.runs.1, b.c, b.len),
+    })
+}
+
+/// The offset of the start of the closing fence's line and of the line after it (or, for a
+/// block that is not closed, of the line that ended it, twice).
+fn fence_end(b: &Fenced, offset: &impl Fn(usize) -> usize) -> (usize, usize) {
+    match b.close {
+        Some(j) => (offset(j), offset(j + 1)),
+        None => (offset(b.stop), offset(b.stop)),
+    }
 }
 
 /// Whether `path` names a Markdown file (`.md` or `.markdown`).

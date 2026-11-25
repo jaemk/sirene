@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "\\documentclass{article}\n\\usepackage{amsmath}\n\\begin{document}\n% one formula only\n\\[\n  \\frac{1}{2} + \\frac{1}{3}\n\\]\n\\end{document}\n"
+---
+"\n  \\frac{1}{2} + \\frac{1}{3}\n"
+Tex
+[]

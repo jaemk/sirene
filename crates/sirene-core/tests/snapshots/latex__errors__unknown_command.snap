@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "\\begin{align}\n  a &= b \\\\\n  c &= \\notacommand{d}\n\\end{align}\n"
+---
+"\\begin{align}\n  a &= b \\\\\n  c &= \\notacommand{d}\n\\end{align}"
+[
+    Diagnostic {
+        range: 33..45,
+        message: "Undefined control sequence: \\notacommand",
+        severity: Error,
+    },
+]

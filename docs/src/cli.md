@@ -18,12 +18,15 @@ A diagram's language comes from its file extension (`.mmd` and `.mermaid` Mermai
 `.gv` [Graphviz DOT](dot.md), `.puml`, `.plantuml`, `.pu`, and `.iuml` [PlantUML](plantuml.md))
 or its Markdown block's name (`mermaid`, `dot`, `graphviz`, `plantuml`, `puml`). Stdin and other
 files are DOT when they start with a DOT graph header, PlantUML when they have an `@start` line,
-and Mermaid otherwise. `--lang mermaid|dot|plantuml`, before or after the command, reads every
-diagram as that language:
+and Mermaid otherwise. `--lang mermaid|dot|plantuml|latex`, before or after the command, reads
+every diagram as that language:
 
 ```
 printf 'digraph { a -> b }\n' | sirene ascii --lang dot
 ```
+
+A `.tex` or `.latex` file (or `--lang latex`, also spelled `tex`) is one formula; see
+[LaTeX formulas](#latex-formulas). Directories do not pick up `.tex` files.
 
 ## Opening files
 
@@ -144,6 +147,24 @@ flowchart LR
 ````
 
 Diagnostic positions are lines and columns in the Markdown file.
+
+Formulas are blocks too, in source order with the diagrams, so N counts them: a fenced block
+named `math`, `latex`, or `tex`, a `$$...$$` block, and an inline `$...$` (GitHub's rules: the
+opening `$` is not followed by a space, the closing one is not preceded by one or followed by a
+digit, `\$` is a dollar sign, and it stays on its line). Fenced and `$$` formulas are set in
+display style, `$...$` in text style. Code blocks, code spans, and diagram blocks are not read for
+formulas. `--link` links diagram blocks only. In a build without the `math` feature, formulas are
+skipped with one warning per file.
+
+## LaTeX formulas
+
+`sirene svg|png|ascii|check FILE.tex` reads one formula: a bare formula, or one wrapped in
+`$$...$$`, `$...$`, `\[...\]`, `\(...\)`, or a `displaymath` or `math` environment. `equation`,
+`align`, `gather`, and the other math environments are passed through. `%` starts a comment. A
+file with `\documentclass` or `\begin{document}` is refused with `full LaTeX documents are not
+supported; give one formula` on its first line, unless the text between `\begin{document}` and
+`\end{document}` is one math block. A formula that does not typeset is drawn as its source, with
+one error at the offending command.
 
 ## `sirene check`
 

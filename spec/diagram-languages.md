@@ -10,7 +10,8 @@ Mermaid state (`mermaid-state-diagrams.md`), class (`mermaid-class-diagrams.md`)
 ## LANGS-1 Detecting the language
 
 A file's extension names its language: `.mmd` and `.mermaid` Mermaid, `.dot` and `.gv` DOT, `.d2`
-D2, `.puml`, `.plantuml`, `.pu`, and `.iuml` PlantUML. Stdin, and a file with another extension,
+D2, `.puml`, `.plantuml`, `.pu`, and `.iuml` PlantUML, and `.tex` and `.latex` one TeX formula
+(LEMB-3; detection never picks it). Stdin, and a file with another extension,
 is detected from its first statement: `@startuml` (or another `@start...`) is PlantUML; `graph`,
 `digraph`, or `strict` followed by an optional ID and `{` is DOT; anything else is Mermaid. D2 has
 no header, so it needs its extension or `--lang d2`. Every command takes `--lang
@@ -74,9 +75,9 @@ diagrams. End labels take no room in the layout. In ASCII the crow's feet are `?
 `diagram::Kind::of` is `Kind::Dot` for a source that starts with a DOT graph header (DOT-1), and
 otherwise reads the Mermaid header keyword after frontmatter, comments, and directives;
 `diagram::lower` sends the source to its parser, and the CLI and the editor go through it.
-`Kind::of_lang` and `diagram::lower_as` take a `diagram::Lang` (Mermaid, DOT, or PlantUML) that
+`Kind::of_lang` and `diagram::lower_as` take a `diagram::Lang` (Mermaid, DOT, PlantUML, or Latex) that
 overrides detection: `--lang`, else `Lang::of_path` (the extension) or `Lang::of_info` (the
-Markdown block's info word), as DOT-5. `--lang` takes `mermaid`, `dot`, and `plantuml` so far.
+Markdown block's info word), as DOT-5. `--lang` takes `mermaid`, `dot`, `plantuml`, and `latex` (also `tex`) so far.
 
 ## LANGS-4 Commands
 

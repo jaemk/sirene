@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "\\begin{displaymath}\n  x_1 + x_2\n\\end{displaymath}\n"
+---
+"\n  x_1 + x_2\n"
+Tex
+[]

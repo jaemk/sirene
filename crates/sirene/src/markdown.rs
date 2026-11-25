@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use sirene_core::ascii::{Charset, Options};
 use sirene_core::diagram::{self, Lowered};
-use sirene_core::markdown::{self, Block};
+use sirene_core::markdown::{self, Block, Part};
 use sirene_core::{Error, Result, Severity};
 
 /// Where `sirene check` reports: stderr as text, or collected for one JSON array on stdout
@@ -130,6 +130,72 @@ fn report_to(
     errors
 }
 
+/// The parts of a Markdown file to draw (MARKDO-5): each diagram block and formula with its number
+/// from 1, which counts every part found, drawn or not, so a build without math numbers them as
+/// one with it.
+struct Plan {
+    /// How many parts the file has.
+    total: usize,
+    parts: Vec<(usize, Part)>,
+    /// How many formulas were left out for want of math support.
+    skipped: usize,
+}
+
+impl Plan {
+    /// The parts of `src`, without the formulas when `math` is off.
+    fn new(src: &str, math: bool) -> Plan {
+        let all = markdown::parts(src);
+        let total = all.len();
+        let mut skipped = 0;
+        let mut parts = Vec::with_capacity(total);
+        for (i, part) in all.into_iter().enumerate() {
+            if !math && matches!(part, Part::Math(_)) {
+                skipped += 1;
+            } else {
+                parts.push((i + 1, part));
+            }
+        }
+        Plan {
+            total,
+            parts,
+            skipped,
+        }
+    }
+
+    /// The one warning for the formulas left out, if any.
+    fn warning(&self) -> Option<String> {
+        let n = self.skipped;
+        (n > 0).then(|| {
+            let s = if n == 1 { "" } else { "s" };
+            format!("math support is off in this build; {n} formula{s} not drawn")
+        })
+    }
+}
+
+/// `part` lowered, in its language.
+fn lower(part: &Part) -> Lowered {
+    match part {
+        Part::Diagram(block) => diagram::lower_as(&block.code, crate::lang(Some(block.lang))),
+        Part::Math(math) => math.lower(),
+    }
+}
+
+/// The text `part` is lowered from.
+fn code(part: &Part) -> &str {
+    match part {
+        Part::Diagram(block) => &block.code,
+        Part::Math(math) => &math.source,
+    }
+}
+
+/// Where a line and column of `code(part)` is in the Markdown.
+fn position(part: &Part, line: usize, col: usize) -> (usize, usize) {
+    match part {
+        Part::Diagram(block) => block.position(line, col),
+        Part::Math(math) => math.position(line, col),
+    }
+}
+
 /// Checks `path`'s diagrams, reporting their diagnostics to `out`: a Markdown file's diagram
 /// blocks, every diagram under a directory, or one diagram (stdin for `-`). Returns whether all
 /// were read and had no errors. With `as_markdown`, a file or stdin is read as Markdown whatever
@@ -184,16 +250,19 @@ fn check_markdown(out: &mut Out, path: &Path) -> bool {
             return false;
         }
     };
-    let blocks = markdown::mermaid_blocks(&src);
-    log::debug!("{name}: {} diagram block(s)", blocks.len());
-    if blocks.is_empty() {
+    let plan = Plan::new(&src, sirene_core::equation::MATH);
+    log::debug!("{name}: {} diagram block(s) and formula(s)", plan.total);
+    if plan.total == 0 {
         out.diagnostic(Some(&name), None, "warning", "no diagram blocks");
     }
+    if let Some(warning) = plan.warning() {
+        out.diagnostic(Some(&name), None, "warning", &warning);
+    }
     let mut ok = true;
-    for block in &blocks {
-        let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
-        ok &= !report_to(out, &name, &block.code, &lowered, |l, c| {
-            block.position(l, c)
+    for (_, part) in &plan.parts {
+        let lowered = lower(part);
+        ok &= !report_to(out, &name, code(part), &lowered, |l, c| {
+            position(part, l, c)
         });
     }
     ok
@@ -394,29 +463,32 @@ pub fn print_ascii(md: &Path, charset: Charset, width: Option<usize>) -> crate::
             };
         }
     };
-    let blocks = markdown::mermaid_blocks(&src);
-    if blocks.is_empty() {
+    let plan = Plan::new(&src, sirene_core::equation::MATH);
+    if plan.total == 0 {
         diagnostic!("{name}: no diagram blocks");
+    }
+    if let Some(warning) = plan.warning() {
+        diagnostic!("{name}: {warning}");
     }
     let mut ok = true;
     let mut written = true;
     let mut out = String::new();
-    for (i, block) in blocks.iter().enumerate() {
-        let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
-        ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
+    for (i, (n, part)) in plan.parts.iter().enumerate() {
+        let lowered = lower(part);
+        ok &= !report(&name, code(part), &lowered, |l, c| position(part, l, c));
         if i > 0 {
             out.push('\n');
         }
         match lowered.ascii(&Options { charset }) {
             Ok(drawing) => {
-                let block_name = format!("{name} block {}", i + 1);
+                let block_name = format!("{name} block {n}");
                 ok &= !crate::too_wide(&block_name, &drawing, width);
                 out.push_str(&drawing);
             }
             Err(e) => {
                 diagnostic!(
                     "error: {}",
-                    e.context(format!("cannot render {name} block {}", i + 1))
+                    e.context(format!("cannot render {name} block {n}"))
                         .report()
                 );
                 ok = false;
@@ -485,17 +557,19 @@ pub fn render(
             };
         }
     }
-    let blocks = markdown::mermaid_blocks(&src);
-    if blocks.is_empty() {
+    let plan = Plan::new(&src, sirene_core::equation::MATH);
+    if plan.total == 0 {
         diagnostic!("{name}: no diagram blocks");
+    }
+    if let Some(warning) = plan.warning() {
+        diagnostic!("{name}: {warning}");
     }
     let mut ok = true;
     let mut completed = true;
     let mut links = Vec::new();
-    for (i, block) in blocks.into_iter().enumerate() {
-        let n = i + 1;
-        let lowered = diagram::lower_as(&block.code, crate::lang(Some(block.lang)));
-        ok &= !report(&name, &block.code, &lowered, |l, c| block.position(l, c));
+    for (n, part) in plan.parts {
+        let lowered = lower(&part);
+        ok &= !report(&name, code(&part), &lowered, |l, c| position(&part, l, c));
         let image = image_path(md, out, n, ext);
         let written = render(&lowered).and_then(|bytes| {
             crate::write_file(&image, &bytes, false)
@@ -504,13 +578,17 @@ pub fn render(
         match written {
             Ok(()) => {
                 diagnostic!("wrote {}", image.display());
-                links.push((block, Some(link_line(md, &image, n))));
+                if let Part::Diagram(block) = part {
+                    links.push((block, Some(link_line(md, &image, n))));
+                }
             }
             Err(message) => {
                 diagnostic!("error: {}", message.report());
                 ok = false;
                 completed = false;
-                links.push((block, None));
+                if let Part::Diagram(block) = part {
+                    links.push((block, None));
+                }
             }
         }
     }
@@ -536,6 +614,34 @@ pub fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Without math support the formulas are left out with one warning, and the numbers of the
+    /// parts are those of a build with it.
+    #[test]
+    fn formulas_are_skipped_once_without_math() {
+        let src = "$a$ $b$\n\n```mermaid\npie\n```\n\n$$c$$\n\n```math\nd\n```\n";
+        let on = Plan::new(src, true);
+        assert_eq!((on.total, on.skipped, on.warning()), (5, 0, None));
+        assert_eq!(
+            on.parts.iter().map(|(n, _)| *n).collect::<Vec<_>>(),
+            [1, 2, 3, 4, 5]
+        );
+        let off = Plan::new(src, false);
+        assert_eq!((off.total, off.skipped), (5, 4));
+        assert_eq!(off.parts.iter().map(|(n, _)| *n).collect::<Vec<_>>(), [3]);
+        assert_eq!(
+            off.warning().as_deref(),
+            Some("math support is off in this build; 4 formulas not drawn")
+        );
+        let one = Plan::new("$a$\n", false);
+        assert_eq!(
+            one.warning().as_deref(),
+            Some("math support is off in this build; 1 formula not drawn")
+        );
+        // A file with no formulas has no warning, however it is built.
+        assert_eq!(Plan::new("```mermaid\npie\n```\n", false).warning(), None);
+        assert_eq!(Plan::new("", false).total, 0);
+    }
 
     #[test]
     fn image_paths_and_links() {

@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/latex.rs
+expression: "% leading comment\n  $$\n    1 + \\frobnicate\n  $$\n"
+---
+"\n    1 + \\frobnicate\n  "
+[
+    Diagnostic {
+        range: 31..42,
+        message: "Undefined control sequence: \\frobnicate",
+        severity: Error,
+    },
+]
