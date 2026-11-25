@@ -5,7 +5,7 @@ use rowan::TextRange;
 
 use super::lines::{self, Common, Cursor, Line};
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::{self, Arrow, Direction, Edge, Flowchart, Label, Style};
+use crate::flowchart::{self, Arrow, Delim, Direction, Edge, Flowchart, Label, Style, formula};
 use crate::lines::MAX_DEPTH;
 use crate::mindmap::{self, Mindmap};
 use crate::syntax::SyntaxNode;
@@ -261,6 +261,8 @@ pub(crate) fn lower_mindmap(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
     };
     // Item index to node index.
     let mut at: Vec<Option<usize>> = Vec::with_capacity(r.items.len());
+    // Formula bodies already found in the source, so equal formulas take their own places.
+    let mut used = std::collections::HashSet::new();
     for (item, parent) in r.items.iter().zip(parents) {
         let parent = match parent {
             Some(Some(p)) => match at[p] {
@@ -290,9 +292,24 @@ pub(crate) fn lower_mindmap(root: &SyntaxNode) -> (Mindmap, Vec<Diagnostic>) {
             }
             None => (0, None),
         };
+        // A node's text is PlantUML text: `<latex>` and `<math>` are formulas (LEMB-2).
+        let label = Label {
+            delim: Delim::Latex,
+            ..Label::plain(&item.text)
+        };
+        if label.has_formula() {
+            r.d.extend(formula::errors_among(
+                &r.src,
+                label.text.split('\n').map(flowchart::clean),
+                &[item.range],
+                &mut used,
+                item.range,
+                Delim::Latex,
+            ));
+        }
         map.nodes.push(mindmap::Node {
             id: None,
-            label: Label::plain(&item.text),
+            label,
             shape: if item.boxless {
                 mindmap::Shape::Default
             } else {
