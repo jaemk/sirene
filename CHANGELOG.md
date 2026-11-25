@@ -35,6 +35,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `sirene_core::markdown::{parts, Part, MathBlock, MathKind}`, `Block::range`, `Equation::tex`,
   `Equation::formula`, `diagram::lower_formula`, `equation::MATH`, and the web module's
   `LANG_LATEX`.
+- A "Visio drawings" page in the book, and Visio entries in the command line and library pages.
 
 ### Changed
 

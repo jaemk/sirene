@@ -43,6 +43,9 @@ fn main() -> sirene_core::Result<()> {
 - Reading never fails: problems are `Diagnostic`s with byte ranges and a `Severity` (an error
   is what Mermaid would refuse to draw). The diagram is still drawn. `diagnostic::LineIndex`
   finds the lines and columns of many diagnostics in one pass.
+- A Visio `.vsdx` is bytes, not text: `diagram::lower_bytes(&bytes, Lang::of_path(path))` reads
+  it, and `Lowered::page_count` and `Lowered::with_page` (from 0) pick the page to draw. Its
+  diagnostics have empty ranges.
 - A diagram's own `theme` and `themeVariables` apply over the theme passed in.
 - `Lowered::scene` gives the display list for other renderers, with text measured by any
   `scene::TextMetrics`.

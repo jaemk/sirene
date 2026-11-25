@@ -28,6 +28,9 @@ printf 'digraph { a -> b }\n' | sirene ascii --lang dot
 A `.tex` or `.latex` file (or `--lang latex`, also spelled `tex`) is one formula; see
 [LaTeX formulas](#latex-formulas). Directories do not pick up `.tex` files.
 
+A `.vsdx` file (or `--lang visio`) is a [Visio drawing](visio.md): `svg` and `png` write each
+page, or one with `--page N`; `ascii` is refused.
+
 ## Opening files
 
 `sirene a.mmd b.mmd` opens a window for each file; `sirene` alone opens a new document with a
