@@ -4,7 +4,7 @@
 
 use rowan::{TextRange, TextSize};
 
-use super::lines;
+use super::{decor, lines};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::{Direction, Edge, Flowchart, Label, Node, Row, Shape};
 use crate::lines::MAX_DEPTH;
@@ -43,9 +43,19 @@ fn too_deep(start: usize) -> Error {
 
 /// The document's data at its source offsets (`lines::body`). `<style>` blocks and `#highlight`
 /// lines are blanked, with a warning.
-fn body(root: &SyntaxNode, d: &mut Vec<Diagnostic>) -> String {
+fn body(root: &SyntaxNode, yaml: bool, d: &mut Vec<Diagnostic>) -> String {
     let mut style: Option<TextRange> = None;
+    // The `header`, `footer`, `caption`, and `legend` lines are read apart (PCOM-1).
+    let raw = if yaml {
+        decor::Raw::Yaml
+    } else {
+        decor::Raw::Json
+    };
+    let claimed = decor::claim(root, raw);
     let body = lines::body(root, |line| {
+        if claimed.contains(&line.range.start()) {
+            return false;
+        }
         let t = line.text.trim();
         if let Some(open) = style {
             if t.eq_ignore_ascii_case("</style>") {
@@ -784,7 +794,7 @@ fn table<'a>(chart: &mut Flowchart, v: &'a Value) -> String {
 
 fn lower(root: &SyntaxNode, yaml: bool) -> (Flowchart, Vec<Diagnostic>) {
     let mut d = Vec::new();
-    let body = body(root, &mut d);
+    let body = body(root, yaml, &mut d);
     let (value, error) = if yaml {
         Yaml::new(&body).document()
     } else {

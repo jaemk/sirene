@@ -6,7 +6,8 @@
 //! `<math>` formulas (LEMB-2). Each line of text is kept as source; [`lines`] reads it as runs.
 
 use crate::diagram::Diagram;
-use crate::flowchart::{Delim, Span, formula};
+use crate::flowchart::Span;
+use crate::plantuml::creole;
 
 /// Where a decoration sits across the diagram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -87,35 +88,125 @@ impl Marker {
     }
 }
 
-/// A run of a line: a span and its `<color:...>`, as written.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A run of a line: a span and the Creole style it is read in. The color and background are as
+/// written (`<color:red>`, `<back:#ff0>`), the size is `<size:N>`.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Run {
     pub span: Span,
     pub color: Option<String>,
+    pub underline: bool,
+    pub strike: bool,
+    pub mono: bool,
+    pub size: Option<u32>,
+    pub back: Option<String>,
 }
 
-/// A line of a decoration read as Creole.
+/// A horizontal rule line: `----`, `====`, `____`, or `....` (four or more of one character).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rule {
+    Single,
+    Double,
+    Thick,
+    Dotted,
+}
+
+impl Rule {
+    /// The character a rule is drawn with as text.
+    pub fn ch(self) -> char {
+        match self {
+            Rule::Single => '-',
+            Rule::Double => '=',
+            Rule::Thick => '_',
+            Rule::Dotted => '.',
+        }
+    }
+}
+
+/// A line of a decoration read as Creole: a rule, a row of table cells, or text runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Line {
     pub marker: Marker,
     pub runs: Vec<Run>,
+    pub rule: Option<Rule>,
+    /// The cells of a table row `|a|b|`; a `|=` cell is a bold heading. Empty for other lines.
+    pub cells: Vec<Vec<Run>>,
 }
 
 /// Reads the source `lines` as Creole lines. A list line is `*` or `#` (repeated for a deeper
-/// level) and a space, then text; `== text` is a bold heading. Bold, italic, and color carry
-/// from one run to the next within a line, and formulas are runs of their own.
+/// level) and a space, then text; `== text` is a bold heading; `----` is a rule; `|a|b|` is a
+/// table row. Runs are read by [`creole::styled`]: bold, italic, and the other styles carry from
+/// one run to the next within a line, and formulas are runs of their own.
 pub fn lines(lines: &[String]) -> Vec<Line> {
     let mut out = Vec::new();
     let mut numbers: Vec<usize> = Vec::new();
     for src in lines {
-        let (marker, text) = marker(src.trim(), &mut numbers);
-        let (text, heading) = heading(text);
-        out.push(Line {
+        let src = src.trim();
+        let line = |marker, runs, rule, cells| Line {
             marker,
-            runs: runs(text, heading),
-        });
+            runs,
+            rule,
+            cells,
+        };
+        if let Some(rule) = rule(src) {
+            numbers.clear();
+            out.push(line(Marker::None, Vec::new(), Some(rule), Vec::new()));
+            continue;
+        }
+        if let Some(cells) = table_row(src) {
+            numbers.clear();
+            out.push(line(Marker::None, Vec::new(), None, cells));
+            continue;
+        }
+        let (marker, text) = marker(src, &mut numbers);
+        let (text, heading) = heading(text);
+        out.push(line(
+            marker,
+            creole::styled(text, heading),
+            None,
+            Vec::new(),
+        ));
     }
     out
+}
+
+/// The rule `line` is: four or more of `-`, `=`, `_`, or `.`.
+fn rule(line: &str) -> Option<Rule> {
+    let c = line.chars().next()?;
+    if line.chars().count() < 4 || !line.chars().all(|d| d == c) {
+        return None;
+    }
+    match c {
+        '-' => Some(Rule::Single),
+        '=' => Some(Rule::Double),
+        '_' => Some(Rule::Thick),
+        '.' => Some(Rule::Dotted),
+        _ => None,
+    }
+}
+
+/// The cells of `|a|b|`, each a heading when it starts `=`.
+fn table_row(line: &str) -> Option<Vec<Vec<Run>>> {
+    let inner = line.strip_prefix('|')?;
+    let inner = inner.strip_suffix('|').unwrap_or(inner);
+    // A `|` inside a formula (`|x|`) is the formula's.
+    let formulas = creole::latex_tags(inner);
+    let mut cells = Vec::new();
+    let mut from = 0;
+    let mut cut = |end: usize, next: usize| {
+        let cell = inner[from..end].trim();
+        cells.push(match cell.strip_prefix('=') {
+            Some(head) => creole::styled(head.trim(), true),
+            None => creole::styled(cell, false),
+        });
+        from = next;
+    };
+    for (i, c) in inner.char_indices() {
+        if c == '|' && !formulas.iter().any(|f| f.contains(&i)) {
+            cut(i, i + 1);
+        }
+    }
+    cut(inner.len(), inner.len());
+    Some(cells)
 }
 
 /// The list marker at the start of `line` and the rest. `numbers` counts each open numbered
@@ -146,124 +237,6 @@ fn heading(line: &str) -> (&str, bool) {
         Some(rest) if eq >= 2 => (rest.trim_end().trim_end_matches('=').trim_end(), true),
         _ => (line, false),
     }
-}
-
-/// The text and formula runs of one line.
-fn runs(line: &str, bold_all: bool) -> Vec<Run> {
-    let mut state = State {
-        bold: bold_all,
-        ..State::default()
-    };
-    let mut out = Vec::new();
-    for piece in formula::runs(line, Delim::Latex) {
-        if piece.math {
-            out.push(Run {
-                span: piece,
-                color: state.color.clone(),
-            });
-            continue;
-        }
-        state.read(&piece.text, bold_all, &mut out);
-    }
-    out
-}
-
-#[derive(Default)]
-struct State {
-    bold: bool,
-    italic: bool,
-    color: Option<String>,
-}
-
-impl State {
-    /// Reads `text`, adding its runs to `out` and changing the state at each marker.
-    fn read(&mut self, text: &str, bold_all: bool, out: &mut Vec<Run>) {
-        let mut buf = String::new();
-        let mut i = 0;
-        while i < text.len() {
-            let rest = &text[i..];
-            let n = self.marker(rest, text[..i].chars().next_back(), bold_all, |s| {
-                if !buf.is_empty() {
-                    s.push(&mut buf, out);
-                }
-            });
-            match n {
-                Some(len) => i += len,
-                None => {
-                    let c = rest.chars().next().map_or(1, char::len_utf8);
-                    buf.push_str(&rest[..c]);
-                    i += c;
-                }
-            }
-        }
-        self.push(&mut buf, out);
-    }
-
-    /// If `rest` starts with a marker, flushes with `flush`, applies it, and gives its length.
-    fn marker(
-        &mut self,
-        rest: &str,
-        before: Option<char>,
-        bold_all: bool,
-        mut flush: impl FnMut(&Self),
-    ) -> Option<usize> {
-        let lower = rest
-            .get(..rest.len().min(8))
-            .map(str::to_ascii_lowercase)
-            .unwrap_or_default();
-        let tag = |t: &str| lower.starts_with(t).then_some(t.len());
-        let found = if rest.starts_with("**") {
-            Some((2, Change::Bold(!self.bold)))
-        } else if rest.starts_with("//") && before != Some(':') {
-            Some((2, Change::Italic(!self.italic)))
-        } else if let Some(n) = tag("<b>") {
-            Some((n, Change::Bold(true)))
-        } else if let Some(n) = tag("</b>") {
-            Some((n, Change::Bold(bold_all)))
-        } else if let Some(n) = tag("<i>") {
-            Some((n, Change::Italic(true)))
-        } else if let Some(n) = tag("</i>") {
-            Some((n, Change::Italic(false)))
-        } else if let Some(n) = tag("</color>") {
-            Some((n, Change::Color(None)))
-        } else if lower.starts_with("<color:") {
-            let close = rest.find('>')?;
-            let name = rest[7..close].trim();
-            // `<color:#red>` and `<color:red>` are both a color.
-            Some((close + 1, Change::Color(Some(name.to_owned()))))
-        } else {
-            None
-        };
-        let (len, change) = found?;
-        flush(self);
-        match change {
-            Change::Bold(b) => self.bold = b,
-            Change::Italic(b) => self.italic = b,
-            Change::Color(c) => self.color = c,
-        }
-        Some(len)
-    }
-
-    fn push(&self, buf: &mut String, out: &mut Vec<Run>) {
-        if buf.is_empty() {
-            return;
-        }
-        out.push(Run {
-            span: Span {
-                text: std::mem::take(buf),
-                bold: self.bold,
-                italic: self.italic,
-                ..Span::default()
-            },
-            color: self.color.clone(),
-        });
-    }
-}
-
-enum Change {
-    Bold(bool),
-    Italic(bool),
-    Color(Option<String>),
 }
 
 #[cfg(test)]
@@ -375,5 +348,102 @@ mod tests {
         assert_eq!(l[0].runs.len(), 1);
         assert_eq!(l[0].runs[0].span.text, "Title");
         assert!(l[0].runs[0].span.bold);
+    }
+
+    fn runs_of(src: &str) -> Vec<Run> {
+        lines(&[src.to_owned()]).remove(0).runs
+    }
+
+    #[test]
+    fn underline_strike_and_monospace_markers_style_their_text() {
+        let r = runs_of("a __b__ --c-- \"\"d\"\" e");
+        let styled: Vec<(&str, bool, bool, bool)> = r
+            .iter()
+            .map(|r| (r.span.text.as_str(), r.underline, r.strike, r.mono))
+            .collect();
+        assert_eq!(
+            styled,
+            [
+                ("a ", false, false, false),
+                ("b", true, false, false),
+                (" ", false, false, false),
+                ("c", false, true, false),
+                (" ", false, false, false),
+                ("d", false, false, true),
+                (" e", false, false, false),
+            ]
+        );
+    }
+
+    #[test]
+    fn tags_set_underline_strike_size_and_background() {
+        let r = runs_of("<u>a</u><s>b</s><size:20>c</size><back:#ff0>d</back>e");
+        assert!(r[0].underline && !r[1].underline);
+        assert!(r[1].strike && !r[2].strike);
+        assert_eq!(r[2].size, Some(20));
+        assert_eq!(r[3].back.as_deref(), Some("ff0"));
+        assert_eq!((r[4].size, r[4].back.clone()), (None, None));
+    }
+
+    #[test]
+    fn a_marker_with_no_partner_or_a_space_after_it_is_text() {
+        for src in [
+            "A --> B",
+            "a__b",
+            "x -- y -- z",
+            "-- x",
+            "__ x __",
+            "\"\" x",
+        ] {
+            let r = runs_of(src);
+            let text: String = r.iter().map(|r| r.span.text.as_str()).collect();
+            assert_eq!(text, src, "{src}");
+            assert!(
+                r.iter().all(|r| !r.underline && !r.strike && !r.mono),
+                "{src}"
+            );
+        }
+        // A bad size is text, not a style.
+        assert_eq!(runs_of("<size:big>x")[0].size, None);
+    }
+
+    #[test]
+    fn styles_carry_across_a_formula() {
+        let r = runs_of("__a <latex>x</latex> b__");
+        assert_eq!(r.len(), 3);
+        assert!(r[0].underline && r[2].underline);
+    }
+
+    #[test]
+    fn four_of_a_character_is_a_rule() {
+        for (src, want) in [
+            ("----", Rule::Single),
+            ("=====", Rule::Double),
+            ("____", Rule::Thick),
+            ("....", Rule::Dotted),
+        ] {
+            let l = &lines(&[src.into()])[0];
+            assert_eq!(l.rule, Some(want), "{src}");
+            assert!(l.runs.is_empty());
+        }
+        for src in ["---", "--x--", "-=-=", "== h =="] {
+            assert_eq!(lines(&[src.into()])[0].rule, None, "{src}");
+        }
+    }
+
+    #[test]
+    fn a_table_row_has_cells_and_headings() {
+        let l = &lines(&[
+            "|= Name |= Qty |".into(),
+            "| a | <latex>|x|</latex> |".into(),
+        ]);
+        assert_eq!(l[0].cells.len(), 2);
+        assert!(l[0].cells[0][0].span.bold);
+        assert_eq!(l[0].cells[1][0].span.text, "Qty");
+        assert_eq!(l[1].cells.len(), 2);
+        assert_eq!(l[1].cells[0][0].span.text, "a");
+        // The bars of the formula are not cell breaks.
+        assert!(l[1].cells[1][0].span.text.contains("|x|"));
+        assert!(l[0].runs.is_empty());
     }
 }

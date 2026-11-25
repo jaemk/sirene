@@ -9,7 +9,7 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 
-use rowan::TextRange;
+use rowan::{TextRange, TextSize};
 
 use super::lines::{Cursor, Line, word};
 use crate::decor::{Banner, Decorated, Decorations, HAlign, Legend, VAlign};
@@ -106,7 +106,8 @@ fn name(slot: Slot) -> &'static str {
 /// - `header`, `header left|right|center`, `left|right|center header`, and the lines up to
 ///   `end header` (the same for `footer`);
 /// - `caption text`;
-/// - `legend [top|bottom] [left|right|center]` and the lines up to `end legend`.
+/// - `legend [top|bottom] [left|right|center]` and the lines up to `end legend`, or
+///   `legend [top|bottom] [left|right|center] [:] text` on one line.
 ///
 /// Anything else is not read: `None`, with nothing consumed.
 pub(crate) fn statement(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) -> Option<Item> {
@@ -168,8 +169,16 @@ pub(crate) fn statement(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic
         }
         return Some(item);
     }
+    let mut rest = rest;
     if slot == Slot::Legend {
-        return None;
+        // `legend [top|bottom] [left|right|center] text`: the legend on one line.
+        while let Some(p) = position(word(rest)) {
+            match p {
+                Ok(h) => item.horizontal = h,
+                Err(v) => item.vertical = v,
+            }
+            rest = rest[word(rest).len()..].trim_start();
+        }
     }
     let text = rest.strip_prefix(':').unwrap_or(rest).trim();
     if text.is_empty() {
@@ -177,6 +186,64 @@ pub(crate) fn statement(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic
     }
     push_lines(&mut item, text, line.range);
     Some(item)
+}
+
+/// A kind whose body another reader reads, and so what in its lines can be a decoration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Raw {
+    Json,
+    Yaml,
+    Dot,
+    Ebnf,
+    Regex,
+}
+
+/// Whether `line` (a block or not) can be a decoration in a `raw` body, and not that body's own
+/// syntax.
+fn claimable(raw: Raw, line: &Line, block: bool, src: &str) -> bool {
+    let rest = line.text[word(&line.text).len()..].trim_start();
+    match raw {
+        Raw::Json => true,
+        // A line of a graph has an edge, a bracket, a brace, an assignment, or a semicolon.
+        Raw::Dot => {
+            !line.text.contains(['{', '}', '[', ']', ';', '=']) && !line.text.contains("->")
+        }
+        // `header = "x";` is a rule.
+        Raw::Ebnf => !rest.starts_with('='),
+        // `header: x` is a mapping, and an indented line may continue a value.
+        Raw::Yaml => {
+            let at = usize::from(line.range.start());
+            !rest.starts_with(':') && (at == 0 || src.as_bytes().get(at - 1) == Some(&b'\n'))
+        }
+        // Every line is a regex, `header x` included: only a block with its closer is not.
+        Raw::Regex => block,
+    }
+}
+
+/// Reads the decoration statements of a `raw` kind's body, records them, and gives the start of
+/// each line they use, for [`lines::body`](super::lines::body) to blank. A block with no closer
+/// is left to the body's reader.
+pub(crate) fn claim(root: &SyntaxNode, raw: Raw) -> HashSet<TextSize> {
+    let src = root.text().to_string();
+    let mut claimed = HashSet::new();
+    let mut cursor = Cursor::new(super::lines::read(root));
+    while let Some(line) = cursor.next() {
+        let from = cursor.position();
+        let mut probe = cursor.clone();
+        let mut unclosed = Vec::new();
+        let Some(item) = statement(&line, &mut probe, &mut unclosed) else {
+            continue;
+        };
+        let block = probe.position() != from;
+        if !unclosed.is_empty() || !claimable(raw, &line, block, &src) {
+            continue;
+        }
+        claimed.insert(line.range.start());
+        claimed.extend(probe.ranges_since(from).iter().map(|r| r.start()));
+        cursor = probe;
+        record(item);
+    }
+    claimed
 }
 
 /// Adds the lines of `text`, where `\n` breaks a line outside a formula, read from `range`.
@@ -350,10 +417,22 @@ mod tests {
     }
 
     #[test]
-    fn a_legend_with_text_on_its_line_is_not_read() {
+    fn a_legend_with_text_on_its_line_is_one_line() {
         let (item, _, next) = read("legend hello", &["x"]);
-        assert!(item.is_none());
+        let item = item.unwrap();
+        assert_eq!(texts(&item), ["hello"]);
+        assert_eq!(
+            (item.horizontal, item.vertical),
+            (HAlign::Center, VAlign::Bottom)
+        );
         assert_eq!(next.as_deref(), Some("x"));
+        let (item, ..) = read("legend top left : a\\nb", &[]);
+        let item = item.unwrap();
+        assert_eq!(texts(&item), ["a", "b"]);
+        assert_eq!(
+            (item.horizontal, item.vertical),
+            (HAlign::Left, VAlign::Top)
+        );
     }
 
     #[test]

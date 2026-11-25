@@ -282,12 +282,28 @@ pub(crate) fn stereotype(s: &str) -> String {
 }
 
 /// Reads a statement's lines one at a time.
+#[derive(Clone)]
 pub(crate) struct Cursor {
     lines: Vec<Line>,
     at: usize,
 }
 
 impl Cursor {
+    /// The ranges of the lines read since `from` (a [`Cursor::position`]).
+    pub fn ranges_since(&self, from: usize) -> Vec<TextRange> {
+        self.lines
+            .get(from..self.at.min(self.lines.len()))
+            .unwrap_or_default()
+            .iter()
+            .map(|l| l.range)
+            .collect()
+    }
+
+    /// How many lines have been read.
+    pub fn position(&self) -> usize {
+        self.at
+    }
+
     pub fn new(lines: Vec<Line>) -> Self {
         Self { lines, at: 0 }
     }

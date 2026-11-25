@@ -814,7 +814,11 @@ impl Parser<'_> {
             .to_ascii_lowercase();
         let kw = base.as_str();
         let block = match kw {
-            "legend" => true,
+            // `legend text` is one line; positions alone open the block.
+            "legend" => r[..line].split_whitespace().all(|w| {
+                ["left", "right", "center", "top", "bottom"]
+                    .contains(&w.to_ascii_lowercase().as_str())
+            }),
             // `header right` opens a block like `header` does.
             "header" | "footer" => r[..line]
                 .split_whitespace()

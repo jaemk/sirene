@@ -329,7 +329,12 @@ fn range(line: &Line, start: usize, end: usize) -> TextRange {
 pub(crate) fn lower(root: &SyntaxNode) -> (Railroad, Vec<Diagnostic>) {
     let mut d = Vec::new();
     let mut chart = Railroad::default();
-    let mut cursor = Cursor::new(lines::read(root));
+    // Every line is a regex, so only a `header`, `footer`, or `legend` block with its closer is
+    // a decoration (PCOM-1).
+    let claimed = super::decor::claim(root, super::decor::Raw::Regex);
+    let mut lines = lines::read(root);
+    lines.retain(|l| !claimed.contains(&l.range.start()));
+    let mut cursor = Cursor::new(lines);
     while let Some(line) = cursor.next() {
         // Only `title TEXT` and `skinparam ...` are settings; any other line is a regex, even
         // one starting `set`, `page`, `<style>`, or `!`.

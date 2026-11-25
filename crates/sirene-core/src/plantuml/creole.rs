@@ -11,6 +11,7 @@ use std::ops::Range;
 
 use rowan::TextRange;
 
+use crate::decor::Run;
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::{Delim, Flowchart, Label, Span};
 use crate::syntax::SyntaxNode;
@@ -118,9 +119,218 @@ pub(crate) fn split_outside(s: &str, sep: char) -> Vec<&str> {
 
 /// `line` as a row of text runs and formula runs. Without the `math` feature, or without a
 /// formula, one plain run.
-#[allow(dead_code)]
 pub(crate) fn runs(line: &str) -> Vec<Span> {
     crate::flowchart::formula::runs(line, Delim::Latex)
+}
+
+/// `line` as styled runs: the text and formula runs of [`runs`], each with the Creole style in
+/// force where it starts (PCREO-3). Read: `**bold**`, `//italic//`, `__underline__`,
+/// `--strike--`, `""monospace""`, `<b>`, `<i>`, `<u>`, `<s>`, `<color:c>`, `<size:N>`, and
+/// `<back:c>`, with their closing tags. A style carries across a formula. `bold_all` makes the
+/// whole line bold (a heading). A marker with no closing marker later in the line, or followed
+/// by a space, is text, so `A --> B` and `a__b` are not styled.
+pub(crate) fn styled(line: &str, bold_all: bool) -> Vec<Run> {
+    let mut state = State {
+        bold: bold_all,
+        ..State::default()
+    };
+    let mut out = Vec::new();
+    let mut at = 0;
+    for piece in runs(line) {
+        let len = piece.text.len();
+        if piece.math {
+            out.push(Run {
+                span: piece,
+                color: state.color.clone(),
+                ..Run::default()
+            });
+        } else {
+            state.read(&line[at..], len, bold_all, &mut out);
+        }
+        at += len;
+    }
+    out
+}
+
+/// The style in force while a line is read.
+#[derive(Default)]
+struct State {
+    bold: bool,
+    italic: bool,
+    underline: bool,
+    strike: bool,
+    mono: bool,
+    color: Option<String>,
+    size: Option<u32>,
+    back: Option<String>,
+}
+
+/// A style marker that is a pair of characters.
+const PAIRS: [&str; 3] = ["__", "--", "\"\""];
+
+impl State {
+    /// Reads the first `len` bytes of `tail` (the rest of the line from here), adding its runs
+    /// to `out` and changing the state at each marker.
+    fn read(&mut self, tail: &str, len: usize, bold_all: bool, out: &mut Vec<Run>) {
+        let text = &tail[..len];
+        let mut buf = String::new();
+        let mut i = 0;
+        while i < text.len() {
+            let rest = &tail[i..];
+            let before = if i == 0 {
+                None
+            } else {
+                text[..i].chars().next_back()
+            };
+            match self.marker(rest, before, bold_all) {
+                Some((n, change)) => {
+                    self.push(&mut buf, out);
+                    self.apply(change);
+                    i += n;
+                }
+                None => {
+                    let c = rest.chars().next().map_or(1, char::len_utf8);
+                    buf.push_str(&rest[..c]);
+                    i += c;
+                }
+            }
+        }
+        self.push(&mut buf, out);
+    }
+
+    /// The marker `rest` starts with, its length and what it changes.
+    fn marker(&self, rest: &str, before: Option<char>, bold_all: bool) -> Option<(usize, Change)> {
+        let lower = rest
+            .get(..rest.len().min(8))
+            .map(str::to_ascii_lowercase)
+            .unwrap_or_default();
+        let tag = |t: &str| lower.starts_with(t).then_some(t.len());
+        if rest.starts_with("**") {
+            return Some((2, Change::Bold(!self.bold)));
+        }
+        if rest.starts_with("//") && before != Some(':') {
+            return Some((2, Change::Italic(!self.italic)));
+        }
+        for pair in PAIRS {
+            if !rest.starts_with(pair) {
+                continue;
+            }
+            let on = match pair {
+                "__" => self.underline,
+                "--" => self.strike,
+                _ => self.mono,
+            };
+            // An opener has text after it and a closer later; a closer closes.
+            let after = &rest[2..];
+            let opens = after.chars().next().is_some_and(|c| {
+                !c.is_whitespace()
+                    && c != '>'
+                    && after.get(c.len_utf8()..).is_some_and(|r| r.contains(pair))
+            });
+            if !on && !opens {
+                return None;
+            }
+            let change = match pair {
+                "__" => Change::Underline(!on),
+                "--" => Change::Strike(!on),
+                _ => Change::Mono(!on),
+            };
+            return Some((2, change));
+        }
+        if let Some(n) = tag("<b>") {
+            return Some((n, Change::Bold(true)));
+        }
+        if let Some(n) = tag("</b>") {
+            return Some((n, Change::Bold(bold_all)));
+        }
+        if let Some(n) = tag("<i>") {
+            return Some((n, Change::Italic(true)));
+        }
+        if let Some(n) = tag("</i>") {
+            return Some((n, Change::Italic(false)));
+        }
+        if let Some(n) = tag("<u>") {
+            return Some((n, Change::Underline(true)));
+        }
+        if let Some(n) = tag("</u>") {
+            return Some((n, Change::Underline(false)));
+        }
+        if let Some(n) = tag("<s>").or_else(|| tag("<del>")) {
+            return Some((n, Change::Strike(true)));
+        }
+        if let Some(n) = tag("</s>").or_else(|| tag("</del>")) {
+            return Some((n, Change::Strike(false)));
+        }
+        if let Some(n) = tag("</color>") {
+            return Some((n, Change::Color(None)));
+        }
+        if let Some(n) = tag("</size>") {
+            return Some((n, Change::Size(None)));
+        }
+        if let Some(n) = tag("</back>") {
+            return Some((n, Change::Back(None)));
+        }
+        // `<color:red>`, `<size:14>`, `<back:#ff0>`: the tag, a colon, the value, a `>`.
+        for name in ["color", "size", "back"] {
+            let open = format!("<{name}:");
+            if !lower.starts_with(&open) {
+                continue;
+            }
+            let close = rest.find('>')?;
+            let value = rest[open.len()..close].trim().trim_start_matches('#');
+            let change = match name {
+                "color" => Change::Color(Some(value.to_owned())),
+                "size" => Change::Size(Some(value.parse().ok().filter(|n| *n > 0)?)),
+                _ => Change::Back(Some(value.to_owned())),
+            };
+            return Some((close + 1, change));
+        }
+        None
+    }
+
+    fn apply(&mut self, change: Change) {
+        match change {
+            Change::Bold(b) => self.bold = b,
+            Change::Italic(b) => self.italic = b,
+            Change::Underline(b) => self.underline = b,
+            Change::Strike(b) => self.strike = b,
+            Change::Mono(b) => self.mono = b,
+            Change::Color(c) => self.color = c,
+            Change::Size(s) => self.size = s,
+            Change::Back(c) => self.back = c,
+        }
+    }
+
+    fn push(&self, buf: &mut String, out: &mut Vec<Run>) {
+        if buf.is_empty() {
+            return;
+        }
+        out.push(Run {
+            span: Span {
+                text: std::mem::take(buf),
+                bold: self.bold,
+                italic: self.italic,
+                ..Span::default()
+            },
+            color: self.color.clone(),
+            underline: self.underline,
+            strike: self.strike,
+            mono: self.mono,
+            size: self.size,
+            back: self.back.clone(),
+        });
+    }
+}
+
+enum Change {
+    Bold(bool),
+    Italic(bool),
+    Underline(bool),
+    Strike(bool),
+    Mono(bool),
+    Color(Option<String>),
+    Size(Option<u32>),
+    Back(Option<String>),
 }
 
 /// `s` with each literal `\n` made a line break, except inside a formula: `\neq` and `\nu` are
