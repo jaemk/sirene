@@ -1,0 +1,28 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "stateDiagram-v2\n    [*] --> A\n    A : Rate $$\\sqrt{x}$$ and $$\\eta$$\n    state \"$$\\alpha$$ stage\" as C {\n        [*] --> B\n        B : $$\\beta$$\n    }\n    A --> C : $$\\gamma$$\n    note right of A : see $$\\delta$$\n    C --> [*]\n"
+---
+
+         ●
+         │
+         ▼
+╭────────────────╮  ┌───────╮
+│        _       │  │ see δ │
+│ Rate \/x and η │┄┄└───────┘
+╰────────┬───────╯
+         │
+         γ
+         ▼
+       ┌───── α stage ─┐
+       │               │
+       │     ●         │
+       │     │         │
+       │     ▼         │
+       │   ╭───╮       │
+       │   │ β │       │
+       │   ╰───╯       │
+       │               │
+       └─────┬─────────┘
+             │
+             ▼
+             ◉

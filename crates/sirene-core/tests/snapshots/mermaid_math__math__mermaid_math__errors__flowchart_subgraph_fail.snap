@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "flowchart LR\n    subgraph one[\"ok $$x$$ bad $$\\foo$$ and $$\\bar{y}$$\"]\n        A --> B\n    end\n"
+---
+2:34: error: Undefined control sequence: \foo [\foo]
+
+┌─                       _ ─┐
+│  ok x bad $$\foo$$ and y  │
+│      ┌───┐    ┌───┐       │
+│      │ A ├───►│ B │       │
+│      └───┘    └───┘       │
+└───────────────────────────┘

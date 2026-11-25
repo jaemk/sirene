@@ -1,0 +1,26 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "classDiagram\n    namespace Shapes {\n        class Circle[\"$$\\pi r^2$$ circle\"] {\n            +area $$\\sqrt{x}$$ value\n        }\n        class Square\n    }\n    Circle \"$$\\mu$$\" --> \"$$\\nu$$\" Square : has $$\\sqrt{2}$$\n    Square : +side $$\\rho$$ length\n    note for Square \"edge $$\\tau$$\"\n"
+---
+
+┌──────────── Shapes ────────────┐
+│                                │
+│ ┌─────────────────┐            │
+│ │   πr^2 circle   │            │
+│ ├─────────────────┤            │
+│ │         _       │            │
+│ │ +area \/x value │            │
+│ ├─────────────────┤            │
+│ └────────┬────────┘            │
+│          │μ                    │
+│             _                  │
+│       has \/2                  │
+│          ▼ν                    │
+│ ┌────────────────┐             │
+│ │     Square     │  ┌────────╮ │
+│ ├────────────────┤  │ edge τ │ │
+│ │ +side ρ length │┄┄└────────┘ │
+│ ├────────────────┤             │
+│ └────────────────┘             │
+│                                │
+└────────────────────────────────┘

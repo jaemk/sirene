@@ -1,0 +1,10 @@
+stateDiagram-v2
+    [*] --> A
+    A : Rate $$\sqrt{x}$$ and $$\eta$$
+    state "$$\alpha$$ stage" as C {
+        [*] --> B
+        B : $$\beta$$
+    }
+    A --> C : $$\gamma$$
+    note right of A : see $$\delta$$
+    C --> [*]

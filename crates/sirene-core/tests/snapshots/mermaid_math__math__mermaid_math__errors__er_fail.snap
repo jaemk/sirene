@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "erDiagram\n    \"$$\\fooa$$ SET\" ||--o{ ITEM : \"has $$\\foob$$\"\n    ITEM {\n        string name \"the $$\\fooc$$ value\"\n    }\n"
+---
+2:8: error: Undefined control sequence: \fooa [\fooa]
+2:42: error: Undefined control sequence: \foob [\foob]
+4:28: error: Undefined control sequence: \fooc [\fooc]
+
+         ┌───────────────┐
+         │ $$\fooa$$ SET │
+         └───────────────┘
+                 1
+           has $$\foob$$
+                 *
+┌─────────────────────────────────┐
+│              ITEM               │
+├─────────────────────────────────┤
+│ string name the $$\fooc$$ value │
+└─────────────────────────────────┘

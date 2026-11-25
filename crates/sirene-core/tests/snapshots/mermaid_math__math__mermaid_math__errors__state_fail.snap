@@ -1,0 +1,28 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "stateDiagram-v2\n    [*] --> A\n    A : ok $$x$$ bad $$\\foo$$\n    state \"$$\\fooc$$ stage\" as C {\n        [*] --> B\n    }\n    A --> C : $$\\foot$$\n    note right of A : see $$\\foon$$\n"
+---
+3:24: error: Undefined control sequence: \foo [\foo]
+4:14: error: Undefined control sequence: \fooc [\fooc]
+7:17: error: Undefined control sequence: \foot [\foot]
+8:29: error: Undefined control sequence: \foon [\foon]
+
+          ●
+          │
+          ▼
+╭───────────────────╮  ┌───────────────╮
+│ ok x bad $$\foo$$ │┄┄│ see $$\foon$$ │
+╰─────────┬─────────╯  └───────────────┘
+          │
+      $$\foot$$
+          ▼
+        ┌───── $$\fooc$$ stage ─┐
+        │                       │
+        │       ●               │
+        │       │               │
+        │       ▼               │
+        │     ╭───╮             │
+        │     │ B │             │
+        │     ╰───╯             │
+        │                       │
+        └───────────────────────┘

@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "erDiagram\n    \"$$\\Sigma$$ SET\" ||--o{ ITEM : \"has $$\\sqrt{n}$$\"\n    ITEM {\n        string name \"the $$\\theta$$ value\"\n    }\n"
+---
+
+         ┌───────┐
+         │ Σ SET │
+         └───────┘
+             1
+                _
+          has \/n
+             *
+┌─────────────────────────┐
+│          ITEM           │
+├─────────────────────────┤
+│ string name the θ value │
+└─────────────────────────┘

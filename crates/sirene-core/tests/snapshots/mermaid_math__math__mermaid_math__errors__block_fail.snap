@@ -1,0 +1,23 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "block-beta\n  columns 2\n  a[\"Area $$\\fooa$$\"] b[\"ok $$x$$\"]\n  block:g[\"$$\\foob$$ group\"]\n    c d\n  end\n  a -- \"$$\\fooc$$\" --> b\n"
+---
+3:13: error: Undefined control sequence: \fooa [\fooa]
+4:14: error: Undefined control sequence: \foob [\foob]
+7:11: error: Undefined control sequence: \fooc [\fooc]
+
+┌────────────────┐  ┌────────────────┐
+│                │  │                │
+│ Area $$\fooa$$ │  │      ok x      │
+│                │  │                │
+│                │  │                │
+└────────────────┘  └────────────────┘
+
+┌─ $$\foob$$ group
+│                │
+│ ┌────┐  ┌────┐ │
+│ │ c  │  │ d  │ │
+│ └────┘  └────┘ │
+└────────────────┘
+
+a --> b: $$\fooc$$
