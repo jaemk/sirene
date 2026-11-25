@@ -1,0 +1,9 @@
+@startregex
+header
+Pattern
+end header
+legend
+Groups
+end legend
+^ab+(c|d)*$
+@endregex

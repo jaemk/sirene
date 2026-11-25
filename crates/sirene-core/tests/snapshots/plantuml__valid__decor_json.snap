@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startjson\nheader Release data\nfooter Generated\ncaption Figure 1\nlegend top right\nValues\nend legend\n{\"name\": \"sirene\", \"tags\": [\"a\", \"b\"]}\n@endjson\n"
+---
+
+            Release data
+
+              ┌────────┐
+              │ Values │
+              └────────┘
+
+┌─────────────┐    ┌───┐
+│ name sirene │    │ a │
+│ tags        ├────┤ b │
+└─────────────┘    └───┘
+
+        Figure 1
+
+       Generated

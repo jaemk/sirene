@@ -210,7 +210,7 @@ fn a_drawn_decoration_is_not_reported() {
 }
 
 #[test]
-fn an_unclosed_block_is_an_error_and_a_legend_with_text_is_not_drawn() {
+fn an_unclosed_block_is_an_error_and_a_legend_with_text_is_one_line() {
     let lowered = diagram::lower("@startuml\nclass A\nlegend\nx\n@enduml\n");
     assert!(
         lowered
@@ -221,12 +221,39 @@ fn an_unclosed_block_is_an_error_and_a_legend_with_text_is_not_drawn() {
         lowered.diagnostics
     );
     let lowered = diagram::lower("@startuml\nclass A\nlegend hello\n@enduml\n");
-    assert!(matches!(lowered.diagram, Diagram::Graph(_)));
-    let [d] = lowered.diagnostics.as_slice() else {
-        panic!("{:?}", lowered.diagnostics);
+    assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+    let Diagram::Decorated(d) = &lowered.diagram else {
+        panic!("{:?}", lowered.diagram);
     };
-    assert_eq!(d.severity, Severity::Warning);
-    assert!(d.message.contains("not drawn"), "{d:?}");
+    let legend = d.decor.legend.as_ref().unwrap();
+    assert_eq!(legend.lines, ["hello"]);
+    assert_eq!(
+        (legend.horizontal, legend.vertical),
+        (HAlign::Center, VAlign::Bottom)
+    );
+}
+
+#[test]
+fn a_one_line_legend_takes_positions_and_a_colon() {
+    for doc in [
+        "legend top left : Key\nA -> B\n",
+        "legend top left Key\nA -> B\n",
+    ] {
+        let d = decor(&format!("@startuml\n{doc}@enduml\n"));
+        let legend = d.legend.unwrap();
+        assert_eq!(legend.lines, ["Key"], "{doc}");
+        assert_eq!(
+            (legend.horizontal, legend.vertical),
+            (HAlign::Left, VAlign::Top)
+        );
+    }
+    // The text is drawn in a box, in the scene and as text.
+    let src = "@startuml\nlegend right Key\nA -> B\n@enduml\n";
+    at(&scene(src), "Key");
+    assert!(ascii(src, Charset::Unicode).contains("Key"));
+    // A sequence diagram reads it too, and the next line is not swallowed.
+    let seq = decor(&wrap("legend left Key"));
+    assert_eq!(seq.legend.unwrap().lines, ["Key"]);
 }
 
 /// The names that stay members and links are not decorations.
@@ -494,7 +521,7 @@ mod drawing {
         .map(|n| n.trim_end_matches(".puml").to_owned())
         .collect();
         names.sort();
-        assert!(names.len() == 12, "{names:?}");
+        assert!(names.len() == 18, "{names:?}");
         for name in names {
             let src = fixture("valid", &name);
             let s = scene(&src);
@@ -692,6 +719,305 @@ mod math {
         lines.sort_unstable();
         assert_eq!(lines, [3, 4], "{d:?}");
     }
+}
+
+/// The lowered diagram a decorated document wraps, as its `Debug` text.
+fn wrapped(src: &str) -> (String, Decorations) {
+    match diagram::lower(src).diagram {
+        Diagram::Decorated(d) => (format!("{:?}", d.diagram), d.decor),
+        other => panic!("not decorated: {other:?}"),
+    }
+}
+
+/// The kinds whose body another reader reads take the statements too.
+#[test]
+fn data_graph_and_grammar_kinds_take_decorations() {
+    let cases = [
+        (
+            "@startjson\nheader H\nfooter: F\ncaption C\nlegend top\nL\nend legend\n{\"a\": 1}\n@endjson\n",
+            "Graph",
+        ),
+        (
+            "@startyaml\nheader H\nfooter F\ncaption C\nlegend\nL\nendlegend\na: 1\n@endyaml\n",
+            "Graph",
+        ),
+        (
+            "@startdot\nheader H\nfooter F\ncaption C\nlegend left K\ndigraph { a -> b }\n@enddot\n",
+            "Graph",
+        ),
+        (
+            "@startebnf\nheader H\nfooter F\ncaption C\nlegend K\nr = \"a\";\n@endebnf\n",
+            "Railroad",
+        ),
+        (
+            "@startregex\nheader\nH\nend header\nfooter\nF\nend footer\nlegend\nL\nend legend\nab+\n@endregex\n",
+            "Railroad",
+        ),
+    ];
+    for (src, inner) in cases {
+        let lowered = diagram::lower(src);
+        let (shown, d) = wrapped(src);
+        assert!(shown.starts_with(inner), "{src}: {shown}");
+        assert!(
+            d.header.is_some() && d.footer.is_some() && d.legend.is_some(),
+            "{src}"
+        );
+        assert!(!src.contains("regex") == d.caption.is_some(), "{src}");
+        assert!(
+            lowered
+                .diagnostics
+                .iter()
+                .all(|d| d.severity != Severity::Error),
+            "{src}: {:?}",
+            lowered.diagnostics
+        );
+        let s = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+        at(&s, "H");
+        at(&s, if src.contains("\nL\n") { "L" } else { "K" });
+        assert!(ascii(src, Charset::Ascii).contains('H'), "{src}");
+    }
+    // The data is still drawn.
+    let s = scene("@startjson\nheader H\n{\"key\": \"val\"}\n@endjson\n");
+    at(&s, "key");
+    at(&s, "val");
+}
+
+/// PlantUML draws no header or footer in a formula document, and every line there is TeX or
+/// AsciiMath: the statements stay formula text.
+#[test]
+fn formula_documents_take_no_decorations() {
+    for src in [
+        "@startlatex\nheader x\nfooter y\n@endlatex\n",
+        "@startmath\nheader x\n@endmath\n",
+        "@startlatex\nlegend\nx\nend legend\n@endlatex\n",
+    ] {
+        let lowered = diagram::lower(src);
+        assert!(
+            matches!(lowered.diagram, Diagram::Equation(_)),
+            "{src}: {:?}",
+            lowered.diagram
+        );
+    }
+}
+
+/// A line that is the body's own syntax is not a decoration.
+#[test]
+fn raw_bodies_keep_lines_that_are_theirs() {
+    for src in [
+        "@startyaml\nheader: x\n@endyaml\n",
+        "@startyaml\ncaption: x\n@endyaml\n",
+        "@startdot\ndigraph {\nlegend\nheader [label=h]\nfooter -> x\n}\n@enddot\n",
+        "@startebnf\nheader = \"x\";\n@endebnf\n",
+        "@startregex\nheader x\n@endregex\n",
+        "@startregex\ncaption x\n@endregex\n",
+    ] {
+        let lowered = diagram::lower(src);
+        assert!(
+            !matches!(lowered.diagram, Diagram::Decorated(_)),
+            "{src}: {:?}",
+            lowered.diagram
+        );
+    }
+    // A regex block with its closer is a decoration; the regex lines are still read.
+    let (shown, d) = wrapped("@startregex\nheader\nTitle\nend header\nab+\n@endregex\n");
+    assert!(shown.starts_with("Railroad"));
+    assert_eq!(d.header, banner(&["Title"], HAlign::Right));
+    // Without the closer, the lines are regexes.
+    let lowered = diagram::lower("@startregex\nheader\nTitle\n@endregex\n");
+    assert!(!matches!(lowered.diagram, Diagram::Decorated(_)));
+}
+
+/// A horizontal line: its two x, its y, its width, and its dash.
+type Rule = (f32, f32, f32, f32, Option<(f32, f32)>);
+
+/// The horizontal lines a scene draws (two points, no fill).
+fn rules(scene: &Scene) -> Vec<Rule> {
+    use sirene_core::scene::Segment;
+    scene
+        .elements
+        .iter()
+        .filter_map(|e| match &e.primitive {
+            Primitive::Path {
+                segments,
+                fill: None,
+                stroke: Some(s),
+                ..
+            } => match segments.as_slice() {
+                [Segment::Move(a), Segment::Line(b)] if (a.y - b.y).abs() < 0.001 => {
+                    Some((a.x, b.x, a.y, s.width, s.dash))
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+/// The filled rectangles with no outline a scene draws.
+fn highlights(scene: &Scene) -> usize {
+    scene
+        .elements
+        .iter()
+        .filter(|e| {
+            matches!(
+                &e.primitive,
+                Primitive::Path {
+                    fill: Some(_),
+                    stroke: None,
+                    ..
+                }
+            )
+        })
+        .count()
+}
+
+#[test]
+fn underline_and_strike_draw_a_line_over_their_text() {
+    // The header's row is at the top of the scene, above any line the diagram draws.
+    let near = |s: &Scene| -> Vec<f32> {
+        let mut ys: Vec<f32> = rules(s).iter().map(|l| l.2).filter(|y| *y < 40.0).collect();
+        ys.sort_by(f32::total_cmp);
+        ys
+    };
+    assert!(near(&scene(&wrap("header under gone"))).is_empty());
+    let styled = scene(&wrap("header __under__ --gone-- end"));
+    let (_, y_under) = at(&styled, "under");
+    let (_, y_gone) = at(&styled, "gone");
+    assert_eq!(y_under, y_gone);
+    let ys = near(&styled);
+    assert_eq!(ys.len(), 2, "{ys:?}");
+    // The strike is through the middle of the text, the underline below it.
+    assert!((ys[0] - y_under).abs() < 0.01, "{ys:?} {y_under}");
+    assert!(ys[1] > y_under + 3.0, "{ys:?} {y_under}");
+    // The markers are not drawn.
+    assert!(
+        texts(&styled)
+            .iter()
+            .all(|t| !t.0.contains("__") && !t.0.contains("--"))
+    );
+    // `<u>` and `<s>` are the same.
+    let tagged = scene(&wrap("header <u>under</u> <s>gone</s> end"));
+    assert_eq!(near(&tagged).len(), 2);
+}
+
+#[test]
+fn an_arrow_or_a_lone_marker_is_text() {
+    let s = scene(&wrap("header a --> b __ c"));
+    assert!(
+        texts(&s).iter().any(|t| t.0.contains("-->")),
+        "{:?}",
+        texts(&s)
+    );
+    assert!(rules(&s).iter().all(|l| l.2 > 40.0), "{:?}", rules(&s));
+}
+
+#[test]
+fn size_and_background_change_the_run() {
+    let s = scene(&wrap(
+        "header a <size:30>big</size> <back:#ffcc00>lit</back> z",
+    ));
+    let size_of = |text: &str| {
+        s.elements
+            .iter()
+            .find_map(|e| match &e.primitive {
+                Primitive::Text { text: t, size, .. } if t == text => Some(*size),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("{text}"))
+    };
+    assert_eq!(size_of("big"), 30.0);
+    assert!(size_of("a") < 30.0);
+    assert_eq!(size_of("lit"), size_of("z"));
+    assert_eq!(highlights(&s), highlights(&scene(&wrap("header x"))) + 1);
+    // A bigger run makes a taller header.
+    let small = scene(&wrap("header a"));
+    assert!(s.height > small.height + 10.0);
+}
+
+#[test]
+fn monospace_text_is_read_without_its_markers() {
+    let s = scene(&wrap("header a \"\"code\"\" z"));
+    at(&s, "code");
+    assert!(texts(&s).iter().all(|t| !t.0.contains("\"\"")));
+}
+
+#[test]
+fn a_rule_is_a_line_across_the_block() {
+    let base = scene(&wrap("legend\nabcdef\ndef\nend legend"));
+    for (rule, extra, width, dash) in [
+        ("----", 1, 1.0, false),
+        ("====", 2, 1.0, false),
+        ("____", 1, 2.0, false),
+        ("....", 1, 1.0, true),
+    ] {
+        let s = scene(&wrap(&format!("legend\nabcdef\n{rule}\ndef\nend legend")));
+        let added: Vec<_> = rules(&s)
+            .into_iter()
+            .filter(|r| !rules(&base).contains(r))
+            .collect();
+        assert_eq!(added.len(), extra, "{rule}: {added:?}");
+        assert!(
+            added.iter().all(|r| r.3 == width && r.4.is_some() == dash),
+            "{rule}"
+        );
+        // It runs the width of the text, and sits between the two lines.
+        let (_, above) = at(&s, "abcdef");
+        let (_, below) = at(&s, "def");
+        assert!(added.iter().all(|r| r.2 > above && r.2 < below), "{rule}");
+        assert!(added.iter().all(|r| r.1 - r.0 > 20.0), "{rule}");
+    }
+    let text = ascii(
+        &wrap("legend\nabcdef\n----\ndef\nend legend"),
+        Charset::Ascii,
+    );
+    assert!(text.contains("| ------ |"), "{text}");
+    let text = ascii(&wrap("legend\nab\n====\nend legend"), Charset::Ascii);
+    assert!(text.contains("| ==== |"), "{text}");
+}
+
+#[test]
+fn a_table_is_a_grid_of_cells() {
+    let src = wrap("legend\n|= Name |= Qty |\n| ab | 12 |\nend legend");
+    let s = scene(&src);
+    for cell in ["Name", "Qty", "ab", "12"] {
+        at(&s, cell);
+    }
+    // Cells in a column share a width, and the heading is bold.
+    let (name, ab) = (at(&s, "Name"), at(&s, "ab"));
+    assert!((name.0 - ab.0).abs() < 20.0);
+    assert!(name.1 < ab.1);
+    let bold = s.elements.iter().any(|e| {
+        matches!(&e.primitive, Primitive::Text { text, style, .. } if text == "Name" && style.bold)
+    });
+    assert!(bold);
+    let none = scene(&wrap("legend\nx\nend legend"));
+    let cells = |s: &Scene| {
+        s.elements
+            .iter()
+            .filter(|e| {
+                matches!(&e.primitive, Primitive::Path { segments, fill: None, stroke: Some(_), .. } if segments.len() == 5)
+            })
+            .count()
+    };
+    assert_eq!(cells(&s), cells(&none) + 4);
+    let text = ascii(&src, Charset::Ascii);
+    for row in ["+------+-----+", "| Name | Qty |", "| ab   | 12  |"] {
+        assert!(text.contains(row), "{row}\n{text}");
+    }
+    let unicode = ascii(&src, Charset::Unicode);
+    assert!(
+        unicode.contains("\u{2502} Name \u{2502} Qty \u{2502}"),
+        "{unicode}"
+    );
+}
+
+#[test]
+fn creole_markers_are_not_drawn_as_text() {
+    let text = ascii(
+        &wrap("header __a__ --b-- <size:20>c</size> <back:red>d</back>"),
+        Charset::Ascii,
+    );
+    assert!(text.contains("a b c d"), "{text}");
 }
 
 #[cfg(not(feature = "math"))]

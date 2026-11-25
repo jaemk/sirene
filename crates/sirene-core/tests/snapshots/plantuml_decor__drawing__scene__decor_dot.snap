@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startdot\nheader Build graph\nfooter Generated\ncaption Figure 1\nlegend bottom left : edges are dependencies\ndigraph G {\n  a -> b;\n  b -> c;\n}\n@enddot\n"
+---
+232.8 x 394.0
+text "Build graph" (170.6, 18.0) #333333
+path 3 points (112.4, 124.1)-(121.4, 133.1) fill
+path 2 points (116.9, 91.9)-(116.9, 125.1) stroke
+path 3 points (112.4, 205.1)-(121.4, 214.1) fill
+path 2 points (116.9, 172.9)-(116.9, 206.1) stroke
+path 3 points (101.9, 72.0)-(130.9, 72.0) fill stroke
+text "a" (116.4, 72.0) #333333
+path 3 points (101.9, 153.0)-(130.9, 153.0) fill stroke
+text "b" (116.4, 153.0) #333333
+path 3 points (101.9, 234.0)-(130.9, 234.0) fill stroke
+text "c" (116.4, 234.0) #333333
+path 4 points (16.0, 278.0)-(216.8, 314.0) fill stroke
+text "edges are dependencies" (116.4, 296.0) #333333
+text "Figure 1" (116.4, 340.0) #333333
+text "Generated" (116.4, 376.0) #333333

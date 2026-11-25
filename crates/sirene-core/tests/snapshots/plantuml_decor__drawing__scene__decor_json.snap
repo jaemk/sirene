@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startjson\nheader Release data\nfooter Generated\ncaption Figure 1\nlegend top right\nValues\nend legend\n{\"name\": \"sirene\", \"tags\": [\"a\", \"b\"]}\n@endjson\n"
+---
+234.0 x 254.0
+text "Release data" (167.6, 18.0) #333333
+path 4 points (151.6, 44.0)-(218.0, 80.0) fill stroke
+text "Values" (184.8, 62.0) #333333
+path 2 points (136.0, 140.0)-(185.0, 140.0) stroke
+path 4 points (16.0, 104.0)-(136.0, 156.0) fill stroke
+text "name" (44.8, 120.0) #333333
+text "sirene" (98.8, 120.0) #333333
+text "tags" (44.8, 140.0) #333333
+path 4 points (185.0, 114.0)-(218.0, 166.0) fill stroke
+text "a" (201.2, 130.0) #333333
+text "b" (201.2, 150.0) #333333
+text "Figure 1" (117.0, 200.0) #333333
+text "Generated" (117.0, 236.0) #333333

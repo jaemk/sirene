@@ -1,0 +1,10 @@
+@startdot
+header Build graph
+footer Generated
+caption Figure 1
+legend bottom left : edges are dependencies
+digraph G {
+  a -> b;
+  b -> c;
+}
+@enddot

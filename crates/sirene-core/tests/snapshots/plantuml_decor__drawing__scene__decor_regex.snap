@@ -1,0 +1,39 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startregex\nheader\nPattern\nend header\nlegend\nGroups\nend legend\n^ab+(c|d)*$\n@endregex\n"
+---
+584.2 x 260.8
+text "Pattern" (538.8, 18.0) #333333
+path 2 points (174.8, 108.4)-(184.8, 108.4) stroke
+path 2 points (214.4, 108.4)-(224.4, 108.4) stroke
+path 2 points (224.4, 108.4)-(244.4, 108.4) stroke
+path 2 points (274.0, 108.4)-(294.0, 108.4) stroke
+path 8 points (234.4, 108.4)-(284.0, 147.6) stroke
+path 2 points (294.0, 108.4)-(304.0, 108.4) stroke
+path 5 points (324.0, 85.2)-(344.0, 108.4) stroke
+path 5 points (373.6, 85.2)-(393.6, 108.4) stroke
+path 5 points (324.0, 108.4)-(344.0, 131.6) stroke
+path 5 points (373.6, 108.4)-(393.6, 131.6) stroke
+path 2 points (304.0, 108.4)-(324.0, 108.4) stroke
+path 2 points (393.6, 108.4)-(413.6, 108.4) stroke
+path 8 points (314.0, 108.4)-(403.6, 170.8) stroke
+path 8 points (304.0, 46.0)-(413.6, 108.4) stroke
+path 2 points (413.6, 108.4)-(423.6, 108.4) stroke
+path 2 points (15.0, 108.4)-(30.0, 108.4) stroke
+path 2 points (549.2, 108.4)-(554.2, 108.4) stroke
+path 4 points (30.0, 89.2)-(174.8, 127.6) fill stroke
+text "start of line" (102.4, 108.4) #333333
+path 9 points (184.8, 89.2)-(214.4, 127.6) fill stroke
+text "a" (199.6, 108.4) #333333
+path 9 points (244.4, 89.2)-(274.0, 127.6) fill stroke
+text "b" (259.2, 108.4) #333333
+path 9 points (344.0, 66.0)-(373.6, 104.4) fill stroke
+text "c" (358.8, 85.2) #333333
+path 9 points (344.0, 112.4)-(373.6, 150.8) fill stroke
+text "d" (358.8, 131.6) #333333
+path 4 points (423.6, 89.2)-(549.2, 127.6) fill stroke
+text "end of line" (486.4, 108.4) #333333
+path 3 points (5.0, 108.4)-(15.0, 108.4) fill
+path 3 points (554.2, 108.4)-(564.2, 108.4) fill
+path 4 points (258.9, 216.8)-(325.3, 252.8) fill stroke
+text "Groups" (292.1, 234.8) #333333

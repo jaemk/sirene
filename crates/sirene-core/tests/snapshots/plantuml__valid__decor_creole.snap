@@ -1,0 +1,34 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nheader __Draft__ --old-- <size:16>big</size> <back:#ffee88>note</back> \"\"code\"\"\nfooter <u>Page</u> 1\ncaption Figure 1\nlegend top left\n== Key ==\n* __underlined__ item\n----\n|= Name |= Qty |\n| apple | 3 |\n| pear | 12 |\n====\nthe last line\nend legend\nclass A\nclass B\nA --> B\n@enduml\n"
+---
+
+Draft old big note code
+
+┌───────────────────┐
+│ Key               │
+│ • underlined item │
+│ ----------------- │
+│ ┌───────┬─────┐   │
+│ │ Name  │ Qty │   │
+│ ├───────┼─────┤   │
+│ │ apple │ 3   │   │
+│ ├───────┼─────┤   │
+│ │ pear  │ 12  │   │
+│ └───────┴─────┘   │
+│ ================= │
+│ the last line     │
+└───────────────────┘
+
+         ┌───┐
+         │ A │
+         └─┬─┘
+           │
+           ▼
+         ┌───┐
+         │ B │
+         └───┘
+
+       Figure 1
+
+        Page 1

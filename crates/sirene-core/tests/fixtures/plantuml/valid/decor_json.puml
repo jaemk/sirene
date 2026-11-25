@@ -1,0 +1,9 @@
+@startjson
+header Release data
+footer Generated
+caption Figure 1
+legend top right
+Values
+end legend
+{"name": "sirene", "tags": ["a", "b"]}
+@endjson
