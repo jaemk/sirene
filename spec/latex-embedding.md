@@ -101,7 +101,8 @@ shows. An unclosed tag is plain text.
 Status (`<latex>`): read in sequence participant names, messages, notes, and `ref` text and in the
 labels of the graph kinds, including class and state compartment rows and titles, the labels at
 the ends of an edge, subgraph titles, the document title, sequence group and frame text, and JSON
-and YAML values (PCREO-3 lists them and what is not read). The tag is matched in any
+and YAML values, and the Gantt title, section names, and task names, the chronology title and
+event text, and the timing title (PCREO-3 lists them and what is not read). The tag is matched in any
 case; several per line; no nesting; the body is verbatim, so a doubled backslash is a TeX line
 break and `\n` inside a closed tag is not a line break. Typeset in text style (inline), not
 Mermaid's display style. `<math>` (AsciiMath) is read in the same places, translated to TeX by
@@ -224,10 +225,16 @@ flowchart lowering). Without the `math` feature each formula gets one warning on
   `Label::runs` and `Formulas` (`scene/paint.rs`) and `Rows` (`ascii/mod.rs`); also the document
   `title`, sequence group titles, frame tabs and labels, dividers, separators, delays, and JSON
   and YAML values (`scene/sequence.rs`, `ascii/sequence.rs`, `Flowchart::title_delim`); and, for
-  Mermaid sequence diagrams, block labels and section titles (the same code). Left,
-  for PlantUML: headers, footers, captions, and legends (not drawn at all), and the kinds that
-  keep plain strings with their own painters (Gantt, timing, chronology, DOT; PCREO-3). PlantUML mindmap node text is done: it shares the
-  Mermaid mindmap model and reads `<latex>` and `<math>`.
+  Mermaid sequence diagrams, block labels and section titles (the same code). PlantUML mindmap
+  node text is done: it shares the Mermaid mindmap model and reads `<latex>` and `<math>`. Done,
+  for the PlantUML kinds that keep plain strings: the Gantt title, section names, and task names;
+  the chronology title and event text; and the timing title (`scene/gantt.rs`,
+  `scene/timeline.rs`, `scene/timing.rs`, and their `ascii` twins, drawn from `tag_runs` and
+  `tag_rows`). Left, for PlantUML: headers, footers, captions, and legends (not drawn at all, so
+  none is added); the timing diagram's signal names, state labels, notes, constraints,
+  highlights, messages, and change notes (fixed-height bands and one-row cells in the text
+  renderer); the chronology's date labels; and DOT (`@startdot` is Graphviz's language, with no
+  tags; PCREO-3).
   Done, for Mermaid (LEMB-1): flowchart subgraph titles; state names, descriptions, notes,
   composite titles, and transition labels; class names, members, notes, namespace titles,
   relation labels, and cardinalities; ER entity names, attributes, and relationship labels;
