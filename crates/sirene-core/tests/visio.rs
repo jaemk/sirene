@@ -1084,6 +1084,53 @@ fn a_shape_with_too_many_rows_is_an_error() {
     assert!(read_err(&page(&sh).build()).contains("geometry rows"));
 }
 
+#[test]
+fn a_master_that_cannot_be_read_is_a_warning() {
+    let rows: Vec<String> = (0..4100)
+        .map(|i| row("LineTo", i, &[("X", 1.0), ("Y", 1.0)]))
+        .collect();
+    let bad = shape(1, "", &geometry(0, "", &rows));
+    let own = rect_shape(2, "", (2.0, 1.0), (2.0, 1.0));
+    let bytes = page(&own).master(5, &bad).build();
+    let v = open(&bytes);
+    assert_eq!(scene(&bytes, 0).elements.len(), 1);
+    let (_, diagnostics) = visio::read(&bytes).unwrap();
+    assert!(
+        diagnostics.iter().any(|d| d.message.contains("master")),
+        "{diagnostics:?} {v:?}"
+    );
+}
+
+#[test]
+fn instances_of_a_large_master_share_a_row_budget() {
+    let mut rows = vec![row("MoveTo", 0, &[("X", 0.0), ("Y", 0.0)])];
+    rows.extend((1..4000).map(|i| row("LineTo", i, &[("X", 1.0), ("Y", 1.0)])));
+    let master = shape(
+        1,
+        "",
+        &(xform(1.0, 1.0, 2.0, 2.0) + &geometry(0, "", &rows)),
+    );
+    // 300 instances of 4,000 rows are 1.2 million rows, over the page's 1 million.
+    let instances: String = (0..300)
+        .map(|i| {
+            shape(
+                10 + i,
+                r#"Master="5""#,
+                &(cell("PinX", 2.0) + &cell("PinY", 1.0)),
+            )
+        })
+        .collect();
+    let bytes = page(&instances).master(5, &master).build();
+    let s = scene(&bytes, 0);
+    // Each open filled instance is two elements, so 250 instances (1 million rows) are 500.
+    assert_eq!(s.elements.len(), 500);
+    let p = open(&bytes).problems();
+    assert!(
+        p.iter().any(|d| d.message.contains("geometry rows")),
+        "{p:?}"
+    );
+}
+
 // ---- diagram integration (VISIO-12) ----
 
 mod lowered {

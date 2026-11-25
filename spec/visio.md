@@ -296,6 +296,13 @@ empty drawing. Limits (`visio/limits.rs`, LANGS-8):
 | Geometry rows per shape | 4096 |
 | Master and style inheritance depth | 16 |
 | Text length per shape | 64 KiB |
+| Geometry rows per page, inherited rows counted per inheriting shape | 1,000,000 |
+| Text per page, inherited text counted per inheriting shape | 4 MiB |
+
+Past a per-page budget the remaining shapes' geometry or text is not drawn, with one warning. An
+entry with a compression method other than stored or deflate fails only when it is read, so an
+unused part of that kind does not refuse the package. A master whose part cannot be read is a
+warning, and its instances draw what they have of their own.
 
 A DOCTYPE in any part is an error (`roxmltree`'s `allow_dtd` is false; entities beyond the five
 predefined and numeric references are therefore never expanded). Compressed data is inflated

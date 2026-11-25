@@ -202,8 +202,11 @@ fn rejects_encryption_zip64_and_other_methods() {
 
     let mut method = base.clone();
     *method.get_mut(central + 10).unwrap() = 12;
+    // An unsupported method fails only the entry that uses it.
     assert!(
         Archive::open(&method)
+            .unwrap()
+            .read("a.txt")
             .unwrap_err()
             .report()
             .contains("method")

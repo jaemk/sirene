@@ -48,6 +48,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   characters: `x_i^2` and `int_0^1`, not `x^2_i` and `int^1_0`. A space follows such a script
   before a letter (`int_0^n i`, not `int_0^ni`).
 
+### Fixed
+
+- Markdown files with many unmatched `$` on one line were read in quadratic time (60,000 bytes
+  took 10 seconds); each line is now scanned once.
+- A Visio page draws at most 1,000,000 geometry rows and 4 MiB of text over all its shapes,
+  inherited rows and text counted for each instance; a master with many rows and many instances
+  was not bounded.
+- A `.vsdx` with an entry in an unsupported compression method is refused only when that entry is
+  read, and a master that cannot be read is a warning rather than an error.
+
 ## [0.6.4] - 2026-11-22
 
 ### Added

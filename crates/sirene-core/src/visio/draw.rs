@@ -279,6 +279,19 @@ impl<'a> Ctx<'a> {
             .collect()
     }
 
+    /// How many rows the sections called `name` have, the shape's and its master shape's, before
+    /// they are merged.
+    fn row_estimate(&self, name: &str) -> usize {
+        let count = |sections: &[Section]| {
+            sections
+                .iter()
+                .filter(|s| s.n == name)
+                .map(|s| s.rows.len())
+                .sum::<usize>()
+        };
+        count(&self.shape.sections) + self.master.map_or(0, |m| count(&m.sections))
+    }
+
     fn has_own_geometry(&self) -> bool {
         self.shape.sections.iter().any(|s| s.n == "Geometry")
     }
@@ -403,6 +416,9 @@ struct Drawer<'a, M: TextMetrics> {
     warnings: Vec<String>,
     seen: HashSet<String>,
     count: usize,
+    /// Geometry rows and text bytes spent on this page, against the per-page budgets.
+    rows: usize,
+    text_bytes: usize,
     page_w: f64,
     page_h: f64,
 }
@@ -549,6 +565,14 @@ impl<M: TextMetrics> Drawer<'_, M> {
     }
 
     fn geometry(&mut self, ctx: &Ctx, total: &Mat, t: &Transform, look: &Look) {
+        self.rows = self.rows.saturating_add(ctx.row_estimate("Geometry"));
+        if self.rows > limits::MAX_PAGE_ROWS {
+            self.warn(format!(
+                "the page has more than {} geometry rows; the shapes after them are not drawn",
+                limits::MAX_PAGE_ROWS
+            ));
+            return;
+        }
         let mut sections = ctx.sections("Geometry");
         if sections.iter().map(|s| s.rows.len()).sum::<usize>() > limits::MAX_ROWS {
             self.warn(format!(
@@ -813,6 +837,21 @@ impl<M: TextMetrics> Drawer<'_, M> {
             .iter()
             .any(|p| matches!(p, TextPart::Chars(s) if !s.trim().is_empty()))
         {
+            return;
+        }
+        let bytes: usize = parts
+            .iter()
+            .map(|p| match p {
+                TextPart::Chars(s) => s.len(),
+                _ => 0,
+            })
+            .sum();
+        self.text_bytes = self.text_bytes.saturating_add(bytes);
+        if self.text_bytes > limits::MAX_PAGE_TEXT {
+            self.warn(format!(
+                "the page has more than {} bytes of text; the shapes after it have none",
+                limits::MAX_PAGE_TEXT
+            ));
             return;
         }
         let char_rows: BTreeMap<i32, Row> = ctx
@@ -1104,6 +1143,8 @@ pub(crate) fn draw(visio: &Visio, metrics: &impl TextMetrics) -> Result<Drawn> {
         warnings: Vec::new(),
         seen: HashSet::new(),
         count: 0,
+        rows: 0,
+        text_bytes: 0,
         page_w: w,
         page_h: h,
     };
