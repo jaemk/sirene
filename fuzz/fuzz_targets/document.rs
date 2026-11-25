@@ -1,7 +1,9 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
+use sirene_core::diagnostic::LineIndex;
 use sirene_core::diagram::{self, Diagram, Kind, Lang, Lowered};
+use sirene_core::markdown::{self, Part};
 use sirene_core::theme::ThemeConfig;
 
 #[path = "../../crates/sirene-core/tests/common/parser_registry.rs"]
@@ -15,6 +17,7 @@ fuzz_target!(|data: &[u8]| {
     }
     let raw = String::from_utf8_lossy(data);
     check(&raw, None);
+    markdown_and_tex(&raw);
 
     let newline = ["\n", "\r\n", "\r"][byte(data, 3) % 3];
     match byte(data, 6) % 3 {
@@ -26,6 +29,28 @@ fuzz_target!(|data: &[u8]| {
         _ => directive_recovery(data, newline),
     }
 });
+
+/// The same text as a TeX file, and as Markdown: the formulas found in it have ranges in the
+/// text, in order, and their diagnostics map back into it.
+fn markdown_and_tex(src: &str) {
+    assert_eq!(check(src, Some(Lang::Latex)).kind, Kind::Latex);
+    let mut end = 0;
+    for part in markdown::parts(src) {
+        let range = part.range();
+        assert!(range.start >= end && src.get(range.clone()).is_some(), "{src:?}");
+        end = range.end;
+        if let Part::Math(math) = &part {
+            let lowered = math.lower();
+            check_ranges(&math.source, &lowered.diagnostics);
+            let index = LineIndex::new(&math.source);
+            for d in &lowered.diagnostics {
+                let (line, col) = index.line_col(d);
+                let (line, col) = math.position(line, col);
+                assert!(line >= math.line && col >= 1, "{src:?}");
+            }
+        }
+    }
+}
 
 fn byte(data: &[u8], at: usize) -> usize {
     usize::from(data.get(at).copied().unwrap_or_default())

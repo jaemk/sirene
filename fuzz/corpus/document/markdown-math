@@ -1,0 +1,29 @@
+# Notes
+
+Inline $x^2$, a price of $5 and $6, \$7, and `$y$`.
+
+$$
+\int_0^1 x\,dx
+$$
+
+```mermaid
+flowchart LR
+  A["$$x^2$$"] --> B
+```
+
+```math
+\frac{a}{b}
+```
+
+- item $a+b$ and $$c$$
+> quote $q^1^2$
+>
+> $$
+> \frobnicate
+> $$
+
+    $indented$
+
+```latex
+$$ \sqrt{2} $$
+```
