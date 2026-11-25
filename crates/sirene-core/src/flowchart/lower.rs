@@ -210,6 +210,12 @@ fn label_token(node: &SyntaxNode) -> Option<SyntaxToken> {
     tokens(node).find(|t| matches!(t.kind(), STRING | MD_STRING | TEXT))
 }
 
+/// The diagnostics for each `$$...$$` formula of `label`, the label of the `LABEL` node `node`,
+/// that does not typeset (LEMB-4, LEMB-5).
+pub(crate) fn label_diagnostics(node: &SyntaxNode, label: &Label) -> Vec<Diagnostic> {
+    super::formula::check_label(label_token(node).as_ref(), label, node.text_range())
+}
+
 impl Lowerer {
     /// The label of a `LABEL` node, reporting each `$$...$$` formula in it that does not
     /// typeset (LEMB-4, LEMB-5).
@@ -220,16 +226,7 @@ impl Lowerer {
     }
 
     fn check_formulas(&mut self, node: &SyntaxNode, label: &Label) {
-        if !label.has_formula() {
-            return;
-        }
-        let lines: Vec<String> = label.text.split('\n').map(super::model::clean).collect();
-        self.diagnostics.extend(super::formula::check_text(
-            label_token(node).as_ref(),
-            &lines,
-            node.text_range(),
-            label.delim,
-        ));
+        self.diagnostics.extend(label_diagnostics(node, label));
     }
 
     fn error(&mut self, range: TextRange, message: impl Into<String>) {
@@ -724,6 +721,11 @@ impl Lowerer {
         // MAGF-2: a `flow` is titled only by `flow id["Title"]`.
         if self.chart.agentflow && child(&header, SHAPE).is_none() {
             title = Label::default();
+        }
+        let title_node =
+            child(&header, LABEL).or_else(|| child(&header, SHAPE).and_then(|s| child(&s, LABEL)));
+        if let Some(n) = title_node {
+            self.check_formulas(&n, &title);
         }
         let (members, direction) = self.statements(syntax, true);
         let meta = child(&header, METADATA).map(|m| self.metadata(&m));

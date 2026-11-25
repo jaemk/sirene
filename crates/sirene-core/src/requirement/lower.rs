@@ -5,10 +5,10 @@ use std::collections::{HashMap, HashSet};
 use rowan::TextRange;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::text;
 use crate::flowchart::{
     Arrow, ClassDef, Direction, Edge, Flowchart, Label, Node, Row, Shape, Stroke, Style,
 };
+use crate::flowchart::{formula, text};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -138,6 +138,12 @@ impl Lowerer {
         self.diagnostics.push(Diagnostic::warning(range, message));
     }
 
+    /// Reports each formula of `label`, read from `tok`, that does not typeset (LEMB-5).
+    fn check(&mut self, tok: &SyntaxToken, label: &Label) {
+        self.diagnostics
+            .extend(formula::check_label(Some(tok), label, tok.text_range()));
+    }
+
     /// The node named `id`, created if new.
     fn node(&mut self, id: &str, range: TextRange) -> usize {
         let i = match self.node_index.get(id) {
@@ -202,6 +208,7 @@ impl Lowerer {
             );
             return;
         }
+        self.check(&name, &Label::plain(&id));
         let i = self.node(&id, stmt.text_range());
         self.chart.nodes[i].label = Label::plain(format!("«{}»\n{id}", stereotype(&kind)));
         self.shorthand(stmt, &id);
@@ -213,7 +220,10 @@ impl Lowerer {
                 continue;
             };
             match field(element, key.text(), &value(&v)) {
-                Ok((at, label, v)) => self.fields[i][at] = Some((label, v)),
+                Ok((at, label, text)) => {
+                    self.check(&v, &Label::plain(&text));
+                    self.fields[i][at] = Some((label, text));
+                }
                 Err(message) => self.warning(f.text_range(), message),
             }
         }

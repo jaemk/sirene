@@ -6,7 +6,7 @@ use rowan::TextRange;
 
 use super::{Block, Cell, CellKind, Group, Heading};
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::lower::{edge_style, label_of};
+use crate::flowchart::lower::{edge_style, label_diagnostics, label_of};
 use crate::flowchart::{ClassDef, Edge, Label, Node, Shape, Style, Subgraph, text};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
@@ -102,6 +102,8 @@ struct Mention {
     label: Option<Label>,
     width: Option<(usize, TextRange)>,
     arrow: Option<Vec<Heading>>,
+    /// The formulas of the label that do not typeset (LEMB-5).
+    issues: Vec<Diagnostic>,
 }
 
 fn mention(node: &SyntaxNode) -> Option<Mention> {
@@ -112,6 +114,7 @@ fn mention(node: &SyntaxNode) -> Option<Mention> {
         label: None,
         width: None,
         arrow: None,
+        issues: Vec::new(),
     };
     if let Some(shape) = child(node, SHAPE) {
         if shape.children().any(|c| c.kind() == ERROR) {
@@ -119,7 +122,11 @@ fn mention(node: &SyntaxNode) -> Option<Mention> {
         }
         let open = token(&shape, SHAPE_OPEN)?;
         let close = token(&shape, SHAPE_CLOSE)?;
-        m.label = child(&shape, LABEL).map(|l| label_of(&l));
+        m.label = child(&shape, LABEL).map(|l| {
+            let label = label_of(&l);
+            m.issues = label_diagnostics(&l, &label);
+            label
+        });
         if open.text() == "<[" {
             m.shape = Some(Shape::Text);
             m.arrow = Some(
@@ -184,6 +191,9 @@ impl Lowerer {
                 format!("block-{}", self.anonymous)
             }
         };
+        if let Some(m) = &m {
+            self.diagnostics.extend(m.issues.iter().cloned());
+        }
         let s = self.block.chart.subgraphs.len();
         self.subgraphs.insert(id.clone(), s);
         self.block.chart.subgraphs.push(Subgraph {
@@ -243,7 +253,8 @@ impl Lowerer {
         }
     }
 
-    fn node(&mut self, m: Mention, group: usize, range: TextRange) {
+    fn node(&mut self, mut m: Mention, group: usize, range: TextRange) {
+        self.diagnostics.append(&mut m.issues);
         if self.subgraphs.contains_key(&m.id) {
             return;
         }
@@ -326,9 +337,11 @@ impl Lowerer {
         let Some((stroke, start, end, _)) = edge_style(e) else {
             return;
         };
-        let label = child(e, EDGE_LABEL)
-            .map(|l| label_of(&l))
-            .filter(|l| !l.text.trim().is_empty());
+        let label = child(e, EDGE_LABEL).map(|l| (label_of(&l), l));
+        if let Some((label, node)) = &label {
+            self.diagnostics.extend(label_diagnostics(node, label));
+        }
+        let label = label.map(|(l, _)| l).filter(|l| !l.text.trim().is_empty());
         self.block.chart.edges.push(Edge {
             id: None,
             from,

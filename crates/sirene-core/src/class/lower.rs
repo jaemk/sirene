@@ -6,11 +6,11 @@ use rowan::TextRange;
 
 use super::parser::opens;
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::text;
 use crate::flowchart::{
     Arrow, ClassDef, Click, Direction, Edge, Flowchart, Label, Node, Note, NoteSide, Row, Shape,
     Stroke, Style, Subgraph,
 };
+use crate::flowchart::{formula, text};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -307,12 +307,21 @@ impl Lowerer {
         Some(i)
     }
 
-    fn add_member(&mut self, i: usize, raw: &str) {
-        let raw = raw.trim();
+    /// Reports each formula of `label`, read from `tok`, that does not typeset (LEMB-5).
+    fn check(&mut self, tok: &SyntaxToken, label: &Label) {
+        self.diagnostics
+            .extend(formula::check_label(Some(tok), label, tok.text_range()));
+    }
+
+    fn add_member(&mut self, i: usize, tok: &SyntaxToken) {
+        let raw = tok.text().trim();
         if raw.is_empty() {
             return;
         }
         let (method, row) = member(raw);
+        for cell in &row.cells {
+            self.check(tok, &Label::plain(cell.as_str()));
+        }
         let class = &mut self.classes[i];
         if method {
             class.methods.push(row);
@@ -338,9 +347,10 @@ impl Lowerer {
                 }
                 CLASS_DECL => self.class_decl(&stmt, namespace),
                 MEMBER_STMT => {
-                    if let Some(i) = child(&stmt, CLASS_REF).and_then(|r| self.reference(&r)) {
-                        let raw = text_of(&stmt, MEMBER).unwrap_or_default();
-                        self.add_member(i, &raw);
+                    if let Some(i) = child(&stmt, CLASS_REF).and_then(|r| self.reference(&r))
+                        && let Some(t) = token(&stmt, MEMBER)
+                    {
+                        self.add_member(i, &t);
                     }
                 }
                 ANNOTATION_STMT => {
@@ -399,11 +409,13 @@ impl Lowerer {
             self.join(&id, n);
         }
         if let Some(s) = token(stmt, STRING) {
-            self.chart.nodes[i].label = text::label(text::unquote(s.text()), false);
+            let l = text::label(text::unquote(s.text()), false);
+            self.check(&s, &l);
+            self.chart.nodes[i].label = l;
         }
         for t in tokens(stmt) {
             match t.kind() {
-                MEMBER => self.add_member(i, t.text()),
+                MEMBER => self.add_member(i, &t),
                 STEREOTYPE => self.classes[i].annotation = Some(t.text().trim().to_owned()),
                 _ => {}
             }
@@ -440,16 +452,20 @@ impl Lowerer {
         let mut start_label = None;
         let mut end_label = None;
         for s in tokens(stmt).filter(|t| t.kind() == STRING) {
-            let l = Some(Label::plain(text::unquote(s.text())));
+            let l = Label::plain(text::unquote(s.text()));
+            self.check(&s, &l);
             if rel_at.is_some_and(|at| s.text_range().start() < at) {
-                start_label = l;
+                start_label = Some(l);
             } else {
-                end_label = l;
+                end_label = Some(l);
             }
         }
-        let label = text_of(stmt, TEXT)
-            .filter(|t| !t.is_empty())
-            .map(|t| text::label(&t, false));
+        let label = token(stmt, TEXT).and_then(|tok| {
+            let text = tok.text().trim();
+            let label = (!text.is_empty()).then(|| text::label(text, false))?;
+            self.check(&tok, &label);
+            Some(label)
+        });
         self.chart.edges.push(Edge {
             id: None,
             from: self.chart.nodes[a].id.clone(),
@@ -504,10 +520,14 @@ impl Lowerer {
     }
 
     fn note(&mut self, stmt: &SyntaxNode) {
-        let body = token(stmt, STRING).map(|s| text::unquote(s.text()).replace("\\n", "\n"));
-        let Some(body) = body else {
+        let tok = token(stmt, STRING);
+        let body = tok
+            .as_ref()
+            .map(|s| text::unquote(s.text()).replace("\\n", "\n"));
+        let (Some(body), Some(tok)) = (body, tok) else {
             return;
         };
+        self.check(&tok, &text::label(&body, false));
         let Some(target) = text_of(stmt, IDENT).map(|t| unticked(&t).to_owned()) else {
             // A note on its own is a node that no relation can name: `:` never appears in a
             // class name.

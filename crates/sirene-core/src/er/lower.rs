@@ -6,10 +6,10 @@ use rowan::TextRange;
 
 use super::parser::WORDS;
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::text;
 use crate::flowchart::{
     Arrow, ClassDef, Direction, Edge, Flowchart, Label, Node, Row, Shape, Stroke, Style,
 };
+use crate::flowchart::{formula, text};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -130,12 +130,24 @@ impl Lowerer {
         self.diagnostics.push(Diagnostic::warning(range, message));
     }
 
+    /// Reports each formula of `label`, read from `tok`, that does not typeset (LEMB-5).
+    fn check(&mut self, tok: &SyntaxToken, label: &Label) {
+        self.diagnostics
+            .extend(formula::check_label(Some(tok), label, tok.text_range()));
+    }
+
     /// The entity an `ENTITY_REF` names, created if new, with its alias and `:::` class.
     fn reference(&mut self, r: &SyntaxNode) -> Option<usize> {
         let names: Vec<SyntaxToken> = tokens(r)
             .filter(|t| matches!(t.kind(), IDENT | STRING))
             .collect();
         let id = name(names.first()?);
+        let colons = token(r, TRIPLE_COLON).map(|t| t.text_range().start());
+        for t in names.iter().filter(|t| t.kind() == STRING) {
+            if colons.is_none_or(|at| t.text_range().start() < at) {
+                self.check(t, &Label::plain(name(t)));
+            }
+        }
         let i = match self.node_index.get(&id) {
             Some(&i) => i,
             None => {
@@ -157,7 +169,6 @@ impl Lowerer {
             }
         };
         self.chart.nodes[i].mentions.push(r.text_range());
-        let colons = token(r, TRIPLE_COLON).map(|t| t.text_range().start());
         for t in names.iter().skip(1) {
             match colons {
                 Some(at) if t.text_range().start() > at => self.styling.push((
@@ -195,7 +206,11 @@ impl Lowerer {
                 })
                 .unwrap_or_default();
             let comment = token(&a, STRING)
-                .map(|s| text::unquote(s.text()).to_owned())
+                .map(|s| {
+                    let c = text::unquote(s.text()).to_owned();
+                    self.check(&s, &Label::plain(&c));
+                    c
+                })
                 .unwrap_or_default();
             let node = &mut self.chart.nodes[i];
             if node.sections.is_empty() {
@@ -216,16 +231,17 @@ impl Lowerer {
             return;
         };
         let (start, stroke, end) = relationship(rel.text());
-        let label = text_of(stmt, TEXT)
-            .map(|t| {
-                if t.len() >= 2 && t.starts_with('"') && t.ends_with('"') {
-                    t[1..t.len() - 1].to_owned()
-                } else {
-                    t
-                }
-            })
-            .filter(|t| !t.is_empty())
-            .map(|t| text::label(&t, false));
+        let label = token(stmt, TEXT).and_then(|tok| {
+            let t = tok.text().trim();
+            let t = if t.len() >= 2 && t.starts_with('"') && t.ends_with('"') {
+                &t[1..t.len() - 1]
+            } else {
+                t
+            };
+            let label = (!t.is_empty()).then(|| text::label(t, false))?;
+            self.check(&tok, &label);
+            Some(label)
+        });
         self.chart.edges.push(Edge {
             id: None,
             from: self.chart.nodes[a].id.clone(),
