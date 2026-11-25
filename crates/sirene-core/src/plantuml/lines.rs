@@ -95,8 +95,11 @@ pub(crate) fn keyword_split<'a>(s: &'a str, kw: &str) -> Option<(&'a str, &'a st
 /// anchors and `1:15` times stay): the text before it, and the caption.
 pub(crate) fn caption(s: &str) -> (&str, Option<String>) {
     let b = s.as_bytes();
+    // A `:` written in a formula is not a caption's.
+    let formulas = super::creole::latex_tags(s);
     for (i, c) in s.char_indices() {
         if c == ':'
+            && !formulas.iter().any(|r| r.contains(&i))
             && !b
                 .get(i + 1)
                 .is_some_and(|n| n.is_ascii_alphanumeric() || *n == b'_')

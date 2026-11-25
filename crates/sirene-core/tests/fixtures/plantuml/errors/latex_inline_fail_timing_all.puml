@@ -1,0 +1,20 @@
+@startuml
+title Timing <latex>\plugh</latex>
+robust "<latex>\foo</latex> in" as A
+concise "Out <latex>\bark</latex>" as B
+A has "<latex>\baz</latex>" as hi, "Lo" as lo
+
+@0
+A is hi
+B is "<latex>\qux</latex>"
+A is lo : <latex>\quux</latex> start
+
+@50
+A is hi
+B is Idle
+A@50 -> B@+10 : <latex>\corge</latex> sent
+A@0 <-> @50 : {<latex>\grault</latex>}
+@0 <-> @50 : {<latex>\garply</latex>}
+highlight 0 to 50 #Gold : <latex>\waldo</latex> span
+note top of A : above <latex>\fred</latex>
+@enduml
