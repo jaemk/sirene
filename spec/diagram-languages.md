@@ -4,14 +4,15 @@ How languages other than Mermaid flowcharts fit the pipeline. Each language has 
 Mermaid state (`mermaid-state-diagrams.md`), class (`mermaid-class-diagrams.md`), ER
 (`mermaid-er-diagrams.md`), sequence (`mermaid-sequence-diagrams.md`), pie
 (`mermaid-pie-charts.md`), gantt (`mermaid-gantt-charts.md`), mindmap
-(`mermaid-mindmaps.md`), journey (`mermaid-journeys.md`), quadrant chart (`mermaid-quadrant-charts.md`), XY chart (`mermaid-xy-charts.md`), requirement (`mermaid-requirement-diagrams.md`), kanban (`mermaid-kanban-boards.md`), packet (`mermaid-packet-diagrams.md`), radar chart (`mermaid-radar-charts.md`), sankey (`mermaid-sankey-diagrams.md`), treemap (`mermaid-treemaps.md`), block (`mermaid-block-diagrams.md`), and the remaining Mermaid types (`mermaid-charts.md`); Graphviz DOT (`graphviz-dot.md`); D2 (`d2.md`); PlantUML
+(`mermaid-mindmaps.md`), journey (`mermaid-journeys.md`), quadrant chart (`mermaid-quadrant-charts.md`), XY chart (`mermaid-xy-charts.md`), requirement (`mermaid-requirement-diagrams.md`), kanban (`mermaid-kanban-boards.md`), packet (`mermaid-packet-diagrams.md`), radar chart (`mermaid-radar-charts.md`), sankey (`mermaid-sankey-diagrams.md`), treemap (`mermaid-treemaps.md`), block (`mermaid-block-diagrams.md`), and the remaining Mermaid types (`mermaid-charts.md`); Visio `.vsdx` drawings (`visio.md`); Graphviz DOT (`graphviz-dot.md`); D2 (`d2.md`); PlantUML
 (`plantuml.md`), with its sequence diagrams in `plantuml-sequence-diagrams.md`.
 
 ## LANGS-1 Detecting the language
 
 A file's extension names its language: `.mmd` and `.mermaid` Mermaid, `.dot` and `.gv` DOT, `.d2`
 D2, `.puml`, `.plantuml`, `.pu`, and `.iuml` PlantUML, and `.tex` and `.latex` one TeX formula
-(LEMB-3; detection never picks it). Stdin, and a file with another extension,
+(LEMB-3; detection never picks it), and `.vsdx` a Visio drawing (VISIO-12; read from bytes, so
+the string entry points never detect it; a file starting `PK\x03\x04` is read as one). Stdin, and a file with another extension,
 is detected from its first statement: `@startuml` (or another `@start...`) is PlantUML; `graph`,
 `digraph`, or `strict` followed by an optional ID and `{` is DOT; anything else is Mermaid. D2 has
 no header, so it needs its extension or `--lang d2`. Every command takes `--lang

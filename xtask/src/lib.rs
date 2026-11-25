@@ -34,7 +34,7 @@ pub const BUNDLE_ID: &str = "io.github.jaemk.sirene";
 pub const MERMAID_UTI: &str = "io.github.jaemk.sirene.mermaid";
 /// The file types the app declares and opens (MACOSP-3): type identifier, description, and
 /// file name extensions (LANGS-1).
-pub const DOCUMENT_TYPES: [(&str, &str, &[&str]); 3] = [
+pub const DOCUMENT_TYPES: [(&str, &str, &[&str]); 4] = [
     (MERMAID_UTI, "Mermaid diagram", &["mmd", "mermaid"]),
     (
         "io.github.jaemk.sirene.dot",
@@ -46,7 +46,20 @@ pub const DOCUMENT_TYPES: [(&str, &str, &[&str]); 3] = [
         "PlantUML diagram",
         &["puml", "plantuml", "pu", "iuml"],
     ),
+    (VISIO_UTI, "Visio drawing", &["vsdx"]),
 ];
+/// The type identifier declared for Visio drawings: a ZIP package opened read-only (VISIO-12),
+/// unlike the text types above.
+pub const VISIO_UTI: &str = "io.github.jaemk.sirene.visio";
+
+/// The type a declared type conforms to: plain text, except Visio's ZIP package.
+pub fn conforms_to(id: &str) -> &'static str {
+    if id == VISIO_UTI {
+        "public.zip-archive"
+    } else {
+        "public.plain-text"
+    }
+}
 /// Markdown, which the app opens as an alternate editor (MARKDO-1).
 pub const MARKDOWN_UTI: &str = "net.daringfireball.markdown";
 /// The workspace version.
@@ -193,7 +206,9 @@ pub fn info_plist() -> Value {
     let document = |id: &str, name: &str, rank: &str| {
         let mut doc = Dictionary::new();
         doc.insert("CFBundleTypeName".into(), name.into());
-        doc.insert("CFBundleTypeRole".into(), "Editor".into());
+        // A Visio drawing is only viewed.
+        let role = if id == VISIO_UTI { "Viewer" } else { "Editor" };
+        doc.insert("CFBundleTypeRole".into(), role.into());
         doc.insert("LSHandlerRank".into(), rank.into());
         doc.insert("LSItemContentTypes".into(), Value::Array(vec![id.into()]));
         Value::from(doc)
@@ -206,7 +221,7 @@ pub fn info_plist() -> Value {
         uti.insert("UTTypeDescription".into(), name.into());
         uti.insert(
             "UTTypeConformsTo".into(),
-            Value::Array(vec!["public.plain-text".into()]),
+            Value::Array(vec![conforms_to(id).into()]),
         );
         let mut tags = Dictionary::new();
         tags.insert(
@@ -215,7 +230,13 @@ pub fn info_plist() -> Value {
         );
         uti.insert("UTTypeTagSpecification".into(), tags.into());
         utis.push(uti.into());
-        docs.push(document(id, name, "Default"));
+        // Visio's own app keeps its files.
+        let rank = if id == VISIO_UTI {
+            "Alternate"
+        } else {
+            "Default"
+        };
+        docs.push(document(id, name, rank));
     }
     docs.push(document(MARKDOWN_UTI, "Markdown document", "Alternate"));
 

@@ -11,7 +11,12 @@ use crate::{APP, DOCUMENT_TYPES, ICON_SVG, LICENSES, context, icon_png, write};
 /// The desktop entry's, icon's, and MIME package's base name.
 pub const NAME: &str = "sirene";
 /// The MIME types of `DOCUMENT_TYPES`, in the same order (LINUXP-3).
-pub const MIME_TYPES: [&str; 3] = ["text/x-mermaid", "text/vnd.graphviz", "text/x-plantuml"];
+pub const MIME_TYPES: [&str; 4] = [
+    "text/x-mermaid",
+    "text/vnd.graphviz",
+    "text/x-plantuml",
+    "application/vnd.ms-visio.drawing",
+];
 /// Markdown, which the app also opens (MARKDO-1); shared-mime-info declares it.
 pub const MARKDOWN_MIME: &str = "text/markdown";
 /// The PNG icon sizes under `usr/share/icons/hicolor`, beside the scalable SVG.
@@ -47,9 +52,15 @@ pub fn mime_package() -> String {
 <mime-info xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\">
 ",
     );
-    for ((_, comment, extensions), mime) in DOCUMENT_TYPES.iter().zip(MIME_TYPES) {
+    for ((id, comment, extensions), mime) in DOCUMENT_TYPES.iter().zip(MIME_TYPES) {
+        // Visio drawings are ZIP packages, not text.
+        let parent = if *id == crate::VISIO_UTI {
+            "application/zip"
+        } else {
+            "text/plain"
+        };
         xml.push_str(&format!(
-            "  <mime-type type=\"{mime}\">\n    <comment>{comment}</comment>\n    <sub-class-of type=\"text/plain\"/>\n"
+            "  <mime-type type=\"{mime}\">\n    <comment>{comment}</comment>\n    <sub-class-of type=\"{parent}\"/>\n"
         ));
         for e in *extensions {
             xml.push_str(&format!("    <glob pattern=\"*.{e}\"/>\n"));
@@ -152,6 +163,11 @@ mod tests {
         assert!(xml.contains("type=\"text/x-mermaid\">\n    <comment>Mermaid"));
         assert!(xml.contains("type=\"text/vnd.graphviz\">\n    <comment>Graphviz"));
         assert!(xml.contains("type=\"text/x-plantuml\">\n    <comment>PlantUML"));
+        assert!(xml.contains(
+            "type=\"application/vnd.ms-visio.drawing\">\n    <comment>Visio drawing</comment>\n    <sub-class-of type=\"application/zip\"/>\n    <glob pattern=\"*.vsdx\"/>"
+        ));
+        // Text types stay text.
+        assert!(xml.contains("<sub-class-of type=\"text/plain\"/>"));
     }
 
     #[test]
@@ -160,7 +176,7 @@ mod tests {
             let d = desktop_entry(executable);
             assert!(
                 d.contains(
-                    "MimeType=text/x-mermaid;text/vnd.graphviz;text/x-plantuml;text/markdown;\n"
+                    "MimeType=text/x-mermaid;text/vnd.graphviz;text/x-plantuml;application/vnd.ms-visio.drawing;text/markdown;\n"
                 ),
                 "{d}"
             );

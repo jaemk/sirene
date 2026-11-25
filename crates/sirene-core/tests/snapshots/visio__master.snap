@@ -1,0 +1,6 @@
+---
+source: crates/sirene-core/tests/visio.rs
+expression: "summary(& scene(&bytes, 0))"
+---
+576x384
+path fill=#ff0000/255 stroke=#000000/255:4.8:None M96.0,336.0 L288.0,336.0 L288.0,240.0 L96.0,240.0 L96.0,336.0 Z

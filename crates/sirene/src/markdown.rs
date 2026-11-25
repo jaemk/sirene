@@ -39,6 +39,10 @@ impl Out {
                 (Some(file), Some((line, col))) => {
                     diagnostic!("{file}:{line}:{col}: {severity}: {message}")
                 }
+                // A warning without a position keeps its bare form; an error names itself.
+                (Some(file), None) if severity == "error" => {
+                    diagnostic!("{file}: error: {message}")
+                }
                 (Some(file), None) => diagnostic!("{file}: {message}"),
                 _ => diagnostic!("{severity}: {message}"),
             }
@@ -128,6 +132,32 @@ fn report_to(
         out.diagnostic(Some(name), Some(at(line, col)), severity, &d.message);
     }
     errors
+}
+
+/// Prints the diagnostics of a diagram read from `source`, to stderr. Bytes have no lines, so
+/// their diagnostics print as `NAME: SEVERITY: MESSAGE`.
+pub fn report_source(name: &str, source: &crate::Source, lowered: &Lowered) -> bool {
+    report_source_to(&mut Out::text(), name, source, lowered)
+}
+
+fn report_source_to(out: &mut Out, name: &str, source: &crate::Source, lowered: &Lowered) -> bool {
+    match source {
+        crate::Source::Text(src) => report_to(out, name, src, lowered, |l, c| (l, c)),
+        crate::Source::Bytes(_) => {
+            let mut errors = false;
+            for d in &lowered.diagnostics {
+                let severity = match d.severity {
+                    Severity::Error => {
+                        errors = true;
+                        "error"
+                    }
+                    Severity::Warning => "warning",
+                };
+                out.diagnostic(Some(name), None, severity, &d.message);
+            }
+            errors
+        }
+    }
 }
 
 /// The parts of a Markdown file to draw (MARKDO-5): each diagram block and formula with its number
@@ -270,10 +300,10 @@ fn check_markdown(out: &mut Out, path: &Path) -> bool {
 
 /// Checks one diagram file, or stdin for `None`.
 fn check_source(out: &mut Out, path: Option<&Path>) -> bool {
-    match crate::read(path.map(Path::to_path_buf)) {
+    match crate::read_source(path.map(Path::to_path_buf)) {
         Ok((name, src)) => {
             let lowered = crate::lower_file(path.filter(|p| p.as_os_str() != "-"), &src);
-            !report_to(out, &name, &src, &lowered, |l, c| (l, c))
+            !report_source_to(out, &name, &src, &lowered)
         }
         Err(e) => {
             out.error(&e);

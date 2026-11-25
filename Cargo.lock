@@ -7116,6 +7116,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "log",
+ "miniz_oxide 0.9.1",
  "predicates",
  "self_update",
  "semver",
@@ -7131,6 +7132,7 @@ dependencies = [
  "criterion",
  "insta",
  "log",
+ "miniz_oxide 0.9.1",
  "proptest",
  "resvg 0.46.0",
  "rowan",
@@ -7148,6 +7150,7 @@ dependencies = [
  "futures",
  "gpui-kit",
  "log",
+ "miniz_oxide 0.9.1",
  "sirene-core",
  "tempfile",
 ]
@@ -7156,6 +7159,7 @@ dependencies = [
 name = "sirene-wasm"
 version = "0.7.0-dev"
 dependencies = [
+ "miniz_oxide 0.9.1",
  "sirene-core",
 ]
 

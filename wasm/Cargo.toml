@@ -18,6 +18,10 @@ png = ["sirene-core/png"]
 [dependencies]
 sirene-core.workspace = true
 
+[dev-dependencies]
+# The test-only .vsdx package writer deflates parts.
+miniz_oxide = { version = "0.9.1", default-features = false, features = ["with-alloc"] }
+
 # The workspace lints, except that `unsafe_code` is denied rather than forbidden: each export to
 # JavaScript is `#[unsafe(no_mangle)]` and allows it on that item alone (WORKSP-3).
 [lints.rust]

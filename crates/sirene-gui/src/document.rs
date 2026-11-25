@@ -154,6 +154,11 @@ pub struct Document {
     pub disk_changed: bool,
     /// The file's metadata when it was last read, for `poll` to skip reading an unchanged file.
     stamp: Option<Stamp>,
+    /// The file is a binary package (a Visio `.vsdx`): drawn read-only from its bytes, with its
+    /// pages shown like a Markdown file's blocks, and never saved (VISIO-12).
+    package: bool,
+    /// A hash of the package's bytes, so `poll` can tell a rewrite of the same bytes.
+    fingerprint: u64,
 }
 
 /// A file's size, modification time, and identity, taken just before reading it, and when.
@@ -241,6 +246,8 @@ impl Document {
             write_error: None,
             disk_changed: false,
             stamp: None,
+            package: false,
+            fingerprint: 0,
         }
     }
 
@@ -255,6 +262,9 @@ impl Document {
 
     /// Why drawing edits are off for this diagram's type, when they are (LANGS-5).
     pub fn read_only(&self) -> Option<&'static str> {
+        if self.package {
+            return Some(PACKAGE_READ_ONLY);
+        }
         let kind = Kind::of_lang(&self.source, self.lang());
         // Lists of items (WYSIWY-28).
         if let Some(list) = Items::of(kind) {
@@ -302,6 +312,7 @@ impl Document {
             Kind::Agentflow => Some("drawing edits are not supported for agentflow diagrams yet"),
             Kind::ZenUml => Some("drawing edits are not supported for ZenUML diagrams yet"),
             Kind::Latex => Some("a formula has nothing to edit in the drawing"),
+            Kind::Visio => Some("a Visio drawing is read-only"),
             Kind::Dot => Some(DOT_EDITS),
             Kind::PlantUml if plantuml::edit::editable(&self.source) => Some(PLANTUML_EDITS),
             Kind::PlantUml => Some("drawing edits are not supported for PlantUML yet"),
@@ -419,6 +430,20 @@ impl Document {
 
     /// Shows diagram block `i` of a Markdown file. Returns whether the shown block changed.
     pub fn show_block(&mut self, i: usize) -> bool {
+        if self.package {
+            // The pages of a Visio drawing.
+            let Some(Diagram::Visio(v)) = &self.other else {
+                return false;
+            };
+            if i == v.page() {
+                return false;
+            }
+            let Some(next) = v.with_page(i) else {
+                return false;
+            };
+            self.other = Some(Diagram::Visio(next));
+            return true;
+        }
         let Some(md) = &mut self.markdown else {
             return false;
         };
@@ -437,6 +462,13 @@ impl Document {
     /// For a Markdown file: the shown block (from 1), the number of blocks, and the shown
     /// block's first line in the file.
     pub fn block_info(&self) -> Option<(usize, usize, usize)> {
+        if self.package {
+            // For a Visio drawing: the page shown (from 1) and the page count; line 0.
+            return match &self.other {
+                Some(Diagram::Visio(v)) => Some((v.page() + 1, v.page_count(), 0)),
+                _ => None,
+            };
+        }
         let md = self.markdown.as_ref()?;
         let block = md.blocks.get(md.block)?;
         Some((md.block + 1, md.blocks.len(), block.line))
@@ -461,12 +493,56 @@ impl Document {
     fn read(path: &Path) -> Self {
         // Taken first, so a change during the read moves the stamp the next poll sees.
         let stamp = Stamp::of(path);
+        if Lang::of_path(path) == Some(Lang::Visio) {
+            return Self::read_package(path, stamp);
+        }
         let (text, error) = Self::read_text(path);
         Self {
             read_error: error,
             stamp,
             ..Self::from_source(Some(path.to_owned()), text)
         }
+    }
+
+    /// A Visio `.vsdx` file read as bytes and drawn read-only; a file that cannot be read gives an
+    /// empty document that records the error.
+    fn read_package(path: &Path, stamp: Option<Stamp>) -> Self {
+        let context = || format!("cannot read {}", path.display());
+        let bytes = std::fs::File::open(path)
+            .map_err(|e| Error::with_source(context(), e))
+            .and_then(|f| sirene_core::source::read_bytes(f).map_err(|e| e.context(context())));
+        let mut doc = Self::from_source(Some(path.to_owned()), String::new());
+        doc.package = true;
+        doc.stamp = stamp;
+        match bytes {
+            Ok(bytes) => {
+                doc.fingerprint = {
+                    use std::hash::{Hash, Hasher};
+                    let mut h = std::collections::hash_map::DefaultHasher::new();
+                    bytes.hash(&mut h);
+                    h.finish()
+                };
+                let lowered = diagram::lower_bytes(&bytes, Some(Lang::Visio));
+                let lines = sirene_core::diagnostic::LineIndex::new("");
+                doc.problems = lowered
+                    .diagnostics
+                    .iter()
+                    .map(|d| {
+                        let (line, column) = lines.line_col(d);
+                        Problem {
+                            range: d.range.into(),
+                            line,
+                            column,
+                            severity: d.severity,
+                            message: d.message.clone(),
+                        }
+                    })
+                    .collect();
+                doc.other = Some(lowered.diagram);
+            }
+            Err(e) => doc.read_error = Some(e),
+        }
+        doc
     }
 
     /// The file's text, or an empty text and the read error. A file over
@@ -480,7 +556,7 @@ impl Document {
 
     /// Replaces the text and re-parses it, returning whether it changed.
     pub fn set_source(&mut self, source: String) -> bool {
-        if source == self.source {
+        if self.package || source == self.source {
             return false;
         }
         if let Some(md) = &mut self.markdown {
@@ -522,6 +598,20 @@ impl Document {
             && old.holds(new)
         {
             return Disk::Unchanged;
+        }
+        if self.package {
+            // Nothing is edited, so changed bytes are always taken.
+            let path = path.clone();
+            let next = Self::read(&path);
+            if next.fingerprint == self.fingerprint
+                && next.read_error.as_ref().map(Error::report)
+                    == self.read_error.as_ref().map(Error::report)
+            {
+                self.stamp = next.stamp;
+                return Disk::Unchanged;
+            }
+            self.replace(next);
+            return Disk::Reloaded;
         }
         let (text, error) = Self::read_text(path);
         if text == self.saved
@@ -582,6 +672,9 @@ impl Document {
     /// Returns the disk state requiring confirmation when saving to this path. This never
     /// reloads the document. Confirmations apply only to the exact observed disk state.
     pub fn save_conflict(&self, path: &Path) -> Option<SaveConflict> {
+        if self.package {
+            return None;
+        }
         let original = self.path.as_deref()?;
         if !same_path(original, path) {
             return None;
@@ -638,6 +731,11 @@ impl Document {
 
     /// Saves after approving the exact disk state returned by `save_conflict`.
     pub fn save_confirmed(&mut self, approved: Option<&SaveConflict>) -> Result<()> {
+        if self.package {
+            let e = Error::new(PACKAGE_READ_ONLY);
+            self.write_error = Some(e.clone());
+            return Err(e);
+        }
         if let Some(path) = &self.path
             && let Err(e) = self.ensure_save_allowed(path, approved)
         {
@@ -682,6 +780,11 @@ impl Document {
         path: PathBuf,
         approved: Option<&SaveConflict>,
     ) -> Result<()> {
+        if self.package {
+            let e = Error::new(PACKAGE_READ_ONLY);
+            self.write_error = Some(e.clone());
+            return Err(e);
+        }
         if let Err(e) = self.ensure_save_allowed(&path, approved) {
             self.write_error = Some(e.clone());
             return Err(e);
@@ -798,6 +901,9 @@ pub(crate) fn same_path(a: &Path, b: &Path) -> bool {
     }
     false
 }
+
+/// Why a Visio drawing cannot be edited or saved.
+const PACKAGE_READ_ONLY: &str = "a Visio drawing is read-only";
 
 /// The info string of a Markdown block holding `source`, read as `lang` when given: `dot`,
 /// `plantuml`, or `mermaid` (MARKDO-1).
@@ -959,9 +1065,61 @@ pub(crate) fn error_scene(error: &Error, theme: &Theme) -> Scene {
     }
 }
 
+/// The test-only `.vsdx` package writer, shared with `sirene-core`'s tests.
+#[cfg(test)]
+#[path = "../../sirene-core/src/visio/testpkg.rs"]
+mod testpkg;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// VISIO-12: a `.vsdx` opens as a read-only drawing of its pages; it is never saved over.
+    #[test]
+    fn a_vsdx_opens_read_only_with_pages() {
+        use crate::document::testpkg::{Builder, rect_geometry, shape, xform};
+        let sh = shape(
+            1,
+            "",
+            &format!("{}{}", xform(1.0, 1.0, 2.0, 1.0), rect_geometry(2.0, 1.0)),
+        );
+        let bytes = Builder::new()
+            .page(6.0, 4.0, &sh)
+            .page(3.0, 2.0, &sh)
+            .build();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.vsdx");
+        std::fs::write(&path, &bytes).unwrap();
+        let mut d = Document::open(&path);
+        assert!(d.read_error.is_none() && d.problems.is_empty());
+        assert_eq!(d.read_only(), Some("a Visio drawing is read-only"));
+        assert_eq!(d.block_info(), Some((1, 2, 0)));
+        let scene = d.scene(&sirene_core::scene::Approx, &Theme::LIGHT).unwrap();
+        assert_eq!((scene.width, scene.height), (576.0, 384.0));
+        assert!(!d.show_block(0) && d.show_block(1) && !d.show_block(2));
+        assert_eq!(d.block_info(), Some((2, 2, 0)));
+        let scene = d.scene(&sirene_core::scene::Approx, &Theme::LIGHT).unwrap();
+        assert_eq!(scene.width, 288.0);
+        // Never edited or saved.
+        assert!(!d.set_source("x".into()) && !d.is_edited());
+        assert!(d.save().is_err() && d.save_as(dir.path().join("b.mmd")).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        assert!(!dir.path().join("b.mmd").exists());
+        assert_eq!(d.poll(), Disk::Unchanged);
+        // A changed file is taken, back on its first page.
+        let one = Builder::new().page(6.0, 4.0, &sh).build();
+        std::fs::write(&path, &one).unwrap();
+        assert_eq!(d.poll(), Disk::Reloaded);
+        assert_eq!(d.block_info(), Some((1, 1, 0)));
+        // A package that cannot be read is a problem, not a panic.
+        std::fs::write(&path, b"PK\x03\x04 junk").unwrap();
+        let bad = Document::open(&path);
+        assert!(
+            bad.problems
+                .iter()
+                .any(|p| p.severity == sirene_core::Severity::Error)
+        );
+    }
 
     /// ERRORH-2: presentation does not discard typed filesystem or UTF-8 causes.
     #[test]

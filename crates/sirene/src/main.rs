@@ -53,6 +53,9 @@ enum LangArg {
     /// One TeX formula (`.tex`, `.latex`).
     #[value(alias = "tex")]
     Latex,
+    /// A Visio drawing (`.vsdx`).
+    #[value(alias = "vsdx")]
+    Visio,
 }
 
 /// The language `--lang` forces, set once at startup (DOT-5).
@@ -64,14 +67,32 @@ fn lang(named: Option<Lang>) -> Option<Lang> {
     FORCED_LANG.get().copied().flatten().or(named)
 }
 
+/// The page of a multi-page drawing to write, from 1, set once at startup (VISIO-11).
+static PAGE: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
+
+/// What a diagram input held: UTF-8 text, or the bytes of a binary package such as `.vsdx`.
+pub(crate) enum Source {
+    Text(String),
+    Bytes(Vec<u8>),
+}
+
+impl Source {
+    fn len(&self) -> usize {
+        match self {
+            Source::Text(s) => s.len(),
+            Source::Bytes(b) => b.len(),
+        }
+    }
+}
+
 /// Parses and lowers the diagram read from `path` (stdin for `None`) in its language.
-fn lower_file(path: Option<&Path>, src: &str) -> Lowered {
-    log::trace!(
-        "lowering {} bytes with language {:?}",
-        src.len(),
-        lang(path.and_then(Lang::of_path))
-    );
-    let lowered = diagram::lower_as(src, lang(path.and_then(Lang::of_path)));
+fn lower_file(path: Option<&Path>, src: &Source) -> Lowered {
+    let named = lang(path.and_then(Lang::of_path));
+    log::trace!("lowering {} bytes with language {named:?}", src.len());
+    let lowered = match src {
+        Source::Text(s) => diagram::lower_as(s, named),
+        Source::Bytes(b) => diagram::lower_bytes(b, named),
+    };
     log::debug!("read as a {}", lowered.kind.name());
     lowered
 }
@@ -138,6 +159,10 @@ enum Command {
         /// write into.
         #[arg(short, long)]
         output: Option<PathBuf>,
+        /// For a Visio drawing: write page N (from 1). Without it each page is written as
+        /// STEM-N.svg beside --output.
+        #[arg(long, value_name = "N")]
+        page: Option<usize>,
     },
     /// Write a diagram as a PNG image, or one per diagram in a directory or Markdown file.
     Png {
@@ -164,6 +189,10 @@ enum Command {
         /// stdout for stdin. For a directory, the directory to write into.
         #[arg(short, long)]
         output: Option<PathBuf>,
+        /// For a Visio drawing: write page N (from 1). Without it each page is written as
+        /// STEM-N.png beside the output.
+        #[arg(long, value_name = "N")]
+        page: Option<usize>,
     },
     /// Replace this sirene with the latest release, or the one --to names.
     Update {
@@ -249,6 +278,7 @@ fn main() -> ExitCode {
         LangArg::Dot => Lang::Dot,
         LangArg::Plantuml => Lang::PlantUml,
         LangArg::Latex => Lang::Latex,
+        LangArg::Visio => Lang::Visio,
     }));
     log::debug!(
         "sirene {} ({}, {}): {:?}",
@@ -403,7 +433,9 @@ fn run(cli: Cli) -> ExitCode {
             link,
             theme,
             output,
+            page,
         }) => {
+            let _ = PAGE.set(page);
             let render = |l: &Lowered| l.svg(&theme.theme()).map(String::into_bytes);
             let output = match stdout_dash(&file, output) {
                 Ok(output) => output,
@@ -427,7 +459,9 @@ fn run(cli: Cli) -> ExitCode {
             quality,
             scale,
             output,
+            page,
         }) => {
+            let _ = PAGE.set(page);
             let quality = quality.quality();
             let render = |l: &Lowered| l.png(&theme.theme(), quality, scale);
             let to_stdout = output.as_deref() == Some(Path::new("-"));
@@ -598,6 +632,46 @@ fn read(file: Option<PathBuf>) -> Result<(String, String)> {
                 .map_err(|e| e.context("cannot read <stdin>"))
         }
     }
+}
+
+/// Reads the source named on the command line as text, or as bytes when it is a package: forced
+/// or named as Visio, or starting with the ZIP magic (VISIO-12).
+fn read_source(file: Option<PathBuf>) -> Result<(String, Source)> {
+    use std::io::BufRead;
+    let named = lang(file.as_deref().and_then(Lang::of_path));
+    let (name, context, mut reader): (String, String, Box<dyn BufRead>) =
+        match file.filter(|f| f.as_os_str() != "-") {
+            Some(path) => {
+                let name = path.display().to_string();
+                log::debug!("reading {name}");
+                let context = format!("cannot read {name}");
+                let f = std::fs::File::open(&path)
+                    .map_err(|e| Error::with_source(context.clone(), e))?;
+                (name, context, Box::new(std::io::BufReader::new(f)))
+            }
+            None => {
+                log::debug!("reading <stdin>");
+                (
+                    "<stdin>".to_owned(),
+                    "cannot read <stdin>".to_owned(),
+                    Box::new(std::io::stdin().lock()),
+                )
+            }
+        };
+    let package = match named {
+        Some(Lang::Visio) => true,
+        Some(_) => false,
+        None => reader
+            .fill_buf()
+            .map_err(|e| Error::with_source(context.clone(), e))?
+            .starts_with(b"PK\x03\x04"),
+    };
+    let source = if package {
+        source::read_bytes(reader).map(Source::Bytes)
+    } else {
+        source::read_text(reader).map(Source::Text)
+    };
+    source.map(|s| (name, s)).map_err(|e| e.context(context))
 }
 
 /// Reads the file at `path` as UTF-8 text, with an error naming it.
@@ -866,7 +940,7 @@ fn is_diagram_file(path: &Path) -> bool {
 /// The message for a directory with no diagram files.
 pub(crate) fn no_diagrams(dir: &Path) -> String {
     format!(
-        "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, or .iuml files in {}",
+        "error: no .mmd, .mermaid, .dot, .gv, .puml, .plantuml, .pu, .iuml, or .vsdx files in {}",
         dir.display()
     )
 }
@@ -1104,6 +1178,79 @@ struct Done {
     clean: bool,
 }
 
+/// Writes `bytes` to `output` (stdout when `None`), creating its directory first when `make_dirs`
+/// is set.
+fn write_output(output: Option<&Path>, bytes: &[u8], make_dirs: bool) -> Result<()> {
+    let target = output.map_or_else(|| "<stdout>".to_owned(), |p| p.display().to_string());
+    log::debug!("writing {target}");
+    match output {
+        Some(path) => {
+            if make_dirs && let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    Error::with_source(format!("cannot create {}", parent.display()), e)
+                })?;
+            }
+            write_file(path, bytes, false)
+                .map_err(|e| Error::with_source(format!("cannot write {}", path.display()), e))
+        }
+        None => {
+            let mut out = std::io::stdout().lock();
+            out.write_all(bytes)
+                .and_then(|()| out.flush())
+                .map_err(|e| Error::with_source("cannot write <stdout>", e))
+        }
+    }
+}
+
+/// `path` with `-N` after its stem: `a.svg` and 2 give `a-2.svg`.
+pub(crate) fn page_path(path: &Path, n: usize) -> PathBuf {
+    let stem = path
+        .file_stem()
+        .map_or_else(|| "page".to_owned(), |s| s.to_string_lossy().into_owned());
+    let name = match path.extension() {
+        Some(ext) => format!("{stem}-{n}.{}", ext.to_string_lossy()),
+        None => format!("{stem}-{n}"),
+    };
+    path.with_file_name(name)
+}
+
+/// The drawings to write for `lowered` and where (VISIO-11): itself for most diagrams; for a
+/// Visio drawing, the page `chosen` names, or each page as `STEM-N.EXT` beside `output`.
+fn pages(
+    lowered: Lowered,
+    output: Option<&Path>,
+    chosen: Option<usize>,
+) -> Result<Vec<(Lowered, Option<PathBuf>)>> {
+    let count = lowered.page_count();
+    let same = |l: Lowered| vec![(l, output.map(Path::to_path_buf))];
+    if let Some(n) = chosen {
+        if count <= 1 && n == 1 {
+            return Ok(same(lowered));
+        }
+        let page = n
+            .checked_sub(1)
+            .and_then(|i| lowered.with_page(i))
+            .ok_or_else(|| {
+                Error::new(format!(
+                    "--page {n} is out of range; the drawing has {count} page{}",
+                    if count == 1 { "" } else { "s" }
+                ))
+            })?;
+        return Ok(same(page));
+    }
+    if count <= 1 {
+        return Ok(same(lowered));
+    }
+    let Some(output) = output else {
+        return Err(Error::new(format!(
+            "the drawing has {count} pages; choose one with --page N, or write them to files with --output"
+        )));
+    };
+    Ok((1..=count)
+        .filter_map(|n| Some((lowered.with_page(n - 1)?, Some(page_path(output, n)))))
+        .collect())
+}
+
 /// Reports diagnostics on stderr and writes `render`'s output to `output` (stdout when `None`),
 /// creating its directory first when `make_dirs` is set.
 fn render_one(
@@ -1116,7 +1263,7 @@ fn render_one(
         written: false,
         clean: false,
     };
-    let (name, src) = match read(file.map(Path::to_path_buf)) {
+    let (name, src) = match read_source(file.map(Path::to_path_buf)) {
         Ok(read) => read,
         Err(message) => {
             diagnostic!("error: {}", message.report());
@@ -1127,29 +1274,16 @@ fn render_one(
     let start = Instant::now();
     let lowered = lower_file(file.filter(|f| f.as_os_str() != "-"), &src);
     log::debug!("parsed and lowered in {:.1?}", start.elapsed());
-    let errors = markdown::report(&name, &src, &lowered, |l, c| (l, c));
+    let errors = markdown::report_source(&name, &src, &lowered);
     let start = Instant::now();
-    let written = render(&lowered).and_then(|bytes| {
-        log::debug!("rendered {} bytes in {:.1?}", bytes.len(), start.elapsed());
-        let target = output.map_or_else(|| "<stdout>".to_owned(), |p| p.display().to_string());
-        log::debug!("writing {target}");
-        match output {
-            Some(path) => {
-                if make_dirs && let Some(parent) = path.parent() {
-                    std::fs::create_dir_all(parent).map_err(|e| {
-                        Error::with_source(format!("cannot create {}", parent.display()), e)
-                    })?;
-                }
-                write_file(path, &bytes, false)
-                    .map_err(|e| Error::with_source(format!("cannot write {}", path.display()), e))
-            }
-            None => {
-                let mut out = std::io::stdout().lock();
-                out.write_all(&bytes)
-                    .and_then(|()| out.flush())
-                    .map_err(|e| Error::with_source("cannot write <stdout>", e))
-            }
+    let chosen = PAGE.get().copied().flatten();
+    let written = pages(lowered, output, chosen).and_then(|targets| {
+        for (page, target) in &targets {
+            let bytes = render(page)?;
+            log::debug!("rendered {} bytes in {:.1?}", bytes.len(), start.elapsed());
+            write_output(target.as_deref(), &bytes, make_dirs)?;
         }
+        Ok(())
     });
     if let Err(message) = written {
         diagnostic!("error: {}", message.report());

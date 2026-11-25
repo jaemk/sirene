@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/visio.rs
+expression: summary(& s)
+---
+576x384
+path fill=none stroke=#000000/255:0.96:None M96.0,288.0 L288.0,288.0
+path fill=#000000/255 stroke=none M288.0,288.0 L277.4,283.8 L277.4,292.2 Z
