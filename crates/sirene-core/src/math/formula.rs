@@ -36,6 +36,11 @@ pub struct Formula {
     pub ascent: f32,
     /// Depth below the baseline, in em.
     pub descent: f32,
+    /// How far the drawn items reach left of x = 0, in em and never negative: 0 for a formula
+    /// that draws inside its box on the left. A `{CD}` label beside a first-column arrow can
+    /// reach left (as in KaTeX), and a consumer that keeps ink inside an allotted box offsets
+    /// `place`'s origin by this and widens the box by it. `width` does not include it.
+    pub left: f32,
     items: Vec<Owned>,
 }
 
@@ -191,6 +196,7 @@ pub fn typeset(source: &str, style: MathStyle) -> Result<Formula, MathError> {
         width: extent(bx.width.0)?,
         ascent: extent(bx.height.0)?,
         descent: extent(bx.depth.0)?,
+        left: left_overhang(&items),
         items: items.iter().map(Owned::new).collect(),
     })
 }
@@ -245,6 +251,19 @@ pub(super) fn checked_layout<'t>(
         ));
     }
     Ok(bx)
+}
+
+/// How far the items start left of x = 0, in em; 0 when none does. Items at a position that is
+/// not finite are skipped.
+fn left_overhang(items: &[Item<'_>]) -> f32 {
+    let min = items
+        .iter()
+        .map(|item| match item {
+            Item::Glyph { x, .. } | Item::Rule { x, .. } | Item::Path { x, .. } => *x,
+        })
+        .filter(|x| x.is_finite())
+        .fold(0.0_f64, f64::min);
+    (-min).min(limits::MAX_EXTENT_EM) as f32
 }
 
 /// A box side in em for the public `Formula`: a negative side (a `\kern` back past the start)
@@ -318,6 +337,30 @@ mod tests {
             "{right} {}",
             labeled.width
         );
+    }
+
+    #[test]
+    fn a_formula_that_stays_right_of_its_origin_has_no_left_overhang() {
+        for src in [
+            r"x",
+            r"\frac12",
+            r"\begin{CD}A@>a>>B\end{CD}",
+            r"\kern1em x",
+        ] {
+            let f = typeset(src, MathStyle::Display).unwrap();
+            assert_eq!(f.left, 0.0, "{src}");
+        }
+    }
+
+    #[test]
+    fn a_left_label_of_a_first_column_arrow_is_a_left_overhang() {
+        let src = r"\begin{CD}A\\@VdddVV\\B\end{CD}";
+        let f = typeset(src, MathStyle::Display).unwrap();
+        assert!(f.left > 0.0, "{}", f.left);
+        let prims = f.place(Pt::new(0.0, 0.0), 100.0, BLACK);
+        let (x0, ..) = bounds(&prims).unwrap();
+        // Ink does not pass the overhang (a path's control points may lie a little further).
+        assert!(x0 >= -f.left * 100.0 - 2.0, "{x0} {}", f.left);
     }
 
     #[test]
