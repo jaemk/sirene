@@ -15,20 +15,38 @@ only two diagram types as supporting it:
 - sequence diagrams: participant aliases (`participant 1 as $$\alpha$$`), message text
   (`Solve: $$\sqrt{2+2}$$`), and notes (`Note right of 2: $$...$$`).
 
-Text and a formula share a label (the sequence example mixes them); the reference gives no rule
-for several formulas in one label, for escaping `$$`, or for what an unparsable formula
-becomes. The `legacyMathML` and `forceLegacyMathML` settings choose between the browser's
-MathML and KaTeX's stylesheet rendering; sirene draws the formula itself, so neither applies
-and both are ignored. The reference states no KaTeX version, so KaTeX's current supported
-functions list is the syntax target (LPA-2).
+Text and a formula share a label (the sequence example mixes them). The `legacyMathML` and
+`forceLegacyMathML` settings choose between the browser's MathML and KaTeX's stylesheet
+rendering; sirene draws the formula itself, so neither applies and both are ignored. The
+reference states no KaTeX version, so KaTeX's current supported functions list is the syntax
+target (LPA-2).
+
+In Mermaid 12.3.0's source (LEMB-T6), `$$` is read wherever a label goes through `createText`
+with HTML labels (the default): flowchart, state, class, ER, mindmap, requirement, kanban, block,
+and the agentflow, usecase, and swimlane types that reuse the flowchart renderer (node, edge, edge
+end, and subgraph titles, class members, ER attributes, and so on), and in sequence participant
+names, messages, notes, and `loop`, `alt`, `opt`, `par`, `critical`, and `break` labels and their
+section titles. Titles never render math. Architecture, C4, gantt, pie, journey, timeline,
+quadrant, xychart, sankey, packet, radar, gitGraph, treemap, and treeView draw `$$` as text. With
+`htmlLabels: false` nothing renders math (class diagrams force HTML labels when `$$` is present).
+
+Mermaid's rules (LEMB-T7; `diagrams/common/common.ts:295-365`,
+`rendering-util/createText.ts:340-353`): a formula is found with the lazy `/\$\$(.*?)\$\$/g`
+(`.` does not cross a newline, so a pair sits on one line; several per label; no escape for
+`$$`) and is set in display style (`displayMode: true`). `\\` is collapsed to `\` in every
+diagram except sequence: `createText` replaces `\\` with `\` in the whole label before KaTeX,
+while sequence text is passed through unchanged. A label with `$$` skips markdown and entity
+decoding. A formula KaTeX rejects throws (`throwOnError: true`) and Mermaid draws no fallback.
+Not checked against a live render: `\\` in the reference's own `cases` examples, `<br>` inside a
+math label, and the error diagram.
 
 Decisions: sirene reads `$$...$$` in the flowchart and sequence label positions above and in
 the label positions of the kinds that lower to the flowchart model (Status), and nowhere else in
 Mermaid (LEMB-T5 lists what is left). An unclosed `$$` is plain text. A
-formula that fails to parse is drawn as its source (LEMB-4). A formula is set in display
-style, as Mermaid's `displayMode: true`, at the theme font size in the label's text color. It
-is found per line with the lazy `/\$\$(.*?)\$\$/`, has no escape, and `\\` in it is read as `\`
-before typesetting, as Mermaid does. A label with a formula is not read as markdown.
+formula that fails to parse is drawn as its source with a diagnostic (LEMB-4). A formula is set
+in display style at the theme font size in the label's text color. `\\` is read as `\` before
+typesetting in flowchart-model labels and kept in sequence text, as Mermaid does. A label with a
+formula is not read as markdown.
 
 Status: flowchart node and edge labels are done (`Label::runs`, `scene/mathtext.rs`,
 `ascii/mathtext.rs`; tests in `tests/flowchart_math.rs`). Every kind that lowers to the
@@ -51,9 +69,6 @@ sequence model keeps `Text = Vec<String>` (and block labels as `String`) with th
 sequence diagram does not collapse it (a TeX row break in `cases`), while flowchart labels
 (`Delim::Dollar`) do.
 
-To verify in Mermaid's source (LEMB-T7): the delimiter regular expression, multiple formulas per
-label, `$$` inside quoted and Markdown strings, and whether display or inline style is used.
-
 ## LEMB-2 PlantUML
 
 From the PlantUML math reference (<https://plantuml.com/ascii-math>; the Creole page does not
@@ -67,8 +82,10 @@ list the tags):
 
 PlantUML converts AsciiMath to LaTeX and renders that with JLaTeXMath, which is not bundled and
 must be installed beside PlantUML. AsciiMath support was ported to Java in V1.2021.8 and
-improved in V1.2024.5. The page's examples show `_` written as `\_` and LaTeX commands with a
-doubled backslash; this looks like a Markdown artifact of the page, to confirm (LEMB-T8).
+improved in V1.2024.5. v1.2026.10 vendors JLaTeXMath 1.0.7; earlier releases and the reference
+page need the jars installed beside PlantUML. The page's `\_` and doubled backslashes are an
+artifact of its Markdown rendering: its HTML has single backslashes and plain `_`
+(`<latex>\int_0^1f(x)dx</latex>`), and `\_` is not special in a tag.
 
 Decisions: AsciiMath is a front end that translates to the LaTeX math list, as PlantUML does,
 so the typesetter has one input. A `<math>` or `<latex>` tag is read wherever the PlantUML
@@ -86,8 +103,17 @@ Mermaid's display style. `<math>` (AsciiMath) is read in the same places, transl
 `$$` is text in PlantUML, and `<latex>` is text in Mermaid: `flowchart::Delim` says which delimiters a label
 (`Label::delim`) or a sequence (`Sequence::math`) reads.
 
-To verify (LEMB-T8): the escape rules inside the tags (the reference page's doubled backslashes),
-and how PlantUML aligns an inline formula with the text baseline.
+PlantUML v1.2026.10 (LEMB-T8): the tag is `<latex>(.+?)</latex>` (and `<math>`), case-insensitive,
+one line (`Splitter.java:79-80`); a line that is exactly `<latex>` opens a block ending at a line
+that is exactly `</latex>`. The body is verbatim (`Display.getWithNewlines` is in raw mode in
+the tags), so `\\` stays two backslashes and `\n` is not a line break. The formula is set in
+display style at a fixed size 20 (`math/TeXIconBuilder.java:57`) with a 1 px inset, not at the
+surrounding font size. Its color is the text's font color (black if not a plain color). Its box
+is bottom-aligned with the line, with no baseline matching (`Sea.java:72-80`). A failing formula
+is drawn as its source in black monospaced text, and the diagram still renders. sirene differs
+deliberately: text style at the font size, the shared baseline rule (LEMB-4), and the source in
+the label's color with a diagnostic. Not checked: JLaTeXMath's top-level `\\` and AsciiMath's own
+backslash handling (LEMB-T10).
 
 ## LEMB-3 Markdown
 
@@ -167,10 +193,14 @@ flowchart lowering). Without the `math` feature each formula gets one warning on
 
 - [x] LEMB-T1 Read the Mermaid math reference; LEMB-1 is filled from it.
 - [x] LEMB-T2 Read the PlantUML math reference; LEMB-2 is filled from it.
-- [ ] LEMB-T6 Check which other Mermaid types render `$$` in the Mermaid release sirene tracks,
-  against its source and a live render, and extend LEMB-1.
-- [ ] LEMB-T7 Read Mermaid's source for the `$$` rules listed at the end of LEMB-1.
-- [ ] LEMB-T8 Read PlantUML's source or run it for the escape and alignment rules in LEMB-2.
+- [x] LEMB-T6 Check which other Mermaid types render `$$` in the Mermaid release sirene tracks
+  (12.3.0), against its source, and extend LEMB-1. Not checked against a live render.
+- [x] LEMB-T7 Read Mermaid's source for the `$$` rules; they are in LEMB-1.
+- [x] LEMB-T8 Read PlantUML's source for the escape and alignment rules; they are in LEMB-2.
+- [ ] LEMB-T9 Read `$$` in mindmap node text, kanban cards, and the agentflow, usecase, and
+  swimlane types.
+- [ ] LEMB-T10 Confirm JLaTeXMath's `\\` outside an environment and AsciiMath's backslash
+  handling, and the Mermaid live-render items at the end of the LEMB-1 rules.
 - [x] LEMB-T3 Decide LEMB-3 with the Markdown spec.
 - [x] LEMB-T4 Define `Formula` and the inline-label item in the display list. A formula is drawn
   as `Primitive::Path` items (with an optional clip), placed on a baseline shared with the text
