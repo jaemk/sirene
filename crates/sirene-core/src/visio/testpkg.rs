@@ -170,8 +170,8 @@ impl Builder {
             "visio/document.xml".into(),
             xml(format!(r#"<VisioDocument xmlns="{NS}" xmlns:r="{REL_NS}"><Colors>{}</Colors><StyleSheets>{}</StyleSheets></VisioDocument>"#, self.colors, self.styles)),
         ));
-        let mut doc_rels = format!(
-            r#"<Relationship Id="rId1" Type="http://schemas.microsoft.com/visio/2010/relationships/pages" Target="pages/pages.xml"/><Relationship Id="rId2" Type="http://schemas.microsoft.com/visio/2010/relationships/masters" Target="masters/masters.xml"/>"#
+        let mut doc_rels = String::from(
+            r#"<Relationship Id="rId1" Type="http://schemas.microsoft.com/visio/2010/relationships/pages" Target="pages/pages.xml"/><Relationship Id="rId2" Type="http://schemas.microsoft.com/visio/2010/relationships/masters" Target="masters/masters.xml"/>"#,
         );
         for (i, _) in self.themes.iter().enumerate() {
             doc_rels.push_str(&format!(

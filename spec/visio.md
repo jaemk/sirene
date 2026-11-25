@@ -3,9 +3,9 @@
 Microsoft Visio `.vsdx` drawings (the Open Packaging Conventions format of Visio 2013 and later),
 read from bytes and drawn as scene diagrams (LANGS-2, DISPLA-1). The binary `.vsd` and the XML
 `.vdx` formats are not read. Code: `crates/sirene-core/src/visio/` (`zip.rs`, `opc.rs`,
-`model.rs`, `draw.rs`, `limits.rs`); `diagram::lower_bytes` builds it. Tests:
-`crates/sirene-core/tests/visio.rs` with the package writer in `tests/visio/`, and the unit tests
-in `visio/`.
+`model.rs`, `geom.rs`, `draw.rs`, `limits.rs`); `diagram::lower_bytes` builds it. Tests:
+`crates/sirene-core/tests/visio.rs` with the package writer in `visio/testpkg.rs`, and the unit
+tests in `visio/`.
 
 Sources read: the Visio file format reference on Microsoft Learn ("Introduction to the Visio file
 format (.vsdx)"; "Cell element (Geometry Section)"; the row pages "EllipticalArcTo Row", "ArcTo
@@ -108,8 +108,8 @@ parent = (PinX + dx cos(Angle) - dy sin(Angle), PinY + dx sin(Angle) + dy cos(An
 A child of a group is in the group's frame (origin at the group's bottom left corner, before
 its pin), so a child's full transform is its own followed by its parent's, up to the page. A
 missing `Width`, `Height`, `PinX`, `PinY`, `Angle` is 0; a missing `LocPinX` or `LocPinY` is half
-of `Width` or `Height`. Non-finite or absurd values (above 1e6 in magnitude) make the shape
-skipped.
+of `Width` or `Height`. A cell value that is not a finite number is read as missing; a transform value above 1e6 in
+magnitude makes the shape skipped.
 
 ## VISIO-6 Inheritance
 
@@ -123,6 +123,9 @@ the shape's `LineStyle` for line cells (`LineWeight`, `LineColor`, `LinePattern`
 when the shape has none of its own. A style sheet's own cells fall back to the style named by
 the same-kind attribute on it (`StyleSheet LineStyle="n"`), to a depth of `MAX_STYLE_DEPTH`.
 Geometry sections merge by `IX` and rows by `IX`, cell by cell; a row with `Del="1"` is removed.
+A shape with no `Geometry` of its own that sets its own `Width` draws the master's geometry
+scaled by its `Width` and `Height` over the master shape's, since the master's cached values are
+for the master's size.
 Text is the shape's own `Text`, else the master shape's. A cycle is cut at the depth limit.
 
 Defaults: `LineWeight` 0.01, `LineColor` 0, `LinePattern` 1, `FillForegnd` 1 (white), `FillPattern` 1, character `Size` 0.1111, `Color` 0, `Style` 0, paragraph `HorzAlign`
@@ -152,10 +155,11 @@ shape's frame, inches):
 Arcs: a circular arc with bulge `a` over chord length `c` has sagitta `|a|` and radius
 `r = (c^2 / 4 + a^2) / (2 |a|)`; the sign of `a` picks the side (positive is to the left of the
 chord direction, unverified). An elliptical arc is solved from its endpoints and the control
-point on a rotated ellipse of the given ratio, and emitted as `Segment::Arc` (the scene's SVG
-arc form, DISPLA-2). `Ellipse` is four cubic arcs. Splines and NURBS are evaluated by the
-Cox-de Boor recursion at a fixed number of samples per span and emitted as cubic segments
-(approximate).
+point (the circle through the three points in the space where the ellipse is a circle) and
+emitted as up to four cubic Beziers, so a transform applies to its control points. `Ellipse` is
+four cubic arcs. Splines and NURBS are clamped uniform B-splines over their control points (the
+knot values in the cells are not used; NURBS weights are), sampled at 16 points per span and
+emitted as line segments (approximate).
 
 The three formulas read as data, not evaluated: `POLYLINE(xType, yType, x1, y1, ...)`,
 `NURBS(lastKnot, degree, xType, yType, x1, y1, knot1, weight1, ...)`, and the spline rows' own
@@ -163,8 +167,9 @@ cells. Only numeric literals are read; one with a reference or function skips th
 extra points and draws a line to `(X, Y)`, with one warning. `xType` and `yType` 0 mean
 relative to `Width` and `Height`, 1 absolute (unverified).
 
-A path is closed (and filled) when its last point equals its first; an open path is stroked
-only. `Rounding` (rounded corners) is not applied.
+A path is closed when its last point equals its first. A path is filled whether open or closed
+(an open one as if closed, as Visio does, unverified) unless `NoFill`, and stroked open unless
+`NoLine`. `Rounding` (rounded corners) is not applied.
 
 ## VISIO-8 Line, fill, color
 
@@ -205,14 +210,14 @@ it) and `fld` (a field, drawn as its cached text). `Character` cells: `Size` (in
 `IndLeft`, `IndRight`, `IndFirst`, `SpLine` (negative is a multiple of the font size, positive
 inches; default 1.2 times the size), `SpBefore`, `SpAfter`. Text block cells: `TxtPinX`,
 `TxtPinY`, `TxtLocPinX`, `TxtLocPinY`, `TxtWidth`, `TxtHeight`, `TxtAngle` (default: the whole
-shape box, pin at its center), `LeftMargin`, `RightMargin`, `TopMargin`, `BottomMargin`, and
+shape box, pin at its center; `TxtAngle` is ignored), `LeftMargin`, `RightMargin`, `TopMargin`, `BottomMargin`, and
 `VerticalAlign` (0 top, 1 middle, 2 bottom).
 
 Lines break at newlines and wrap at word boundaries inside the block's width less margins; a
 word wider than a line stays whole. Each line is one `Primitive::Text` (centered on its box, so
 left and right lines are placed by measured width), underline is a path under it, in the line's
-first run's color. Text is drawn upright: a shape's `Angle` and a `TxtAngle` move the text block's
-center but do not rotate the text (VISIO-15). Text with no visible characters draws nothing.
+first run's color. Text is drawn upright: the block is the bounding box of the text block's
+rotated corners, and the text is not rotated (VISIO-15). Text with no visible characters draws nothing.
 
 ## VISIO-10 Groups, connectors, layers, backgrounds, foreign shapes
 
@@ -237,7 +242,7 @@ Every non-background page is one output, in `pages.xml` order, numbered from 1. 
 such page is one output with no suffix; with several, outputs are `STEM-N.ext` as Markdown blocks
 are (CLI-12), and `--page N` picks one (no suffix). A page's scene is `PageWidth` by
 `PageHeight` inches at 96 px per inch (a page with a missing, zero, or over-limit size is an
-error), on the theme's background. The library draws one page: `Diagram::Visio(Visio)` holds the
+error), on a white background whatever the theme (the drawing carries its own colors). The library draws one page: `Diagram::Visio(Visio)` holds the
 `Document` (shared) and a page index; `Visio::pages` lists the drawable pages and `with_page`
 picks one.
 
@@ -274,7 +279,7 @@ empty drawing. Limits (`visio/limits.rs`, LANGS-8):
 | XML part size | 16 MiB; nodes 1,000,000; element depth 256 |
 | Pages | 256 |
 | Masters | 4096 |
-| Shapes per page (masters count in each instance) | 50,000 |
+| Shapes per page or master part | 50,000 |
 | Group nesting | 64 |
 | Geometry rows per shape | 4096 |
 | Master and style inheritance depth | 16 |
@@ -313,15 +318,15 @@ real Visio files.
 
 | Feature | Status |
 |---------|--------|
-| Zip reader (stored, deflate), limits | pending |
-| OPC relationships, content types | pending |
-| Document, pages, masters, themes model | pending |
-| Transform, groups, flips, rotation | pending |
-| Geometry rows | pending |
-| Line, fill, indexed and theme colors | pending |
-| Text | pending |
-| Inheritance (master, style sheets) | pending |
-| Connectors, layers, backgrounds, Foreign placeholders | pending |
+| Zip reader (stored, deflate), limits | done |
+| OPC relationships, content types | done |
+| Document, pages, masters, themes model | done |
+| Transform, groups, flips, rotation | done |
+| Geometry rows | done |
+| Line, fill, indexed and theme colors | done |
+| Text | done |
+| Inheritance (master, style sheets) | done |
+| Connectors, layers, backgrounds, Foreign placeholders | done |
 | CLI, wasm, GUI, packaging | pending |
 | Fuzz target | pending |
 

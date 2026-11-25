@@ -1,6 +1,8 @@
 //! Microsoft Visio `.vsdx` drawings (VISIO-1 to VISIO-16): the package is read here, the drawing
 //! is built in `draw`, and `scene::visio` hands it to the backends.
 
+mod draw;
+mod geom;
 pub(crate) mod limits;
 pub mod model;
 pub(crate) mod opc;
@@ -13,6 +15,7 @@ use std::sync::Arc;
 use rowan::TextRange;
 
 use crate::diagnostic::Diagnostic;
+use crate::scene::{Scene, TextMetrics};
 use crate::{Error, Result};
 use model::{Document, Master, Page, Theme};
 use opc::{parse_rels, parse_xml, rels_name, text};
@@ -63,6 +66,34 @@ impl Visio {
             doc: Arc::clone(&self.doc),
             page: n,
         })
+    }
+
+    /// The page drawn as a scene, with text measured by `metrics` (VISIO-11).
+    pub fn scene(&self, metrics: &impl TextMetrics) -> Result<Scene> {
+        Ok(draw::draw(self, metrics)?.scene)
+    }
+
+    /// The problems drawing every output page: an error for a page that cannot be drawn, and a
+    /// warning for each thing drawn approximately (VISIO-14).
+    pub fn problems(&self) -> Vec<Diagnostic> {
+        let mut out = Vec::new();
+        for n in 0..self.page_count() {
+            let Some(page) = self.with_page(n) else {
+                continue;
+            };
+            match draw::draw(&page, &crate::scene::Approx) {
+                Ok(drawn) => {
+                    for w in drawn.warnings {
+                        let d = Diagnostic::warning(TextRange::default(), w);
+                        if !out.contains(&d) {
+                            out.push(d);
+                        }
+                    }
+                }
+                Err(e) => out.push(Diagnostic::new(TextRange::default(), e.report())),
+            }
+        }
+        out
     }
 
     /// The page drawn.

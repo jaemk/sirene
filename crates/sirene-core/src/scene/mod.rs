@@ -35,6 +35,7 @@ mod timing;
 mod treemap;
 mod treeview;
 mod venn;
+mod visio;
 mod wardley;
 mod xychart;
 
@@ -68,6 +69,7 @@ pub use timing::timing;
 pub use treemap::treemap;
 pub use treeview::treeview;
 pub use venn::venn;
+pub use visio::visio;
 pub use wardley::wardley;
 pub use xychart::xychart;
 

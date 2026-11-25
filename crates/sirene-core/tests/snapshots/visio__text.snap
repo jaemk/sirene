@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/visio.rs
+expression: summary(& s)
+---
+576x384
+text "Hello" at 288.0,192.0 size=19.20 color=#ff0000 bold=true italic=true
+path fill=none stroke=#ff0000/255:1.2:None M259.2,201.6 L316.8,201.6
