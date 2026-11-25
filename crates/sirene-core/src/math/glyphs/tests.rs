@@ -236,6 +236,14 @@ const CASES: &[(&str, [Lines; 3])] = &[
         [&["int_0^1 f(x) dx"], &["int_0^1 f(x) dx"], &["∫₀¹ f(x) dx"]],
     ),
     (
+        r"\int_0^n i\,di",
+        [&["int_0^n i di"], &["int_0^n i di"], &["∫₀ⁿ i di"]],
+    ),
+    (
+        r"x^n + y^n i",
+        [&["x^n + y^n i"], &["x^n + y^n i"], &["xⁿ + yⁿi"]],
+    ),
+    (
         r"\begin{pmatrix}a&b\\c&d\end{pmatrix}",
         [
             &["╭a  b╮", "╰c  d╯"],

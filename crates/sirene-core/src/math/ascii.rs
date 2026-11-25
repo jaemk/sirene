@@ -504,6 +504,7 @@ impl Renderer<'_> {
     fn line(&self, nodes: &[Node<'_>], display: bool) -> Block {
         // Each node drawn, with its class and whether it opens; `\not` joins the node after it.
         let mut items: Vec<(Class, bool, Block, bool)> = Vec::new();
+        let mut trailing: Vec<bool> = Vec::new();
         let mut at = 0;
         while let Some(node) = nodes.get(at) {
             at += 1;
@@ -539,6 +540,15 @@ impl Renderer<'_> {
                 last.2 = negated(std::mem::take(&mut last.2), self.charset);
                 continue;
             }
+            // A script written with `^` or `_` and ending in a letter or digit (`sum_(i=1)^n`) is
+            // set off from a letter after it, which would read as part of the script.
+            let script_end = !self.rich()
+                && matches!(node.kind, NodeKind::SupSub { .. })
+                && block
+                    .one_row()
+                    .and_then(|r| r.chars().last())
+                    .is_some_and(|c| c.is_ascii_alphanumeric());
+            trailing.push(script_end);
             items.push((class_of(node), is_open(node), block, word));
         }
         // The first and last character of each item that is one row, and whether it is a word.
@@ -564,7 +574,7 @@ impl Renderer<'_> {
             let prev = i.checked_sub(1).and_then(|j| classes.get(j)).copied();
             if let Some(((_, last, left), (first, _, right))) =
                 i.checked_sub(1).and_then(|j| ends.get(j)).zip(ends.get(i))
-                && (*left || *right)
+                && (*left || *right || trailing.get(i - 1).copied().unwrap_or(false))
                 && last.is_some_and(|c| c.is_ascii_alphanumeric())
                 && first.is_some_and(|c| c.is_ascii_alphanumeric())
             {
