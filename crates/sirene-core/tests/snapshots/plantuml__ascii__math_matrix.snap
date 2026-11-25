@@ -2,5 +2,5 @@
 source: crates/sirene-core/tests/plantuml.rs
 expression: "@startmath\nA = [[a, b], [c, d]]\n@endmath\n"
 ---
-    ⎡a  b⎤
-A = ⎣c  d⎦
+    [a  b]
+A = [c  d]

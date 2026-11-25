@@ -2,17 +2,17 @@
 source: crates/sirene-core/tests/plantuml.rs
 expression: "@startuml\n[*] --> Idle\nstate \"rate <latex>\\lambda</latex>\" as Idle\nIdle --> Busy : <latex>p = \\frac{1}{2}</latex>\n@enduml\n"
 ---
-     *
-     |
-     v
-.--------.
-| rate λ |
-'----+---'
-     |
-       1
-  p = ---
-       2
-     v
- .------.
- | Busy |
- '------'
+       *
+       |
+       v
+.-------------.
+| rate lambda |
+'------+------'
+       |
+         1
+    p = ---
+         2
+       v
+   .------.
+   | Busy |
+   '------'

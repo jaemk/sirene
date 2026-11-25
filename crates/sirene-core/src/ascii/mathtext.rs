@@ -12,6 +12,7 @@ use std::rc::Rc;
 #[cfg(feature = "math")]
 use unicode_width::UnicodeWidthChar;
 
+use super::Charset;
 #[cfg(feature = "math")]
 use crate::flowchart::Span;
 use crate::flowchart::{Delim, Label};
@@ -20,7 +21,11 @@ use crate::flowchart::{Delim, Label};
 /// holds the delimiters, so says the language and style too).
 #[cfg(feature = "math")]
 #[derive(Default)]
-pub(super) struct Rows(RefCell<HashMap<String, Rc<Block>>>);
+pub(super) struct Rows {
+    cache: RefCell<HashMap<String, Rc<Block>>>,
+    /// The characters the formulas are drawn with.
+    charset: Charset,
+}
 
 #[cfg(not(feature = "math"))]
 #[derive(Default)]
@@ -28,17 +33,34 @@ pub(super) struct Rows(());
 
 #[cfg(feature = "math")]
 impl Rows {
+    /// An empty set of formulas, to be drawn in `charset`.
+    pub(super) fn new(charset: Charset) -> Rows {
+        Rows {
+            charset,
+            ..Rows::default()
+        }
+    }
+
     /// The block of `span`: a formula's rows when it typesets (cached), else its text.
     fn block(&self, span: &Span) -> Rc<Block> {
         if !span.math {
             return Rc::new(Block::text(&span.text));
         }
-        if let Some(hit) = self.0.borrow().get(&span.text) {
+        if let Some(hit) = self.cache.borrow().get(&span.text) {
             return hit.clone();
         }
-        let made = Rc::new(Block::of(span));
-        self.0.borrow_mut().insert(span.text.clone(), made.clone());
+        let made = Rc::new(Block::of(span, self.charset));
+        self.cache
+            .borrow_mut()
+            .insert(span.text.clone(), made.clone());
         made
+    }
+}
+
+#[cfg(not(feature = "math"))]
+impl Rows {
+    pub(super) fn new(_: Charset) -> Rows {
+        Rows::default()
     }
 }
 
@@ -69,12 +91,12 @@ pub(super) fn rows(_: &Rows, label: &Label) -> Option<Vec<String>> {
 /// `lines` of source text as rows, each line with a formula as many rows as the formula has.
 /// Without a formula, or without the `math` feature, the lines are unchanged.
 #[cfg(feature = "math")]
-pub(super) fn text_rows(lines: &[String], delim: Delim) -> Vec<String> {
+pub(super) fn text_rows(lines: &[String], delim: Delim, charset: Charset) -> Vec<String> {
     use crate::flowchart::formula;
     if !lines.iter().any(|l| formula::has(l, delim)) {
         return lines.to_vec();
     }
-    let cache = Rows::default();
+    let cache = Rows::new(charset);
     lines
         .iter()
         .flat_map(|l| line_rows(&cache, &formula::runs(l, delim)))
@@ -82,7 +104,7 @@ pub(super) fn text_rows(lines: &[String], delim: Delim) -> Vec<String> {
 }
 
 #[cfg(not(feature = "math"))]
-pub(super) fn text_rows(lines: &[String], _: Delim) -> Vec<String> {
+pub(super) fn text_rows(lines: &[String], _: Delim, _: Charset) -> Vec<String> {
     lines.to_vec()
 }
 
@@ -170,8 +192,8 @@ impl Block {
     /// The rows of a formula span as the scene draws it: the rows of a formula that typesets
     /// (none, for a formula with nothing to draw, which is no width and one empty row), and the
     /// span's text only when it does not typeset.
-    fn of(span: &Span) -> Block {
-        match span.ascii_rows() {
+    fn of(span: &Span, charset: Charset) -> Block {
+        match span.ascii_rows(charset) {
             Some(Ok((rows, _))) if rows.is_empty() => Block::text(""),
             Some(Ok((rows, base))) => Block {
                 width: rows.iter().map(|r| width(r)).max().unwrap_or(0),
@@ -234,9 +256,29 @@ mod tests {
     }
 
     #[test]
+    fn every_row_of_a_line_is_as_wide_as_the_block_in_every_set() {
+        for set in [Charset::Unicode, Charset::Ascii, Charset::UnicodeMath] {
+            for src in [
+                r"$$\sqrt[3]{x^2+1}$$",
+                r"$$\frac{\alpha}{\sum_{i=1}^n x_i}$$",
+                r"$$\left(\frac{a}{b}\right)$$",
+                r"$$\hat{x}\xrightarrow{f}\overline{yz}\pm\infty$$",
+            ] {
+                let cache = Rows::new(set);
+                let rows = line_rows(&cache, &[formula(src)]);
+                let b = Block::of(&formula(src), set);
+                assert!(rows.len() > 1, "{src}");
+                for r in &rows {
+                    assert_eq!(width(r), b.width, "{src} {set:?} {r:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn a_formula_with_nothing_to_draw_is_no_width_not_its_source() {
         for src in ["$$$$", r"$$\phantom{x}$$", r"$$\,$$"] {
-            let b = Block::of(&formula(src));
+            let b = Block::of(&formula(src), Charset::Unicode);
             assert_eq!(b.rows, [""], "{src}");
             assert_eq!(b.width, 0, "{src}");
             let got = rows(&Rows::default(), &label(&format!("a {src} b"))).unwrap();
@@ -246,7 +288,7 @@ mod tests {
 
     #[test]
     fn only_a_formula_that_does_not_typeset_is_drawn_as_source() {
-        let b = Block::of(&formula(r"$$\foo$$"));
+        let b = Block::of(&formula(r"$$\foo$$"), Charset::Unicode);
         assert_eq!(b.rows, [r"$$\foo$$"]);
         let got = rows(&Rows::default(), &label(r"a $$\foo$$ b")).unwrap();
         assert_eq!(got, [r"a $$\foo$$ b"]);
@@ -269,7 +311,7 @@ mod tests {
         for _ in 0..5 {
             assert_eq!(rows(&cache, &l).unwrap(), first);
         }
-        assert_eq!(cache.0.borrow().len(), 2);
+        assert_eq!(cache.cache.borrow().len(), 2);
     }
 
     /// A flowchart of formula labels is set once per formula in a render, whatever the shape.
@@ -336,6 +378,6 @@ mod tests {
         let cache = Rows::default();
         let b = cache.block(&Span::plain("$$x$$"));
         assert_eq!(b.rows, ["$$x$$"]);
-        assert_eq!(cache.0.borrow().len(), 0);
+        assert_eq!(cache.cache.borrow().len(), 0);
     }
 }

@@ -360,6 +360,36 @@ fn ascii_charset() {
         .stderr(predicate::str::contains("ebcdic"));
 }
 
+fn ascii_stdout(charset: &str, source: &str) -> String {
+    let out = sirene()
+        .args(["ascii", "--charset", charset])
+        .write_stdin(source)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    String::from_utf8(out).expect("utf-8 output")
+}
+
+#[test]
+fn ascii_charset_sets_formulas() {
+    let sources = [
+        "flowchart LR\nA[\"$$\\sqrt{x^2} \\le \\alpha$$\"] --> B\n",
+        "sequenceDiagram\nA->>B: $$\\sqrt{x^2} \\le \\alpha$$\n",
+    ];
+    for source in sources {
+        let ascii = ascii_stdout("ascii", source);
+        assert!(ascii.is_ascii(), "{ascii}");
+        assert!(ascii.contains("\\/x^2 <= alpha"), "{ascii}");
+        let unicode = ascii_stdout("unicode", source);
+        assert!(unicode.contains("\\/x^2 <= \u{3b1}"), "{unicode}");
+        assert!(!unicode.contains('\u{221a}'), "{unicode}");
+        let rich = ascii_stdout("unicode-math", source);
+        assert!(rich.contains("\u{221a}x\u{b2} \u{2264} \u{3b1}"), "{rich}");
+    }
+}
+
 #[test]
 fn ascii_reports_warnings() {
     sirene()

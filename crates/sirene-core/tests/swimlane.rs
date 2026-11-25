@@ -73,8 +73,8 @@ fn snapshots() {
                 out.push('\n');
                 out.push_str(&lowered.diagram.ascii(&Options { charset }).unwrap());
                 let kind = match charset {
-                    Charset::Unicode => dir,
                     Charset::Ascii => "ascii",
+                    _ => dir,
                 };
                 insta::assert_snapshot!(format!("{kind}__{name}"), out, &src);
             }

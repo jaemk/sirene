@@ -2,7 +2,7 @@
 source: crates/sirene-core/tests/plantuml.rs
 expression: "@startuml\npackage \"Set <latex>\\mathbb{N}</latex>\" {\n  class Counter\n  class Step\n}\nCounter --> Step\n@enduml\n"
 ---
-+--- Set ℕ ---+
++--- Set N ---+
 |             |
 | +---------+ |
 | | Counter | |

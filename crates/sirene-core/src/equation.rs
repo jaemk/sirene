@@ -38,15 +38,16 @@ impl Flavor {
         }
     }
 
-    /// `src` as text in `style`.
+    /// `src` as text in `style`, drawn with `charset`.
     pub(crate) fn ascii(
         self,
         src: &str,
         style: crate::math::MathStyle,
+        charset: crate::ascii::Charset,
     ) -> Result<String, crate::math::MathError> {
         match self {
-            Flavor::Tex => crate::math::ascii_formula(src, style),
-            Flavor::AsciiMath => crate::math::ascii_asciimath(src, style),
+            Flavor::Tex => crate::math::ascii_formula(src, style, charset),
+            Flavor::AsciiMath => crate::math::ascii_asciimath(src, style, charset),
         }
     }
 
@@ -55,12 +56,13 @@ impl Flavor {
         self,
         src: &str,
         style: crate::math::MathStyle,
+        charset: crate::ascii::Charset,
     ) -> Result<(Vec<String>, usize), crate::math::MathError> {
         #[cfg(test)]
         count::bump();
         match self {
-            Flavor::Tex => crate::math::ascii_formula_rows(src, style),
-            Flavor::AsciiMath => crate::math::ascii_asciimath_rows(src, style),
+            Flavor::Tex => crate::math::ascii_formula_rows(src, style, charset),
+            Flavor::AsciiMath => crate::math::ascii_asciimath_rows(src, style, charset),
         }
     }
 }
@@ -73,10 +75,13 @@ impl Equation {
             .typeset(&self.source, crate::math::MathStyle::Display)
     }
 
-    /// The formula as text, in display style.
-    pub(crate) fn ascii(&self) -> Result<String, crate::math::MathError> {
+    /// The formula as text, in display style, drawn with `charset`.
+    pub(crate) fn ascii(
+        &self,
+        charset: crate::ascii::Charset,
+    ) -> Result<String, crate::math::MathError> {
         self.flavor
-            .ascii(&self.source, crate::math::MathStyle::Display)
+            .ascii(&self.source, crate::math::MathStyle::Display, charset)
     }
 }
 

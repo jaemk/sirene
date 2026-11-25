@@ -44,8 +44,8 @@ fn snapshots() {
         for charset in [Charset::Unicode, Charset::Ascii] {
             let out = lowered.diagram.ascii(&Options { charset }).unwrap();
             let kind = match charset {
-                Charset::Unicode => "valid",
                 Charset::Ascii => "ascii",
+                _ => "valid",
             };
             insta::assert_snapshot!(format!("{kind}__{name}"), out, &src);
         }

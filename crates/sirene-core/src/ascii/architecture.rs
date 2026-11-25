@@ -51,7 +51,7 @@ pub fn render(a: &Architecture, options: &Options) -> String {
         }
     }
     // The formulas set to size the layout are the ones drawn.
-    let rows = Rows::default();
+    let rows = Rows::new(options.charset);
     let cells = CellsIn(&rows);
     let node = |i: usize| {
         let s = cells.node(&chart.nodes[i]);

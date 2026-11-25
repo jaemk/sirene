@@ -34,7 +34,7 @@ fn widest(lines: &[String]) -> i32 {
 /// Renders `chart` as text (MCYN-4).
 pub fn render(chart: &Cynefin, options: &Options) -> String {
     let arrow = match options.charset {
-        Charset::Unicode => "\u{2192}",
+        Charset::Unicode | Charset::UnicodeMath => "\u{2192}",
         Charset::Ascii => "->",
     };
     let [complex, complicated, chaotic, clear, confusion] =

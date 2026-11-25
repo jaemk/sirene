@@ -69,12 +69,17 @@ use mathtext::Rows;
 
 /// Characters to draw with (ASCIIR-2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum Charset {
-    /// Box-drawing characters.
+    /// Box-drawing characters. Formulas use only characters that common monospace fonts draw in
+    /// one cell (see `math::glyphs`), with `^2` and `_i` scripts and `\/` radicals.
     #[default]
     Unicode,
     /// Only printable ASCII.
     Ascii,
+    /// As `Unicode`, and formulas also use mathematical symbols, Unicode super- and subscripts, and
+    /// bracket pieces, which some fonts draw wider than one cell.
+    UnicodeMath,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -123,7 +128,7 @@ pub fn render(chart: &Flowchart, options: &Options) -> crate::Result<String> {
         .flatten();
     let chart = plain.as_ref().unwrap_or(chart);
     // The formulas set to size the layout are the ones drawn.
-    let rows = Rows::default();
+    let rows = Rows::new(options.charset);
     let graph = chart.layout_graph(&CellsIn(&rows))?;
     let layout = layout::layout(&graph, &CONFIG)?;
     let _phase = crate::profile::Phase::start("ascii.draw");
@@ -400,12 +405,7 @@ fn width(s: &str) -> i32 {
 }
 
 /// Display lines of a label, with markdown emphasis markers dropped (ASCIIR-3). A line with a
-/// `$$...$$` formula is as many rows as the formula has (LEMB-4).
-fn lines(label: &Label) -> Vec<String> {
-    lines_in(&Rows::default(), label)
-}
-
-/// [`lines`] with the formulas already set in `rows`.
+/// `$$...$$` formula is as many rows as the formula has (LEMB-4), set in `rows` (once each).
 fn lines_in(rows: &Rows, label: &Label) -> Vec<String> {
     mathtext::rows(rows, label).unwrap_or_else(|| label.lines())
 }

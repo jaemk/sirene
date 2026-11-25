@@ -9,15 +9,15 @@ expression: "@startuml\nAlice -> Bob : hi\nnote over Alice, Bob\n  Given <latex>
      |    hi    |
      +--------->|
      |          |
- +-------------------+
- |               ¯   |
- | Given x² and √y,  |
- | plain second line |
- +-------------------+
++--------------------+
+|                 _  |
+| Given x^2 and \/y, |
+| plain second line  |
++--------------------+
      |          |
-     |          | +----------+
-     |          | | area πr² |
-     |          | +----------+
+     |          | +-------------+
+     |          | | area pi r^2 |
+     |          | +-------------+
      |          |
  +---+---+   +--+--+
  | Alice |   | Bob |

@@ -6,7 +6,7 @@ use crate::journey::{Journey, MAX_SCORE};
 /// A five-step bar for `score`, rounded to the nearest step.
 fn bar(score: f64, charset: Charset) -> String {
     let (on, off) = match charset {
-        Charset::Unicode => ('●', '○'),
+        Charset::Unicode | Charset::UnicodeMath => ('●', '○'),
         Charset::Ascii => ('*', '.'),
     };
     let n = score.round().clamp(0.0, MAX_SCORE) as usize;

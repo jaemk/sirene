@@ -4,7 +4,7 @@ expression: "@startuml\npackage \"Set <latex>\\mathbb{N}</latex> and <latex>\\fo
 ---
 2:51: error: Undefined control sequence: \foo
 
-┌─ Set ℕ and <latex>\foo</latex> ─┐
+┌─ Set N and <latex>\foo</latex> ─┐
 │                                 │
 │           ┌─────────┐           │
 │           │ Counter │           │

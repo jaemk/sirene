@@ -10,7 +10,7 @@ expression: "@startuml\nA -> B : go\nalt <latex>x^2 > 1</latex>\n  B -> A : big\
   │  go   │
   ├──────►│
   │       │
-┌─alt [x² > 1]───┐
+┌─alt [x^2 > 1]──┐
 │ │  big  │      │
 │ │◄──────┤      │
 │ │       │      │

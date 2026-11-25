@@ -7,7 +7,7 @@ expression: "@startuml\n[Web] --> [Api] : <latex>O(n^2)</latex>\n(Use <latex>\\a
 │ Web │   ( Use α )
 └──┬──┘   ╰───────╯
    │
- O(n²)
+O(n^2)
    ▼
 ┌─────┐
 │ Api │

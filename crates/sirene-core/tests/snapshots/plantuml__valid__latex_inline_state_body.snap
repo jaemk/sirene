@@ -3,24 +3,24 @@ source: crates/sirene-core/tests/plantuml.rs
 expression: "@startuml\n[*] --> Idle\nIdle : entry / <latex>x_0 + 1</latex>\nIdle : do / <math>sum_(i=1)^n i</math>\nIdle --> Busy\nstate \"Run <latex>\\tau</latex>\" as Busy {\n  [*] --> Step\n}\n@enduml\n"
 ---
 
-         ●
-         │
-         ▼
-╭────────────────╮
-│      Idle      │
-├────────────────┤
-│ entry / x₀ + 1 │
-│ do / ∑ᵢ₌₁ⁿi    │
-╰────────┬───────╯
-         │
-         ▼
-       ┌───── Run τ ─┐
-       │             │
-       │     ●       │
-       │     │       │
-       │     ▼       │
-       │ ╭──────╮    │
-       │ │ Step │    │
-       │ ╰──────╯    │
-       │             │
-       └─────────────┘
+          ●
+          │
+          ▼
+╭───────────────────╮
+│       Idle        │
+├───────────────────┤
+│ entry / x_0 + 1   │
+│ do / sum^n_(i=1)i │
+╰─────────┬─────────╯
+          │
+          ▼
+        ┌───── Run τ ─┐
+        │             │
+        │     ●       │
+        │     │       │
+        │     ▼       │
+        │ ╭──────╮    │
+        │ │ Step │    │
+        │ ╰──────╯    │
+        │             │
+        └─────────────┘

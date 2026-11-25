@@ -241,9 +241,10 @@ impl Span {
     #[cfg(feature = "math")]
     pub(crate) fn ascii_rows(
         &self,
+        charset: crate::ascii::Charset,
     ) -> Option<Result<(Vec<String>, usize), crate::math::MathError>> {
         let (src, style) = (self.formula()?, self.delim()?.style());
-        Some(self.flavor().ascii_rows(&src, style))
+        Some(self.flavor().ascii_rows(&src, style, charset))
     }
 
     /// The language of a formula span.

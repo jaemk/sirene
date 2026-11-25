@@ -52,7 +52,7 @@ pub fn render(treemap: &Treemap, options: &Options) -> String {
         treemap,
         values,
         glyphs: match options.charset {
-            Charset::Unicode => ["├─ ", "└─ ", "│  "],
+            Charset::Unicode | Charset::UnicodeMath => ["├─ ", "└─ ", "│  "],
             Charset::Ascii => ["+- ", "`- ", "|  "],
         },
         lines: Vec::new(),

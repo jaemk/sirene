@@ -5,9 +5,9 @@ expression: "@startuml\nclass Order\nclass Item\nOrder \"<latex>\\alpha</latex>\
 +-------+
 | Order |
 +---+---+
-    |α
+    |alph
   lines
-    vn²
+    vn^2
 +------+
 | Item |
 +------+

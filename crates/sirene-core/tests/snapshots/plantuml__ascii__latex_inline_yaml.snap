@@ -5,6 +5,6 @@ expression: "@startyaml\narea: \"<latex>\\frac{a}{b}</latex>\"\nlist:\n  - <late
 +----------+
 |       a  |
 | area --- |    +-------+
-|       b  |    | x²    |
+|       b  |    | x^2   |
 | list     +----+ plain |
 +----------+    +-------+

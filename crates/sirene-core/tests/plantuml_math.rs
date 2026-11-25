@@ -423,7 +423,7 @@ mod math {
         let out = diagram::lower(&valid("math_inline_message"))
             .diagram
             .ascii(&Options {
-                charset: Charset::Unicode,
+                charset: Charset::UnicodeMath,
             })
             .unwrap();
         assert!(out.contains("ax\u{b2} + bx + c = 0"), "{out}");
@@ -1104,7 +1104,7 @@ mod math {
         let out = diagram::lower(src)
             .diagram
             .ascii(&Options {
-                charset: Charset::Unicode,
+                charset: Charset::UnicodeMath,
             })
             .unwrap();
         out.lines().map(|r| r.chars().collect()).collect()

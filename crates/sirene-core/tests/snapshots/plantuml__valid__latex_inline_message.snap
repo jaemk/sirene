@@ -3,18 +3,18 @@ source: crates/sirene-core/tests/plantuml.rs
 expression: "@startuml\nparticipant \"<latex>\\alpha</latex>\" as A\nparticipant Bob\nBob -> A : Can you solve: <latex>\\frac{a}{b} + x^2</latex>\nA --> Bob : <latex>\\neq 0</latex> only\n@enduml\n"
 ---
 
-┌───┐                   ┌─────┐
-│ α │                   │ Bob │
-└─┬─┘                   └──┬──┘
-  │                        │
-  │                a       │
-  │Can you solve: --- + x² │
-  │                b       │
-  │◄───────────────────────┤
-  │                        │
-  │        ≠ 0 only        │
-  ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄►│
-  │                        │
-┌─┴─┐                   ┌──┴──┐
-│ α │                   │ Bob │
-└───┘                   └─────┘
+┌───┐                    ┌─────┐
+│ α │                    │ Bob │
+└─┬─┘                    └──┬──┘
+  │                         │
+  │                a        │
+  │Can you solve: --- + x^2 │
+  │                b        │
+  │◄────────────────────────┤
+  │                         │
+  │        != 0 only        │
+  ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄►│
+  │                         │
+┌─┴─┐                    ┌──┴──┐
+│ α │                    │ Bob │
+└───┘                    └─────┘

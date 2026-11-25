@@ -6,7 +6,7 @@ use crate::ishikawa::{Cause, Ishikawa};
 /// The branch, last branch, continuing, and blank prefixes.
 fn glyphs(charset: Charset) -> [&'static str; 4] {
     match charset {
-        Charset::Unicode => ["├── ", "└── ", "│   ", "    "],
+        Charset::Unicode | Charset::UnicodeMath => ["├── ", "└── ", "│   ", "    "],
         Charset::Ascii => ["+-- ", "`-- ", "|   ", "    "],
     }
 }

@@ -7,8 +7,8 @@ expression: "@startuml\nparticipant \"<math>alpha</math>\" as A\nparticipant Bob
 │ α │                  │ Bob │
 └─┬─┘                  └──┬──┘
   │                       │
-  │   a       a       ¯   │
-  │  --- and --- and √x   │
+  │   a       a        _  │
+  │  --- and --- and \/x  │
   │   b       b           │
   │◄──────────────────────┤
   │                       │

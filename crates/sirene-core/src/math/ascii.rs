@@ -2,25 +2,36 @@
 //!
 //! It reads the parse tree, not the box tree, and builds blocks of characters with a baseline,
 //! which are joined side by side (aligned on the baselines) or stacked. A fraction is a numerator,
-//! a rule of `-` and a denominator; scripts use Unicode super- and subscript characters where
-//! they exist and `^`/`_` forms where not; a radical is `√` under an overline row; a table is
-//! aligned columns. Like the flowchart renderer's default character set it draws with Unicode;
-//! a node it has no drawing for shows its source text. It never panics.
+//! a rule of `-` and a denominator; a table is aligned columns. What the glyphs are depends on the
+//! character set (`glyphs`): with `UnicodeMath` scripts are Unicode super- and subscript
+//! characters where they exist and `^`/`_` forms where not, a radical is `√` under an overline
+//! row, and operators and delimiter pieces are Unicode symbols. With `Unicode` and `Ascii` scripts
+//! are always `^`/`_` forms, a radical is `\/` under a row of `_`, and a symbol is a character the
+//! set has, its ASCII name (`<=`, `alpha`, `sum`), or `?`. A node it has no drawing for shows its
+//! source text. It never panics.
+
+use std::borrow::Cow;
 
 use super::{
     ast::{AlignSpec, Array, MathClass, Measurement, Node, NodeKind, OpContent, StyleName},
     error::MathError,
     formula::MathStyle,
-    limits,
+    glyphs, limits,
     parser::{Settings, parse_with},
     symbols::{AtomGroup, Mode, Name, lookup},
 };
+use crate::ascii::Charset;
 
-/// Typesets `source`, a formula in TeX math mode (no `$` delimiters), as rows of text.
+/// Typesets `source`, a formula in TeX math mode (no `$` delimiters), as rows of text drawn with
+/// `charset`.
 ///
 /// Trailing spaces and blank rows at either end are removed. Fails as `typeset` does.
-pub fn ascii_formula(source: &str, style: MathStyle) -> Result<String, MathError> {
-    Ok(ascii_formula_rows(source, style)?.0.join("\n"))
+pub fn ascii_formula(
+    source: &str,
+    style: MathStyle,
+    charset: Charset,
+) -> Result<String, MathError> {
+    Ok(ascii_formula_rows(source, style, charset)?.0.join("\n"))
 }
 
 /// Like `ascii_formula`, but as the rows and the index of the row the baseline is on, so a
@@ -28,6 +39,7 @@ pub fn ascii_formula(source: &str, style: MathStyle) -> Result<String, MathError
 pub fn ascii_formula_rows(
     source: &str,
     style: MathStyle,
+    charset: Charset,
 ) -> Result<(Vec<String>, usize), MathError> {
     let nodes = parse_with(
         source,
@@ -41,12 +53,13 @@ pub fn ascii_formula_rows(
     let renderer = Renderer {
         source,
         compact: false,
+        charset,
     };
     let block = renderer.list(&nodes, style == MathStyle::Display);
     if reset_budget() {
         return Err(MathError::new("formula too large to draw as text", 0..0));
     }
-    Ok(block.finish_rows())
+    Ok(block.finish_rows(charset))
 }
 
 thread_local! {
@@ -279,17 +292,29 @@ impl Block {
     }
 
     /// The rows as text, trailing spaces and blank rows at either end cut, and the index of the
-    /// baseline row among them.
-    fn finish_rows(self) -> (Vec<String>, usize) {
+    /// baseline row among them. With `Ascii` a cell that is not printable ASCII is `?` (a wide
+    /// character, which takes two cells, two): the glyphs are mapped as they are built, so this
+    /// only holds what no builder mapped.
+    fn finish_rows(self, charset: Charset) -> (Vec<String>, usize) {
+        let ascii = charset == Charset::Ascii;
         let lines: Vec<String> = self
             .rows
             .iter()
             .map(|r| {
-                r.iter()
-                    .filter(|c| **c != WIDE_FILL)
-                    .collect::<String>()
-                    .trim_end()
-                    .to_owned()
+                let mut line = String::with_capacity(r.len());
+                let mut wide = false;
+                for &c in r {
+                    if c == WIDE_FILL {
+                        if ascii && wide {
+                            line.push('?');
+                        }
+                        wide = false;
+                        continue;
+                    }
+                    wide = ascii && !glyphs::is_ascii_cell(c);
+                    line.push(if wide { '?' } else { c });
+                }
+                line.trim_end().to_owned()
             })
             .collect();
         let first = lines.iter().position(|l| !l.is_empty());
@@ -367,11 +392,21 @@ fn is_not(n: &Node<'_>) -> bool {
     }
 }
 
-/// A block with a slash through it: one character takes its negated form.
-fn negated(block: Block) -> Block {
+/// A block with a slash through it: one character takes its negated form (with `Unicode` and
+/// `Ascii`, a relation written as text takes a `!` before it, and any other block a `/`).
+fn negated(block: Block, charset: Charset) -> Block {
     let Some(row) = block.one_row() else {
         return block;
     };
+    if charset != Charset::UnicodeMath {
+        let relation = row.chars().next().is_some_and(|c| !c.is_alphanumeric())
+            || matches!(
+                row.as_str(),
+                "in" | "ni" | "subset" | "supset" | "subseteq" | "supseteq" | "prec" | "succ"
+            );
+        let mark = if relation { "!" } else { "/" };
+        return Block::text(&format!("{mark}{row}"));
+    }
     let mut chars = row.chars();
     let (Some(c), None) = (chars.next(), chars.next()) else {
         return Block::hcat(vec![Block::text("/"), block]);
@@ -416,9 +451,44 @@ struct Renderer<'s> {
     source: &'s str,
     /// Set inside scripts and limits' scripts: no spaces around operators.
     compact: bool,
+    /// The characters glyphs are drawn with.
+    charset: Charset,
 }
 
 impl Renderer<'_> {
+    /// Whether the glyphs are those of `UnicodeMath`, which draws the symbol table's characters.
+    fn rich(&self) -> bool {
+        self.charset == Charset::UnicodeMath
+    }
+
+    /// The character of a horizontal rule or line (the boxes' own).
+    fn hbar(&self) -> char {
+        if self.charset == Charset::Ascii {
+            '-'
+        } else {
+            '\u{2500}'
+        }
+    }
+
+    /// The character of a vertical rule or line.
+    fn vbar(&self) -> char {
+        if self.charset == Charset::Ascii {
+            '|'
+        } else {
+            '\u{2502}'
+        }
+    }
+
+    /// Text of the symbol table (or generated) as drawn, `?` for a character with no form.
+    fn glyph<'t>(&self, s: &'t str) -> Cow<'t, str> {
+        glyphs::text(s, self.charset)
+    }
+
+    /// Text from the source as drawn.
+    fn literal<'t>(&self, s: &'t str) -> Cow<'t, str> {
+        glyphs::literal(s, self.charset)
+    }
+
     /// Nodes in a row, spaced as TeX spaces atoms; a line break stacks lines.
     fn list(&self, nodes: &[Node<'_>], display: bool) -> Block {
         if nodes.iter().any(|n| matches!(n.kind, NodeKind::Cr { .. })) {
@@ -433,7 +503,7 @@ impl Renderer<'_> {
 
     fn line(&self, nodes: &[Node<'_>], display: bool) -> Block {
         // Each node drawn, with its class and whether it opens; `\not` joins the node after it.
-        let mut items: Vec<(Class, bool, Block)> = Vec::new();
+        let mut items: Vec<(Class, bool, Block, bool)> = Vec::new();
         let mut at = 0;
         while let Some(node) = nodes.get(at) {
             at += 1;
@@ -445,7 +515,17 @@ impl Renderer<'_> {
                 _ => (node, false),
             };
             let block = self.node(node, display);
-            let block = if negate { negated(block) } else { block };
+            // A symbol written as a word (`alpha`, `in`) is set off from letters next to it.
+            let word = !self.rich()
+                && matches!(node.kind, NodeKind::Symbol { .. })
+                && block
+                    .one_row()
+                    .is_some_and(|r| r.len() > 1 && r.chars().all(|c| c.is_ascii_alphabetic()));
+            let block = if negate {
+                negated(block, self.charset)
+            } else {
+                block
+            };
             // `\notin` strikes the symbol before it with a slash laid over it.
             if matches!(
                 &node.kind,
@@ -456,11 +536,19 @@ impl Renderer<'_> {
             ) && block.one_row().is_some_and(|r| r.trim() == "/")
                 && let Some(last) = items.last_mut()
             {
-                last.2 = negated(std::mem::take(&mut last.2));
+                last.2 = negated(std::mem::take(&mut last.2), self.charset);
                 continue;
             }
-            items.push((class_of(node), is_open(node), block));
+            items.push((class_of(node), is_open(node), block, word));
         }
+        // The first and last character of each item that is one row, and whether it is a word.
+        let ends: Vec<(Option<char>, Option<char>, bool)> = items
+            .iter()
+            .map(|(_, _, block, word)| {
+                let row = block.one_row().unwrap_or_default();
+                (row.chars().next(), row.chars().last(), *word)
+            })
+            .collect();
         let mut pieces: Vec<Block> = Vec::new();
         let mut last_space = false;
         let space = |pieces: &mut Vec<Block>, last_space: &mut bool| {
@@ -472,8 +560,16 @@ impl Renderer<'_> {
         let count = items.len();
         let classes: Vec<Class> = items.iter().map(|i| i.0).collect();
         let nodes_open: Vec<bool> = items.iter().map(|i| i.1).collect();
-        for (i, (class, _, block)) in items.into_iter().enumerate() {
+        for (i, (class, _, block, _)) in items.into_iter().enumerate() {
             let prev = i.checked_sub(1).and_then(|j| classes.get(j)).copied();
+            if let Some(((_, last, left), (first, _, right))) =
+                i.checked_sub(1).and_then(|j| ends.get(j)).zip(ends.get(i))
+                && (*left || *right)
+                && last.is_some_and(|c| c.is_ascii_alphanumeric())
+                && first.is_some_and(|c| c.is_ascii_alphanumeric())
+            {
+                space(&mut pieces, &mut last_space);
+            }
             let next = classes.get(i + 1).copied();
             let binary = class == Class::Bin
                 && prev.is_some_and(|p| {
@@ -487,6 +583,7 @@ impl Renderer<'_> {
             let has_next = i + 1 < count;
             if self.compact {
                 pieces.push(block);
+                last_space = false;
                 continue;
             }
             match class {
@@ -528,7 +625,7 @@ impl Renderer<'_> {
     fn source_of(&self, n: &Node<'_>) -> Block {
         self.source
             .get(n.span.clone())
-            .map(Block::text)
+            .map(|s| Block::text(&self.literal(s)))
             .unwrap_or_default()
     }
 
@@ -558,7 +655,7 @@ impl Renderer<'_> {
             NodeKind::Sqrt { body, index } => self.sqrt(body, index.as_deref(), d),
             NodeKind::Font { font, body } => {
                 let block = self.node(body, d);
-                if *font == "mathbb" {
+                if *font == "mathbb" && self.rich() {
                     block.map_chars(double_struck)
                 } else {
                     block
@@ -566,7 +663,7 @@ impl Renderer<'_> {
             }
             NodeKind::Overline { body } => {
                 let body = self.node(body, d);
-                let bar = Block::filled('\u{af}', body.width, 1, 0);
+                let bar = Block::filled(if self.rich() { '\u{af}' } else { '_' }, body.width, 1, 0);
                 let base = body.base + 1;
                 let mut out = Block::stack(vec![bar, body], 1, Align::Left);
                 out.base = base;
@@ -586,16 +683,16 @@ impl Renderer<'_> {
             NodeKind::Accent { label, base, .. } => self.accent(label, base, d),
             NodeKind::AccentUnder { label, base } => self.accent_under(label, base, d),
             NodeKind::Op { content, .. } => match content {
-                OpContent::Name(name) => Block::text(&op_text(name)),
+                OpContent::Name(name) => Block::text(&self.op_text(name)),
                 OpContent::Body(body) => self.list(body, d),
             },
             NodeKind::OperatorName { body, .. } => self.list(body, false),
             NodeKind::Kern { dimension } => Block::text(&" ".repeat(cells(dimension))),
             NodeKind::Rule { width, height, .. } => {
                 if em_of(height) > em_of(width) {
-                    Block::filled('\u{2502}', 1, cells(height).max(1), 0)
+                    Block::filled(self.vbar(), 1, cells(height).max(1), 0)
                 } else {
-                    Block::filled('\u{2500}', cells(width).max(1), 1, 0)
+                    Block::filled(self.hbar(), cells(width).max(1), 1, 0)
                 }
             }
             NodeKind::Phantom { body } => self.list(body, d).blank_like(),
@@ -625,7 +722,7 @@ impl Renderer<'_> {
             NodeKind::Enclose { label, body, .. } => {
                 let body = self.node(body, d);
                 if matches!(label.as_str(), "\\fbox" | "\\fcolorbox" | "\\boxed") {
-                    boxed(body)
+                    boxed(body, self.charset)
                 } else {
                     body
                 }
@@ -633,9 +730,9 @@ impl Renderer<'_> {
             NodeKind::MathChoice { display, text, .. } => {
                 self.list(if d { display } else { text }, d)
             }
-            NodeKind::Verb { body, .. } => Block::text(body),
+            NodeKind::Verb { body, .. } => Block::text(&self.literal(body)),
             NodeKind::HtmlMathml { html, .. } => self.list(html, d),
-            NodeKind::CharCode(c) => Block::text(&c.to_string()),
+            NodeKind::CharCode(c) => Block::text(&self.literal(&c.to_string())),
             NodeKind::XArrow { label, body, below } => self.xarrow(label, body, below.as_deref()),
             NodeKind::HorizBrace {
                 label,
@@ -645,7 +742,7 @@ impl Renderer<'_> {
                 let base = self.node(base, d);
                 let brace = label.contains("brace");
                 let w = base.width;
-                let line = bracket_line(w, *is_over, brace);
+                let line = bracket_line(w, *is_over, brace, self.charset);
                 if *is_over {
                     let at = base.base + 1;
                     let mut out = Block::stack(vec![line, base], 1, Align::Left);
@@ -678,11 +775,43 @@ impl Renderer<'_> {
             return Block::text(&" ".repeat(width));
         }
         match lookup(n.mode, name) {
-            Some(symbol) => Block::text(&plain_space(symbol.replace)),
+            Some(symbol) => {
+                let shown = plain_space(symbol.replace);
+                if self.rich() {
+                    return Block::text(&shown);
+                }
+                // A symbol with no form in the set shows its command, if that is plain.
+                let command = || {
+                    self.source
+                        .get(n.span.clone())
+                        .filter(|s| s.starts_with('\\') && s.chars().all(glyphs::is_ascii_cell))
+                };
+                match (glyphs::exact(&shown, self.charset), command()) {
+                    (Some(text), _) => Block::text(&text),
+                    (None, Some(source)) => Block::text(source),
+                    (None, None) => Block::text(&self.glyph(&shown)),
+                }
+            }
             None => match name {
-                Name::Char(text) => Block::text(text),
+                Name::Char(text) => Block::text(&self.literal(text)),
                 Name::Control(_) => self.source_of(n),
             },
+        }
+    }
+
+    /// A large operator's character, or the name of a text operator, from its command.
+    fn op_text(&self, name: &str) -> String {
+        let word = name.strip_prefix('\\').unwrap_or(name);
+        match lookup(Mode::Math, Name::Control(word)) {
+            Some(symbol) => {
+                let shown = plain_space(symbol.replace);
+                if self.rich() {
+                    shown
+                } else {
+                    glyphs::exact(&shown, self.charset).unwrap_or_else(|| word.to_owned())
+                }
+            }
+            None => word.to_owned(),
         }
     }
 
@@ -710,9 +839,10 @@ impl Renderer<'_> {
         let small = Renderer {
             source: self.source,
             compact: true,
+            charset: self.charset,
         };
-        let sup = sup.map(|s| script(small.node(s, false), true));
-        let sub = sub.map(|s| script(small.node(s, false), false));
+        let sup = sup.map(|s| script(small.node(s, false), true, self.charset));
+        let sub = sub.map(|s| script(small.node(s, false), false, self.charset));
         // Unicode scripts read as `x_i^2`; the `^` and `_` forms as `x^2_i`.
         let all_unicode = sup.iter().chain(&sub).all(|(_, unicode)| *unicode);
         let mut parts = vec![base_block];
@@ -757,25 +887,45 @@ impl Renderer<'_> {
         let body = self.node(body, d);
         let index = index.map(|i| {
             let b = self.node(i, false);
-            match script_string(&b, true) {
-                Some(s) => s,
-                None => format!("({})", b.one_row().unwrap_or_default()),
+            if self.rich() {
+                return match script_string(&b, true) {
+                    Some(s) => s,
+                    None => format!("({})", b.one_row().unwrap_or_default()),
+                };
+            }
+            // The index is a digit or a letter as it is, and in parentheses if more.
+            let row = b.one_row().unwrap_or_default();
+            let digits = !row.is_empty() && row.chars().all(|c| c.is_ascii_digit());
+            let letter =
+                matches!(row.chars().collect::<Vec<_>>().as_slice(), [c] if c.is_alphanumeric());
+            if digits || letter {
+                row
+            } else {
+                format!("({row})")
             }
         });
         let lead: Vec<char> = index.unwrap_or_default().chars().collect();
         let pad = lead.len();
-        if too_big(body.height() + 1, pad + 1 + body.width) {
+        // The radical is a character, or `\/` with the other sets.
+        let radical: &[char] = if self.rich() {
+            &['\u{221a}']
+        } else {
+            &['\\', '/']
+        };
+        let over = if self.rich() { '\u{af}' } else { '_' };
+        let indent = pad + radical.len();
+        if too_big(body.height() + 1, indent + body.width) {
             return Block::default();
         }
         let mut rows = Vec::new();
-        let mut top = vec![' '; pad + 1];
-        top.extend(std::iter::repeat_n('\u{af}', body.width));
+        let mut top = vec![' '; indent];
+        top.extend(std::iter::repeat_n(over, body.width));
         rows.push(top);
         for (r, cells) in body.rows.iter().enumerate() {
-            let mut row = vec![' '; pad + 1];
+            let mut row = vec![' '; indent];
             if r == body.base {
                 row = lead.clone();
-                row.push('\u{221a}');
+                row.extend(radical);
             }
             row.extend(cells);
             rows.push(row);
@@ -783,7 +933,7 @@ impl Renderer<'_> {
         Block {
             rows,
             base: body.base + 1,
-            width: pad + 1 + body.width,
+            width: indent + body.width,
         }
     }
 
@@ -800,6 +950,10 @@ impl Renderer<'_> {
             return Block::default();
         };
         let height = above.saturating_add(below).saturating_add(1);
+        // One row is the delimiter as a symbol, which may be more than a character.
+        if height == 1 && !self.rich() {
+            return Block::text(&self.glyph(&c.to_string()));
+        }
         if too_big(height, 1) {
             return Block::default();
         }
@@ -816,7 +970,11 @@ impl Renderer<'_> {
             } else {
                 Piece::Extender
             };
-            rows.push(vec![delim_char(c, at)]);
+            rows.push(vec![if self.rich() {
+                delim_char(c, at)
+            } else {
+                plain_delim_char(c, at, r, height, self.charset)
+            }]);
         }
         Block {
             rows,
@@ -859,7 +1017,7 @@ impl Renderer<'_> {
 
     fn accent(&self, label: &str, base: &Node<'_>, d: bool) -> Block {
         let block = self.node(base, d);
-        let Some(mark) = accent_mark(label) else {
+        let Some(mark) = accent_mark(label, self.charset) else {
             return block;
         };
         if too_big(1, block.width) {
@@ -867,9 +1025,24 @@ impl Renderer<'_> {
         }
         let mut row = vec![' '; block.width];
         let at = block.width.saturating_sub(1) / 2;
-        for (k, c) in mark.chars().enumerate() {
-            if let Some(cell) = row.get_mut(at + k) {
-                *cell = c;
+        // An arrow accent is a line the width of the base, with the head or heads at its ends.
+        if !self.rich() && matches!(mark, "->" | "<-" | "<->") {
+            row.fill(self.hbar());
+            if mark.ends_with('>')
+                && let Some(c) = row.last_mut()
+            {
+                *c = '>';
+            }
+            if mark.starts_with('<')
+                && let Some(c) = row.first_mut()
+            {
+                *c = '<';
+            }
+        } else {
+            for (k, c) in mark.chars().enumerate() {
+                if let Some(cell) = row.get_mut(at + k) {
+                    *cell = c;
+                }
             }
         }
         let mut top = Block {
@@ -892,15 +1065,20 @@ impl Renderer<'_> {
         if too_big(1, w) {
             return Block::default();
         }
-        let mut line = vec!['\u{2500}'; w];
+        let mut line = vec![self.hbar(); w];
+        let (left, right) = if self.rich() {
+            ('\u{2190}', '\u{2192}')
+        } else {
+            ('<', '>')
+        };
         if label.contains("rightarrow") {
             if let Some(last) = line.last_mut() {
-                *last = '\u{2192}';
+                *last = right;
             }
         } else if label.contains("leftarrow")
             && let Some(first) = line.first_mut()
         {
-            *first = '\u{2190}';
+            *first = left;
         }
         let row = Block {
             rows: vec![line],
@@ -921,14 +1099,18 @@ impl Renderer<'_> {
             || label.contains("Leftarrow")
             || label.contains("Leftrightarrow")
             || label.contains("longequal");
-        let line = if double { '\u{2550}' } else { '\u{2500}' };
+        let line = match (double, self.charset) {
+            (true, Charset::Ascii) => '=',
+            (true, _) => '\u{2550}',
+            _ => self.hbar(),
+        };
         let mut cells = vec![line; n];
         let has_right = label.contains("ightarrow") || label.contains("ightleft");
         let has_left = label.contains("eftarrow") || label.contains("leftright");
-        let (lh, rh) = if double {
-            ('\u{21d0}', '\u{21d2}')
-        } else {
-            ('\u{2190}', '\u{2192}')
+        let (lh, rh) = match (self.rich(), double) {
+            (true, true) => ('\u{21d0}', '\u{21d2}'),
+            (true, false) => ('\u{2190}', '\u{2192}'),
+            (false, _) => ('<', '>'),
         };
         if has_right && let Some(c) = cells.last_mut() {
             *c = rh;
@@ -1024,7 +1206,7 @@ impl Renderer<'_> {
             }
             let mut block = Block::hcat(parts);
             if rules.iter().any(|r| *r) {
-                block = with_rules(block, &widths, &rules, &spacing);
+                block = with_rules(block, &widths, &rules, &spacing, self.vbar());
             }
             table_width = table_width.max(block.width);
             if i > 0 && tall {
@@ -1035,12 +1217,12 @@ impl Renderer<'_> {
                 });
             }
             if hline(i) {
-                rows.push(Block::filled('\u{2500}', total, 1, 0));
+                rows.push(Block::filled(self.hbar(), total, 1, 0));
             }
             rows.push(block);
         }
         if hline(array.body.len()) {
-            rows.push(Block::filled('\u{2500}', total, 1, 0));
+            rows.push(Block::filled(self.hbar(), total, 1, 0));
         }
         let mut table = Block::stack(rows, 0, Align::Left);
         // A table sits on the middle row.
@@ -1056,6 +1238,7 @@ fn with_rules(
     widths: &[usize],
     rules: &[bool],
     spacing: &dyn Fn(usize) -> usize,
+    rule: char,
 ) -> Block {
     let mut x = 0;
     for (j, w) in widths.iter().enumerate() {
@@ -1064,7 +1247,7 @@ fn with_rules(
             let at = x + w + gap / 2;
             for cells in &mut row.rows {
                 if let Some(c) = cells.get_mut(at) {
-                    *c = '\u{2502}';
+                    *c = rule;
                 }
             }
         }
@@ -1092,21 +1275,26 @@ fn stacked(base: &Node<'_>, display: bool) -> bool {
     }
 }
 
-/// A script as a block: Unicode characters if there are some for all of it, else the `^` or `_`
-/// form, in parentheses if it is more than a character.
-fn script(block: Block, sup: bool) -> (Block, bool) {
+/// A script as a block: Unicode characters if there are some for all of it (with `UnicodeMath`),
+/// else the `^` or `_` form, in parentheses if it is more than a character.
+fn script(block: Block, sup: bool, charset: Charset) -> (Block, bool) {
     if block.is_empty() {
         return (block, true);
     }
+    let rich = charset == Charset::UnicodeMath;
+    // A prime is the script itself, written `'` with the other sets.
+    let primes: &[char] = if rich {
+        &['\u{2032}', '\u{2033}', '\u{2034}']
+    } else {
+        &['\'']
+    };
     if sup
         && let Some(row) = block.one_row()
-        && row
-            .chars()
-            .all(|c| matches!(c, '\u{2032}' | '\u{2033}' | '\u{2034}'))
+        && row.chars().all(|c| primes.contains(&c))
     {
         return (block, true);
     }
-    if let Some(s) = script_string(&block, sup) {
+    if rich && let Some(s) = script_string(&block, sup) {
         return (Block::text(&s), true);
     }
     let marker = Block::text(if sup { "^" } else { "_" });
@@ -1228,15 +1416,6 @@ fn sub_char(c: char) -> Option<char> {
     })
 }
 
-/// A large operator's character, or the name of a text operator, from its command.
-fn op_text(name: &str) -> String {
-    let word = name.strip_prefix('\\').unwrap_or(name);
-    match lookup(Mode::Math, Name::Control(word)) {
-        Some(symbol) => plain_space(symbol.replace),
-        None => word.to_owned(),
-    }
-}
-
 /// Spaces of any width as a plain space.
 fn plain_space(text: &str) -> String {
     text.chars()
@@ -1264,7 +1443,26 @@ fn double_struck(c: char) -> char {
 }
 
 /// The mark an accent shows over its base, from the command.
-fn accent_mark(label: &str) -> Option<&'static str> {
+fn accent_mark(label: &str, charset: Charset) -> Option<&'static str> {
+    if charset != Charset::UnicodeMath {
+        return Some(match label.strip_prefix('\\').unwrap_or(label) {
+            "hat" | "widehat" | "^" => "^",
+            "tilde" | "widetilde" | "utilde" | "~" => "~",
+            "bar" | "=" | "overline" => "_",
+            "acute" | "'" => "'",
+            "grave" | "`" => "`",
+            "dot" | "." => ".",
+            "ddot" | "\"" => "..",
+            "breve" | "u" => "u",
+            "check" | "v" => "v",
+            "mathring" | "r" => "o",
+            "H" => "\"",
+            "vec" | "overrightarrow" | "Overrightarrow" => "->",
+            "overleftarrow" => "<-",
+            "overleftrightarrow" => "<->",
+            _ => return None,
+        });
+    }
     Some(match label.strip_prefix('\\').unwrap_or(label) {
         "hat" | "widehat" | "^" => "^",
         "tilde" | "widetilde" | "utilde" | "~" => "~",
@@ -1285,17 +1483,26 @@ fn accent_mark(label: &str) -> Option<&'static str> {
 }
 
 /// The row of a bracket or brace over or under a base `width` wide.
-fn bracket_line(width: usize, over: bool, brace: bool) -> Block {
-    let (left, mid, right) = match (over, brace) {
-        (true, true) => ('\u{256d}', '\u{2534}', '\u{256e}'),
-        (false, true) => ('\u{2570}', '\u{252c}', '\u{256f}'),
-        (true, false) => ('\u{250c}', '\u{2500}', '\u{2510}'),
-        (false, false) => ('\u{2514}', '\u{2500}', '\u{2518}'),
+fn bracket_line(width: usize, over: bool, brace: bool, charset: Charset) -> Block {
+    let (left, mid, right) = match (over, brace, charset == Charset::Ascii) {
+        (true, true, false) => ('\u{256d}', '\u{2534}', '\u{256e}'),
+        (false, true, false) => ('\u{2570}', '\u{252c}', '\u{256f}'),
+        (true, false, false) => ('\u{250c}', '\u{2500}', '\u{2510}'),
+        (false, false, false) => ('\u{2514}', '\u{2500}', '\u{2518}'),
+        (true, true, true) => ('/', '^', '\\'),
+        (false, true, true) => ('\\', 'v', '/'),
+        (true, false, true) => ('.', '-', '.'),
+        (false, false, true) => ('\'', '-', '\''),
     };
     if too_big(1, width) {
         return Block::default();
     }
-    let mut cells = vec!['\u{2500}'; width.max(1)];
+    let rule = if charset == Charset::Ascii {
+        '-'
+    } else {
+        '\u{2500}'
+    };
+    let mut cells = vec![rule; width.max(1)];
     if width >= 2 {
         if let Some(c) = cells.first_mut() {
             *c = left;
@@ -1318,25 +1525,33 @@ fn bracket_line(width: usize, over: bool, brace: bool) -> Block {
 }
 
 /// A frame around a block.
-fn boxed(body: Block) -> Block {
+fn boxed(body: Block, charset: Charset) -> Block {
     let w = body.width;
     if too_big(body.height() + 2, w + 2) {
         return Block::default();
     }
+    // Corners, then the horizontal and vertical lines.
+    let (tl, tr, bl, br, h, v) = if charset == Charset::Ascii {
+        ('+', '+', '+', '+', '-', '|')
+    } else {
+        (
+            '\u{250c}', '\u{2510}', '\u{2514}', '\u{2518}', '\u{2500}', '\u{2502}',
+        )
+    };
     let mut rows = Vec::with_capacity(body.height() + 2);
-    let mut top = vec!['\u{250c}'];
-    top.extend(std::iter::repeat_n('\u{2500}', w));
-    top.push('\u{2510}');
+    let mut top = vec![tl];
+    top.extend(std::iter::repeat_n(h, w));
+    top.push(tr);
     rows.push(top);
     for cells in &body.rows {
-        let mut row = vec!['\u{2502}'];
+        let mut row = vec![v];
         row.extend(cells);
-        row.push('\u{2502}');
+        row.push(v);
         rows.push(row);
     }
-    let mut bottom = vec!['\u{2514}'];
-    bottom.extend(std::iter::repeat_n('\u{2500}', w));
-    bottom.push('\u{2518}');
+    let mut bottom = vec![bl];
+    bottom.extend(std::iter::repeat_n(h, w));
+    bottom.push(br);
     rows.push(bottom);
     Block {
         rows,
@@ -1393,6 +1608,116 @@ fn delim_char(c: char, at: Piece) -> char {
     }
 }
 
+/// The character of row `r` of `height` of a tall delimiter `c` with `Unicode` or `Ascii`: box
+/// drawing or ASCII pieces, so a table's brackets are in the set. A delimiter with no pieces is
+/// its own character if the set has it, else `|`.
+fn plain_delim_char(c: char, at: Piece, r: usize, height: usize, charset: Charset) -> char {
+    use Piece::*;
+    let ascii = charset == Charset::Ascii;
+    let upper = r < height / 2 || (height % 2 == 1 && r == height / 2);
+    // (Unicode, Ascii) for each piece; the row is on the top, bottom, middle, or between.
+    let pick = |top: (char, char), mid: (char, char), ext: (char, char), bottom: (char, char)| {
+        let (u, a) = match at {
+            Top => top,
+            Bottom => bottom,
+            Middle => mid,
+            _ => ext,
+        };
+        if ascii { a } else { u }
+    };
+    match c {
+        '(' => pick(
+            ('\u{256d}', '/'),
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+            ('\u{2570}', '\\'),
+        ),
+        ')' => pick(
+            ('\u{256e}', '\\'),
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+            ('\u{256f}', '/'),
+        ),
+        '[' => pick(
+            ('\u{250c}', '['),
+            ('\u{2502}', '['),
+            ('\u{2502}', '['),
+            ('\u{2514}', '['),
+        ),
+        ']' => pick(
+            ('\u{2510}', ']'),
+            ('\u{2502}', ']'),
+            ('\u{2502}', ']'),
+            ('\u{2518}', ']'),
+        ),
+        '{' => pick(
+            ('\u{256d}', '/'),
+            ('\u{2524}', '<'),
+            ('\u{2502}', '|'),
+            ('\u{2570}', '\\'),
+        ),
+        '}' => pick(
+            ('\u{256e}', '\\'),
+            ('\u{251c}', '>'),
+            ('\u{2502}', '|'),
+            ('\u{256f}', '/'),
+        ),
+        '\u{2308}' => pick(
+            ('\u{250c}', '['),
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+        ),
+        '\u{2309}' => pick(
+            ('\u{2510}', ']'),
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+        ),
+        '\u{230a}' => pick(
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+            ('\u{2514}', '['),
+        ),
+        '\u{230b}' => pick(
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+            ('\u{2502}', '|'),
+            ('\u{2518}', ']'),
+        ),
+        '\u{27e8}' | '<' => {
+            if height % 2 == 1 && r == height / 2 {
+                '<'
+            } else if upper {
+                '/'
+            } else {
+                '\\'
+            }
+        }
+        '\u{27e9}' | '>' => {
+            if height % 2 == 1 && r == height / 2 {
+                '>'
+            } else if upper {
+                '\\'
+            } else {
+                '/'
+            }
+        }
+        '\u{2225}' | '\u{2016}' if !ascii => '\u{2551}',
+        '\u{2223}' | '\u{2225}' | '\u{2016}' | '|' => {
+            if ascii {
+                '|'
+            } else {
+                '\u{2502}'
+            }
+        }
+        other => glyphs::fold(other, charset)
+            .and_then(|s| s.chars().next())
+            .unwrap_or('|'),
+    }
+}
+
 /// The length of a measurement in em.
 fn em_of(m: &Measurement) -> f64 {
     match m.unit.as_str() {
@@ -1418,6 +1743,18 @@ fn cells(m: &Measurement) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The cases below pin `UnicodeMath`, the richest set; `glyphs::tests` covers the others.
+    fn ascii_formula(source: &str, style: MathStyle) -> Result<String, MathError> {
+        super::ascii_formula(source, style, Charset::UnicodeMath)
+    }
+
+    fn ascii_formula_rows(
+        source: &str,
+        style: MathStyle,
+    ) -> Result<(Vec<String>, usize), MathError> {
+        super::ascii_formula_rows(source, style, Charset::UnicodeMath)
+    }
 
     fn text(src: &str) -> String {
         ascii_formula(src, MathStyle::Text).unwrap_or_else(|e| format!("error: {e}"))
@@ -1915,8 +2252,8 @@ mod tests {
         assert!(Block::text("abc").is_empty());
         assert!(Block::hcat(vec![Block::default()]).is_empty());
         assert!(Block::default().blank_like().is_empty());
-        assert!(boxed(Block::default()).is_empty());
-        assert!(bracket_line(3, true, true).is_empty());
+        assert!(boxed(Block::default(), Charset::UnicodeMath).is_empty());
+        assert!(bracket_line(3, true, true, Charset::UnicodeMath).is_empty());
         assert!(reset_budget());
     }
 
@@ -1985,6 +2322,7 @@ mod tests {
         let renderer = Renderer {
             source,
             compact: false,
+            charset: Charset::UnicodeMath,
         };
         let node = |kind, span| Node {
             kind,

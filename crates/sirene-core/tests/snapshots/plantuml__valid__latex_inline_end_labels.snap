@@ -8,7 +8,7 @@ expression: "@startuml\nclass Order\nclass Item\nOrder \"<latex>\\alpha</latex>\
 └───┬───┘
     │α
   lines
-    ▼n²
+    ▼n^2
 ┌──────┐
 │ Item │
 └──────┘

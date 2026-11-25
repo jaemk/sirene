@@ -1,6 +1,5 @@
 ---
 source: crates/sirene-core/tests/plantuml.rs
-assertion_line: 93
 expression: "@startlatex\n  e^{i\\pi}\n    + 1 = 0\n@endlatex\n"
 ---
-e^(iπ) + 1 = 0
+e^(i pi) + 1 = 0

@@ -3,7 +3,7 @@ source: crates/sirene-core/tests/plantuml.rs
 expression: "@startuml\nbox \"Group <latex>\\alpha_1</latex>\" #LightBlue\nparticipant A\nparticipant B\nend box\nA -> B : go\n@enduml\n"
 ---
 
-┌┄┄ Group α₁ ┄┄┄┐
+┌┄┄ Group α_1 ┄┄┐
 ┆               ┆
 ┆ ┌───┐   ┌───┐ ┆
 ┆ │ A │   │ B │ ┆

@@ -3,6 +3,6 @@ source: crates/sirene-core/tests/plantuml.rs
 expression: "@startmath\nf(t)=(a_0)/2 + sum_(n=1)^ooa_ncos((npit)/L)+sum_(n=1)^oo b_n\\ sin((npit)/L)\n@endmath\n"
 ---
 
-        a₀      ∞        ⎛ nπt ⎞     ∞         ⎛ nπt ⎞
-f(t) = ---- +   ∑  aₙcos ⎜-----⎟ +   ∑  bₙ sin ⎜-----⎟
-        2     n = 1      ⎝  L  ⎠   n = 1       ⎝  L  ⎠
+        a_0     inf        ╭ nπt ╮    inf         ╭ nπt ╮
+f(t) = ----- +  sum a_ncos │-----│ +  sum b_n sin │-----│
+         2     n = 1       ╰  L  ╯   n = 1        ╰  L  ╯
