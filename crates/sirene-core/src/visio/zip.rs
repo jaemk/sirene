@@ -121,11 +121,6 @@ impl<'a> Archive<'a> {
             if name.ends_with('/') {
                 continue;
             }
-            if method != 0 && method != 8 {
-                return Err(Error::new(format!(
-                    "entry {name:?} uses unsupported compression method {method}"
-                )));
-            }
             let (compressed, size) = (to_usize(compressed)?, to_usize(size)?);
             if size > limits::MAX_PART {
                 return Err(Error::new(format!("entry {name:?} is over 32 MiB")));
@@ -182,6 +177,12 @@ impl<'a> Archive<'a> {
             .get(&name.to_ascii_lowercase())
             .ok_or_else(|| Error::new(format!("the package has no part {name:?}")))?
             .clone();
+        if entry.method != 0 && entry.method != 8 {
+            return Err(Error::new(format!(
+                "entry {name:?} uses unsupported compression method {}",
+                entry.method
+            )));
+        }
         let at = entry.offset;
         if u32_at(self.data, at) != Some(LOCAL_SIG) {
             return Err(Error::new(format!("entry {name:?} has a damaged header")));

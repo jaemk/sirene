@@ -36,6 +36,14 @@ pub(crate) const MAX_MASTERS: usize = 4096;
 /// A page draws at most this many shapes, each master instance counted by the shapes it expands to.
 pub(crate) const MAX_SHAPES: usize = 50_000;
 
+/// A page draws at most this many geometry rows over all its shapes, inherited rows counted once
+/// for each shape that inherits them.
+pub(crate) const MAX_PAGE_ROWS: usize = 1_000_000;
+
+/// A page lays out at most this many bytes of text over all its shapes, inherited text counted
+/// once for each shape that inherits it.
+pub(crate) const MAX_PAGE_TEXT: usize = 4 * 1024 * 1024;
+
 /// Groups nest at most this deep.
 pub(crate) const MAX_GROUP_DEPTH: usize = 64;
 

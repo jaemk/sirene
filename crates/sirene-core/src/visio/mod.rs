@@ -291,9 +291,18 @@ fn read_masters(
         };
         match part(zip, &target) {
             Ok(xml) => {
-                let contents = parse_xml(&xml, &target)?;
-                master.shapes = model::parse_contents(contents.root_element(), &target)?;
-                document.masters.insert(master.id, master);
+                let shapes = parse_xml(&xml, &target)
+                    .and_then(|c| model::parse_contents(c.root_element(), &target));
+                match shapes {
+                    Ok(shapes) => {
+                        master.shapes = shapes;
+                        document.masters.insert(master.id, master);
+                    }
+                    Err(e) => warn(
+                        diagnostics,
+                        format!("master {:?} not read: {}", master.name, e.report()),
+                    ),
+                }
             }
             Err(e) => warn(
                 diagnostics,
