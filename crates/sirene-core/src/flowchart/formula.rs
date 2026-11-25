@@ -250,6 +250,20 @@ pub(crate) fn check_text(
     errors(start, raw, text.iter().cloned(), fallback, delim)
 }
 
+/// The diagnostics for the formulas of `label`, read from the source text `token`, or reported on
+/// `fallback` (see [`check_text`]). No formula, no diagnostic.
+pub(crate) fn check_label(
+    token: Option<&SyntaxToken>,
+    label: &super::Label,
+    fallback: TextRange,
+) -> Vec<Diagnostic> {
+    if !label.has_formula() {
+        return Vec::new();
+    }
+    let lines: Vec<String> = label.text.split('\n').map(super::model::clean).collect();
+    check_text(token, &lines, fallback, label.delim)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "block-beta\n  columns 2\n  a[\"Area $$\\pi r^2$$\"] b[\"$$\\frac{a}{b}$$ and $$\\sqrt{x}$$\"]\n  block:g[\"$$\\Sigma$$ group\"]\n    c d\n  end\n  a -- \"$$\\lambda$$\" --> b\n"
+---
+
+┌──────────────┐  ┌──────────────┐
+│              │  │  a        _  │
+│  Area πr^2   │  │ --- and \/x  │
+│              │  │  b           │
+│              │  │              │
+└──────────────┘  └──────────────┘
+
+┌─ Σ group ────┐
+│              │
+│ ┌───┐  ┌───┐ │
+│ │ c │  │ d │ │
+│ └───┘  └───┘ │
+└──────────────┘
+
+a --> b: λ

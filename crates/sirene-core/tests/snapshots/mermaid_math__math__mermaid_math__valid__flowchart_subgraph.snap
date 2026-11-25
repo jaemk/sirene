@@ -1,0 +1,12 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "flowchart LR\n    subgraph one[\"Area $$\\pi r^2$$ and $$\\frac{a}{b}$$\"]\n        A --> B\n    end\n    subgraph two [$$\\alpha$$ group]\n        C\n    end\n    B --> C\n"
+---
+
+┌─                a  ─┐
+│  Area πr^2 and ---  │
+│                 b   │    ┌─ α group ─┐
+│   ┌───┐    ┌───┐    │    │   ┌───┐   │
+│   │ A ├───►│ B ├────┼────┼──►│ C │   │
+│   └───┘    └───┘    │    │   └───┘   │
+└─────────────────────┘    └───────────┘

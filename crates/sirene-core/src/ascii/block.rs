@@ -4,7 +4,7 @@
 use super::canvas::{Canvas, Line, glyph};
 use super::mathtext::Rows;
 use super::{CellsIn, Options, clean, draw_box, draw_lines, draw_node_frame, draw_node_text_in};
-use super::{lines_in, title as subgraph_title, width};
+use super::{lines_in, title as subgraph_title, title_rows, width};
 use crate::block::layout::{self, Sizes};
 use crate::block::{Block, Heading};
 use crate::flowchart::{Arrow, Edge, Measure, Stroke};
@@ -29,7 +29,14 @@ pub fn render(b: &Block, options: &Options) -> String {
             None => (f64::from(s.w), f64::from(s.h)),
         }
     };
-    let title = |g: usize| -> f64 { if g == 0 { 0.0 } else { 1.0 } };
+    // A title with a formula is as many rows as the formula has.
+    let title = |g: usize| -> f64 {
+        match b.groups[g].subgraph {
+            _ if g == 0 => 0.0,
+            Some(s) => title_rows(&rows, &chart.subgraphs[s]).len().max(1) as f64,
+            None => 1.0,
+        }
+    };
     let placed = layout::layout(
         b,
         &Sizes {
@@ -75,8 +82,14 @@ pub fn render(b: &Block, options: &Options) -> String {
     }
     for (g, group) in b.groups.iter().enumerate().skip(1) {
         let Some(s) = group.subgraph else { continue };
-        let t = subgraph_title(&chart.subgraphs[s]);
         let r = rect(placed.groups[g]);
+        if chart.subgraphs[s].title.has_formula() {
+            for (i, row) in title_rows(&rows, &chart.subgraphs[s]).iter().enumerate() {
+                canvas.text(r.x + 2, r.y + i as i32, &format!(" {row} "));
+            }
+            continue;
+        }
+        let t = subgraph_title(&chart.subgraphs[s]);
         if !t.is_empty() {
             canvas.text(r.x + 2, r.y, &format!(" {t} "));
         }

@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "classDiagram\n    class Circle[\"$$\\foon$$ circle\"] {\n        +area $$\\foom$$ value\n    }\n    Circle \"$$\\foos$$\" --> \"$$m$$\" Square : has $$\\foor$$\n    note for Square \"edge $$\\fooe$$\"\n"
+---
+2:21: error: Undefined control sequence: \foon [\foon]
+3:17: error: Undefined control sequence: \foom [\foom]
+5:15: error: Undefined control sequence: \foos [\foos]
+5:51: error: Undefined control sequence: \foor [\foor]
+6:29: error: Undefined control sequence: \fooe [\fooe]
+
+┌───────────────────────┐
+│   $$\foon$$ circle    │
+├───────────────────────┤
+│ +area $$\foom$$ value │
+├───────────────────────┤
+└───────────┬───────────┘
+            │$$\foos$$
+      has $$\foor$$
+            ▼m
+       ┌────────┐  ┌────────────────╮
+       │ Square │┄┄│ edge $$\fooe$$ │
+       └────────┘  └────────────────┘

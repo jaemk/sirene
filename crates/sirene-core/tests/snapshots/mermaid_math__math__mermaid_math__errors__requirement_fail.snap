@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "requirementDiagram\n    requirement \"$$\\fooa$$ req\" {\n    id: 1\n    text: \"holds $$\\foob$$\"\n    risk: high\n    verifymethod: test\n    }\n"
+---
+2:20: error: Undefined control sequence: \fooa [\fooa]
+4:20: error: Undefined control sequence: \foob [\foob]
+
+┌───────────────────────────────┐
+│         «Requirement»         │
+│         $$\fooa$$ req         │
+├───────────────────────────────┤
+│ Id:           1               │
+│ Text:         holds $$\foob$$ │
+│ Risk:         High            │
+│ Verification: Test            │
+└───────────────────────────────┘

@@ -362,6 +362,74 @@ mod tests {
         assert!(!scene.elements.is_empty());
     }
 
+    /// The Mermaid fixtures with a formula in each label position that lowers to the flowchart
+    /// model, and how many formulas each has (all distinct).
+    const MERMAID: [(&str, &str, usize); 6] = [
+        (
+            "flowchart subgraph",
+            include_str!("../../tests/fixtures/mermaid/valid/flowchart_subgraph.mmd"),
+            3,
+        ),
+        (
+            "state",
+            include_str!("../../tests/fixtures/mermaid/valid/state_labels.mmd"),
+            6,
+        ),
+        (
+            "class",
+            include_str!("../../tests/fixtures/mermaid/valid/class_labels.mmd"),
+            7,
+        ),
+        (
+            "er",
+            include_str!("../../tests/fixtures/mermaid/valid/er_labels.mmd"),
+            3,
+        ),
+        (
+            "requirement",
+            include_str!("../../tests/fixtures/mermaid/valid/requirement_labels.mmd"),
+            4,
+        ),
+        (
+            "block",
+            include_str!("../../tests/fixtures/mermaid/valid/block_labels.mmd"),
+            5,
+        ),
+    ];
+
+    /// Mermaid labels of every kind that lowers to the flowchart model: each formula is typeset
+    /// once to check it when lowering and once to draw it, in the scene and as text.
+    #[test]
+    fn mermaid_labels_typeset_each_formula_once_per_render() {
+        for (kind, src, n) in MERMAID {
+            crate::equation::count::reset();
+            let lowered = crate::diagram::lower(src);
+            assert!(
+                lowered.diagnostics.is_empty(),
+                "{kind}: {:?}",
+                lowered.diagnostics
+            );
+            assert_eq!(
+                crate::equation::count::get(),
+                n,
+                "{kind}: lowering checks each"
+            );
+            crate::equation::count::reset();
+            let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+            assert_eq!(
+                crate::equation::count::get(),
+                n,
+                "{kind}: drawing sets each"
+            );
+            assert!(!scene.elements.is_empty(), "{kind}");
+            crate::equation::count::reset();
+            let options = crate::ascii::Options::default();
+            let text = lowered.diagram.ascii(&options).unwrap();
+            assert_eq!(crate::equation::count::get(), n, "{kind}: text sets each");
+            assert!(!text.contains("$$"), "{kind}:\n{text}");
+        }
+    }
+
     /// The left of the ink of `prims` (a clipped path counts inside its clip), `None` with none.
     fn left_of(prims: impl IntoIterator<Item = Primitive>) -> Option<f32> {
         super::super::equation::ink(&prims.into_iter().collect::<Vec<_>>()).map(|b| b.0)

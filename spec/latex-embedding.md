@@ -22,19 +22,26 @@ MathML and KaTeX's stylesheet rendering; sirene draws the formula itself, so nei
 and both are ignored. The reference states no KaTeX version, so KaTeX's current supported
 functions list is the syntax target (LPA-2).
 
-Decisions: sirene reads `$$...$$` in the flowchart and sequence label positions above, and
-nowhere else in Mermaid (LEMB-T6 tracks whether other types should follow, since a source
-that uses it elsewhere draws as plain text in Mermaid too). An unclosed `$$` is plain text. A
+Decisions: sirene reads `$$...$$` in the flowchart and sequence label positions above and in
+the label positions of the kinds that lower to the flowchart model (Status), and nowhere else in
+Mermaid (LEMB-T5 lists what is left). An unclosed `$$` is plain text. A
 formula that fails to parse is drawn as its source (LEMB-4). A formula is set in display
 style, as Mermaid's `displayMode: true`, at the theme font size in the label's text color. It
 is found per line with the lazy `/\$\$(.*?)\$\$/`, has no escape, and `\\` in it is read as `\`
 before typesetting, as Mermaid does. A label with a formula is not read as markdown.
 
 Status: flowchart node and edge labels are done (`Label::runs`, `scene/mathtext.rs`,
-`ascii/mathtext.rs`; tests in `tests/flowchart_math.rs`). Other kinds that lower to the
-flowchart model share the label type but are not wired for `$$`: subgraph titles, end labels,
-and compartment titles and rows draw the formula as text (PlantUML's tags are read there, see
-LEMB-2). Sequence participant names and aliases, message
+`ascii/mathtext.rs`; tests in `tests/flowchart_math.rs`). Every kind that lowers to the
+flowchart model reads `$$` in the positions that model draws, in both renderers, through
+`Label::delim` (`Delim::Dollar`): subgraph titles (flowchart subgraphs, state composite titles,
+class namespace titles, block groups), edge end labels (class cardinalities), compartment titles
+(class and ER names, requirement names) and rows (class members, ER attributes, requirement
+fields), notes, and state names, descriptions, and transition labels. Tests:
+`tests/mermaid_math.rs` and `scene::mathtext` (one typeset per formula per render). Not read,
+because the kind has its own model and painter: mindmap node text, kanban cards, and the diagram
+`title` of every kind (Mermaid never renders math in a title). DOT, C4, and architecture build
+the same `Label` and so also read `$$` in these positions; Mermaid's C4 and architecture draw it
+as text (known difference). Sequence participant names and aliases, message
 text, notes, and the labels of `loop`, `alt`, `opt`, `par`, `critical`, and `break` blocks and
 of their `else`, `and`, and `option` sections are done (`tests/sequence_math.rs`); `box` and
 diagram titles draw the formula as text, as Mermaid does, and a `rect` label is a color. The
@@ -146,6 +153,11 @@ whole range when the decoded text is not found there as written). One diagnostic
 formula, once per edge for an `&` product. Without the `math` feature each formula gets one
 warning on its body and is drawn as its source.
 
+Status (state, class, ER, requirement, block, flowchart subgraphs): the lowering reports each
+failing formula of a label on the offending command in its token (`flowchart::formula::check_label`),
+the token's range as the fallback; one error per failing formula, and without the `math`
+feature one warning per formula. Tests: `tests/mermaid_math.rs`.
+
 Status (sequence): the lowering reports each failing formula of a participant alias (`as` text
 or a metadata `alias`), message, note, block label, or section title on the offending command,
 with the statement's range as the fallback (`flowchart::formula::errors` is shared with the
@@ -172,5 +184,11 @@ flowchart lowering). Without the `math` feature each formula gets one warning on
   Mermaid sequence diagrams, block labels and section titles (the same code). Left,
   for PlantUML: headers, footers, captions, and legends (not drawn at all), and the kinds that
   keep plain strings with their own painters (mindmap, Gantt, timing, chronology, DOT; PCREO-3).
-  Left, for Mermaid (LEMB-1): subgraph titles, end labels, and compartments, which stay text.
-  Mermaid sequence `box` and diagram titles stay text by design (Mermaid does not typeset them).
+  Done, for Mermaid (LEMB-1): flowchart subgraph titles; state names, descriptions, notes,
+  composite titles, and transition labels; class names, members, notes, namespace titles,
+  relation labels, and cardinalities; ER entity names, attributes, and relationship labels;
+  requirement names and fields; block labels, group titles, and edge labels (all measured and
+  drawn from `Label::runs`, `Formulas`, and `Rows`). Left, for Mermaid: mindmap node text and
+  kanban cards (their own models and painters keep `Label` text drawn through `spans()`),
+  and requirement relationship labels (always the fixed `<<kind>>` text). Diagram titles stay
+  text, as in Mermaid. Mermaid sequence `box` and diagram titles stay text by design.

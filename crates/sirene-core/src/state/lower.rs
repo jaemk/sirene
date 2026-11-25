@@ -5,11 +5,11 @@ use std::collections::{HashMap, HashSet};
 use rowan::TextRange;
 
 use crate::diagnostic::Diagnostic;
-use crate::flowchart::text;
 use crate::flowchart::{
     Arrow, ClassDef, Direction, Edge, Flowchart, Label, Node, Note, NoteSide, Shape, Stroke, Style,
     Subgraph,
 };
+use crate::flowchart::{formula, text};
 use crate::syntax::SyntaxKind::{self, *};
 use crate::syntax::{SyntaxNode, SyntaxToken};
 
@@ -92,6 +92,12 @@ enum Styling {
 impl Lowerer {
     fn warning(&mut self, range: TextRange, message: impl Into<String>) {
         self.diagnostics.push(Diagnostic::warning(range, message));
+    }
+
+    /// Reports each formula of `label`, read from `tok`, that does not typeset (LEMB-5).
+    fn check(&mut self, tok: &SyntaxToken, label: &Label) {
+        self.diagnostics
+            .extend(formula::check_label(Some(tok), label, tok.text_range()));
     }
 
     fn push_subgraph(&mut self, s: Subgraph) {
@@ -265,9 +271,12 @@ impl Lowerer {
         ) else {
             return;
         };
-        let label = text_of(stmt, TEXT)
-            .filter(|t| !t.is_empty())
-            .map(|t| label(&t));
+        let label = token(stmt, TEXT).and_then(|tok| {
+            let text = tok.text().trim();
+            let label = (!text.is_empty()).then(|| label(text))?;
+            self.check(&tok, &label);
+            Some(label)
+        });
         self.edge_ranges.push(stmt.text_range());
         self.chart.edges.push(Edge {
             id: None,
@@ -333,10 +342,12 @@ impl Lowerer {
             node.label = Label::default();
         }
         if let Some(s) = token(stmt, STRING) {
-            self.chart.nodes[i].label = label(text::unquote(s.text()));
+            let l = label(text::unquote(s.text()));
+            self.check(&s, &l);
+            self.chart.nodes[i].label = l;
             self.described.insert(id.clone());
         }
-        if let Some(t) = text_of(stmt, TEXT) {
+        if let Some(t) = token(stmt, TEXT) {
             self.describe(&id, &t);
         }
     }
@@ -362,13 +373,25 @@ impl Lowerer {
         let Some(id) = self.reference(&r, scope, false) else {
             return;
         };
-        let t = text_of(stmt, TEXT).unwrap_or_default();
-        self.describe(&id, &t);
+        match token(stmt, TEXT) {
+            Some(t) => self.describe(&id, &t),
+            None => self.describe_text(&id, ""),
+        }
     }
 
-    /// Sets the description of `id`, or adds a line to it.
-    fn describe(&mut self, id: &str, t: &str) {
-        let new = label(t);
+    /// Sets the description of `id` from the text token `t`, or adds a line to it.
+    fn describe(&mut self, id: &str, t: &SyntaxToken) {
+        let new = label(t.text());
+        self.check(t, &new);
+        self.describe_label(id, new);
+    }
+
+    fn describe_text(&mut self, id: &str, t: &str) {
+        self.describe_label(id, label(t));
+    }
+
+    /// Sets the description of `id` to `new`, or adds its lines to it.
+    fn describe_label(&mut self, id: &str, new: Label) {
         let first = self.described.insert(id.to_owned());
         let target = match self.node_index.get(id) {
             Some(&i) => &mut self.chart.nodes[i].label,
@@ -396,8 +419,14 @@ impl Lowerer {
                 format!("composite state `{id}` is already defined; adding to it"),
             );
         } else {
-            let title = token(stmt, STRING)
-                .map_or_else(|| Label::plain(&id), |s| label(text::unquote(s.text())));
+            let title = token(stmt, STRING).map_or_else(
+                || Label::plain(&id),
+                |s| {
+                    let l = label(text::unquote(s.text()));
+                    self.check(&s, &l);
+                    l
+                },
+            );
             if token(stmt, STRING).is_some() {
                 self.described.insert(id.clone());
             }
@@ -452,6 +481,10 @@ impl Lowerer {
                     .collect()
             })
             .unwrap_or_default();
+        let note = text::label(&body.join("\n"), false);
+        if let Some(t) = token(stmt, TEXT) {
+            self.check(&t, &note);
+        }
         self.chart.notes.push(Note {
             target,
             side: if side == "left" {
@@ -459,7 +492,7 @@ impl Lowerer {
             } else {
                 NoteSide::After
             },
-            label: text::label(&body.join("\n"), false),
+            label: note,
             range: stmt.text_range(),
         });
     }

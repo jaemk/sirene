@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/mermaid_math.rs
+expression: "requirementDiagram\n    requirement \"$$\\sigma$$ req\" {\n    id: 1\n    text: \"holds $$\\sqrt{x}$$\"\n    risk: high\n    verifymethod: test\n    }\n    element \"$$\\Omega$$ unit\" {\n    type: sim\n    docRef: \"ref $$\\phi$$\"\n    }\n"
+---
+
+┌─────────────────────────┐
+│      «Requirement»      │   ┌────────────────┐
+│          σ req          │   │   «Element»    │
+├─────────────────────────┤   │     Ω unit     │
+│ Id:           1         │   ├────────────────┤
+│                       _ │   │ Type:    sim   │
+│ Text:         holds \/x │   │ Doc Ref: ref φ │
+│ Risk:         High      │   └────────────────┘
+│ Verification: Test      │
+└─────────────────────────┘
