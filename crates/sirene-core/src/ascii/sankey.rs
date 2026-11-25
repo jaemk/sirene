@@ -15,7 +15,7 @@ pub(super) fn bar(share: f64, charset: Charset) -> String {
     let cells = share.clamp(0.0, 1.0) * FIELD as f64;
     let mut out = String::new();
     match charset {
-        Charset::Unicode => {
+        Charset::Unicode | Charset::UnicodeMath => {
             let eighths = ((cells * 8.0).round() as usize).max(usize::from(share > 0.0));
             out.extend(std::iter::repeat_n('█', eighths / 8));
             if let Some(&e) = EIGHTHS.get((eighths % 8).wrapping_sub(1)) {
@@ -38,7 +38,7 @@ fn pad(s: &str, w: i32) -> String {
 pub fn render(sankey: &Sankey, options: &Options) -> String {
     let layout = sankey.layout();
     let (tee, elbow) = match options.charset {
-        Charset::Unicode => ("├─ ", "└─ "),
+        Charset::Unicode | Charset::UnicodeMath => ("├─ ", "└─ "),
         Charset::Ascii => ("+- ", "`- "),
     };
     let max = sankey.links.iter().map(|l| l.value).fold(0.0, f64::max);

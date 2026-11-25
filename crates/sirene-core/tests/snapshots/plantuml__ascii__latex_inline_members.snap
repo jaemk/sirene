@@ -2,18 +2,18 @@
 source: crates/sirene-core/tests/plantuml.rs
 expression: "@startuml\nclass \"<latex>\\Sigma_n</latex>\" as Sum {\n  +total : <latex>\\sum_i x_i</latex>\n  -count : int\n  +mean() : <math>(sum x)/n</math>\n}\nclass Item\nSum --> Item\n@enduml\n"
 ---
-+-----------------+
-|       Σₙ        |
-+-----------------+
-| +total : ∑ᵢ xᵢ  |
-| -count : int    |
-+-----------------+
-|            ∑ x  |
-| +mean() : ----- |
-|             n   |
-+--------+--------+
-         |
-         v
-     +------+
-     | Item |
-     +------+
++--------------------+
+|      Sigma_n       |
++--------------------+
+| +total : sum_i x_i |
+| -count : int       |
++--------------------+
+|            sum x   |
+| +mean() : -------  |
+|              n     |
++----------+---------+
+           |
+           v
+       +------+
+       | Item |
+       +------+

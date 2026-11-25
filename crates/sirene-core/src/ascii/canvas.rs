@@ -230,7 +230,7 @@ impl Canvas {
 
 fn pick(g: Glyph, charset: Charset) -> char {
     match charset {
-        Charset::Unicode => g.unicode,
+        Charset::Unicode | Charset::UnicodeMath => g.unicode,
         Charset::Ascii => g.ascii,
     }
 }
@@ -253,7 +253,7 @@ fn char_of(c: &Cell, glyphs: &[Glyph], charset: Charset) -> char {
     }
     let line = c.line.unwrap_or(Line::Light);
     match charset {
-        Charset::Unicode => unicode(c.mask, line),
+        Charset::Unicode | Charset::UnicodeMath => unicode(c.mask, line),
         Charset::Ascii => ascii(c.mask, line),
     }
 }

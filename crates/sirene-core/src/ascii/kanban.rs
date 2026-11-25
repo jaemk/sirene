@@ -39,15 +39,15 @@ fn wrap(s: &str, max: i32) -> Vec<String> {
 
 /// A priority's marker before a card's details.
 fn marker(p: Priority, charset: Charset) -> &'static str {
-    match (p, charset) {
-        (Priority::VeryHigh, Charset::Unicode) => "▲▲",
-        (Priority::High, Charset::Unicode) => "▲",
-        (Priority::Low, Charset::Unicode) => "▼",
-        (Priority::VeryLow, Charset::Unicode) => "▼▼",
-        (Priority::VeryHigh, Charset::Ascii) => "^^",
-        (Priority::High, Charset::Ascii) => "^",
-        (Priority::Low, Charset::Ascii) => "v",
-        (Priority::VeryLow, Charset::Ascii) => "vv",
+    match (p, charset == Charset::Ascii) {
+        (Priority::VeryHigh, false) => "▲▲",
+        (Priority::High, false) => "▲",
+        (Priority::Low, false) => "▼",
+        (Priority::VeryLow, false) => "▼▼",
+        (Priority::VeryHigh, true) => "^^",
+        (Priority::High, true) => "^",
+        (Priority::Low, true) => "v",
+        (Priority::VeryLow, true) => "vv",
     }
 }
 

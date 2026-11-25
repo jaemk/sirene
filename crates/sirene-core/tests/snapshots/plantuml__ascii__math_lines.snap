@@ -2,7 +2,7 @@
 source: crates/sirene-core/tests/plantuml.rs
 expression: "@startmath\n  x = (-b+-sqrt(b^2-4ac))\n      /(2a)\n@endmath\n"
 ---
-           ¯¯¯¯¯¯¯¯
-     −b ± √b² − 4ac
-x = ----------------
-           2a
+              _________
+     -b +/- \/b^2 - 4ac
+x = --------------------
+             2a

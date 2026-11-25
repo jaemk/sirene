@@ -4,7 +4,7 @@
 use super::canvas::{Canvas, Line, glyph};
 use super::mathtext::Rows;
 use super::{CellsIn, Options, clean, draw_box, draw_lines, draw_node_frame, draw_node_text_in};
-use super::{lines, lines_in, title as subgraph_title, width};
+use super::{lines_in, title as subgraph_title, width};
 use crate::block::layout::{self, Sizes};
 use crate::block::{Block, Heading};
 use crate::flowchart::{Arrow, Edge, Measure, Stroke};
@@ -13,7 +13,7 @@ use crate::layout::Rect;
 pub fn render(b: &Block, options: &Options) -> String {
     let chart = &b.chart;
     // The formulas set to size the layout are the ones drawn.
-    let rows = Rows::default();
+    let rows = Rows::new(options.charset);
     let node = |i: usize| -> (f64, f64) {
         let s = CellsIn(&rows).node(&chart.nodes[i]);
         match &b.arrows[i] {
@@ -93,7 +93,7 @@ pub fn render(b: &Block, options: &Options) -> String {
         .edges
         .iter()
         .filter(|e| e.stroke != Stroke::Invisible)
-        .map(edge)
+        .map(|e| edge(e, &rows))
         .collect();
     if !edges.is_empty() {
         out.push('\n');
@@ -128,7 +128,7 @@ fn draw_heads(canvas: &mut Canvas, r: Rect, dirs: &[Heading]) {
 }
 
 /// An edge as Mermaid writes it: `a --> b`, `a -- label --> b`.
-fn edge(e: &Edge) -> String {
+fn edge(e: &Edge, rows: &Rows) -> String {
     let head = |a: Option<Arrow>, point: &'static str| match a {
         Some(Arrow::Point) => point,
         Some(Arrow::Cross) => "x",
@@ -144,7 +144,7 @@ fn edge(e: &Edge) -> String {
         (_, false) => "--",
     };
     let link = format!("{start}{body}{end}");
-    match e.label.as_ref().map(|l| lines(l).join(" ")) {
+    match e.label.as_ref().map(|l| lines_in(rows, l).join(" ")) {
         Some(l) if !l.is_empty() => format!("{} {link} {}: {l}", e.from, e.to),
         _ => format!("{} {link} {}", e.from, e.to),
     }

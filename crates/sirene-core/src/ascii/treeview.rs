@@ -7,7 +7,7 @@ use crate::treeview::{Entry, TreeView};
 /// Renders `view` as text (MTREEV-5).
 pub fn render(view: &TreeView, options: &Options) -> String {
     let (tee, last, bar, gap) = match options.charset {
-        Charset::Unicode => ("├── ", "└── ", "│   ", "    "),
+        Charset::Unicode | Charset::UnicodeMath => ("├── ", "└── ", "│   ", "    "),
         Charset::Ascii => ("|-- ", "`-- ", "|   ", "    "),
     };
     let mut rows: Vec<(String, Option<&str>)> = vec![("/".to_owned(), None)];

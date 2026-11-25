@@ -30,6 +30,8 @@ mod fonts;
 #[cfg(feature = "math")]
 mod formula;
 mod functions;
+#[cfg(feature = "math")]
+mod glyphs;
 #[rustfmt::skip]
 mod functions_data;
 #[cfg(test)]

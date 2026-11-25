@@ -16,7 +16,7 @@ fn bar(share: f64, charset: Charset) -> String {
     let cells = share.clamp(0.0, 1.0) * FIELD as f64;
     let mut out = String::new();
     match charset {
-        Charset::Unicode => {
+        Charset::Unicode | Charset::UnicodeMath => {
             let eighths = (cells * 8.0).round() as usize;
             out.extend(std::iter::repeat_n('█', eighths / 8));
             if let Some(&e) = EIGHTHS.get((eighths % 8).wrapping_sub(1)) {

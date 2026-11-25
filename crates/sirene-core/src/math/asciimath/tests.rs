@@ -365,20 +365,23 @@ fn an_error_of_the_tex_is_on_the_source() {
 #[cfg(feature = "math")]
 #[test]
 fn ascii_output_reads_the_translation() {
+    use crate::ascii::Charset;
     use crate::math::formula::MathStyle;
-    let a = ascii_asciimath("x^2", MathStyle::Text).unwrap();
-    assert_eq!(a, ascii_formula_via_tex("x^2"));
-    let f = ascii_asciimath("1/2", MathStyle::Display).unwrap();
-    assert!(
-        f.contains('1') && f.contains('2') && f.lines().count() >= 3,
-        "{f}"
-    );
+    for charset in [Charset::Unicode, Charset::Ascii, Charset::UnicodeMath] {
+        let a = ascii_asciimath("x^2", MathStyle::Text, charset).unwrap();
+        assert_eq!(a, ascii_formula_via_tex("x^2", charset));
+        let f = ascii_asciimath("1/2", MathStyle::Display, charset).unwrap();
+        assert!(
+            f.contains('1') && f.contains('2') && f.lines().count() >= 3,
+            "{f}"
+        );
+    }
 }
 
 #[cfg(feature = "math")]
-fn ascii_formula_via_tex(src: &str) -> String {
+fn ascii_formula_via_tex(src: &str, charset: crate::ascii::Charset) -> String {
     use crate::math::formula::MathStyle;
-    super::super::ascii::ascii_formula(&tex(src), MathStyle::Text).unwrap()
+    super::super::ascii::ascii_formula(&tex(src), MathStyle::Text, charset).unwrap()
 }
 
 /// `AMgetSymbol`'s search as the JavaScript makes it: every symbol, then every TeX name, the

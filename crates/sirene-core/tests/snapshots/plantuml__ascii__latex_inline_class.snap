@@ -2,11 +2,11 @@
 source: crates/sirene-core/tests/plantuml.rs
 expression: "@startuml\nclass Order\nclass Item\nOrder --> Item : <latex>\\sum_i p_i</latex>\nnote right of Order : cost <latex>\\beta</latex>\n@enduml\n"
 ---
-+-------+  +--------.
-| Order |..| cost β |
-+---+---+  +--------+
++-------+  +-----------.
+| Order |..| cost beta |
++---+---+  +-----------+
     |
-  ∑ᵢ pᵢ
+sum_i p_i
     v
 +------+
 | Item |

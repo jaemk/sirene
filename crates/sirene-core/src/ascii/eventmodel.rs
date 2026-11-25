@@ -41,7 +41,7 @@ struct Boxed {
 /// Renders `chart` as text (MEVM-4).
 pub fn render(chart: &EventModel, options: &Options) -> String {
     let arrow = match options.charset {
-        Charset::Unicode => "\u{2192}",
+        Charset::Unicode | Charset::UnicodeMath => "\u{2192}",
         Charset::Ascii => "->",
     };
     let labels: Vec<String> = chart.lanes.iter().map(|l| l.label()).collect();

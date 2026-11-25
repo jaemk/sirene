@@ -143,7 +143,7 @@ fn header(canvas: &mut Canvas, kind: ParticipantKind, lines: &[String], x: i32, 
 pub fn render(seq: &Sequence, options: &Options) -> String {
     // A line with a formula is as many rows as the formula has (LEMB-4).
     let rows = |lines: &[String]| match seq.math {
-        Some(delim) => mathtext::text_rows(lines, delim),
+        Some(delim) => mathtext::text_rows(lines, delim, options.charset),
         None => lines.to_vec(),
     };
     // The positions only PlantUML has (a frame's tab, a divider, a separator, a delay, a group's

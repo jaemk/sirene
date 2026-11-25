@@ -7,7 +7,7 @@ expression: "@startuml\nclass Order\nclass Item\nOrder --> Item : <latex>\\sum_i
 │ Order │┄┄│ cost β │
 └───┬───┘  └────────┘
     │
-  ∑ᵢ pᵢ
+sum_i p_i
     ▼
 ┌──────┐
 │ Item │

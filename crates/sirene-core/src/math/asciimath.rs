@@ -1202,20 +1202,25 @@ fn check_tex(t: &Translation) -> Res<()> {
     ))
 }
 
-/// The AsciiMath `source` as rows of text and the row of the baseline (see
+/// The AsciiMath `source` as rows of text drawn with `charset` and the row of the baseline (see
 /// `ascii_formula_rows`); errors as [`typeset_asciimath`] does.
 #[cfg(feature = "math")]
 pub fn ascii_asciimath_rows(
     source: &str,
     style: super::formula::MathStyle,
+    charset: crate::ascii::Charset,
 ) -> Res<(Vec<String>, usize)> {
     let t = translate(source)?;
     check_tex(&t)?;
-    super::ascii::ascii_formula_rows(&t.tex, style).map_err(|e| remap(&t, e))
+    super::ascii::ascii_formula_rows(&t.tex, style, charset).map_err(|e| remap(&t, e))
 }
 
 /// The AsciiMath `source` as text; see [`ascii_asciimath_rows`].
 #[cfg(feature = "math")]
-pub fn ascii_asciimath(source: &str, style: super::formula::MathStyle) -> Res<String> {
-    Ok(ascii_asciimath_rows(source, style)?.0.join("\n"))
+pub fn ascii_asciimath(
+    source: &str,
+    style: super::formula::MathStyle,
+    charset: crate::ascii::Charset,
+) -> Res<String> {
+    Ok(ascii_asciimath_rows(source, style, charset)?.0.join("\n"))
 }

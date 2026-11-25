@@ -5,7 +5,13 @@ use std::time::{Duration, Instant};
 
 use proptest::prelude::*;
 
-use super::{MathStyle, ascii_formula, typeset};
+use super::{MathStyle, typeset};
+
+use crate::ascii::Charset;
+
+fn ascii_formula(source: &str, style: MathStyle) -> Result<String, super::MathError> {
+    super::ascii_formula(source, style, Charset::UnicodeMath)
+}
 
 fn typeset_error(src: &str) -> String {
     // An empty message makes the caller's `contains` assertion fail when typesetting succeeds.
@@ -157,7 +163,9 @@ fn short_asciimath_that_translates_long_names_the_tex_limit() {
         typeset_asciimath(&src, MathStyle::Text)
             .unwrap_err()
             .message,
-        ascii_asciimath(&src, MathStyle::Text).unwrap_err().message,
+        ascii_asciimath(&src, MathStyle::Text, Charset::Unicode)
+            .unwrap_err()
+            .message,
     ] {
         assert!(message.contains("translated TeX"), "{message}");
     }
