@@ -7,6 +7,7 @@ mod chronology;
 mod class;
 pub(crate) mod creole;
 mod data;
+mod decor;
 mod description;
 mod detect;
 pub mod edit;
@@ -108,7 +109,8 @@ impl Parse {
     /// returned diagnostics include the parser's, ordered by position.
     pub fn lower(&self) -> (Diagram, Vec<Diagnostic>) {
         let root = self.syntax();
-        let (diagram, lowering) = match self.kind {
+        decor::reset();
+        let (diagram, mut lowering) = match self.kind {
             Kind::Activity => {
                 let (chart, d) = activity::lower(&root);
                 creole_graph(chart, d, &root)
@@ -193,6 +195,8 @@ impl Parse {
             // The parser reports the kinds not drawn yet; their drawing is empty.
             _ => (Diagram::default(), Vec::new()),
         };
+        let (diagram, decorations) = decor::apply(diagram, decor::take(), &root);
+        lowering.extend(decorations);
         let diagnostics = crate::diagnostic::merge(&self.diagnostics, lowering);
         log::debug!(
             "lowered a PlantUML {} diagram; {} diagnostics",

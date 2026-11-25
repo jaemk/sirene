@@ -97,6 +97,23 @@ fn keyword_in(s: &str, words: &[&'static str]) -> Option<&'static str> {
     words.iter().find(|k| k.eq_ignore_ascii_case(word)).copied()
 }
 
+/// `left header`, `right footer`, and the like at the start of `s`, as written: a position and
+/// `header` or `footer`, in any case.
+fn aligned_setting(s: &str) -> Option<&str> {
+    keyword_in(s, &["left", "right", "center"])?;
+    let first = word_len(s);
+    let rest = s[first..].trim_start();
+    let second = &rest[..word_len(rest)];
+    if !["header", "footer"]
+        .iter()
+        .any(|k| k.eq_ignore_ascii_case(second))
+    {
+        return None;
+    }
+    let end = s.len() - rest.len() + second.len();
+    Some(&s[..end])
+}
+
 /// The length of a participant name at the start of `s`: a `"..."` string on one line, or a
 /// run of characters other than whitespace and the arrow and statement punctuation.
 pub(crate) fn name_len(s: &str) -> usize {
@@ -478,7 +495,9 @@ impl Parser<'_> {
             self.reference();
         } else if keyword_in(r, &["title"]).is_some() {
             self.title();
-        } else if let Some(kw) = keyword_in(r, &["legend", "header", "footer", "skinparam"]) {
+        } else if let Some(kw) = keyword_in(r, &["legend", "header", "footer", "skinparam"])
+            .or_else(|| aligned_setting(r))
+        {
             self.setting(kw);
         } else if line
             .get(..7)
@@ -787,9 +806,19 @@ impl Parser<'_> {
         self.ws();
         let r = self.rest();
         let line = crate::lines::trim_end_len(r, crate::lines::line_len(r));
+        // `left header` is a header with a position.
+        let base = kw
+            .split_whitespace()
+            .next_back()
+            .unwrap_or(kw)
+            .to_ascii_lowercase();
+        let kw = base.as_str();
         let block = match kw {
             "legend" => true,
-            "header" | "footer" => line == 0,
+            // `header right` opens a block like `header` does.
+            "header" | "footer" => r[..line]
+                .split_whitespace()
+                .all(|w| ["left", "right", "center"].contains(&w.to_ascii_lowercase().as_str())),
             _ => r[..line].ends_with('{'),
         };
         self.rest_of_line(TEXT);

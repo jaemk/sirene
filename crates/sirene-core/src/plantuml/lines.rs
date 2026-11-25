@@ -515,6 +515,16 @@ pub(crate) fn common(line: &Line, cursor: &mut Cursor, d: &mut Vec<Diagnostic>) 
     if setting && (is_link || is_member) {
         return Common::No;
     }
+    // `header`, `footer`, `caption`, and `legend` are drawn around the diagram (PCOM-1).
+    if matches!(
+        w.as_str(),
+        "header" | "footer" | "caption" | "legend" | "left" | "right" | "center"
+    ) && !is_link
+        && let Some(item) = super::decor::statement(line, cursor, d)
+    {
+        super::decor::record(item);
+        return Common::Done;
+    }
     match w.as_str() {
         "title" => {
             let rest = line.after_word();
