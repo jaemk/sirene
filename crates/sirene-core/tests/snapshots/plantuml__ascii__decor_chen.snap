@@ -1,0 +1,38 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startchen\ntitle Rentals\nheader Draft\nfooter Page 1\ncaption Entities\nlegend left\nKeys are underlined\nend legend\nentity CUSTOMER {\n  Number <<key>>\n  Name\n}\nentity COPY\nrelationship RENTED_TO\nRENTED_TO -1- CUSTOMER\nRENTED_TO -N- COPY\n@endchen\n"
+---
+                        Draft
+
+           Rentals
+
+           /-----------\
+           | RENTED_TO |
+           \--+-----+--/
+              |     |
+            +-+     +-+
+            |         |
+            1         N
+            |         |
+            |         +--+
+            |            |
+      +-----+----+   +---+--+
+      | CUSTOMER |   | COPY |
+      +--+----+--+   +------+
+         |    |
+      +--+    ++
+      |        |
+      |        |
+     ++        +-+
+     |           |
+.----+---.   .---+--.
+( Number )   ( Name )
+'--------'   '------'
+
++---------------------+
+| Keys are underlined |
++---------------------+
+
+          Entities
+
+           Page 1

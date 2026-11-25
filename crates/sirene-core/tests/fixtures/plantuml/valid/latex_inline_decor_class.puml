@@ -1,0 +1,11 @@
+@startuml
+left header Area <latex>x^2</latex>
+footer Sum <math>sum_(i=1)^n i</math>
+caption <latex>\frac{a}{b}</latex>
+legend top right
+Legend <latex>\beta</latex>
+end legend
+class A
+class B
+A --> B
+@enduml

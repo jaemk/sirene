@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startwbs\nheader Draft\nfooter Page 1\ncaption Work breakdown\nlegend bottom left\nTasks of the project\nend legend\n* Project\n** Design\n** Code\n@endwbs\n"
+---
+216.0 x 307.0
+text "Draft" (179.0, 18.0) #333333
+path 6 points (64.0, 88.0)-(96.0, 131.0) stroke
+path 6 points (128.0, 88.0)-(161.0, 131.0) stroke
+path 4 points (70.0, 52.0)-(153.0, 88.0) fill stroke
+text "Project" (111.5, 70.0) #333333
+path 4 points (26.0, 131.0)-(101.0, 167.0) fill stroke
+text "Design" (63.5, 149.0) #333333
+path 4 points (132.0, 131.0)-(190.0, 167.0) fill stroke
+text "Code" (161.0, 149.0) #333333
+path 4 points (16.0, 191.0)-(200.0, 227.0) fill stroke
+text "Tasks of the project" (108.0, 209.0) #333333
+text "Work breakdown" (108.0, 253.0) #333333
+text "Page 1" (108.0, 289.0) #333333

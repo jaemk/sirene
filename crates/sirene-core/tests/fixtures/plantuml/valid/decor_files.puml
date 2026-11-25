@@ -1,0 +1,11 @@
+@startfiles
+title Layout
+header Draft
+footer Page 1
+caption Source tree
+legend bottom
+Files of the repository
+end legend
+/sirene/Cargo.toml
+/sirene/crates/sirene-core/src/lib.rs
+@endfiles

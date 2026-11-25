@@ -1,0 +1,12 @@
+@startgantt
+title Release plan
+header Draft
+footer Page 1
+caption Schedule
+legend right
+Bars are tasks
+end legend
+Project starts 2026-01-05
+[Design] lasts 3 days
+then [Code] lasts 5 days
+@endgantt

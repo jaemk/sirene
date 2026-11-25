@@ -1,0 +1,23 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nheader Architecture\nfooter Page 3\ncaption Two parts\nlegend left\nParts talk over **HTTP**\nend legend\ncomponent Web\ncomponent Api\nWeb --> Api\n@enduml\n"
+---
+
+            Architecture
+
+        ┌─────┐
+        │ Web │
+        └──┬──┘
+           │
+           ▼
+        ┌─────┐
+        │ Api │
+        └─────┘
+
+┌──────────────────────┐
+│ Parts talk over HTTP │
+└──────────────────────┘
+
+       Two parts
+
+         Page 3

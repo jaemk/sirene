@@ -3,7 +3,7 @@
 
 use rowan::{TextRange, TextSize};
 
-use super::lines;
+use super::{decor, lines};
 use crate::diagnostic::Diagnostic;
 use crate::dot;
 use crate::flowchart::Flowchart;
@@ -12,7 +12,8 @@ use crate::syntax::SyntaxNode;
 
 /// A `@startdot` document's graph.
 pub(crate) fn lower_dot(root: &SyntaxNode) -> (Flowchart, Vec<Diagnostic>) {
-    let body = lines::body(root, |_| true);
+    let claimed = decor::claim(root, decor::Raw::Dot);
+    let body = lines::body(root, |line| !claimed.contains(&line.range.start()));
     let mut l = dot::parse(&body).lower();
     if l.background.is_some()
         && let Some(at) = body.find("bgcolor")
@@ -32,7 +33,8 @@ const EBNF_HEADER: &str = "railroad-ebnf-beta\n";
 
 /// A `@startebnf` document's rules.
 pub(crate) fn lower_ebnf(root: &SyntaxNode) -> (Railroad, Vec<Diagnostic>) {
-    let body = lines::body(root, |_| true);
+    let claimed = decor::claim(root, decor::Raw::Ebnf);
+    let body = lines::body(root, |line| !claimed.contains(&line.range.start()));
     let (chart, d) = railroad::parse(&format!("{EBNF_HEADER}{body}")).lower();
     let shift = TextSize::new(EBNF_HEADER.len() as u32);
     let d = d

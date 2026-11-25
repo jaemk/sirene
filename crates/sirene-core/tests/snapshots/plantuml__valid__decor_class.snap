@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Model\nleft header\nInternal **draft**\nend header\nright footer Page <b>1</b>\ncaption A //small// model\nlegend top left\n<color:red>Red</color> marks changes\n# first\n# second\nend legend\nclass Foo\nclass Bar\nFoo --> Bar\n@enduml\n"
+---
+
+Internal draft
+
+┌───────────────────┐
+│ Red marks changes │
+│ 1. first          │
+│ 2. second         │
+└───────────────────┘
+
+        Model
+       
+       ┌─────┐
+       │ Foo │
+       └──┬──┘
+          │
+          ▼
+       ┌─────┐
+       │ Bar │
+       └─────┘
+
+    A small model
+
+               Page 1

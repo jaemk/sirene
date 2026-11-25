@@ -1,0 +1,23 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startchronology\ntitle Release\nheader Draft\nfooter Page 1\ncaption Dates\nlegend left\nEvents of the release\nend legend\n[Freeze] happens on 2024-01-15\n[Ship] happens on 2024-02-01\n@endchronology\n"
+---
+272.0 x 348.0
+text "Draft" (235.0, 18.0) #333333
+text "Release" (136.0, 62.0) #333333
+path 2 points (68.0, 128.0)-(68.0, 168.0) stroke
+path 2 points (184.0, 128.0)-(184.0, 168.0) stroke
+path 2 points (16.0, 148.0)-(246.0, 148.0) stroke
+path 3 points (246.0, 142.0)-(256.0, 154.0) fill
+path 9 points (16.0, 88.0)-(120.0, 128.0) fill
+text "2024-01-15" (68.0, 108.0) #ffffff
+path 9 points (16.0, 168.0)-(120.0, 208.0) fill stroke
+text "Freeze" (68.0, 188.0) #222222
+path 9 points (132.0, 88.0)-(236.0, 128.0) fill
+text "2024-02-01" (184.0, 108.0) #ffffff
+path 9 points (132.0, 168.0)-(236.0, 208.0) fill stroke
+text "Ship" (184.0, 188.0) #222222
+path 4 points (16.0, 232.0)-(208.4, 268.0) fill stroke
+text "Events of the release" (112.2, 250.0) #333333
+text "Dates" (136.0, 294.0) #333333
+text "Page 1" (136.0, 330.0) #333333

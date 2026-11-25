@@ -1,0 +1,29 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startchen\ntitle Rentals\nheader Draft\nfooter Page 1\ncaption Entities\nlegend left\nKeys are underlined\nend legend\nentity CUSTOMER {\n  Number <<key>>\n  Name\n}\nentity COPY\nrelationship RENTED_TO\nRENTED_TO -1- CUSTOMER\nRENTED_TO -N- COPY\n@endchen\n"
+---
+270.0 x 483.0
+text "Draft" (233.0, 18.0) #333333
+text "Rentals" (135.0, 62.0) #333333
+path 6 points (61.0, 260.0)-(100.0, 303.0) stroke
+path 6 points (136.0, 260.0)-(169.0, 303.0) stroke
+path 6 points (118.0, 140.0)-(127.0, 224.0) stroke
+path 6 points (205.0, 140.0)-(224.0, 224.0) stroke
+path 4 points (72.0, 224.0)-(164.0, 260.0) fill stroke
+text "CUSTOMER" (118.0, 242.0) #333333
+path 3 points (16.0, 323.0)-(105.0, 323.0) fill stroke
+text "Number" (60.5, 323.0) bold #333333
+path 3 points (136.0, 323.0)-(201.0, 323.0) fill stroke
+text "Name" (168.5, 323.0) #333333
+path 4 points (195.0, 224.0)-(253.0, 260.0) fill stroke
+text "COPY" (224.0, 242.0) #333333
+path 4 points (78.0, 84.0)-(254.0, 156.0) fill stroke
+text "RENTED_TO" (166.0, 120.0) #333333
+path 4 points (111.0, 178.0)-(128.0, 202.0) fill
+text "1" (119.5, 190.0) #333333
+path 4 points (203.0, 178.0)-(220.0, 202.0) fill
+text "N" (211.5, 190.0) #333333
+path 4 points (16.0, 367.0)-(191.6, 403.0) fill stroke
+text "Keys are underlined" (103.8, 385.0) #333333
+text "Entities" (135.0, 429.0) #333333
+text "Page 1" (135.0, 465.0) #333333

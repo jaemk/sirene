@@ -1,0 +1,27 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startuml\nheader\nRelease flow\nv1\\nsecond line\nend header\ncenter footer Confidential\ncaption Release steps\nlegend bottom right\n* build\n** test\n* ship\nend legend\nstart\n:build;\n:ship;\nstop\n@enduml\n"
+---
+141.2 x 499.0
+text "Release flow" (74.8, 18.0) #333333
+text "v1" (116.8, 38.0) #333333
+text "second line" (79.0, 58.0) #333333
+path 3 points (66.1, 138.0)-(75.1, 147.0) fill
+path 2 points (70.6, 106.0)-(70.6, 139.0) stroke
+path 3 points (66.1, 215.0)-(75.1, 224.0) fill
+path 2 points (70.6, 183.0)-(70.6, 216.0) stroke
+path 3 points (66.1, 292.0)-(75.1, 301.0) fill
+path 2 points (70.6, 260.0)-(70.6, 293.0) stroke
+path 3 points (63.6, 99.0)-(77.6, 99.0) fill
+path 9 points (37.6, 147.0)-(103.6, 183.0) fill stroke
+text "build" (70.6, 165.0) #333333
+path 9 points (41.6, 224.0)-(99.6, 260.0) fill stroke
+text "ship" (70.6, 242.0) #333333
+path 3 points (61.6, 310.0)-(79.6, 310.0) fill stroke
+path 3 points (65.6, 310.0)-(75.6, 310.0) fill
+path 4 points (42.0, 343.0)-(125.2, 419.0) fill stroke
+text "• build" (79.4, 361.0) #333333
+text "• test" (92.0, 381.0) #333333
+text "• ship" (75.2, 401.0) #333333
+text "Release steps" (70.6, 445.0) #333333
+text "Confidential" (70.6, 481.0) #333333

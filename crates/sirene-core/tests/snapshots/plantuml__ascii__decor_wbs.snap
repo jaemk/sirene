@@ -1,0 +1,26 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startwbs\nheader Draft\nfooter Page 1\ncaption Work breakdown\nlegend bottom left\nTasks of the project\nend legend\n* Project\n** Design\n** Code\n@endwbs\n"
+---
+                   Draft
+
+       +---------+
+       | Project |
+       +--+---+--+
+          |   |
+        +-+   +-+
+        |       |
+        |       |
+      +-+       +-+
+      |           |
+ +----+---+   +---+--+
+ | Design |   | Code |
+ +--------+   +------+
+
++----------------------+
+| Tasks of the project |
++----------------------+
+
+     Work breakdown
+
+         Page 1

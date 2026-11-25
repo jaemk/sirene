@@ -1,0 +1,18 @@
+@startuml
+header __Draft__ --old-- <size:16>big</size> <back:#ffee88>note</back> ""code""
+footer <u>Page</u> 1
+caption Figure 1
+legend top left
+== Key ==
+* __underlined__ item
+----
+|= Name |= Qty |
+| apple | 3 |
+| pear | 12 |
+====
+the last line
+end legend
+class A
+class B
+A --> B
+@enduml

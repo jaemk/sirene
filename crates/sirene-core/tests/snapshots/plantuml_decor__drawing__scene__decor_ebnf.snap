@@ -1,0 +1,33 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startebnf\nheader Grammar\nfooter Generated\ncaption Figure 1\nlegend right Rules\ngreeting = \"hello\" , name ;\nname = \"world\" | \"there\" ;\n@endebnf\n"
+---
+307.4 x 360.0
+text "Grammar" (262.0, 18.0) #333333
+path 2 points (204.0, 66.0)-(214.0, 66.0) stroke
+path 2 points (121.0, 66.0)-(136.0, 66.0) stroke
+path 2 points (272.4, 66.0)-(277.4, 66.0) stroke
+path 5 points (97.6, 132.4)-(117.6, 155.6) stroke
+path 5 points (185.6, 132.4)-(205.6, 155.6) stroke
+path 5 points (97.6, 155.6)-(117.6, 178.8) stroke
+path 5 points (185.6, 155.6)-(205.6, 178.8) stroke
+path 2 points (82.6, 155.6)-(97.6, 155.6) stroke
+path 2 points (205.6, 155.6)-(210.6, 155.6) stroke
+path 9 points (136.0, 46.8)-(204.0, 85.2) fill stroke
+text "hello" (170.0, 66.0) #333333
+path 4 points (214.0, 46.8)-(272.4, 85.2) fill stroke
+text "name" (243.2, 66.0) #333333
+path 3 points (111.0, 66.0)-(121.0, 66.0) fill
+path 3 points (277.4, 66.0)-(287.4, 66.0) fill
+path 9 points (117.6, 113.2)-(185.6, 151.6) fill stroke
+text "world" (151.6, 132.4) #333333
+path 9 points (117.6, 159.6)-(185.6, 198.0) fill stroke
+text "there" (151.6, 178.8) #333333
+path 3 points (72.6, 155.6)-(82.6, 155.6) fill
+path 3 points (210.6, 155.6)-(220.6, 155.6) fill
+text "greeting =" (48.0, 60.4) bold #333333
+text "name =" (28.8, 150.0) bold #333333
+path 4 points (233.4, 244.0)-(291.4, 280.0) fill stroke
+text "Rules" (262.4, 262.0) #333333
+text "Figure 1" (153.7, 306.0) #333333
+text "Generated" (153.7, 342.0) #333333

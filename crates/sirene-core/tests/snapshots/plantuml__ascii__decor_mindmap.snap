@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startmindmap\ntitle Plan\nheader Draft\nfooter Page 1\ncaption Roadmap\nlegend right\nBranches are goals\nend legend\n* Plan\n** Build\n** Ship\n@endmindmap\n"
+---
+                 Draft
+
+        Plan
+     
+     (Plan)
+     +-- (Build)
+     `-- (Ship)
+
++--------------------+
+| Branches are goals |
++--------------------+
+
+       Roadmap
+
+        Page 1

@@ -1,0 +1,19 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startregex\nheader\nPattern\nend header\nlegend\nGroups\nend legend\n^ab+(c|d)*$\n@endregex\n"
+---
+
+                                                                Pattern
+
+                                       ┌───────────┐
+  ┌───────────────┐  ╭───╮    ╭───╮    │   ╭───╮   │  ┌─────────────┐
+●─┤ start of line ├──┤ a ├──┬─┤ b ├─┬──┼─┬─┤ c ├─┬─┼──┤ end of line ├─●
+  └───────────────┘  ╰───╯  │ ╰───╯ │  │ │ ╰───╯ │ │  └─────────────┘
+                            └───◄───┘  │ │ ╭───╮ │ │
+                                       │ └─┤ d ├─┘ │
+                                       │   ╰───╯   │
+                                       └─────◄─────┘
+
+                              ┌────────┐
+                              │ Groups │
+                              └────────┘

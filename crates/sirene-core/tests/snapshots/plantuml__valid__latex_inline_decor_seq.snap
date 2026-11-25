@@ -1,0 +1,29 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nheader Area <latex>x^2</latex>\nfooter\nSum <math>sum_(i=1)^n i</math>\nend footer\ncaption <latex>\\frac{a}{b}</latex> over two\\nlines of <latex>\\alpha</latex>\nlegend left\n* item <latex>\\beta</latex>\n* **bold** plain\nend legend\nA -> B : go\n@enduml\n"
+---
+
+        Area x^2
+
+ ┌───┐   ┌───┐
+ │ A │   │ B │
+ └─┬─┘   └─┬─┘
+   │       │
+   │  go   │
+   ├──────►│
+   │       │
+ ┌─┴─┐   ┌─┴─┐
+ │ A │   │ B │
+ └───┘   └───┘
+
+┌──────────────┐
+│ • item β     │
+│ • bold plain │
+└──────────────┘
+
+        a
+  --- over two
+        b
+   lines of α
+
+Sum sum_(i=1)^ni

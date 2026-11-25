@@ -1,0 +1,10 @@
+@startyaml
+header Release data
+footer Generated
+caption Figure 1
+legend left Values
+name: sirene
+tags:
+  - a
+  - b
+@endyaml

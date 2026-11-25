@@ -1,0 +1,17 @@
+@startchen
+title Rentals
+header Draft
+footer Page 1
+caption Entities
+legend left
+Keys are underlined
+end legend
+entity CUSTOMER {
+  Number <<key>>
+  Name
+}
+entity COPY
+relationship RENTED_TO
+RENTED_TO -1- CUSTOMER
+RENTED_TO -N- COPY
+@endchen

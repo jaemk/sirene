@@ -1,0 +1,8 @@
+@startebnf
+header Grammar
+footer Generated
+caption Figure 1
+legend right Rules
+greeting = "hello" , name ;
+name = "world" | "there" ;
+@endebnf

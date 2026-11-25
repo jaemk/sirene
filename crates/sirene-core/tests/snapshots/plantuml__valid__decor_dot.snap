@@ -1,0 +1,28 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startdot\nheader Build graph\nfooter Generated\ncaption Figure 1\nlegend bottom left : edges are dependencies\ndigraph G {\n  a -> b;\n  b -> c;\n}\n@enddot\n"
+---
+
+               Build graph
+
+          ╭───╮
+          ( a )
+          ╰─┬─╯
+            │
+            ▼
+          ╭───╮
+          ( b )
+          ╰─┬─╯
+            │
+            ▼
+          ╭───╮
+          ( c )
+          ╰───╯
+
+┌────────────────────────┐
+│ edges are dependencies │
+└────────────────────────┘
+
+         Figure 1
+
+        Generated

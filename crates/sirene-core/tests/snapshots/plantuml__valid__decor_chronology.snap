@@ -1,0 +1,24 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startchronology\ntitle Release\nheader Draft\nfooter Page 1\ncaption Dates\nlegend left\nEvents of the release\nend legend\n[Freeze] happens on 2024-01-15\n[Ship] happens on 2024-02-01\n@endchronology\n"
+---
+
+                          Draft
+
+            Release
+
+┌────────────┐ ┌────────────┐
+│ 2024-01-15 │ │ 2024-02-01 │
+└──────┬─────┘ └──────┬─────┘
+───────┼──────────────┼───────►
+┌──────┴─────┐ ┌──────┴─────┐
+│   Freeze   │ │    Ship    │
+└────────────┘ └────────────┘
+
+┌───────────────────────┐
+│ Events of the release │
+└───────────────────────┘
+
+             Dates
+
+            Page 1

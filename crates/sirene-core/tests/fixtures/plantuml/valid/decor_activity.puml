@@ -1,0 +1,17 @@
+@startuml
+header
+Release flow
+v1\nsecond line
+end header
+center footer Confidential
+caption Release steps
+legend bottom right
+* build
+** test
+* ship
+end legend
+start
+:build;
+:ship;
+stop
+@enduml

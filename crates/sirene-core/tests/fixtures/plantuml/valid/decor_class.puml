@@ -1,0 +1,16 @@
+@startuml
+title Model
+left header
+Internal **draft**
+end header
+right footer Page <b>1</b>
+caption A //small// model
+legend top left
+<color:red>Red</color> marks changes
+# first
+# second
+end legend
+class Foo
+class Bar
+Foo --> Bar
+@enduml

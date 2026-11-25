@@ -1,0 +1,44 @@
+---
+source: crates/sirene-core/tests/plantuml_decor.rs
+expression: "@startuml\nheader __Draft__ --old-- <size:16>big</size> <back:#ffee88>note</back> \"\"code\"\"\nfooter <u>Page</u> 1\ncaption Figure 1\nlegend top left\n== Key ==\n* __underlined__ item\n----\n|= Name |= Qty |\n| apple | 3 |\n| pear | 12 |\n====\nthe last line\nend legend\nclass A\nclass B\nA --> B\n@enduml\n"
+---
+228.8 x 435.9
+text "Draft" (37.0, 19.4) #333333
+path 2 points (16.0, 27.1)-(58.0, 27.1) stroke
+text "old" (79.0, 19.4) #333333
+path 2 points (66.4, 19.4)-(91.6, 19.4) stroke
+text "big" (114.4, 19.4) #333333
+path 4 points (137.2, 9.4)-(170.8, 29.4) fill
+text "note" (154.0, 19.4) #333333
+text "code" (196.0, 19.4) #333333
+path 4 points (16.0, 46.9)-(174.8, 210.9) fill stroke
+text "Key" (36.6, 64.9) bold #333333
+text "• underlined" (74.4, 84.9) #333333
+path 2 points (24.0, 92.6)-(124.8, 92.6) stroke
+text "item" (150.0, 84.9) #333333
+path 2 points (24.0, 98.9)-(166.8, 98.9) stroke
+path 4 points (24.0, 102.9)-(78.0, 126.9) stroke
+text "Name" (46.8, 114.9) bold #333333
+path 4 points (78.0, 102.9)-(115.2, 126.9) stroke
+text "Qty" (96.6, 114.9) bold #333333
+path 4 points (24.0, 126.9)-(78.0, 150.9) stroke
+text "apple" (51.0, 138.9) #333333
+path 4 points (78.0, 126.9)-(115.2, 150.9) stroke
+text "3" (88.2, 138.9) #333333
+path 4 points (24.0, 150.9)-(78.0, 174.9) stroke
+text "pear" (46.8, 162.9) #333333
+path 4 points (78.0, 150.9)-(115.2, 174.9) stroke
+text "12" (92.4, 162.9) #333333
+path 2 points (24.0, 177.4)-(166.8, 177.4) stroke
+path 2 points (24.0, 180.4)-(166.8, 180.4) stroke
+text "the last line" (78.6, 192.9) #333333
+path 3 points (110.4, 302.9)-(119.4, 311.9) fill
+path 2 points (114.9, 270.9)-(114.9, 303.9) stroke
+path 4 points (97.9, 234.9)-(130.9, 270.9) fill stroke
+text "A" (114.4, 252.9) #333333
+path 4 points (97.9, 311.9)-(130.9, 347.9) fill stroke
+text "B" (114.4, 329.9) #333333
+text "Figure 1" (114.4, 381.9) #333333
+text "Page" (106.0, 417.9) #333333
+path 2 points (89.2, 425.6)-(122.8, 425.6) stroke
+text "1" (135.4, 417.9) #333333

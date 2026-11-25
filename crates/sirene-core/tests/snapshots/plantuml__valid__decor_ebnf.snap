@@ -1,0 +1,25 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startebnf\nheader Grammar\nfooter Generated\ncaption Figure 1\nlegend right Rules\ngreeting = \"hello\" , name ;\nname = \"world\" | \"there\" ;\n@endebnf\n"
+---
+
+                           Grammar
+
+             ╭───────╮  ┌──────┐
+greeting = ●─┤ hello ├──┤ name ├─●
+             ╰───────╯  └──────┘
+
+           ╭───────╮
+name = ●─┬─┤ world ├─┬─●
+         │ ╰───────╯ │
+         │ ╭───────╮ │
+         └─┤ there ├─┘
+           ╰───────╯
+
+                         ┌───────┐
+                         │ Rules │
+                         └───────┘
+
+             Figure 1
+
+            Generated

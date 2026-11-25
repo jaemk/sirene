@@ -2,9 +2,11 @@
 
 use std::collections::HashMap;
 
-use rowan::TextRange;
+use rowan::{TextRange, TextSize};
 
 use super::creole;
+use super::decor;
+use super::lines::{Cursor, Line};
 use crate::diagnostic::Diagnostic;
 use crate::flowchart::{Delim, formula};
 use crate::lines::{MAX_DEPTH, too_deep};
@@ -257,6 +259,15 @@ fn split_colors(text: &str) -> (String, String) {
         rest = rest[word.len()..].trim_start();
     }
     (rest.to_owned(), colors.join(" "))
+}
+
+/// Whether the statement keyword `kw` (lowercase) is a decoration's, with or without a position
+/// before it (`left header`).
+fn is_decoration(kw: &str) -> bool {
+    matches!(
+        kw.split_whitespace().last(),
+        Some("header" | "footer" | "caption" | "legend")
+    )
 }
 
 impl Lower {
@@ -824,8 +835,46 @@ impl Lower {
                 range,
                 format!("`{kw} {label}` is not supported; ignoring it"),
             ),
+            _ if is_decoration(&kw) => self.decoration(stmt),
             _ => self.warning(range, format!("`{kw}` is not drawn yet; ignoring it")),
         }
+    }
+
+    /// `header`, `footer`, `caption`, or `legend` and its block (PCOM-1): read as the other
+    /// kinds read them, or a warning when it is not drawn.
+    fn decoration(&mut self, stmt: &SyntaxNode) {
+        let text = stmt.text().to_string();
+        let start = stmt.text_range().start();
+        let mut at = 0;
+        let mut lines = Vec::new();
+        for raw in text.split('\n') {
+            let line = raw.trim();
+            let lead = raw.len() - raw.trim_start().len();
+            let range = TextRange::at(
+                start + TextSize::new((at + lead) as u32),
+                TextSize::new(line.len() as u32),
+            );
+            at += raw.len() + 1;
+            // Blank lines are not statements in the other kinds either.
+            if !line.is_empty() {
+                lines.push(Line {
+                    text: line.to_owned(),
+                    range,
+                });
+            }
+        }
+        let mut lines = lines.into_iter();
+        let Some(first) = lines.next() else { return };
+        let mut cursor = Cursor::new(lines.collect());
+        let mut found = Vec::new();
+        match decor::statement(&first, &mut cursor, &mut found) {
+            Some(item) => decor::record(item),
+            None => self.warning(
+                first.range,
+                format!("`{}` is not drawn yet; ignoring it", first.word()),
+            ),
+        }
+        self.diagnostics.extend(found);
     }
 
     /// `autonumber [start] [step] ["format"]`, `autonumber stop`, or `autonumber resume

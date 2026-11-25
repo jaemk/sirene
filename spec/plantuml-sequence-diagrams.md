@@ -93,8 +93,9 @@ a `ref` tab. Done: tests `plantuml_events` in `crates/sirene-core/tests/sequence
 
 ## PSEQ-6 Not drawn yet
 
-`title text`, and `title` ... `end title`, is the diagram's title. These are warnings and
-ignored: `header`, `footer`, `caption`, and `legend` ... `endlegend`; `skinparam` and `!theme` (PUML-4); colors and stereotypes;
+`title text`, and `title` ... `end title`, is the diagram's title. `header`, `footer`, `caption`,
+and `legend` ... `endlegend` are drawn around the diagram (PCOM-1). These are warnings and
+ignored: `skinparam` and `!theme` (PUML-4); colors and stereotypes;
 `newpage` (everything is on one page); `!pragma`; creole and HTML markup in
 text, which is drawn as written. `!include`, `!includeurl`, and `!import` are errors (PUML-4);
 `!define`, `!function`, variables, and conditionals are a warning and their lines ignored.

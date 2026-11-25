@@ -1,0 +1,9 @@
+@startuml
+header Bad <latex>\foo</latex>
+footer ok <latex>x</latex> and <latex>\bar</latex>
+caption <latex>\baz{x}</latex>
+legend
+a <latex>\qux</latex>
+end legend
+class A
+@enduml

@@ -1,0 +1,18 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startyaml\nheader Release data\nfooter Generated\ncaption Figure 1\nlegend left Values\nname: sirene\ntags:\n  - a\n  - b\n@endyaml\n"
+---
+            Release data
+
++-------------+    +---+
+| name sirene |    | a |
+| tags        +----+ b |
++-------------+    +---+
+
++--------+
+| Values |
++--------+
+
+        Figure 1
+
+       Generated

@@ -1,0 +1,32 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nheader\nRelease flow\nv1\\nsecond line\nend header\ncenter footer Confidential\ncaption Release steps\nlegend bottom right\n* build\n** test\n* ship\nend legend\nstart\n:build;\n:ship;\nstop\n@enduml\n"
+---
+ Release flow
+           v1
+  second line
+
+      *
+      |
+      v
+  .-------.
+  | build |
+  '---+---'
+      |
+      v
+  .------.
+  | ship |
+  '---+--'
+      |
+      v
+      @
+
+ +----------+
+ | * build  |
+ |   * test |
+ | * ship   |
+ +----------+
+
+Release steps
+
+Confidential

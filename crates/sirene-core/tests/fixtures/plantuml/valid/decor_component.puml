@@ -1,0 +1,11 @@
+@startuml
+header Architecture
+footer Page 3
+caption Two parts
+legend left
+Parts talk over **HTTP**
+end legend
+component Web
+component Api
+Web --> Api
+@enduml

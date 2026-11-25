@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startgantt\ntitle Release plan\nheader Draft\nfooter Page 1\ncaption Schedule\nlegend right\nBars are tasks\nend legend\nProject starts 2026-01-05\n[Design] lasts 3 days\nthen [Code] lasts 5 days\n@endgantt\n"
+---
+                                                                         Draft
+
+                                 Release plan
+
+Design  #######################
+Code                           #####################################
+        +-------+------+-------+------+-------+------+-------+------+
+        2026-01-05     2026-01-07     2026-01-09     2026-01-11     2026-01-13
+
+                                                            +----------------+
+                                                            | Bars are tasks |
+                                                            +----------------+
+
+                                   Schedule
+
+                                    Page 1
