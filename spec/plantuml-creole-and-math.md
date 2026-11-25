@@ -79,21 +79,37 @@ the text is written once there, and each of several equal formulas gets its own 
 order. A subgraph title is one line (its lines joined by spaces) in the scene and the rows of
 its formulas in the text renderer, the first on the border.
 
-Not drawn: the document `title`, headers and footers, legends (not drawn at all), sequence
-group and divider text, participant names only given as ids, mindmap, JSON, YAML, Gantt,
-timing, chronology, DOT, and the other kinds that do not carry label runs. Tags there are text
-with no diagnostic. In the text renderer an end label is placed beside the line's first or
-last cell and is not reserved room by the layout, so a wide one is clipped at the drawing's
-edge, as a text one is.
-Tests: `latex_inline_*` and `math_inline_*` fixtures and
-`crates/sirene-core/tests/plantuml_math.rs`.
+- the document `title` of a graph kind (the chart's `title_delim` is `Delim::Latex`; the title
+  is one line of runs set at 1.2 times the text size, centered, and as tall as its formulas,
+  and in the text renderer as many rows as its formulas) and of a sequence (`Sequence::math`).
+  Its formulas have no range of their own in a graph, so a failing one is found by its tags in
+  the whole source, as a row's is;
+- sequence group (`box`) titles, the tab and label of a frame (`alt`, `opt`, `loop`, `par`,
+  `break`, `critical`, `group`), the label of `else`, the text of `==` separators and `...`
+  delays. Each is one line of runs; its row is as tall as its tallest formula (a group's
+  title row, a frame's tab, a divider, a separator, a delay), and in the text renderer as many
+  rows as that, the first on the border or rule. The lowering checks each on its own line;
+- JSON and YAML keys and values (they are rows of compartments, read as a class's are).
+
+Not drawn: headers, footers, captions, and legends (the parser skips them, a legend is not
+drawn at all, so there is nothing to set a formula in), participant names only given as ids (an
+id has no tags), and the kinds that keep their text as plain strings with their own painters:
+mindmap, Gantt, timing, chronology, and DOT (DOT labels are Graphviz's, not Creole). Tags there
+are text with no diagnostic. In the text renderer an end label is placed beside the line's
+first or last cell and is not reserved room by the layout, so a wide one is clipped at the
+drawing's edge, as a text one is.
+Tests: `latex_inline_*` and `math_inline_*` fixtures,
+`crates/sirene-core/tests/plantuml_math.rs`, and
+`crates/sirene-core/tests/plantuml_math_titles.rs` (titles, group and frame text, JSON and
+YAML), with `plantuml_titles_and_frame_labels_typeset_each_formula_once_per_render` in
+`scene/mathtext.rs` for the typeset-once count.
 
 ## PCREO-4 Open questions
 
 - Creole beyond the inline `<latex>` and `<math>` tags (PCREO-1) is not read. The scene and
   the ASCII renderer carry formula runs (`flowchart::Span`) but not other rich text spans, so
   the rest starts with a text-run model in the display list (DISPLA).
-- Formula tags in the document `title` (a graph's `title` is an `Option<String>` drawn as one
-  text run), headers, footers, legends, sequence group and divider text, and the other kinds
-  PCREO-3 lists as not drawn are left: each needs its position drawn from `Span` runs, one
-  painter at a time.
+- Formula tags in headers, footers, captions, and legends (none is drawn), and in mindmap,
+  Gantt, timing, chronology, and DOT text (each keeps plain strings and has its own painter)
+  are left: each needs its position drawn from `Span` runs, one painter at a time. Title
+  formulas are set at one size (1.2 times the text), not mixed with bold text.

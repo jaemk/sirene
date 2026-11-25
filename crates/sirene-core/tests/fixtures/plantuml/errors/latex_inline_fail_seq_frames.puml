@@ -1,0 +1,10 @@
+@startuml
+A -> B : go
+alt <latex>a + \foo{x}</latex>
+  B -> A : big
+else <latex>\bar{</latex>
+  B -> A : small
+end
+== <latex>\baz{x}</latex> ==
+... <latex>\qux</latex> ...
+@enduml

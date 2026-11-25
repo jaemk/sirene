@@ -1,0 +1,6 @@
+@startuml
+box "Group <latex>a + \foo{x}</latex>"
+participant A
+end box
+A -> A : go
+@enduml

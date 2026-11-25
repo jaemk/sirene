@@ -6,7 +6,7 @@ use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
     parse_color,
 };
-use crate::flowchart::{Shape, Span};
+use crate::flowchart::{Delim, Shape, Span};
 use crate::sequence::layout::{self, Placed, Sizes, Spacing};
 use crate::sequence::{BlockKind, Event, Head, LineStyle, ParticipantKind, Sequence};
 
@@ -111,6 +111,43 @@ impl<M: TextMetrics> Painter<'_, M> {
     /// The runs of `lines` when the diagram reads formulas and some line has one.
     fn runs(&self, lines: &[String]) -> Option<Vec<Vec<Span>>> {
         mathtext::source_runs(lines, self.math?)
+    }
+
+    /// The runs of the one line `text` when the diagram reads PlantUML's formula tags and it
+    /// has one. The positions that only PlantUML has (a frame's tab and label, a divider, a
+    /// separator, a delay, a group's title, the diagram's title) read these and no others.
+    fn runs1(&self, text: &str) -> Option<Vec<Vec<Span>>> {
+        let delim = self.math.filter(|d| *d == Delim::Latex)?;
+        mathtext::source_runs(&[text.to_owned()], delim)
+    }
+
+    /// The width and height of the one line `text`, in bold when `bold` and it is text: a line
+    /// with a formula is as tall as the formula needs (LEMB-4).
+    fn size1(&self, text: &str, bold: bool) -> (f32, f32) {
+        match self.runs1(text) {
+            Some(runs) => mathtext::block_size(self.metrics, &self.formulas, self.theme, &runs),
+            None if bold => (self.bold_width(text), self.theme.line_height),
+            None => (self.width(text), self.theme.line_height),
+        }
+    }
+
+    /// Draws the one line `text` centered on `center`: formulas as paths on a common baseline.
+    fn draw1(&mut self, text: &str, center: Pt, bold: bool) {
+        if let Some(runs) = self.runs1(text) {
+            let (m, f, t) = (self.metrics, &self.formulas, self.theme);
+            for primitive in mathtext::draw_lines(m, f, t, &runs, center, t.text) {
+                self.elements.push(Element {
+                    owner: self.owner,
+                    primitive,
+                });
+            }
+            return;
+        }
+        let style = TextStyle {
+            bold,
+            italic: false,
+        };
+        self.text_at(text, center, self.theme.font_size, self.theme.text, style);
     }
 
     /// The width and height of `lines`: a line with a tall formula is taller (LEMB-4).
@@ -383,17 +420,7 @@ impl<M: TextMetrics> Painter<'_, M> {
             Some(self.theme.edge_label_fill),
             Some(solid(1.0, self.theme.edge)),
         );
-        let bold = TextStyle {
-            bold: true,
-            italic: false,
-        };
-        self.text_at(
-            name,
-            Pt::new(b.x + w / 2.0, b.y + h / 2.0),
-            self.theme.font_size,
-            self.theme.text,
-            bold,
-        );
+        self.draw1(name, Pt::new(b.x + w / 2.0, b.y + h / 2.0), true);
     }
 
     /// An `autonumber` badge centered on `at`.
@@ -437,13 +464,29 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty());
+    // The title is set larger than the text, so a formula in it is too.
+    let big = Theme {
+        font_size: theme.font_size * 1.2,
+        line_height: lh * 1.2,
+        ..*theme
+    };
+    let title_runs = title.and_then(|t| p.runs1(t));
+    let title_size = match (&title_runs, title) {
+        (Some(runs), _) => Some(mathtext::block_size(metrics, &p.formulas, &big, runs)),
+        (None, Some(t)) => Some((metrics.width(t, theme.font_size * 1.2), lh)),
+        (None, None) => None,
+    };
     let headers: Vec<(f32, f32)> = seq
         .participants
         .iter()
         .map(|part| p.header_size(part.kind, &part.label))
         .collect();
-    let tab_w = |p: &Painter<_>, name: &str| p.bold_width(name) + 2.0 * TAB_PAD;
+    let tab_w = |p: &Painter<_>, name: &str| p.size1(name, true).0 + 2.0 * TAB_PAD;
     let tab_h = lh + 4.0;
+    // A frame's tab is as tall as its tallest formula needs.
+    let tab_height = |p: &Painter<_>, name: &str, after: &str| {
+        tab_h.max(p.size1(name, true).1.max(p.size1(after, false).1) + 4.0)
+    };
     let sizes = Sizes {
         headers: headers.clone(),
         events: seq
@@ -458,35 +501,52 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
                 Event::Start(BlockKind::Rect, _) => (0.0, 0.0),
                 Event::Start(kind, label) => {
                     let (name, after) = kind.tab(label);
-                    (tab_w(&p, &name) + 2.0 * TAB_PAD + p.width(&after), tab_h)
+                    let w = tab_w(&p, &name) + 2.0 * TAB_PAD + p.size1(&after, false).0;
+                    (w, tab_height(&p, &name, &after))
                 }
                 Event::Divider(label) if label.is_empty() => (0.0, 0.0),
-                Event::Divider(label) => (p.width(&bracketed(label)) + 4.0 * TAB_PAD, lh),
+                Event::Divider(label) => {
+                    let (w, h) = p.size1(&bracketed(label), false);
+                    (w + 4.0 * TAB_PAD, h.max(lh))
+                }
                 Event::Ref { text, .. } => {
                     let (w, h) = p.measure(text);
                     let w = (w + 2.0 * NOTE_PAD).max(tab_w(&p, "ref") + 2.0 * TAB_PAD);
                     (w, tab_h + h + NOTE_PAD)
                 }
                 Event::Separator(t) if t.is_empty() => (0.0, RULE),
-                Event::Separator(t) => (p.width(t) + 4.0 * TAB_PAD, lh + PAD_Y),
-                Event::Delay(Some(t)) if !t.is_empty() => (p.width(t), lh + DELAY),
+                Event::Separator(t) => {
+                    let (w, h) = p.size1(t, false);
+                    (w + 4.0 * TAB_PAD, h.max(lh) + PAD_Y)
+                }
+                Event::Delay(Some(t)) if !t.is_empty() => {
+                    let (w, h) = p.size1(t, false);
+                    (w, h.max(lh) + DELAY)
+                }
                 Event::Delay(_) => (0.0, DELAY),
                 Event::Space(None) => (0.0, lh),
                 Event::Space(Some(px)) => (0.0, *px as f32),
                 _ => (0.0, 0.0),
             })
             .collect(),
-        title_h: if title.is_some() { lh + 12.0 } else { 0.0 },
+        title_h: title_size.map_or(0.0, |(_, h)| h + 12.0),
+        group_title_h: seq
+            .groups
+            .iter()
+            .filter_map(|g| g.title.as_deref())
+            .map(|t| p.size1(t, true).1)
+            .fold(0.0, f32::max),
         groups: seq
             .groups
             .iter()
             .map(|g| {
                 g.title
                     .as_deref()
-                    .map_or(0.0, |t| p.bold_width(t) + 2.0 * TAB_PAD)
+                    .map_or(0.0, |t| p.size1(t, true).0 + 2.0 * TAB_PAD)
             })
             .collect(),
     };
+    let group_title_h = SPACING.group_title_h.max(sizes.group_title_h);
     let l = layout::layout(seq, &sizes, &SPACING);
     let header_h = l.header_h;
     let lifeline = theme.edge.with_alpha(0x60).over(theme.background);
@@ -510,18 +570,9 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         if let Some(t) = &group.title {
             let center = Pt::new(
                 b.x + b.w / 2.0,
-                g.y0 + SPACING.group_pad / 2.0 + SPACING.group_title_h / 2.0,
+                g.y0 + SPACING.group_pad / 2.0 + group_title_h / 2.0,
             );
-            p.text_at(
-                t,
-                center,
-                theme.font_size,
-                theme.text,
-                TextStyle {
-                    bold: true,
-                    italic: false,
-                },
-            );
+            p.draw1(t, center, true);
         }
     }
 
@@ -613,15 +664,11 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         p.path(rect(b), None, Some(solid(1.0, theme.edge)));
         let (name, text) = kind.tab(label);
         let tw = tab_w(&p, &name);
-        p.tab(b, &name, tw, tab_h);
-        let lw = p.width(&text);
-        p.text_at(
-            &text,
-            Pt::new(b.x + tw + TAB_PAD + lw / 2.0, b.y + tab_h / 2.0),
-            theme.font_size,
-            theme.text,
-            TextStyle::default(),
-        );
+        let th = tab_height(&p, &name, &text);
+        p.tab(b, &name, tw, th);
+        let lw = p.size1(&text, false).0;
+        let center = Pt::new(b.x + tw + TAB_PAD + lw / 2.0, b.y + th / 2.0);
+        p.draw1(&text, center, false);
         for &(k, y) in &f.dividers {
             p.path(
                 line(Pt::new(b.x, y), Pt::new(b.right(), y)),
@@ -629,14 +676,9 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
                 Some(dashed(1.0, theme.edge)),
             );
             if let Event::Divider(label) = &seq.events[k] {
-                let center = Pt::new(b.x + b.w / 2.0, y + lh / 2.0 + 2.0);
-                p.text_at(
-                    &bracketed(label),
-                    center,
-                    theme.font_size,
-                    theme.text,
-                    TextStyle::default(),
-                );
+                let text = bracketed(label);
+                let h = p.size1(&text, false).1.max(lh);
+                p.draw1(&text, Pt::new(b.x + b.w / 2.0, y + h / 2.0 + 2.0), false);
             }
         }
     }
@@ -713,7 +755,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
                     );
                 }
                 if !t.is_empty() {
-                    let w = p.width(t) + 2.0 * TAB_PAD;
+                    let w = p.size1(t, false).0 + 2.0 * TAB_PAD;
                     let b = BoxF {
                         x: (x0 + x1 - w) / 2.0,
                         y,
@@ -725,11 +767,11 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
                         Some(theme.edge_label_fill),
                         Some(solid(1.0, theme.edge)),
                     );
-                    p.lines(std::slice::from_ref(t), (x0 + x1) / 2.0, y + (h - lh) / 2.0);
+                    p.draw1(t, Pt::new((x0 + x1) / 2.0, y + h / 2.0), false);
                 }
             }
             (Placed::Band { y, h }, Event::Delay(Some(t))) => {
-                p.lines(std::slice::from_ref(t), l.width / 2.0, y + (h - lh) / 2.0);
+                p.draw1(t, Pt::new(l.width / 2.0, y + h / 2.0), false);
             }
             _ => {}
         }
@@ -773,9 +815,21 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
 
     let width = l
         .width
-        .max(title.map_or(0.0, |t| metrics.width(t, theme.font_size * 1.2)) + 2.0 * SPACING.margin);
+        .max(title_size.map_or(0.0, |(w, _)| w) + 2.0 * SPACING.margin);
     let mut elements = p.elements;
-    if let Some(t) = title {
+    if let (Some(runs), Some((_, h))) = (&title_runs, title_size) {
+        let center = Pt::new(width / 2.0, SPACING.margin + h / 2.0);
+        let out = mathtext::draw_lines(metrics, &p.formulas, &big, runs, center, theme.text);
+        for (i, primitive) in out.into_iter().enumerate() {
+            elements.insert(
+                i,
+                Element {
+                    owner: Owner::Diagram,
+                    primitive,
+                },
+            );
+        }
+    } else if let Some(t) = title {
         elements.insert(
             0,
             Element {

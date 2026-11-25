@@ -435,6 +435,37 @@ mod tests {
         }
     }
 
+    /// The formulas of a sequence's title, group title, frame labels, divider, separator, and
+    /// delay, and of a graph's title, are checked once when lowering and typeset once when
+    /// drawing, however often a pass measures them.
+    #[test]
+    fn plantuml_titles_and_frame_labels_typeset_each_formula_once_per_render() {
+        let sources = [
+            (
+                "@startuml\ntitle <latex>t_1</latex>\nbox \"<latex>g_1</latex>\"\nparticipant A\nend box\nA -> A : go\nalt <latex>a_1</latex>\n  A -> A : x\nelse <latex>b_1</latex>\n  A -> A : y\nend\n== <latex>s_1</latex> ==\n... <latex>d_1</latex> ...\n@enduml\n",
+                6,
+            ),
+            (
+                "@startuml\ntitle <latex>t_1</latex> <math>x^2</math>\nclass A\n@enduml\n",
+                2,
+            ),
+        ];
+        for (src, formulas) in sources {
+            crate::equation::count::reset();
+            let lowered = crate::diagram::lower(src);
+            assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+            assert_eq!(
+                crate::equation::count::get(),
+                formulas,
+                "lowering checks each"
+            );
+            crate::equation::count::reset();
+            let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+            assert_eq!(crate::equation::count::get(), formulas, "drawing sets each");
+            assert!(!scene.elements.is_empty());
+        }
+    }
+
     #[test]
     fn text_spans_are_never_cached() {
         let cache = Formulas::default();

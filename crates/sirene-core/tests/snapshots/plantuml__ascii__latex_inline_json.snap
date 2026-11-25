@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startjson\n{\n  \"area\": \"<latex>\\\\frac{a}{b}</latex>\",\n  \"n\": [\"<latex>x^2</latex>\", \"plain\"]\n}\n@endjson\n"
+---
++----------+
+|       a  |
+| area --- |    +-------+
+|       b  |    | x²    |
+| n        +----+ plain |
++----------+    +-------+

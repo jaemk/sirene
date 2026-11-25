@@ -2,6 +2,7 @@
 
 use super::canvas::{Canvas, DOWN, Glyph, Line, UP, glyph};
 use super::{Options, draw_box, draw_lines, mathtext, width};
+use crate::flowchart::Delim;
 use crate::layout::Rect;
 use crate::sequence::layout::{self, Placed, Sizes, Spacing};
 use crate::sequence::{
@@ -145,6 +146,12 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         Some(delim) => mathtext::text_rows(lines, delim),
         None => lines.to_vec(),
     };
+    // The positions only PlantUML has (a frame's tab, a divider, a separator, a delay, a group's
+    // title, the diagram's title) read its formula tags and no other delimiters.
+    let one = |text: &str| match seq.math {
+        Some(Delim::Latex) => mathtext::text_rows(&[text.to_owned()], Delim::Latex),
+        _ => vec![text.to_owned()],
+    };
     let names: Vec<Vec<String>> = seq.participants.iter().map(|p| rows(&p.label)).collect();
     let headers: Vec<(i32, i32)> = seq
         .participants
@@ -158,13 +165,18 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         .map(|e| match e {
             Event::Message(m) => rows(&label(m)),
             Event::Note(n) => rows(&n.text),
-            Event::Start(kind, l) => vec![tab(*kind, l)],
-            Event::Divider(l) => vec![divider(l)],
+            Event::Start(kind, l) => one(&tab(*kind, l)),
+            Event::Divider(l) => one(&divider(l)),
             Event::Ref { text, .. } => rows(text),
-            Event::Separator(t) if !t.is_empty() => vec![format!(" {t} ")],
-            Event::Delay(Some(t)) if !t.is_empty() => vec![format!(" {t} ")],
+            Event::Separator(t) if !t.is_empty() => one(&format!(" {t} ")),
+            Event::Delay(Some(t)) if !t.is_empty() => one(&format!(" {t} ")),
             _ => Vec::new(),
         })
+        .collect();
+    let titles: Vec<Option<Vec<String>>> = seq
+        .groups
+        .iter()
+        .map(|g| g.title.as_deref().map(|t| one(&format!(" {t} "))))
         .collect();
     let sizes = Sizes {
         headers: headers.iter().map(|&(w, h)| (w as f32, h as f32)).collect(),
@@ -176,12 +188,16 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
                 let (w, h) = match e {
                     Event::Message(_) => (text_w(l), l.len() as i32),
                     Event::Note(_) => (text_w(l) + 4, l.len() as i32 + 2),
-                    Event::Start(..) | Event::Divider(_) => {
-                        (if text_w(l) > 0 { text_w(l) + 4 } else { 0 }, 1)
-                    }
+                    Event::Start(..) | Event::Divider(_) => (
+                        if text_w(l) > 0 { text_w(l) + 4 } else { 0 },
+                        l.len().max(1) as i32,
+                    ),
                     Event::Ref { .. } => ((text_w(l) + 4).max(7), l.len() as i32 + 2),
-                    Event::Separator(_) => (if l.is_empty() { 0 } else { text_w(l) + 4 }, 1),
-                    Event::Delay(_) => (text_w(l), 1),
+                    Event::Separator(_) => (
+                        if l.is_empty() { 0 } else { text_w(l) + 4 },
+                        l.len().max(1) as i32,
+                    ),
+                    Event::Delay(_) => (text_w(l), l.len().max(1) as i32),
                     Event::Space(px) => (0, space_rows(*px)),
                     _ => (0, 0),
                 };
@@ -189,10 +205,15 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
             })
             .collect(),
         title_h: 0.0,
-        groups: seq
-            .groups
+        // A title's first row is on the group's border, the rest below it.
+        group_title_h: titles
             .iter()
-            .map(|g| g.title.as_deref().map_or(0, |t| width(t) + 4) as f32)
+            .flatten()
+            .map(|r| r.len().saturating_sub(1) as f32)
+            .fold(0.0, f32::max),
+        groups: titles
+            .iter()
+            .map(|t| t.as_ref().map_or(0, |r| text_w(r) + 2) as f32)
             .collect(),
     };
     let phase = crate::profile::Phase::start("ascii.sequence.layout");
@@ -307,7 +328,7 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
 
     // Frames, inner ones last so their tabs show.
     for f in l.frames.iter().rev() {
-        let Event::Start(kind, label) = &seq.events[f.event] else {
+        let Event::Start(kind, _) = &seq.events[f.event] else {
             continue;
         };
         let line = if *kind == BlockKind::Rect {
@@ -318,11 +339,15 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         let (x0, x1) = (c(f.x0), c(f.x1));
         let r = Rect::new(x0, c(f.y0), x1 - x0 + 1, c(f.y1) - c(f.y0) + 1);
         draw_box(&mut canvas, r, line);
-        canvas.text(x0 + 2, r.y, &tab(*kind, label));
+        for (i, row) in labels[f.event].iter().enumerate() {
+            canvas.text(x0 + 2, r.y + i as i32, row);
+        }
         for &(k, y) in &f.dividers {
             canvas.hline(x0, x1, c(y), Line::Dotted);
-            if let Event::Divider(label) = &seq.events[k] {
-                canvas.text(x0 + 2, c(y), &divider(label));
+            if let Event::Divider(_) = &seq.events[k] {
+                for (i, row) in labels[k].iter().enumerate() {
+                    canvas.text(x0 + 2, c(y) + i as i32, row);
+                }
             }
         }
     }
@@ -421,9 +446,9 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
 
     // Group titles on their top border.
     for g in &l.groups {
-        if let Some(t) = &seq.groups[g.group].title {
+        if let Some(rows) = &titles[g.group] {
             let r = group_rect(g);
-            draw_lines(&mut canvas, &[format!(" {t} ")], r.x, r.w, r.y);
+            draw_lines(&mut canvas, rows, r.x, r.w, r.y);
         }
     }
 
@@ -438,8 +463,11 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         .filter(|t| !t.is_empty())
     {
         Some(t) => {
-            let pad = (c(l.width) + 1 - width(t)).max(0) / 2;
-            format!("{}{t}\n\n{body}", " ".repeat(pad as usize))
+            let rows = one(t);
+            let tw = text_w(&rows);
+            let pad = " ".repeat(((c(l.width) + 1 - tw).max(0) / 2) as usize);
+            let head: String = rows.iter().map(|r| format!("{pad}{r}\n")).collect();
+            format!("{head}\n{body}")
         }
         None => body,
     }

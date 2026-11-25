@@ -1,0 +1,11 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle <latex>a + \\foo{x}</latex>\nclass A\n@enduml\n"
+---
+2:18: error: Undefined control sequence: \foo
+
+<latex>a + \foo{x}</latex>
+
+┌───┐
+│ A │
+└───┘

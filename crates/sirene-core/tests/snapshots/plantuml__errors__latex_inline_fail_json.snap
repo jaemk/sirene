@@ -1,0 +1,9 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startjson\n{\"a\": \"<latex>{x</latex>\"}\n@endjson\n"
+---
+2:17: error: Expected '}', got 'EOF'
+
+┌─────────────────────┐
+│ a <latex>{x</latex> │
+└─────────────────────┘

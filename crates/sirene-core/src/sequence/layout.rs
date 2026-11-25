@@ -43,6 +43,9 @@ pub(crate) struct Sizes {
     pub events: Vec<(f32, f32)>,
     /// The title's height, or 0.
     pub title_h: f32,
+    /// The height of the row a group's title is on, at least the spacing's when a group has a
+    /// title (a tall formula makes it taller).
+    pub group_title_h: f32,
     /// The narrowest each group can be, to fit its title.
     pub groups: Vec<f32>,
 }
@@ -300,7 +303,13 @@ pub(crate) fn layout(seq: &Sequence, sizes: &Sizes, s: &Spacing) -> Layout {
     let top = if seq.groups.is_empty() {
         groups_top
     } else {
-        groups_top + s.group_pad + if any_title { s.group_title_h } else { 0.0 }
+        groups_top
+            + s.group_pad
+            + if any_title {
+                s.group_title_h.max(sizes.group_title_h)
+            } else {
+                0.0
+            }
     };
     let mut head_y = vec![top; n];
     let mut life_end = vec![0.0; n];
@@ -620,6 +629,7 @@ mod tests {
                 })
                 .collect(),
             title_h: 0.0,
+            group_title_h: 0.0,
             groups: Vec::new(),
         };
         let l = layout(&seq, &sizes, &SPACING);

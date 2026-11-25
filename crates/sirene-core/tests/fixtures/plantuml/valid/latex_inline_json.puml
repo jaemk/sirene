@@ -1,0 +1,6 @@
+@startjson
+{
+  "area": "<latex>\\frac{a}{b}</latex>",
+  "n": ["<latex>x^2</latex>", "plain"]
+}
+@endjson

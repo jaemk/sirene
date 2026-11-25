@@ -1,0 +1,33 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nA -> B : go\nalt <latex>x^2 > 1</latex>\n  B -> A : big\nelse <latex>\\frac{1}{2}</latex> or less\n  B -> A : small\nend\n== part <latex>\\beta</latex> ==\n... after <latex>\\Delta t</latex> ...\nA -> B : again\n@enduml\n"
+---
+
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+  │  go   │
+  ├──────►│
+  │       │
+┌─alt [x² > 1]───┐
+│ │  big  │      │
+│ │◄──────┤      │
+│ │       │      │
+├┄  1          ┄┄┤
+│ [--- or less]  │
+│   2            │
+│ │ small │      │
+│ │◄──────┤      │
+│ │       │      │
+└─┼───────┼──────┘
+══┼══ part β ═════
+  │       │
+  ┆  after Δt
+  │       │
+  │ again │
+  ├──────►│
+  │       │
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘
