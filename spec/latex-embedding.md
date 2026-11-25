@@ -66,7 +66,8 @@ shows. An unclosed tag is plain text.
 
 Status (`<latex>`): read in sequence participant names, messages, notes, and `ref` text and in the
 labels of the graph kinds, including class and state compartment rows and titles, the labels at
-the ends of an edge, and subgraph titles (PCREO-3 lists them and what is not read). The tag is matched in any
+the ends of an edge, subgraph titles, the document title, sequence group and frame text, and JSON
+and YAML values (PCREO-3 lists them and what is not read). The tag is matched in any
 case; several per line; no nesting; the body is verbatim, so a doubled backslash is a TeX line
 break and `\n` inside a closed tag is not a line break. Typeset in text style (inline), not
 Mermaid's display style. `<math>` (AsciiMath) is read in the same places, translated to TeX by
@@ -138,7 +139,9 @@ as the fallback (`flowchart::formula::errors` is shared with the flowchart lower
 - [ ] LEMB-T5 Per diagram kind: where a label is measured and drawn today, and what must change
   to take a formula (a table in this spec). Done for PlantUML's graph kinds: node, edge, end,
   note, subgraph title, and compartment title and row labels are measured and drawn from
-  `Label::runs` and `Formulas` (`scene/paint.rs`) and `Rows` (`ascii/mod.rs`). Left, for
-  PlantUML: the document `title`, headers, footers, legends, sequence group and divider text,
-  and the kinds without label runs (mindmap, JSON, YAML, Gantt, timing, chronology, DOT). Left,
-  for Mermaid (LEMB-1): subgraph titles, end labels, and compartments, which stay text.
+  `Label::runs` and `Formulas` (`scene/paint.rs`) and `Rows` (`ascii/mod.rs`); also the document
+  `title`, sequence group titles, frame tabs and labels, dividers, separators, delays, and JSON
+  and YAML values (`scene/sequence.rs`, `ascii/sequence.rs`, `Flowchart::title_delim`). Left,
+  for PlantUML: headers, footers, captions, and legends (not drawn at all), and the kinds that
+  keep plain strings with their own painters (mindmap, Gantt, timing, chronology, DOT; PCREO-3).
+  Left, for Mermaid (LEMB-1): subgraph titles, end labels, and compartments, which stay text.

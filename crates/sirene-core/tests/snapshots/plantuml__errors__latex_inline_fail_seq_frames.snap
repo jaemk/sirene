@@ -1,0 +1,32 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nA -> B : go\nalt <latex>a + \\foo{x}</latex>\n  B -> A : big\nelse <latex>\\bar{</latex>\n  B -> A : small\nend\n== <latex>\\baz{x}</latex> ==\n... <latex>\\qux</latex> ...\n@enduml\n"
+---
+3:16: error: Undefined control sequence: \foo
+5:18: error: Unexpected end of input in a macro argument, expected '}'
+8:11: error: Undefined control sequence: \baz
+9:12: error: Undefined control sequence: \qux
+
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+  │  go   │
+  ├──────►│
+  │       │
+┌─alt [<latex>a + \foo{x}</latex>]──┐
+│ │  big  │                         │
+│ │◄──────┤                         │
+│ │       │                         │
+├┄[<latex>\bar{</latex>]┄┄┄┄┄┄┄┄┄┄┄┄┤
+│ │ small │                         │
+│ │◄──────┤                         │
+│ │       │                         │
+└─┼───────┼─────────────────────────┘
+══┼═══ <latex>\baz{x}</latex> ═══════
+  │       │
+  ┆      <latex>\qux</latex>
+  │       │
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

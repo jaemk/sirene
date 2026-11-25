@@ -1,0 +1,6 @@
+@startyaml
+area: "<latex>\frac{a}{b}</latex>"
+list:
+  - <latex>x^2</latex>
+  - plain
+@endyaml

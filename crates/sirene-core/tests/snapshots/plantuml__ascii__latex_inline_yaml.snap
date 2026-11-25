@@ -1,0 +1,10 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startyaml\narea: \"<latex>\\frac{a}{b}</latex>\"\nlist:\n  - <latex>x^2</latex>\n  - plain\n@endyaml\n"
+---
++----------+
+|       a  |
+| area --- |    +-------+
+|       b  |    | x²    |
+| list     +----+ plain |
++----------+    +-------+

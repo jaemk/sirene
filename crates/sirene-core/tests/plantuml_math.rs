@@ -957,15 +957,16 @@ mod math {
         }
     }
 
-    /// The document title still reads no tags (a legend is not drawn at all).
+    /// The document title reads the tags (`plantuml_math_titles.rs` has the drawings); a legend
+    /// is not drawn at all.
     #[test]
-    fn the_document_title_stays_text() {
+    fn the_document_title_is_a_formula() {
         let src = "@startuml\ntitle <latex>x</latex>\nclass A\n@enduml\n";
         let lowered = diagram::lower(src);
         assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
         let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
         assert!(
-            texts(&scene).contains(&"<latex>x</latex>"),
+            !texts(&scene).contains(&"<latex>x</latex>"),
             "{:?}",
             texts(&scene)
         );

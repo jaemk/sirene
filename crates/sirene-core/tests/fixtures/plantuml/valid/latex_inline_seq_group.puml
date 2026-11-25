@@ -1,0 +1,7 @@
+@startuml
+box "Group <latex>\alpha_1</latex>" #LightBlue
+participant A
+participant B
+end box
+A -> B : go
+@enduml

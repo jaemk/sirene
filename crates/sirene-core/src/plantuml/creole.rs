@@ -139,6 +139,18 @@ pub(crate) fn mark_labels(chart: &mut Flowchart, root: &SyntaxNode) -> Vec<Diagn
             found.push((label, whole.to_vec()));
         }
     }
+    // The document title has no range of its own either, so it is looked for in the whole source.
+    chart.title_delim = Delim::Latex;
+    if let Some(title) = &chart.title {
+        let label = Label {
+            text: title.clone(),
+            markdown: false,
+            delim: Delim::Latex,
+        };
+        if label.has_formula() {
+            found.push((label, whole.to_vec()));
+        }
+    }
     diagnose(found, root)
 }
 

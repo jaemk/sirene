@@ -271,8 +271,21 @@ fn draw_in(chart: &Flowchart, layout: &layout::Layout, options: &Options, rows: 
         Some(t) if !t.is_empty() => {
             // Centered over the columns kept, so a cut drawing's title stays small.
             let w = layout.size.w.min(canvas.width());
-            let pad = ((w - width(t)).max(0) / 2) as usize;
-            format!("{}{t}\n\n{body}", " ".repeat(pad))
+            // A PlantUML title with a formula is as many rows as the formula has.
+            let label = Label {
+                text: t.to_owned(),
+                markdown: false,
+                delim: chart.title_delim,
+            };
+            let rows = if chart.title_delim == Delim::Latex {
+                lines_in(rows, &label)
+            } else {
+                vec![t.to_owned()]
+            };
+            let tw = rows.iter().map(|r| width(r)).max().unwrap_or(0);
+            let pad = " ".repeat(((w - tw).max(0) / 2) as usize);
+            let head: String = rows.iter().map(|r| format!("{pad}{r}\n")).collect();
+            format!("{head}\n{body}")
         }
         _ => body,
     }

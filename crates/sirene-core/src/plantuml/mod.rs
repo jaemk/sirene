@@ -139,11 +139,11 @@ impl Parse {
             }
             Kind::Json => {
                 let (chart, d) = data::lower_json(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::Yaml => {
                 let (chart, d) = data::lower_yaml(&root);
-                (Diagram::Graph(chart), d)
+                creole_graph(chart, d, &root)
             }
             Kind::Other("dot") => {
                 let (chart, d) = embedded::lower_dot(&root);

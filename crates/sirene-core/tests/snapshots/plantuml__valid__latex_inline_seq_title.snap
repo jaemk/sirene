@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Area <latex>\\int_0^1 x^2\\,dx</latex> of the curve\nparticipant A\nparticipant B\nA -> B : go\n@enduml\n"
+---
+
+Area ∫₀¹ x² dx of the curve
+
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+  │  go   │
+  ├──────►│
+  │       │
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

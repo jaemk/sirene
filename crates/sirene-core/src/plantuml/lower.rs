@@ -42,6 +42,10 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Sequence, Vec<Diagnostic>) {
                     .map(|t| t.text().trim().to_owned())
                     .filter(|t| !t.is_empty())
                     .collect();
+                for t in tokens(&stmt, TEXT) {
+                    let line = [t.text().trim().to_owned()];
+                    l.check_math(Some(&t), &line, stmt.text_range());
+                }
                 l.seq.title = (!lines.is_empty()).then(|| lines.join(" "));
             }
             _ => {}
@@ -266,7 +270,7 @@ impl Lower {
 
     /// Reports each `<latex>` formula in `text` that does not typeset (LEMB-4, LEMB-5). `token`
     /// is the source text it came from, when it has one.
-    fn check_math(&mut self, token: Option<&SyntaxToken>, text: &Text, fallback: TextRange) {
+    fn check_math(&mut self, token: Option<&SyntaxToken>, text: &[String], fallback: TextRange) {
         let found = formula::check_text(token, text, fallback, Delim::Latex);
         self.diagnostics.extend(found);
     }
@@ -644,14 +648,29 @@ impl Lower {
                 return;
             }
             self.stack.push(Open::Block(kind, range));
+            self.check_math(
+                token(stmt, TEXT).as_ref(),
+                std::slice::from_ref(&label),
+                range,
+            );
             self.seq.events.push(Event::Start(kind, label));
             return;
         }
         if kw.starts_with("==") {
+            self.check_math(
+                token(stmt, TEXT).as_ref(),
+                std::slice::from_ref(&label),
+                range,
+            );
             self.seq.events.push(Event::Separator(label));
             return;
         }
         if kw.starts_with("...") {
+            self.check_math(
+                token(stmt, TEXT).as_ref(),
+                std::slice::from_ref(&label),
+                range,
+            );
             let text = (!label.is_empty()).then_some(label);
             self.seq.events.push(Event::Delay(text));
             return;
@@ -735,6 +754,8 @@ impl Lower {
                 };
                 let deactivate = self.deactivate(callee, range);
                 let number = self.number();
+                let text = display(&label);
+                self.check_math(token(stmt, TEXT).as_ref(), &text, range);
                 self.seq.events.push(Event::Message(Message {
                     from: callee,
                     to: caller,
@@ -743,7 +764,7 @@ impl Lower {
                         head: Head::Filled,
                         both: false,
                     },
-                    text: display(&label),
+                    text,
                     activate: false,
                     deactivate,
                     number,
@@ -763,6 +784,9 @@ impl Lower {
                     self.error(range, "a `box` cannot be inside another `box`");
                 }
                 let (g, bad) = group(&label);
+                if let Some(t) = &g.title {
+                    self.check_math(token(stmt, TEXT).as_ref(), std::slice::from_ref(t), range);
+                }
                 if bad {
                     self.warning(range, "unknown `box` color; drawing no background");
                 }
@@ -770,7 +794,14 @@ impl Lower {
                 self.stack.push(Open::Box(range, self.seq.groups.len() - 1));
             }
             "else" => match self.stack.last() {
-                Some(Open::Block(..)) => self.seq.events.push(Event::Divider(label)),
+                Some(Open::Block(..)) => {
+                    self.check_math(
+                        token(stmt, TEXT).as_ref(),
+                        std::slice::from_ref(&label),
+                        range,
+                    );
+                    self.seq.events.push(Event::Divider(label));
+                }
                 _ => self.error(range, "`else` belongs in a frame such as `alt`"),
             },
             "end" if kws.len() > 1 => match self.stack.last() {

@@ -535,16 +535,34 @@ fn draw_with(
         .as_deref()
         .map(|t| crate::flowchart::clean(t).trim().to_owned())
         .filter(|t| !t.is_empty());
-    let title_h = if title.is_some() {
-        theme.line_height + 12.0
-    } else {
-        0.0
+    // A PlantUML title with a formula is a row of runs, set at the title's size.
+    let big = Theme {
+        font_size: theme.font_size * 1.2,
+        line_height: theme.line_height * 1.2,
+        ..*theme
+    };
+    let title_line = title
+        .as_deref()
+        .filter(|_| chart.title_delim == Delim::Latex)
+        .and_then(|t| {
+            let line = crate::flowchart::formula::runs(t, Delim::Latex);
+            line.iter().any(|s| s.math).then_some(line)
+        });
+    let title_size = title_line
+        .as_ref()
+        .map(|l| mathtext::block_size(metrics, &formulas, &big, std::slice::from_ref(l)));
+    let title_h = match (&title, title_size) {
+        (_, Some((_, h))) => h + 12.0,
+        (Some(_), None) => theme.line_height + 12.0,
+        (None, None) => 0.0,
     };
     let content_w = (layout.size.w - 1).max(0) as f32;
     let content_h = (layout.size.h - 1).max(0) as f32;
-    let title_w = title
-        .as_deref()
-        .map_or(0.0, |t| metrics.width(t, theme.font_size * 1.2));
+    let title_w = match (&title, title_size) {
+        (_, Some((w, _))) => w,
+        (Some(t), None) => metrics.width(t, theme.font_size * 1.2),
+        (None, None) => 0.0,
+    };
     let width = content_w.max(title_w) + 2.0 * MARGIN;
     let height = content_h + title_h + 2.0 * MARGIN;
     let off = Pt::new((width - content_w) / 2.0, MARGIN + title_h);
@@ -563,7 +581,20 @@ fn draw_with(
     };
     // The title is the first element, if any.
     let titled = title.is_some();
-    if let Some(t) = title {
+    if let (Some(line), Some((_, h))) = (&title_line, title_size) {
+        let center = Pt::new(width / 2.0, MARGIN + h / 2.0);
+        let out = mathtext::draw_lines(
+            metrics,
+            &p.formulas,
+            &big,
+            std::slice::from_ref(line),
+            center,
+            theme.text,
+        );
+        for primitive in out {
+            p.push(Owner::Diagram, primitive);
+        }
+    } else if let Some(t) = title {
         p.text(
             Owner::Diagram,
             t,
@@ -573,6 +604,7 @@ fn draw_with(
             TextStyle::default(),
         );
     }
+    let title_elements = p.elements.len();
 
     // Outer clusters first, so nested ones paint over them.
     let mut order: Vec<usize> = (0..chart.subgraphs.len()).collect();
@@ -799,10 +831,9 @@ fn draw_with(
     }
     // The title stays centered on the grown scene.
     if titled && left != right {
-        translate(
-            &mut elements[0].primitive,
-            Pt::new((right - left) / 2.0, 0.0),
-        );
+        for e in &mut elements[..title_elements] {
+            translate(&mut e.primitive, Pt::new((right - left) / 2.0, 0.0));
+        }
     }
     let (width, height) = (width + left + right, height + top + bottom);
     let off = Pt::new(off.x + left, off.y + top);

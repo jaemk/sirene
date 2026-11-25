@@ -1,0 +1,11 @@
+@startuml
+A -> B : go
+alt <latex>x^2 > 1</latex>
+  B -> A : big
+else <latex>\frac{1}{2}</latex> or less
+  B -> A : small
+end
+== part <latex>\beta</latex> ==
+... after <latex>\Delta t</latex> ...
+A -> B : again
+@enduml

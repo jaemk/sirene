@@ -1,0 +1,4 @@
+@startuml
+title <latex>a + \foo{x}</latex>
+A -> B : go
+@enduml

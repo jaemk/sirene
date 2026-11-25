@@ -623,10 +623,13 @@ pub struct ClassDef {
 }
 
 /// A lowered flowchart.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq, Default)]
 pub struct Flowchart {
     pub direction: Direction,
     pub title: Option<String>,
+    /// The delimiters that make a formula in `title`: PlantUML's tags only (LEMB-2); Mermaid's
+    /// title stays text.
+    pub title_delim: Delim,
     pub acc_title: Option<String>,
     pub acc_descr: Option<String>,
     /// In first-mention order.
@@ -724,6 +727,35 @@ pub enum RankEnd {
     Max,
     /// In a rank of its own below every other node.
     Sink,
+}
+
+/// Shows `title_delim` only when it is not Mermaid's, so the debug text of Mermaid charts is as
+/// it was.
+impl std::fmt::Debug for Flowchart {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = f.debug_struct("Flowchart");
+        s.field("direction", &self.direction)
+            .field("title", &self.title);
+        if self.title_delim != Delim::Dollar {
+            s.field("title_delim", &self.title_delim);
+        }
+        s.field("acc_title", &self.acc_title)
+            .field("acc_descr", &self.acc_descr)
+            .field("nodes", &self.nodes)
+            .field("edges", &self.edges)
+            .field("subgraphs", &self.subgraphs)
+            .field("classes", &self.classes)
+            .field("notes", &self.notes)
+            .field("default_edge_styles", &self.default_edge_styles)
+            .field("default_curve", &self.default_curve)
+            .field("lanes", &self.lanes)
+            .field("agentflow", &self.agentflow)
+            .field("same_rank", &self.same_rank)
+            .field("end_ranks", &self.end_ranks)
+            .field("ordering", &self.ordering)
+            .field("groups", &self.groups)
+            .finish()
+    }
 }
 
 impl Flowchart {

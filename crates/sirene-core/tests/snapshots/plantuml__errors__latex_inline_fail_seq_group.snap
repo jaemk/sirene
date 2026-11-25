@@ -1,0 +1,21 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\nbox \"Group <latex>a + \\foo{x}</latex>\"\nparticipant A\nend box\nA -> A : go\n@enduml\n"
+---
+2:23: error: Undefined control sequence: \foo
+
+┌ Group <latex>a + \foo{x}</latex> ┐
+┆                                  ┆
+┆ ┌───┐                            ┆
+┆ │ A │                            ┆
+┆ └─┬─┘                            ┆
+┆   │                              ┆
+┆   │ go                           ┆
+┆   ├──┐                           ┆
+┆   ├◄─┘                           ┆
+┆   │                              ┆
+┆ ┌─┴─┐                            ┆
+┆ │ A │                            ┆
+┆ └───┘                            ┆
+┆                                  ┆
+└┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┘
