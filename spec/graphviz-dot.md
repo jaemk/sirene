@@ -104,6 +104,16 @@ overflows the stack. An unclosed block is one error, however many blocks are ope
   too, and its `PORT` is a record port (DOT-2). A `plaintext`, `plain`, `none`, or `underline`
   node with a table is a box. Table, cell, and font attributes other than `PORT` are ignored.
 
+- Formulas (sirene extension, not Graphviz behavior; LEMB-1): `$$...$$` in a node `label` (and
+  a record's fields), an edge's `label`, `headlabel`, and `taillabel`, a cluster's `label`, and
+  the graph's `label` is a formula, in the scene and in text, also in `@startdot`. The formula is
+  read as written: no DOT escape (`\n`, `\l`, `\N`) is read inside it, so `\frac` and `\neq` are
+  TeX, and `\\` is a TeX row break. A record's field splits at `{`, `}`, `|`, and `<` first, so a
+  formula there writes them with a backslash (`\{`). A formula that does not typeset is one
+  error on its body; with the `math` feature off each is one warning. `<latex>` and `<math>`
+  are not read (a DOT label is not Creole, PCREO-3). `xlabel` is not drawn (an attribute
+  warning), so it takes none.
+
 Any other attribute is a warning, once per name and kind per file (LANGS-6); layout attributes
 from other engines (`pos`, `overlap`, `splines`), font attributes, and `width` and `height` are
 among them. So is an unknown shape (drawn as an ellipse), arrow (drawn as `normal`), or style

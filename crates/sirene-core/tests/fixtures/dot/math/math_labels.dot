@@ -1,0 +1,15 @@
+digraph G {
+  label="Graph $$\sum_{i}^{n} i$$"
+  node [shape=box]
+  a [label="Node $$\frac{a}{b}$$"]
+  b [label="$$\pi r^2$$ two"]
+  n [label="$$a \neq b$$"]
+  r [shape=record, label="$$\rho$$ | { $$\sigma$$ | z }"]
+  a -> b [label="Edge $$\alpha+\beta$$", taillabel="$$\tau$$", headlabel="$$\eta$$"]
+  subgraph cluster_0 {
+    label="Cluster $$\gamma$$"
+    c
+  }
+  b -> c
+  n -> r
+}

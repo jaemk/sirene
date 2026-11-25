@@ -3,7 +3,9 @@
 use std::collections::HashMap;
 
 use super::git::ink;
-use super::mathtext::{Formulas, title_elements, title_extent};
+use super::mathtext::{
+    Formulas, block_size, draw_lines, sized, tag_runs, title_elements, title_extent,
+};
 use super::shapes::{self, BoxF};
 use super::style::parse_color;
 use super::{
@@ -30,13 +32,91 @@ struct Painter<'a, M> {
     theme: &'a Theme,
     elements: Vec<Element>,
     right: f32,
+    /// Whether `<latex>` and `<math>` tags in text are formulas (PlantUML).
+    tags: bool,
+    /// The formulas of this render, typeset once each.
+    formulas: Formulas,
 }
 
 impl<M: TextMetrics> Painter<'_, M> {
+    /// The size of the block of `text` at `size` when it holds a formula, else `None` (the text
+    /// is drawn as it always has been).
+    fn block(&self, text: &str, size: f32) -> Option<(f32, f32)> {
+        let runs = tag_runs(text, self.tags)?;
+        Some(block_size(
+            self.metrics,
+            &self.formulas,
+            &sized(self.theme, size),
+            &runs,
+        ))
+    }
+
+    /// The height of the formula in `text` at `size`, with a pixel above and below; `None` for
+    /// plain text.
+    fn math_h(&self, text: &str, size: f32) -> Option<f32> {
+        self.block(text, size).map(|b| b.1 + 2.0)
+    }
+
+    /// The first line's center for text whose first line is centered on `y` when plain: the same
+    /// top, and the formula's block centered in its own height.
+    fn lead(&self, text: &str, y: f32, size: f32) -> f32 {
+        let lh = self.theme.line_height;
+        self.math_h(text, size)
+            .map_or(y, |h| y - lh / 2.0 + h / 2.0)
+    }
+
+    /// As [`Self::lead`] for text whose line sits on a bottom edge: the formula's block rests on
+    /// the same edge.
+    fn trail(&self, text: &str, y: f32, size: f32) -> f32 {
+        let lh = self.theme.line_height;
+        self.math_h(text, size)
+            .map_or(y, |h| y + lh / 2.0 - h / 2.0)
+    }
+
+    /// The tallest formula among `texts` at `size`, and at least `least`.
+    fn tallest<'t>(&self, texts: impl Iterator<Item = &'t str>, size: f32, least: f32) -> f32 {
+        texts
+            .filter_map(|t| self.math_h(t, size))
+            .fold(least, f32::max)
+    }
+
+    /// The room a note takes in its signal's rows: a line each, or its formula's height.
+    fn note_room(&self, text: &str) -> f32 {
+        let size = self.theme.font_size * 0.85;
+        self.math_h(text, size)
+            .unwrap_or_else(|| text.lines().count() as f32 * self.theme.line_height)
+    }
+
+    /// The height of a note's box.
+    fn note_h(&self, text: &str) -> f32 {
+        let size = self.theme.font_size * 0.85;
+        self.math_h(text, size)
+            .unwrap_or_else(|| text.lines().count().max(1) as f32 * self.theme.line_height)
+    }
+
     fn width(&self, text: &str, size: f32) -> f32 {
+        if let Some(b) = self.block(text, size) {
+            return b.0;
+        }
         text.lines()
             .map(|l| self.metrics.width(l, size))
             .fold(0.0, f32::max)
+    }
+
+    /// The formula block of `text` centered on `center`, in the painter's owner; `false` for
+    /// plain text, which the caller draws.
+    fn math(&mut self, text: &str, center: Pt, size: f32, color: Color) -> bool {
+        let Some(runs) = tag_runs(text, self.tags) else {
+            return false;
+        };
+        let theme = sized(self.theme, size);
+        let drawn = draw_lines(self.metrics, &self.formulas, &theme, &runs, center, color);
+        self.elements
+            .extend(drawn.into_iter().map(|primitive| Element {
+                owner: Owner::Diagram,
+                primitive,
+            }));
+        true
     }
 
     fn path(&mut self, segments: Vec<Seg>, fill: Option<Color>, stroke: Option<Stroke>) {
@@ -59,6 +139,9 @@ impl<M: TextMetrics> Painter<'_, M> {
     fn text_c(&mut self, text: &str, x: f32, y: f32, size: f32, color: Color) {
         let w = self.width(text, size);
         self.right = self.right.max(x + w / 2.0);
+        if self.math(text, Pt::new(x, y), size, color) {
+            return;
+        }
         self.elements.push(Element {
             owner: Owner::Diagram,
             primitive: Primitive::Text {
@@ -71,8 +154,12 @@ impl<M: TextMetrics> Painter<'_, M> {
         });
     }
 
-    /// Text starting at `x`, its first line centered on `y`.
+    /// Text starting at `x`, its first line centered on `y`; a formula's block is centered on `y`.
     fn text_at(&mut self, text: &str, x: f32, y: f32, size: f32, color: Color) {
+        if self.block(text, size).is_some() {
+            let w = self.width(text, size);
+            return self.text_c(text, x + w / 2.0, y, size, color);
+        }
         for (i, l) in text.lines().enumerate() {
             let w = self.width(l, size);
             self.text_c(
@@ -103,6 +190,8 @@ struct Row {
     y: f32,
     h: f32,
     constraint_y: Option<f32>,
+    /// What the signal's constraint line is given above it: a line, or its tallest formula.
+    c_h: f32,
 }
 
 /// Draws `timing` (TIMING-4).
@@ -112,6 +201,8 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         theme,
         elements: Vec::new(),
         right: 0.0,
+        tags: timing.tags,
+        formulas: Formulas::default(),
     };
     let fs = theme.font_size;
     let small = fs * 0.85;
@@ -121,13 +212,12 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty());
-    let formulas = Formulas::default();
     let title_h = title.map_or(0.0, |t| {
-        let h = title_extent(metrics, &formulas, theme, t, timing.tags).map_or(lh, |e| e.1);
+        let h = title_extent(metrics, &p.formulas, theme, t, timing.tags).map_or(lh, |e| e.1);
         h + 16.0
     });
     let Some(range) = timing.range() else {
-        return finish(p, title, MARGIN * 2.0 + title_h, (&formulas, timing.tags));
+        return finish(p, title, MARGIN * 2.0 + title_h);
     };
     let (t0, t1) = range;
     // A column of signal names, then one of robust state labels.
@@ -162,48 +252,119 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
 
     // Rows.
     let mut y = MARGIN + title_h;
+    // The lane of highlight captions is as tall as the tallest formula in one.
+    let lane_h = timing
+        .highlights
+        .iter()
+        .filter_map(|h| p.math_h(&h.label, small))
+        .fold(LABEL_H, f32::max);
     let highlight_lane = timing.highlights.iter().any(|h| !h.label.is_empty());
     let highlight_y = y;
     if highlight_lane {
-        y += LABEL_H;
+        y += lane_h;
     }
     let rows_top = y;
-    let mut rows = Vec::new();
-    for (s, lv) in timing.signals.iter().zip(&levels) {
-        let top = y;
-        for n in s.notes.iter().filter(|n| n.above) {
-            y += n.text.lines().count() as f32 * lh + PAD;
+    // What each signal's formulas ask of its rows: a formula taller than the text grows the
+    // level, the band, the name's room, the change-note line, or the constraint line it is in.
+    let heights: Vec<(f32, f32, f32, f32)> = timing
+        .signals
+        .iter()
+        .zip(&levels)
+        .map(|(s, lv)| {
+            let labels = || lv.names.iter().map(|l| lv.label(l));
+            let level = if s.kind == SignalKind::Robust {
+                p.tallest(labels(), small, LEVEL)
+            } else {
+                LEVEL
+            };
+            let band = if matches!(s.kind, SignalKind::Concise | SignalKind::Rectangle) {
+                p.tallest(labels(), small, BAND - 2.0) + 2.0
+            } else {
+                BAND
+            };
+            let notes = s.changes.iter().filter_map(|c| c.note.as_deref());
+            let change_notes = p.tallest(notes, small, lh);
+            let name = p.math_h(&s.label, fs).unwrap_or(0.0);
+            (level, band, change_notes, name)
+        })
+        .collect();
+    let constraint_h: Vec<f32> = timing
+        .signals
+        .iter()
+        .map(|s| {
+            let labels = constraints
+                .get(s.id.as_str())
+                .into_iter()
+                .flatten()
+                .map(|c| c.label.as_str());
+            p.tallest(labels, small, lh)
+        })
+        .collect();
+    let layout = |extra: &[f32]| -> (Vec<Row>, f32) {
+        let mut y = rows_top;
+        let mut rows = Vec::new();
+        for (i, (s, lv)) in timing.signals.iter().zip(&levels).enumerate() {
+            let (level, band, change_notes, name) = heights[i];
+            let top = y;
+            for n in s.notes.iter().filter(|n| n.above) {
+                y += p.note_room(&n.text) + PAD;
+            }
+            y += PAD;
+            let h = match s.kind {
+                SignalKind::Robust => lv.len().max(2) as f32 * level,
+                SignalKind::Binary | SignalKind::Clock => 2.0 * LEVEL,
+                SignalKind::Concise | SignalKind::Rectangle => band,
+                SignalKind::Analog => ANALOG_H,
+            }
+            .max(name);
+            // Change notes sit above the band.
+            if s.changes.iter().any(|c| c.note.is_some()) {
+                y += change_notes;
+            }
+            let band_y = y;
+            y += h + PAD;
+            let c_h = constraint_h[i];
+            let constraint_y = constraints.contains_key(s.id.as_str()).then(|| {
+                let cy = y + c_h;
+                y += c_h + PAD;
+                cy
+            });
+            for n in s.notes.iter().filter(|n| !n.above) {
+                y += p.note_room(&n.text) + PAD;
+            }
+            y += extra[i];
+            rows.push(Row {
+                top,
+                y: band_y,
+                h,
+                constraint_y,
+                c_h,
+            });
         }
-        y += PAD;
-        let h = match s.kind {
-            SignalKind::Robust => lv.len().max(2) as f32 * LEVEL,
-            SignalKind::Binary | SignalKind::Clock => 2.0 * LEVEL,
-            SignalKind::Concise | SignalKind::Rectangle => BAND,
-            SignalKind::Analog => ANALOG_H,
-        };
-        // Change notes sit above the band.
-        let change_notes = s.changes.iter().any(|c| c.note.is_some());
-        if change_notes {
-            y += lh;
+        (rows, y)
+    };
+    let mut gaps = vec![0.0; timing.signals.len()];
+    let (mut rows, mut rows_bottom) = layout(&gaps);
+    // A message's label sits in the gap between its two signals, so a formula taller than the
+    // gap grows the gap below the upper signal.
+    let label_h = |m: &crate::timing::Message| p.math_h(&m.label, small);
+    let ends = |m: &crate::timing::Message| -> Option<(usize, usize)> {
+        let (&a, &b) = (index.get(m.from.as_str())?, index.get(m.to.as_str())?);
+        (a != b).then_some((a.min(b), a.max(b)))
+    };
+    let mut grown = false;
+    for m in &timing.messages {
+        if let (Some(h), Some((a, b))) = (label_h(m), ends(m)) {
+            let room = rows[b].y - (rows[a].y + rows[a].h);
+            if room < h {
+                gaps[a] = gaps[a].max(h - room);
+                grown = true;
+            }
         }
-        let band_y = y;
-        y += h + PAD;
-        let constraint_y = constraints.contains_key(s.id.as_str()).then(|| {
-            let cy = y + lh;
-            y += lh + PAD;
-            cy
-        });
-        for n in s.notes.iter().filter(|n| !n.above) {
-            y += n.text.lines().count() as f32 * lh + PAD;
-        }
-        rows.push(Row {
-            top,
-            y: band_y,
-            h,
-            constraint_y,
-        });
     }
-    let rows_bottom = y;
+    if grown {
+        (rows, rows_bottom) = layout(&gaps);
+    }
     let axis_y = rows_bottom + PAD;
     let mut height = axis_y;
     if !timing.hide_axis {
@@ -214,9 +375,20 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         .iter()
         .filter(|c| c.signal.is_none())
         .collect();
-    let free_y = height + lh;
+    // Each free constraint's line sits under its label, which is a line tall or as tall as
+    // its formula.
+    let free_h: Vec<f32> = free_constraints
+        .iter()
+        .map(|c| p.math_h(&c.label, small).unwrap_or(lh).max(lh))
+        .collect();
+    let mut free_ys = Vec::new();
+    let mut free_at = height;
+    for h in &free_h {
+        free_ys.push(free_at + h);
+        free_at += h + PAD;
+    }
     if !free_constraints.is_empty() {
-        height += free_constraints.len() as f32 * (lh + PAD) + PAD;
+        height = free_at + PAD;
     }
     height += MARGIN;
 
@@ -240,7 +412,7 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
             p.text_c(
                 &h.label,
                 (a + b) / 2.0,
-                highlight_y + LABEL_H / 2.0,
+                highlight_y + lane_h / 2.0,
                 small,
                 theme.text,
             );
@@ -269,14 +441,15 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
 
     for ((s, row), lv) in timing.signals.iter().zip(&rows).zip(&levels) {
         // Name, and a rule between signals.
-        p.text_at(&s.label, MARGIN, row.y + small / 2.0, fs, theme.text);
+        let name_y = p.lead(&s.label, row.y + small / 2.0, fs);
+        p.text_at(&s.label, MARGIN, name_y, fs, theme.text);
         if row.top > rows_top {
             p.line(Pt::new(MARGIN, row.top), Pt::new(x1, row.top), rule);
         }
         let mut ny = row.top + PAD + lh / 2.0;
         for n in s.notes.iter().filter(|n| n.above) {
             note(&mut p, &n.text, x0, ny - lh / 2.0);
-            ny += n.text.lines().count() as f32 * lh + PAD;
+            ny += p.note_room(&n.text) + PAD;
         }
         let segs = timing.segments(s, range);
         match s.kind {
@@ -405,7 +578,8 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         // Change notes, above the band at their moment.
         for c in &s.changes {
             if let Some(n) = &c.note {
-                p.text_at(n, x(c.at) + 3.0, row.y - lh / 2.0, small, theme.text);
+                let ny = p.trail(n, row.y - lh / 2.0, small);
+                p.text_at(n, x(c.at) + 3.0, ny, small, theme.text);
             }
         }
         if let Some(cy) = row.constraint_y {
@@ -413,10 +587,10 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
                 constraint(&mut p, x(c.from), x(c.to), cy, &c.label, small);
             }
         }
-        let mut ny = row.y + row.h + PAD + row.constraint_y.map_or(0.0, |_| lh + PAD);
+        let mut ny = row.y + row.h + PAD + row.constraint_y.map_or(0.0, |_| row.c_h + PAD);
         for n in s.notes.iter().filter(|n| !n.above) {
             note(&mut p, &n.text, x0, ny);
-            ny += n.text.lines().count() as f32 * lh + PAD;
+            ny += p.note_room(&n.text) + PAD;
         }
     }
 
@@ -449,7 +623,21 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         if !m.label.is_empty() {
             let mx = (a.x + b.x) / 2.0;
             let my = (a.y + b.y) / 2.0;
-            p.text_at(&m.label, mx + 4.0, my - lh / 2.0, small, theme.text);
+            // A formula is centered in the gap between the two signals, which was grown to
+            // hold it; plain text hangs above the arrow's middle.
+            let in_gap = index
+                .get(m.from.as_str())
+                .zip(index.get(m.to.as_str()))
+                .filter(|(f, t)| f != t)
+                .map(|(&f, &t)| {
+                    let (a, b) = (f.min(t), f.max(t));
+                    (rows[a].y + rows[a].h + rows[b].y) / 2.0
+                });
+            let ly = match in_gap {
+                Some(gap) if p.math_h(&m.label, small).is_some() => gap,
+                _ => p.trail(&m.label, my - lh / 2.0, small),
+            };
+            p.text_at(&m.label, mx + 4.0, ly, small, theme.text);
         }
     }
 
@@ -468,11 +656,10 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
             p.text_c(label, tx, axis_y + 5.0 + LABEL_H / 2.0, small, theme.text);
         }
     }
-    for (i, c) in free_constraints.iter().enumerate() {
-        let cy = free_y + i as f32 * (lh + PAD);
+    for (c, &cy) in free_constraints.iter().zip(&free_ys) {
         constraint(&mut p, x(c.from), x(c.to), cy, &c.label, small);
     }
-    finish(p, title, height, (&formulas, timing.tags))
+    finish(p, title, height)
 }
 
 /// A two-headed span from `a` to `b` at `y`, its label above.
@@ -499,13 +686,8 @@ fn constraint<M: TextMetrics>(
         p.line(Pt::new(a, y), Pt::new(b.max(a + 1.0), y), stroke);
     }
     if !label.is_empty() {
-        p.text_c(
-            label,
-            (a + b) / 2.0,
-            y - p.theme.line_height / 2.0,
-            size,
-            p.theme.text,
-        );
+        let ly = p.trail(label, y - p.theme.line_height / 2.0, size);
+        p.text_c(label, (a + b) / 2.0, ly, size, p.theme.text);
     }
 }
 
@@ -514,7 +696,7 @@ fn note<M: TextMetrics>(p: &mut Painter<'_, M>, text: &str, x: f32, y: f32) {
     let size = p.theme.font_size * 0.85;
     let lh = p.theme.line_height;
     let w = p.width(text, size) + 2.0 * PAD;
-    let h = text.lines().count().max(1) as f32 * lh;
+    let h = p.note_h(text);
     let r = BoxF { x, y, w, h };
     p.path(
         shapes::polygon(&corners(r)),
@@ -525,7 +707,8 @@ fn note<M: TextMetrics>(p: &mut Painter<'_, M>, text: &str, x: f32, y: f32) {
             dash: None,
         }),
     );
-    p.text_at(text, x + PAD, y + lh / 2.0, size, p.theme.text);
+    let ty = p.lead(text, y + lh / 2.0, size);
+    p.text_at(text, x + PAD, ty, size, p.theme.text);
 }
 
 fn corners(b: BoxF) -> [(f32, f32); 4] {
@@ -538,12 +721,8 @@ fn corners(b: BoxF) -> [(f32, f32); 4] {
 }
 
 /// The scene, as wide as what was drawn, with the title centered above.
-fn finish<M: TextMetrics>(
-    p: Painter<'_, M>,
-    title: Option<&str>,
-    height: f32,
-    (formulas, tags): (&Formulas, bool),
-) -> Scene {
+fn finish<M: TextMetrics>(p: Painter<'_, M>, title: Option<&str>, height: f32) -> Scene {
+    let (formulas, tags) = (&p.formulas, p.tags);
     let size = p.theme.font_size * 1.2;
     let title_w = title.map_or(0.0, |t| {
         title_extent(p.metrics, formulas, p.theme, t, tags)

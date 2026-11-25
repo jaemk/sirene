@@ -1,0 +1,11 @@
+digraph G {
+  label="Graph $$\foo$$"
+  node [shape=box]
+  a [label="Node $$\foo$$"]
+  r [shape=record, label="$$\foo$$ | z"]
+  a -> b [label="Edge $$\foo$$", taillabel="$$\foo$$", headlabel="$$\foo$$"]
+  subgraph cluster_0 {
+    label="Cluster $$\foo$$"
+    c
+  }
+}

@@ -688,6 +688,17 @@ mod tests {
                 "@startuml\ntitle <latex>t_1</latex>\nrobust \"B\" as B\n@0\nB is Idle\n@enduml\n",
                 1,
             ),
+            // Every text position of a timing diagram, each formula distinct.
+            (
+                include_str!("../../tests/fixtures/plantuml/valid/latex_inline_timing_all.puml"),
+                13,
+            ),
+            // Every label position of a DOT graph: the graph, nodes, record fields, edge and end
+            // labels, and a cluster.
+            (
+                include_str!("../../tests/fixtures/dot/math/math_labels.dot"),
+                10,
+            ),
         ];
         for (src, formulas) in sources {
             crate::equation::count::reset();

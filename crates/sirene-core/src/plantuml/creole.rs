@@ -87,6 +87,35 @@ pub(crate) fn latex_tags(line: &str) -> Vec<Range<usize>> {
     out
 }
 
+/// The byte offset of the first `pat` in `s` that is not inside a formula, so a `->`, `:`, `#`, or
+/// `,` written in a formula is not a statement's.
+pub(crate) fn find_outside(s: &str, pat: &str) -> Option<usize> {
+    let tags = latex_tags(s);
+    let mut from = 0;
+    while let Some(i) = s[from..].find(pat) {
+        let at = from + i;
+        match tags.iter().find(|r| r.contains(&at)) {
+            Some(r) => from = r.end,
+            None => return Some(at),
+        }
+    }
+    None
+}
+
+/// `s` split at each `sep` outside a formula.
+pub(crate) fn split_outside(s: &str, sep: char) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut rest = s;
+    let mut buf = [0; 4];
+    let sep = sep.encode_utf8(&mut buf);
+    while let Some(i) = find_outside(rest, sep) {
+        out.push(&rest[..i]);
+        rest = &rest[i + sep.len()..];
+    }
+    out.push(rest);
+    out
+}
+
 /// `line` as a row of text runs and formula runs. Without the `math` feature, or without a
 /// formula, one plain run.
 #[allow(dead_code)]
@@ -371,6 +400,28 @@ mod tests {
         assert!(r[1].is_asciimath());
         assert!(!r[3].is_asciimath());
         assert!(r[1].typeset().unwrap().is_ok());
+    }
+
+    #[test]
+    fn statement_punctuation_in_a_formula_is_not_the_statements() {
+        assert_eq!(find_outside("a -> b", "->"), Some(2));
+        assert_eq!(find_outside("<math>a->b</math> -> c", "->"), Some(18));
+        assert_eq!(find_outside("<math>a->b</math>", "->"), None);
+        // An unclosed tag is text.
+        assert_eq!(find_outside("<math>a->b", "->"), Some(7));
+        assert_eq!(
+            split_outside("a, <math>f(x,y)</math>, b", ','),
+            ["a", " <math>f(x,y)</math>", " b"]
+        );
+        assert_eq!(split_outside("", ','), [""]);
+        // A caption's `:` is outside the formula.
+        let (head, caption) = super::super::lines::caption("x : <latex>a: b</latex>");
+        assert_eq!(
+            (head, caption.as_deref()),
+            ("x", Some("<latex>a: b</latex>"))
+        );
+        let (head, caption) = super::super::lines::caption("<latex>a: b</latex>");
+        assert_eq!((head, caption.as_deref()), ("<latex>a: b</latex>", None));
     }
 
     #[test]

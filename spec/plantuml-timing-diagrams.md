@@ -37,6 +37,10 @@ number.
 - `note top of ID : text` and `note bottom of ID` ... `end note`.
 - `hide time-axis` hides the axis.
 
+A `<latex>` or `<math>` tag is read as a formula in the title, signal names (quoted), state
+labels, change notes, notes, message, constraint, and highlight labels (PCREO-3). Each row grows
+to its formula, in the scene and in text; a failing formula is one error on its body.
+
 ## PTIM-5 Diagnostics
 
 A redeclared signal, a clock with no period, a bad `between`, an unknown word in a

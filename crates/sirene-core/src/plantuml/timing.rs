@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 use rowan::TextRange;
 
+use super::creole::{find_outside, split_outside};
 use super::lines::{self, Common, Cursor, Line};
 use crate::diagnostic::Diagnostic;
 use crate::syntax::SyntaxNode;
@@ -92,9 +93,18 @@ struct Lower {
     focus: Option<String>,
     /// Each signal's `has` states, by name, as indexes into its `states`.
     states: HashMap<usize, HashMap<String, usize>>,
+    /// Every drawn text, with the ranges it may be written in, for the formulas in it (PCREO-3).
+    texts: Vec<(String, Vec<TextRange>)>,
 }
 
 impl Lower {
+    /// Records `text`, written within `at`, to be checked for formulas.
+    fn text(&mut self, text: &str, at: TextRange) {
+        if text.contains('<') {
+            self.texts.push((text.to_owned(), vec![at]));
+        }
+    }
+
     /// A moment: `100`, `+50`, `-5`, `:name`, `:name+5`, `clk*2`, `2019/07/02`, or `1:15:00`.
     /// Relative moments count from `base`.
     fn moment(&mut self, s: &str, base: f64, range: TextRange) -> Option<f64> {
@@ -268,6 +278,7 @@ impl Lower {
             self.clocks.push((i, line.range));
         }
         self.ids.insert(s.id.clone(), i);
+        self.text(&s.label, line.range);
         self.t.signals.push(s);
     }
 
@@ -287,7 +298,7 @@ impl Lower {
     /// `ID is VALUE [#color] [: note]` at `at`.
     fn change(&mut self, id: &str, value: &str, at: f64, range: TextRange) {
         let (value, note) = lines::caption(value);
-        let (value, color) = match value.find('#') {
+        let (value, color) = match find_outside(value, "#") {
             Some(i) => (value[..i].trim(), lines::color(value[i..].trim())),
             None => (value, None),
         };
@@ -322,19 +333,39 @@ impl Lower {
                 format!("an analog signal's value is a number within +-1e15, not `{s}`"),
             ));
         }
+        // A state's name is drawn as the label of a state that has none of its own, on the kinds
+        // that draw state labels.
+        let shown = match &v {
+            Value::State(s)
+                if matches!(
+                    sig.kind,
+                    SignalKind::Robust | SignalKind::Concise | SignalKind::Rectangle
+                ) =>
+            {
+                Some(s.clone())
+            }
+            _ => None,
+        };
         sig.changes.push(Change {
             at,
             value: v,
             color,
-            note,
+            note: note.clone(),
         });
+        if let Some(s) = shown {
+            self.text(&s, range);
+        }
+        if let Some(n) = note {
+            self.text(&n, range);
+        }
     }
 
     /// `A -> B : text`, `A@100 -> B@+50 : text`.
     fn message(&mut self, t: &str, range: TextRange) -> bool {
-        let Some((left, right)) = t.split_once("->") else {
+        let Some(arrow) = find_outside(t, "->") else {
             return false;
         };
+        let (left, right) = (&t[..arrow], &t[arrow + 2..]);
         if left.ends_with('<') {
             return false;
         }
@@ -369,6 +400,7 @@ impl Lower {
                 return true;
             }
         }
+        self.text(&label, range);
         self.t.messages.push(Message {
             from,
             from_at,
@@ -381,9 +413,10 @@ impl Lower {
 
     /// `A@0 <-> @50 : {50 ms}`, `@200 <-> @+150 : {150 ms}`.
     fn constraint(&mut self, t: &str, range: TextRange) -> bool {
-        let Some((left, right)) = t.split_once("<->") else {
+        let Some(arrow) = find_outside(t, "<->") else {
             return false;
         };
+        let (left, right) = (&t[..arrow], &t[arrow + 3..]);
         let (right, label) = lines::caption(right);
         let label = label.unwrap_or_default();
         let label = label
@@ -419,6 +452,7 @@ impl Lower {
             ));
             return true;
         };
+        self.text(&label, range);
         self.t.constraints.push(Constraint {
             signal,
             from,
@@ -440,7 +474,7 @@ impl Lower {
         };
         let from = &rest[..to_at];
         let after = rest[to_at + 4..].trim();
-        let (to, color) = match after.find('#') {
+        let (to, color) = match find_outside(after, "#") {
             Some(i) => (
                 &after[..i],
                 lines::color(after[i..].split(';').next().unwrap_or("")),
@@ -454,6 +488,7 @@ impl Lower {
         let Some(to) = self.moment(to, from, range) else {
             return;
         };
+        self.text(&label, range);
         self.t.highlights.push(Highlight {
             from,
             to,
@@ -472,7 +507,11 @@ impl Lower {
         let sig = &mut self.t.signals[si];
         let at = self.states.entry(si).or_default();
         let mut states = Vec::new();
-        for part in rest.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+        for part in split_outside(rest, ',')
+            .into_iter()
+            .map(str::trim)
+            .filter(|p| !p.is_empty())
+        {
             let (label, name) = match lines::keyword_split(part, "as") {
                 Some((l, n)) => (lines::unquote(l.trim()).to_owned(), n.trim().to_owned()),
                 None => (
@@ -482,6 +521,7 @@ impl Lower {
             };
             states.push((name, label));
         }
+        let labels: Vec<String> = states.iter().map(|(_, l)| l.clone()).collect();
         for (name, label) in states {
             match at.get(&name) {
                 Some(&i) => sig.states[i].1 = label,
@@ -490,6 +530,9 @@ impl Lower {
                     sig.states.push((name, label));
                 }
             }
+        }
+        for label in labels {
+            self.text(&label, range);
         }
     }
 
@@ -506,6 +549,7 @@ impl Lower {
                 "expected `note top of X` or `note bottom of X`",
             ));
         };
+        let mut at = vec![line.range];
         let (id, text) = match after.split_once(':') {
             Some((id, text)) => (id.trim(), lines::text(text.trim())),
             None => {
@@ -517,12 +561,18 @@ impl Lower {
                     ));
                 }
                 let text: Vec<&str> = body.iter().map(|l| l.text.as_str()).collect();
+                at = body.iter().map(|l| l.range).collect();
                 (after.trim(), text.join("\n"))
             }
         };
         let id = lines::id_of(id);
-        if let Some(sig) = self.signal_mut(&id, line.range) {
-            sig.notes.push(Note { above, text });
+        if self.signal_mut(&id, line.range).is_some() {
+            if text.contains('<') {
+                self.texts.push((text.clone(), at));
+            }
+            if let Some(sig) = self.signal_mut(&id, line.range) {
+                sig.notes.push(Note { above, text });
+            }
         }
     }
 
@@ -552,7 +602,7 @@ impl Lower {
             }
             _ => {}
         }
-        if t.contains("<->") {
+        if find_outside(t, "<->").is_some() {
             self.constraint(t, line.range);
             return;
         }
@@ -626,10 +676,10 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
         clocks: Vec::new(),
         focus: None,
         states: HashMap::new(),
+        texts: Vec::new(),
     };
     l.t.tags = true;
-    // The title has no range of its own, so its formulas are looked for in the whole source.
-    let mut texts: Vec<(String, Vec<TextRange>)> = Vec::new();
+    let mut title = None;
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
         if !matches!(
@@ -639,7 +689,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
             match lines::common(&line, &mut cursor, &mut l.d) {
                 Common::No => {}
                 Common::Title(t) => {
-                    texts.push((t.clone(), vec![root.text_range()]));
+                    title = Some(t.clone());
                     l.t.title = Some(t);
                     continue;
                 }
@@ -665,6 +715,10 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
             }
         }
     }
+    // The title has no range of its own, so its formulas are looked for in the whole source,
+    // after the texts that have one have taken the places they are written in.
+    let mut texts = std::mem::take(&mut l.texts);
+    texts.extend(title.map(|t| (t, vec![root.text_range()])));
     l.d.extend(super::creole::check_texts(root, texts));
     (l.t, l.d)
 }

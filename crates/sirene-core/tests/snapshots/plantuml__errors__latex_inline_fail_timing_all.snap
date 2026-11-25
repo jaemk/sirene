@@ -1,0 +1,32 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Timing <latex>\\plugh</latex>\nrobust \"<latex>\\foo</latex> in\" as A\nconcise \"Out <latex>\\bark</latex>\" as B\nA has \"<latex>\\baz</latex>\" as hi, \"Lo\" as lo\n\n@0\nA is hi\nB is \"<latex>\\qux</latex>\"\nA is lo : <latex>\\quux</latex> start\n\n@50\nA is hi\nB is Idle\nA@50 -> B@+10 : <latex>\\corge</latex> sent\nA@0 <-> @50 : {<latex>\\grault</latex>}\n@0 <-> @50 : {<latex>\\garply</latex>}\nhighlight 0 to 50 #Gold : <latex>\\waldo</latex> span\nnote top of A : above <latex>\\fred</latex>\n@enduml\n"
+---
+2:21: error: Undefined control sequence: \plugh
+3:16: error: Undefined control sequence: \foo
+4:21: error: Undefined control sequence: \bark
+5:15: error: Undefined control sequence: \baz
+9:14: error: Undefined control sequence: \qux
+10:18: error: Undefined control sequence: \quux
+15:24: error: Undefined control sequence: \corge
+16:23: error: Undefined control sequence: \grault
+17:22: error: Undefined control sequence: \garply
+18:34: error: Undefined control sequence: \waldo
+19:30: error: Undefined control sequence: \fred
+
+                                                  Timing <latex>\plugh</latex>
+
+                                              ═════════<latex>\waldo</latex> span═══════════
+                                              above <latex>\fred</latex>
+                                              <latex>\quux</latex> start
+<latex>\foo</latex> in   <latex>\baz</latex>                                               ┌───────────────
+                                          Lo  ─────────────────────────────────────────────┘
+                                              ◄────────── <latex>\grault</latex> ──────────►         ┆ <latex>\corge</latex> sent
+                                                                                                     ▼
+Out <latex>\bark</latex>                      ┌────────────────────────────────────────────┬──────────────┐
+                                              │            <latex>\qux</latex>             │     Idle     │
+                                              └────────────────────────────────────────────┴──────────────┘
+
+                                              ┬────────┬────────┬────────┬────────┬────────┬─────────┬─────
+                                              0       10       20       30       40       50        60
+                                              ◄────────── <latex>\garply</latex> ──────────►

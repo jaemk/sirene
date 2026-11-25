@@ -642,6 +642,9 @@ pub struct Flowchart {
     /// The delimiters that make a formula in `title`: PlantUML's tags only (LEMB-2); Mermaid's
     /// title stays text.
     pub title_delim: Delim,
+    /// Whether a `$$...$$` formula in `title` is typeset: a DOT graph's `label` (a sirene
+    /// extension, LEMB-1). Mermaid's title stays text.
+    pub title_math: bool,
     pub acc_title: Option<String>,
     pub acc_descr: Option<String>,
     /// In first-mention order.
@@ -751,6 +754,9 @@ impl std::fmt::Debug for Flowchart {
         if self.title_delim != Delim::Dollar {
             s.field("title_delim", &self.title_delim);
         }
+        if self.title_math {
+            s.field("title_math", &self.title_math);
+        }
         s.field("acc_title", &self.acc_title)
             .field("acc_descr", &self.acc_descr)
             .field("nodes", &self.nodes)
@@ -771,6 +777,15 @@ impl std::fmt::Debug for Flowchart {
 }
 
 impl Flowchart {
+    /// The delimiters that make a formula in the title, if it reads any.
+    pub(crate) fn title_formulas(&self) -> Option<Delim> {
+        match self.title_delim {
+            Delim::Latex => Some(Delim::Latex),
+            d if self.title_math => Some(d),
+            _ => None,
+        }
+    }
+
     pub fn node(&self, id: &str) -> Option<&Node> {
         self.nodes.iter().find(|n| n.id == id)
     }

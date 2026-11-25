@@ -1,0 +1,24 @@
+@startuml
+title Timing <latex>t_1</latex>
+robust "<latex>x_1</latex> in" as A
+concise "Out <math>y^2</math>" as B
+robust "Data" as C
+A has "<latex>\frac{a}{b}</latex>" as hi, "Lo" as lo
+C has Idle, Busy
+
+@0
+A is hi
+B is "<latex>s_0</latex>"
+C is Idle : <latex>n_0</latex> start
+
+@50
+A is lo
+B is "<math>s^2</math>"
+C is Busy
+A@50 -> B@+10 : <latex>m_1</latex> sent
+A@0 <-> @50 : {<latex>\Delta t_1</latex>}
+@0 <-> @50 : {<math>t_2</math>}
+highlight 0 to 50 #Gold : <latex>\alpha</latex> span
+note top of A : above <latex>e^x</latex>
+note bottom of B : below <math>a_1</math>
+@enduml

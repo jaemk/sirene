@@ -61,7 +61,7 @@ pub use xychart::render as xychart;
 use unicode_width::UnicodeWidthChar;
 
 use crate::flowchart::{
-    Arrow, Delim, Edge, Flowchart, Label, Measure, Node, Row, Shape, Stroke, Subgraph, clean,
+    Arrow, Edge, Flowchart, Label, Measure, Node, Row, Shape, Stroke, Subgraph, clean,
 };
 use crate::layout::{self, Config, Point, Rect, Size, Spacing};
 use canvas::{Canvas, DOWN, Glyph, LEFT, Line, RIGHT, UP, glyph};
@@ -282,7 +282,7 @@ fn draw_in(chart: &Flowchart, layout: &layout::Layout, options: &Options, rows: 
                 markdown: false,
                 delim: chart.title_delim,
             };
-            let rows = if chart.title_delim == Delim::Latex {
+            let rows = if chart.title_formulas().is_some() {
                 lines_in(rows, &label)
             } else {
                 vec![t.to_owned()]

@@ -1,0 +1,28 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Timing <latex>t_1</latex>\nrobust \"<latex>x_1</latex> in\" as A\nconcise \"Out <math>y^2</math>\" as B\nrobust \"Data\" as C\nA has \"<latex>\\frac{a}{b}</latex>\" as hi, \"Lo\" as lo\nC has Idle, Busy\n\n@0\nA is hi\nB is \"<latex>s_0</latex>\"\nC is Idle : <latex>n_0</latex> start\n\n@50\nA is lo\nB is \"<math>s^2</math>\"\nC is Busy\nA@50 -> B@+10 : <latex>m_1</latex> sent\nA@0 <-> @50 : {<latex>\\Delta t_1</latex>}\n@0 <-> @50 : {<math>t_2</math>}\nhighlight 0 to 50 #Gold : <latex>\\alpha</latex> span\nnote top of A : above <latex>e^x</latex>\nnote bottom of B : below <math>a_1</math>\n@enduml\n"
+---
+                                  Timing t_1
+
+              =================alpha span===================
+              above e^x
+x_1 in    a
+         ---  ---------------------------------------------+
+          b                                                |
+                                                           |
+          Lo                                               +---------------
+
+              <---------------- Delta t_1 ----------------->         : m_1 sent
+                                                                     v
+Out y^2       +--------------------------------------------+--------------+
+              |                    s_0                     |     s^2      |
+              +--------------------------------------------+--------------+
+              below a_1
+
+              n_0 start
+Data    Idle  ---------------------------------------------+
+        Busy                                               +---------------
+
+              +--------+--------+--------+--------+--------+---------+-----
+              0       10       20       30       40       50        60
+              <------------------- t_2 -------------------->

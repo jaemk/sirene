@@ -228,7 +228,8 @@ pub struct Timing {
     pub hide_axis: bool,
     /// Axis labels for moments written as dates or times; numbered ticks when empty.
     pub marks: Vec<(f64, String)>,
-    /// Whether `<latex>` and `<math>` tags in the title are a formula (LEMB-2).
+    /// Whether `<latex>` and `<math>` tags in the drawn texts (the title, names, state labels,
+    /// notes, constraint, highlight, and message labels) are formulas (LEMB-2).
     pub tags: bool,
 }
 
