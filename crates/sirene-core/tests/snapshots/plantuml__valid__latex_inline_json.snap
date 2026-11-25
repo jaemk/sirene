@@ -6,6 +6,6 @@ expression: "@startjson\n{\n  \"area\": \"<latex>\\\\frac{a}{b}</latex>\",\n  \"
 ┌──────────┐
 │       a  │
 │ area --- │    ┌───────┐
-│       b  │    │ x²    │
+│       b  │    │ x^2   │
 │ n        ├────┤ plain │
 └──────────┘    └───────┘
