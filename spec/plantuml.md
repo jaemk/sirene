@@ -68,6 +68,41 @@ directive (`` `!define` is not supported; ignoring the line ``) and are skipped.
 warning, except `actorStyle` in use case diagrams, and `!theme` is a warning. Tests:
 `common_preprocessor_lines` in `crates/sirene-core/src/plantuml/lines.rs`.
 
+## PCOM-1 Header, footer, caption, legend
+
+Status: done. The statements are read where a kind reads its shared statements
+(`plantuml/lines.rs` `common`, and the sequence parser) by `plantuml/decor.rs`; the lowered
+diagram of any kind is then wrapped as `Diagram::Decorated` (`decor::Decorated`, holding
+`decor::Decorations`), and drawn by `scene/decor.rs` and `ascii/decor.rs` around the diagram's
+own drawing. A diagram with none is not wrapped. Of each kind the last statement is kept.
+
+- `header text`, `header: text`, `left|right|center header text`, and the block `header` (or
+  `header left|right|center`, or `left|right|center header`) up to `end header` or `endheader`;
+  the same for `footer`. Default position: header right, footer center.
+- `caption text` (or `caption: text`): centered under the diagram, above the footer.
+- `legend [top|bottom] [left|right|center]` and the lines up to `end legend` or `endlegend`: a
+  bordered box at that edge or corner of the diagram, default bottom center. The text in the box
+  is left aligned. A `legend` with text on its own line is not read: a warning.
+- `\n` in a line breaks it, except inside a `<latex>` or `<math>` tag. Text is Creole as far as
+  `decor::lines` reads it: `**bold**`, `//italic//`, `<b>`, `<i>`, `<color:...>`, `== heading`
+  (bold), bullet (`*`, `**`) and numbered (`#`, `##`) lists, and formulas (LEMB-2). Underline,
+  strikethrough, monospace, `<size>`, `<back>`, tables, rules, and images are text.
+- From the top: header, a top legend, the diagram, a bottom legend, caption, footer; each is
+  set apart by 8 px (a blank row in text). In text, bold, italic, and color are not drawn, a
+  bullet is `*` in the ASCII set and a bullet character otherwise, and a legend is boxed with
+  the set's line characters.
+- A formula that does not typeset has one error on its body in the source; without the `math`
+  feature each formula has one warning. A replaced statement is not checked.
+
+Drawn for every kind that reads the shared statements: sequence, activity, class, state,
+description (use case, component, deployment), mindmap, WBS, Gantt, timing, Chen, nwdiag, files,
+and chronology. Not drawn: JSON and YAML, DOT, EBNF, and regex (their lines are read by another
+reader, so `header` and the others are its text or an error as before), `@startlatex` and
+`@startmath`, and `hide`, `scale`, `skinparam`, `mainframe`, `newpage` (warnings). Tests:
+`crates/sirene-core/tests/plantuml_decor.rs` (parser, scene, text, and formula tests),
+`decor_*` and `latex_inline_decor_*` fixtures and snapshots, the unit tests in `decor.rs`,
+`plantuml/decor.rs`, and `scene/decor.rs` (typeset once).
+
 ## PUML-5 Open questions
 
 - Resolved: the reference is the current language reference guide and plantuml.com, and the

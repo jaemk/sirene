@@ -8,6 +8,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- PlantUML `header`, `footer`, `caption`, and `legend` are drawn around the diagram of every kind
+  that reads them, with `left|right|center` and `legend top|bottom left|right|center`, Creole
+  bold, italic, `<color>`, and lists, and `<latex>` and `<math>` formulas; `Diagram::Decorated`
+  and `sirene_core::decor`.
 - `--charset unicode-math` and `Charset::UnicodeMath`: formulas in the text renderer with the
   full math glyph set (radical, overline, minus, script forms, sum, integral, bracket pieces).
 - `.tex` and `.latex` files, and `--lang latex` (also `tex`), read one formula: bare, wrapped in

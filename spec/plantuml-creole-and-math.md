@@ -115,14 +115,19 @@ its formulas in the text renderer, the first on the border.
   label's point and can overlap a band, as plain text does. Axis tick labels are moments or
   dates, not authored text, and are not read.
 
-Not drawn: headers, footers, captions, and legends (the parser skips them, a legend is not
-drawn at all, so there is nothing to set a formula in, and none is added), participant names
-only given as ids (an id has no tags), and the kinds that keep their text as plain strings with
-their own painters, in the positions not listed above: mindmap (its painter is not read yet),
-the timing diagram's axis ticks, the chronology's date labels (dates), and DOT (`@startdot` is
+- the lines of a `header`, `footer`, `caption`, and `legend` (PCOM-1): each line is one row of
+  runs set as the title's are, a line as tall as its tallest formula, in the scene and in text,
+  of a diagram of any kind that reads them. The lines are found in the source on their own line,
+  so a failing formula has one error on its body, and an equal one in a label does not take it.
+  A replaced statement is not checked.
+
+Not drawn: participant names only given as ids (an id has no tags), and the kinds that keep
+their text as plain strings with their own painters, in the positions not listed above: the
+timing diagram's axis ticks, the chronology's date labels (dates), and DOT (`@startdot` is
 Graphviz's language, which has no tags, so its labels are Graphviz's, not Creole). Tags there
 are text with no diagnostic; a DOT label reads `$$` instead, as a sirene extension (DOT-3,
-LEMB-1). In the text renderer an end label is placed beside the line's
+LEMB-1), and their `header`, `footer`, `caption`, and `legend` do take formulas. In the text
+renderer an end label is placed beside the line's
 first or last cell and is not reserved room by the layout, so a wide one is clipped at the
 drawing's edge, as a text one is.
 Tests: `latex_inline_*` and `math_inline_*` fixtures,
@@ -138,7 +143,6 @@ typeset-once count.
 - Creole beyond the inline `<latex>` and `<math>` tags (PCREO-1) is not read. The scene and
   the ASCII renderer carry formula runs (`flowchart::Span`) but not other rich text spans, so
   the rest starts with a text-run model in the display list (DISPLA).
-- Formula tags in headers, footers, captions, and legends (none is drawn) and in mindmap text
-  are left (PCREO-3 says why): each needs its position drawn from `Span` runs, one painter at a
-  time. Title formulas are set at one size (1.2 times the text), not mixed with bold text. DOT
-  labels read `$$`, not tags (DOT-3).
+- Title formulas are set at one size (1.2 times the text), not mixed with bold text. DOT labels
+  read `$$`, not tags (DOT-3). The Creole of a header, footer, caption, or legend is read by
+  `decor::lines` (bold, italic, `<color>`, lists; PCOM-1), not yet elsewhere.
