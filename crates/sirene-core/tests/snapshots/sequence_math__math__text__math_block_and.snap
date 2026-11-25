@@ -1,0 +1,22 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    par first\n        A->>B: one\n    and $$\\frac{1}{2}$$\n        B->>A: two\n    end\n"
+---
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+┌─par [first]──┐
+│ │  one  │    │
+│ ├──────►│    │
+│ │       │    │
+├┄  1  ┄┄┄┼┄┄┄┄┤
+│ [---]   │    │
+│   2     │    │
+│ │  two  │    │
+│ │◄──────┤    │
+│ │       │    │
+└─┼───────┼────┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

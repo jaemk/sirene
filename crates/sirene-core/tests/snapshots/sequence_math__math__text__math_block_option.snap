@@ -1,0 +1,20 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    critical lock\n        A->>B: lock\n    option $$\\pi r^2$$\n        B->>A: busy\n    end\n"
+---
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+┌─critical [lock]──┐
+│ │ lock  │        │
+│ ├──────►│        │
+│ │       │        │
+├┄[πr^2]┄┄┼┄┄┄┄┄┄┄┄┤
+│ │ busy  │        │
+│ │◄──────┤        │
+│ │       │        │
+└─┼───────┼────────┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘

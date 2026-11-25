@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    loop Sum $$\\sum_{i} x_i$$ times\n        A->>B: ping\n    end\n"
+---
+266.0 x 216.6
+formula paths: 5
+texts: ["loop", "[Sum", "times]", "ping", "A", "A", "B", "B"]

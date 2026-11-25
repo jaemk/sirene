@@ -1,0 +1,7 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    critical lock\n        A->>B: lock\n    option $$\\pi r^2$$\n        B->>A: busy\n    end\n"
+---
+252.0 x 270.0
+formula paths: 5
+texts: ["critical", "[lock]", "[", "]", "lock", "busy", "A", "A", "B", "B"]

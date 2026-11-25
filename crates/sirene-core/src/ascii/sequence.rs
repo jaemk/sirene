@@ -146,8 +146,8 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         Some(delim) => mathtext::text_rows(lines, delim, options.charset),
         None => lines.to_vec(),
     };
-    // The positions only PlantUML has (a frame's tab, a divider, a separator, a delay, a group's
-    // title, the diagram's title) read its formula tags and no other delimiters.
+    // A block's tab and a divider read the diagram's delimiters. The positions only PlantUML has
+    // (a separator, a delay, a group's title) read its formula tags and no other delimiters.
     let one = |text: &str| match seq.math {
         Some(Delim::Latex) => {
             mathtext::text_rows(&[text.to_owned()], Delim::Latex, options.charset)
@@ -167,8 +167,8 @@ pub fn render(seq: &Sequence, options: &Options) -> String {
         .map(|e| match e {
             Event::Message(m) => rows(&label(m)),
             Event::Note(n) => rows(&n.text),
-            Event::Start(kind, l) => one(&tab(*kind, l)),
-            Event::Divider(l) => one(&divider(l)),
+            Event::Start(kind, l) => rows(&[tab(*kind, l)]),
+            Event::Divider(l) => rows(&[divider(l)]),
             Event::Ref { text, .. } => rows(text),
             Event::Separator(t) if !t.is_empty() => one(&format!(" {t} ")),
             Event::Delay(Some(t)) if !t.is_empty() => one(&format!(" {t} ")),

@@ -166,12 +166,12 @@ mod math {
     #[test]
     fn the_model_keeps_the_source_text() {
         let (seq, _) = lower(&fixture("math_participant"));
-        assert_eq!(seq.math, Some(Delim::Dollar));
+        assert_eq!(seq.math, Some(Delim::DollarRaw));
         assert_eq!(seq.participants[0].label, [r"$$\alpha$$"]);
         let (seq, _) = lower(&fixture("math_mixed"));
         let m = seq.messages().next().unwrap();
         assert_eq!(m.text, [r"Area $$\pi r^2$$ and $$\frac{a}{b}$$ done"]);
-        let runs = formula::runs(&m.text[0], Delim::Dollar);
+        let runs = formula::runs(&m.text[0], Delim::DollarRaw);
         let shape: Vec<(&str, bool)> = runs.iter().map(|s| (s.text.as_str(), s.math)).collect();
         assert_eq!(
             shape,
@@ -342,14 +342,200 @@ mod math {
         );
     }
 
+    /// Mermaid reads `\\` as `\` in the unified renderer only; sequence text reaches KaTeX as
+    /// written, so `\\` is a TeX row break.
     #[test]
-    fn a_double_backslash_is_read_as_one() {
+    fn a_double_backslash_is_kept_in_a_sequence() {
         let src =
             "sequenceDiagram\n    participant 1\n    participant 2\n    1->>2: $$\\\\alpha$$\n";
         let (seq, diagnostics) = lower(src);
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
-        let runs = formula::runs(&seq.messages().next().unwrap().text[0], Delim::Dollar);
-        assert_eq!(runs[0].formula().as_deref(), Some(r"\alpha"));
+        let runs = formula::runs(&seq.messages().next().unwrap().text[0], Delim::DollarRaw);
+        assert_eq!(runs[0].formula().as_deref(), Some(r"\\alpha"));
+        // A flowchart label still collapses it.
+        let label = sirene_core::flowchart::Label::plain(r"$$\\alpha$$");
+        assert_eq!(label.runs()[0][0].formula().as_deref(), Some(r"\alpha"));
+    }
+
+    #[test]
+    fn a_cases_environment_in_a_message_draws_two_rows() {
+        let (seq, diagnostics) = lower(&fixture("math_cases"));
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let rows = ascii(&seq);
+        let row_of = |c: char| rows.lines().position(|l| l.contains(c));
+        let (one, zero) = (row_of('1'), row_of('0'));
+        assert!(one.is_some() && zero.is_some(), "{rows}");
+        assert!(one < zero, "1 is above 0:\n{rows}");
+        // One row in the scene would be as tall as the same formula without its break.
+        let height = |f: &str| {
+            let src = format!(
+                "sequenceDiagram\n    participant A\n    participant B\n    A->>B: $$\\begin{{cases}} {f} \\end{{cases}}$$\n"
+            );
+            draw(&lower(&src).0).height
+        };
+        assert!(height(r"1 \\ 0") > height("1"), "two rows are taller");
+    }
+
+    #[test]
+    fn a_flowchart_label_still_collapses_the_double_backslash() {
+        let lowered = diagram::lower("flowchart TD\n  A[\"$$a \\\\ b$$\"] --> B\n");
+        let Diagram::Graph(chart) = lowered.diagram else {
+            panic!("not a flowchart");
+        };
+        let label = &chart.nodes[0].label;
+        assert_eq!(label.runs()[0][0].formula().as_deref(), Some(r"a \ b"));
+    }
+
+    fn formula_paths(scene: &Scene) -> usize {
+        scene
+            .elements
+            .iter()
+            .filter(|e| {
+                matches!(
+                    &e.primitive,
+                    Primitive::Path { fill: Some(f), stroke: None, .. } if *f == Theme::LIGHT.text
+                )
+            })
+            .count()
+    }
+
+    /// Fixture, the keyword its tab shows, and the formula's position.
+    const POSITIONS: [(&str, &str); 9] = [
+        ("math_block_loop", "loop"),
+        ("math_block_alt", "alt"),
+        ("math_block_else", "alt"),
+        ("math_block_opt", "opt"),
+        ("math_block_par", "par"),
+        ("math_block_and", "par"),
+        ("math_block_critical", "critical"),
+        ("math_block_option", "critical"),
+        ("math_block_break", "break"),
+    ];
+
+    /// A scene as text: its size, its formula paths, and its text items.
+    fn summary(scene: &Scene) -> String {
+        format!(
+            "{:.1} x {:.1}\nformula paths: {}\ntexts: {:?}\n",
+            scene.width,
+            scene.height,
+            formula_paths(scene),
+            texts(scene)
+        )
+    }
+
+    #[test]
+    fn block_labels_and_section_titles_are_formulas_in_the_scene_and_in_text() {
+        for (name, keyword) in POSITIONS {
+            let src = fixture(name);
+            let (mut seq, diagnostics) = lower(&src);
+            assert!(diagnostics.is_empty(), "{name}: {diagnostics:?}");
+            let scene = draw(&seq);
+            let t = texts(&scene);
+            assert!(t.contains(&keyword), "{name}: {t:?}");
+            assert!(t.iter().all(|t| !t.contains('$')), "{name}: {t:?}");
+            let out = ascii(&seq);
+            assert!(!out.contains('$'), "{name}:\n{out}");
+            insta::assert_snapshot!(format!("scene__{name}"), summary(&scene), &src);
+            insta::assert_snapshot!(format!("text__{name}"), out, &src);
+            // Read as text, the same diagram draws fewer formula paths.
+            seq.math = None;
+            let plain = draw(&seq);
+            assert!(formula_paths(&scene) > formula_paths(&plain), "{name}");
+            assert!(texts(&plain).iter().any(|t| t.contains('$')), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_block_formula_is_set_on_its_tab_and_grows_the_diagram() {
+        let height = |label: &str| {
+            let src = format!(
+                "sequenceDiagram\n    participant A\n    participant B\n    alt {label}\n        A->>B: go\n    else {label}\n        B->>A: back\n    end\n"
+            );
+            draw(&lower(&src).0).height
+        };
+        assert!(height(r"$$\frac{a}{b}$$") > height("x"));
+    }
+
+    #[test]
+    fn box_and_diagram_titles_stay_text() {
+        let (seq, diagnostics) = lower(&fixture("math_text_only"));
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let scene = draw(&seq);
+        // Read as text, the diagram draws the same.
+        let mut as_text = seq.clone();
+        as_text.math = None;
+        assert_eq!(scene, draw(&as_text));
+        let t = texts(&scene);
+        assert!(t.contains(&"Plot $$x^2$$"), "{t:?}");
+        assert!(t.contains(&"$$y^2$$ team"), "{t:?}");
+        assert!(ascii(&seq).contains("$$y^2$$ team"));
+    }
+
+    /// One error per failing formula, on the formula's failing span, whichever position it is in.
+    #[test]
+    fn each_failing_block_position_is_diagnosed_on_its_span() {
+        let src = fixture("math_fail_blocks");
+        let (seq, diagnostics) = lower(&src);
+        assert_eq!(diagnostics.len(), 9, "{diagnostics:?}");
+        for (i, d) in diagnostics.iter().enumerate() {
+            assert_eq!(d.severity, Severity::Error);
+            let range = usize::from(d.range.start())..usize::from(d.range.end());
+            assert_eq!(&src[range.clone()], r"\foo", "{d:?}");
+            // The error is on the one failing formula, not on its neighbors: `\fooN` is the
+            // command, and N the position's number.
+            assert!(src[range.end..].starts_with(&(i + 1).to_string()), "{d:?}");
+        }
+        // The failing formula draws as its source.
+        let t = texts(&draw(&seq)).join("|");
+        for i in 1..=9 {
+            assert!(t.contains(&format!(r"$$\foo{i}$$")), "{i}: {t}");
+        }
+        assert!(ascii(&seq).contains(r"$$\foo9$$"));
+    }
+
+    #[test]
+    fn a_failing_position_has_one_error_and_a_good_neighbor_none() {
+        for (keyword, label) in [
+            ("loop", "loop"),
+            ("alt", "alt"),
+            ("opt", "opt"),
+            ("par", "par"),
+            ("critical", "critical"),
+            ("break", "break"),
+        ] {
+            let src = format!(
+                "sequenceDiagram\n    participant A\n    {label} $$x$$ and $$\\bad$$\n        A->>A: go\n    end\n"
+            );
+            let (_, diagnostics) = lower(&src);
+            let [d] = diagnostics.as_slice() else {
+                panic!("{keyword}: one diagnostic, got {diagnostics:?}");
+            };
+            let range = usize::from(d.range.start())..usize::from(d.range.end());
+            assert_eq!(&src[range], r"\bad", "{keyword}");
+        }
+        for (keyword, divider) in [("alt", "else"), ("par", "and"), ("critical", "option")] {
+            let src = format!(
+                "sequenceDiagram\n    participant A\n    {keyword} ok\n        A->>A: go\n    {divider} $$x$$ and $$\\bad$$\n        A->>A: back\n    end\n"
+            );
+            let (_, diagnostics) = lower(&src);
+            let [d] = diagnostics.as_slice() else {
+                panic!("{divider}: one diagnostic, got {diagnostics:?}");
+            };
+            let range = usize::from(d.range.start())..usize::from(d.range.end());
+            assert_eq!(&src[range], r"\bad", "{divider}");
+        }
+    }
+
+    /// A `rect` label is a color and a `box` holds a title: neither is read for formulas.
+    #[test]
+    fn rect_and_box_labels_are_not_checked() {
+        let src = "sequenceDiagram\n    rect $$\\foo$$\n        participant A\n        A->>A: go\n    end\n";
+        let (_, diagnostics) = lower(src);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let src =
+            "sequenceDiagram\n    box $$\\foo$$\n        participant A\n    end\n    A->>A: go\n";
+        let (_, diagnostics) = lower(src);
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
     }
 
     #[test]
@@ -452,5 +638,37 @@ mod no_math {
         assert!(texts(&draw(&seq)).contains(&"bad $$\\foo$$"));
         let (seq, _) = lower(&fixture("math_participant"));
         assert!(texts(&draw(&seq)).contains(&r"$$\alpha$$"));
+    }
+
+    /// Each position's formula is one warning on its body and stays text.
+    #[test]
+    fn block_formulas_stay_text_with_one_warning_each() {
+        for name in [
+            "math_block_loop",
+            "math_block_alt",
+            "math_block_else",
+            "math_block_opt",
+            "math_block_par",
+            "math_block_and",
+            "math_block_critical",
+            "math_block_option",
+            "math_block_break",
+        ] {
+            let src = fixture(name);
+            let (seq, diagnostics) = lower(&src);
+            let [d] = diagnostics.as_slice() else {
+                panic!("{name}: one warning, got {diagnostics:?}");
+            };
+            assert_eq!(d.severity, sirene_core::Severity::Warning, "{name}");
+            let range = usize::from(d.range.start())..usize::from(d.range.end());
+            let body = &src[range];
+            assert!(!body.contains('$') && !body.is_empty(), "{name}: {body:?}");
+            assert!(
+                texts(&draw(&seq)).iter().any(|t| t.contains("$$")),
+                "{name}"
+            );
+        }
+        let (_, diagnostics) = lower(&fixture("math_fail_blocks"));
+        assert_eq!(diagnostics.len(), 9, "{diagnostics:?}");
     }
 }

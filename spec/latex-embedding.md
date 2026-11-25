@@ -35,10 +35,14 @@ Status: flowchart node and edge labels are done (`Label::runs`, `scene/mathtext.
 flowchart model share the label type but are not wired for `$$`: subgraph titles, end labels,
 and compartment titles and rows draw the formula as text (PlantUML's tags are read there, see
 LEMB-2). Sequence participant names and aliases, message
-text, and notes are done (`tests/sequence_math.rs`); block, divider, group, and title text and
-the PlantUML-only separators, delays, and `ref` text draw the formula as text. The sequence
-model keeps `Text = Vec<String>` with the source, and `Sequence::math` (set by the Mermaid
-lowering) says `$$` is a formula; `flowchart::formula::runs` gives a line's runs.
+text, notes, and the labels of `loop`, `alt`, `opt`, `par`, `critical`, and `break` blocks and
+of their `else`, `and`, and `option` sections are done (`tests/sequence_math.rs`); `box` and
+diagram titles draw the formula as text, as Mermaid does, and a `rect` label is a color. The
+sequence model keeps `Text = Vec<String>` (and block labels as `String`) with the source, and
+`Sequence::math` (set by the Mermaid lowering to `Delim::DollarRaw`) says `$$` is a formula;
+`flowchart::formula::runs` gives a line's runs. `Delim::DollarRaw` keeps `\\` as written: a
+sequence diagram does not collapse it (a TeX row break in `cases`), while flowchart labels
+(`Delim::Dollar`) do.
 
 To verify in Mermaid's source (LEMB-T7): the delimiter regular expression, multiple formulas per
 label, `$$` inside quoted and Markdown strings, and whether display or inline style is used.
@@ -143,8 +147,9 @@ formula, once per edge for an `&` product. Without the `math` feature each formu
 warning on its body and is drawn as its source.
 
 Status (sequence): the lowering reports each failing formula of a participant alias (`as` text
-or a metadata `alias`), message, or note on the offending command, with the statement's range
-as the fallback (`flowchart::formula::errors` is shared with the flowchart lowering).
+or a metadata `alias`), message, note, block label, or section title on the offending command,
+with the statement's range as the fallback (`flowchart::formula::errors` is shared with the
+flowchart lowering). Without the `math` feature each formula gets one warning on its body.
 
 ## LEMB-T Tasks
 
@@ -163,7 +168,9 @@ as the fallback (`flowchart::formula::errors` is shared with the flowchart lower
   note, subgraph title, and compartment title and row labels are measured and drawn from
   `Label::runs` and `Formulas` (`scene/paint.rs`) and `Rows` (`ascii/mod.rs`); also the document
   `title`, sequence group titles, frame tabs and labels, dividers, separators, delays, and JSON
-  and YAML values (`scene/sequence.rs`, `ascii/sequence.rs`, `Flowchart::title_delim`). Left,
+  and YAML values (`scene/sequence.rs`, `ascii/sequence.rs`, `Flowchart::title_delim`); and, for
+  Mermaid sequence diagrams, block labels and section titles (the same code). Left,
   for PlantUML: headers, footers, captions, and legends (not drawn at all), and the kinds that
   keep plain strings with their own painters (mindmap, Gantt, timing, chronology, DOT; PCREO-3).
   Left, for Mermaid (LEMB-1): subgraph titles, end labels, and compartments, which stay text.
+  Mermaid sequence `box` and diagram titles stay text by design (Mermaid does not typeset them).

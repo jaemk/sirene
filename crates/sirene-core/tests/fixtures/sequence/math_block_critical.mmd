@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant A
+    participant B
+    critical $$\int_0^1 f$$
+        A->>B: lock
+    option fails
+        B->>A: busy
+    end

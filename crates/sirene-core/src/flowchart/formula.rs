@@ -64,7 +64,7 @@ pub(crate) fn source_range(delim: Delim, body: &str, p: usize, span: Range<usize
             let from = uncollapsed(body, span.start);
             (from, uncollapsed(body, span.end).max(from))
         }
-        Delim::Latex => (span.start, span.end),
+        Delim::DollarRaw | Delim::Latex => (span.start, span.end),
     };
     let s = from.min(body.len());
     let t = to.clamp(s, body.len());

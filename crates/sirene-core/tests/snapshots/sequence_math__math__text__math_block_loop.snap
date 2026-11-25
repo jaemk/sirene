@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/sequence_math.rs
+expression: "sequenceDiagram\n    participant A\n    participant B\n    loop Sum $$\\sum_{i} x_i$$ times\n        A->>B: ping\n    end\n"
+---
+┌───┐   ┌───┐
+│ A │   │ B │
+└─┬─┘   └─┬─┘
+  │       │
+┌─loop [Sum sum x_i times]──┐
+│            i              │
+│ │ ping  │                 │
+│ ├──────►│                 │
+│ │       │                 │
+└─┼───────┼─────────────────┘
+┌─┴─┐   ┌─┴─┐
+│ A │   │ B │
+└───┘   └───┘
