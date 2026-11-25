@@ -61,6 +61,7 @@ pub mod treemap;
 pub mod treeview;
 pub mod usecase;
 pub mod venn;
+pub mod visio;
 pub mod wardley;
 pub mod xychart;
 pub mod zenuml;
