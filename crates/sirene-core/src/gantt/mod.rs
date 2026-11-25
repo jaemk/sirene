@@ -93,6 +93,9 @@ pub struct Gantt {
     /// The time the chart was read, for the today marker.
     pub now: Time,
     pub sections: Vec<Section>,
+    /// Whether `<latex>` and `<math>` tags in the title, section names, and task names are
+    /// formulas (PlantUML, LEMB-2); Mermaid draws them as text.
+    pub tags: bool,
 }
 
 impl Default for Gantt {
@@ -116,6 +119,7 @@ impl Default for Gantt {
             today_marker: TodayMarker::Default,
             now: 0,
             sections: Vec::new(),
+            tags: false,
         }
     }
 }

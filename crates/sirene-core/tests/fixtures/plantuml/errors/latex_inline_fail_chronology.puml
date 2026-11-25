@@ -1,0 +1,5 @@
+@startchronology
+title Release <latex>\foo</latex>
+[Freeze <latex>a + \qux{x}</latex>] happens on 2024-01-15
+[Ship <latex>x^2</latex>] happens on 2024-02-01
+@endchronology

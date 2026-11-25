@@ -49,7 +49,13 @@ fn moment(s: &str) -> Option<[u32; 6]> {
 
 pub(crate) fn lower(root: &SyntaxNode) -> (Timeline, Vec<Diagnostic>) {
     let mut d = Vec::new();
-    let mut timeline = Timeline::default();
+    let mut timeline = Timeline {
+        tags: true,
+        ..Timeline::default()
+    };
+    // The title and each event's name, with the ranges they may be written in (PCREO-3). A
+    // title has no range of its own, so it is looked for in the whole source.
+    let mut texts: Vec<(String, Vec<rowan::TextRange>)> = Vec::new();
     // moment -> (the date as first written, event names), in date order
     let mut moments: BTreeMap<[u32; 6], (String, Vec<String>)> = BTreeMap::new();
     let mut cursor = Cursor::new(lines::read(root));
@@ -57,6 +63,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timeline, Vec<Diagnostic>) {
         match lines::common(&line, &mut cursor, &mut d) {
             Common::No => {}
             Common::Title(t) => {
+                texts.push((t.clone(), vec![root.text_range()]));
                 timeline.title = Some(t);
                 continue;
             }
@@ -88,6 +95,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timeline, Vec<Diagnostic>) {
             ));
             continue;
         };
+        texts.push((name.clone(), vec![line.range]));
         moments
             .entry(at)
             .or_insert_with(|| (date.to_owned(), Vec::new()))
@@ -107,6 +115,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timeline, Vec<Diagnostic>) {
             })
             .collect(),
     });
+    d.extend(super::creole::check_texts(root, texts));
     (timeline, d)
 }
 

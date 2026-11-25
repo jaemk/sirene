@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startchronology\ntitle Release <latex>\\alpha_1</latex>\n[Freeze <latex>\\frac{a}{b}</latex> done] happens on 2024-01-15 13:08:12\n[Ship <math>x^2</math>] happens on 2024-02-01\n[Announce] happens on 2024-02-01\n@endchronology\n"
+---
+
+              Release α_1
+
+┌─────────────────────┐ ┌────────────┐
+│ 2024-01-15 13:08:12 │ │ 2024-02-01 │
+└──────────┬──────────┘ └──────┬─────┘
+───────────┼───────────────────┼───────►
+┌──────────┴──────────┐ ┌──────┴─────┐
+│           a         │ │  Ship x^2  │
+│   Freeze --- done   │ └──────┬─────┘
+│           b         │ ┌──────┴─────┐
+└─────────────────────┘ │  Announce  │
+                        └────────────┘

@@ -1,0 +1,7 @@
+@startgantt
+title Plan <latex>\foo</latex>
+Project starts 2026-01-05
+-- Phase <latex>\qux{x}</latex> --
+[Solve <latex>a + \baz</latex>] lasts 3 days
+[Fine <latex>x^2</latex>] lasts 2 days
+@endgantt

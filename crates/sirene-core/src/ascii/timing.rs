@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use super::canvas::{Canvas, Line, glyph};
+use super::mathtext::{Rows, tag_rows};
 use super::{Options, width};
 use crate::timing::{Constraint, Levels, SignalKind, Timing, Value};
 
@@ -25,8 +26,13 @@ pub fn render(timing: &Timing, options: &Options) -> String {
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty());
+    let formulas = Rows::new(options.charset);
+    let title_rows = title
+        .map(|t| tag_rows(&formulas, t, timing.tags).map_or_else(|| vec![t.to_owned()], |r| r.0));
     let Some(range) = timing.range() else {
-        return title.map_or_else(String::new, |t| format!("{t}\n"));
+        return title_rows.map_or_else(String::new, |r| {
+            r.iter().map(|l| format!("{l}\n")).collect::<String>()
+        });
     };
     let (t0, t1) = range;
     let span = (t1 - t0).max(1e-9);
@@ -293,12 +299,15 @@ pub fn render(timing: &Timing, options: &Options) -> String {
     let body = c.render(options.charset);
     let body = body.trim_end_matches('\n');
     let mut out = String::new();
-    if let Some(t) = title {
+    if let Some(rows) = title_rows {
         let total = body.lines().map(width).max().unwrap_or(0);
-        let pad = ((total - width(t)) / 2).max(0);
-        out.push_str(&" ".repeat(pad as usize));
-        out.push_str(t);
-        out.push_str("\n\n");
+        for t in rows {
+            let pad = ((total - width(&t)) / 2).max(0);
+            out.push_str(&" ".repeat(pad as usize));
+            out.push_str(t.trim_end());
+            out.push('\n');
+        }
+        out.push('\n');
     }
     out.push_str(body);
     out.push('\n');

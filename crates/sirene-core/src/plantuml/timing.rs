@@ -627,6 +627,9 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
         focus: None,
         states: HashMap::new(),
     };
+    l.t.tags = true;
+    // The title has no range of its own, so its formulas are looked for in the whole source.
+    let mut texts: Vec<(String, Vec<TextRange>)> = Vec::new();
     let mut cursor = Cursor::new(lines::read(root));
     while let Some(line) = cursor.next() {
         if !matches!(
@@ -636,6 +639,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
             match lines::common(&line, &mut cursor, &mut l.d) {
                 Common::No => {}
                 Common::Title(t) => {
+                    texts.push((t.clone(), vec![root.text_range()]));
                     l.t.title = Some(t);
                     continue;
                 }
@@ -661,6 +665,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Timing, Vec<Diagnostic>) {
             }
         }
     }
+    l.d.extend(super::creole::check_texts(root, texts));
     (l.t, l.d)
 }
 

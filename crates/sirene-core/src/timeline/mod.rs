@@ -43,6 +43,9 @@ pub struct Timeline {
     pub acc_descr: Option<String>,
     pub direction: Direction,
     pub sections: Vec<Section>,
+    /// Whether `<latex>` and `<math>` tags in the title and the text of periods and events are
+    /// formulas (PlantUML chronology, LEMB-2); Mermaid draws them as text.
+    pub tags: bool,
 }
 
 impl Timeline {

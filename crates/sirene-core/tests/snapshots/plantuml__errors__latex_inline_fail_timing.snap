@@ -1,0 +1,13 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Request <latex>\\foo</latex> handling\nrobust \"Web Browser\" as WB\n@0\nWB is Idle\n@100\nWB is Busy\n@enduml\n"
+---
+2:22: error: Undefined control sequence: \foo
+
+                     Request <latex>\foo</latex> handling
+
+Web Browser Idle  ───────────────────────────────────────────────────────┐
+            Busy                                                         └─────
+
+                  ┬──────────┬──────────┬──────────┬──────────┬──────────┬─────
+                  0         20         40         60         80         100

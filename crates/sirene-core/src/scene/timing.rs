@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 
 use super::git::ink;
+use super::mathtext::{Formulas, title_elements, title_extent};
 use super::shapes::{self, BoxF};
 use super::style::parse_color;
 use super::{
@@ -120,9 +121,13 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty());
-    let title_h = if title.is_some() { lh + 16.0 } else { 0.0 };
+    let formulas = Formulas::default();
+    let title_h = title.map_or(0.0, |t| {
+        let h = title_extent(metrics, &formulas, theme, t, timing.tags).map_or(lh, |e| e.1);
+        h + 16.0
+    });
     let Some(range) = timing.range() else {
-        return finish(p, title, MARGIN * 2.0 + title_h);
+        return finish(p, title, MARGIN * 2.0 + title_h, (&formulas, timing.tags));
     };
     let (t0, t1) = range;
     // A column of signal names, then one of robust state labels.
@@ -467,7 +472,7 @@ pub fn timing(timing: &Timing, metrics: &impl TextMetrics, theme: &Theme) -> Sce
         let cy = free_y + i as f32 * (lh + PAD);
         constraint(&mut p, x(c.from), x(c.to), cy, &c.label, small);
     }
-    finish(p, title, height)
+    finish(p, title, height, (&formulas, timing.tags))
 }
 
 /// A two-headed span from `a` to `b` at `y`, its label above.
@@ -533,11 +538,24 @@ fn corners(b: BoxF) -> [(f32, f32); 4] {
 }
 
 /// The scene, as wide as what was drawn, with the title centered above.
-fn finish<M: TextMetrics>(p: Painter<'_, M>, title: Option<&str>, height: f32) -> Scene {
+fn finish<M: TextMetrics>(
+    p: Painter<'_, M>,
+    title: Option<&str>,
+    height: f32,
+    (formulas, tags): (&Formulas, bool),
+) -> Scene {
     let size = p.theme.font_size * 1.2;
-    let width = (p.right + MARGIN).max(title.map_or(0.0, |t| p.width(t, size)) + 2.0 * MARGIN);
+    let title_w = title.map_or(0.0, |t| {
+        title_extent(p.metrics, formulas, p.theme, t, tags)
+            .map_or_else(|| p.width(t, size), |e| e.0)
+    });
+    let width = (p.right + MARGIN).max(title_w + 2.0 * MARGIN);
+    let formula_title = title
+        .and_then(|t| title_elements(p.metrics, formulas, p.theme, t, tags, (width / 2.0, MARGIN)));
     let mut elements = p.elements;
-    if let Some(t) = title {
+    if let Some(drawn) = formula_title {
+        elements.splice(0..0, drawn);
+    } else if let Some(t) = title {
         elements.insert(
             0,
             Element {

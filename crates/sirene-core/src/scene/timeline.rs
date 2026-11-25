@@ -1,10 +1,14 @@
 //! Timeline to scene (TIMELI-3).
 
 use super::git::{ink, scale_color};
+use super::mathtext::{
+    Formulas, block_size, draw_lines, span_width, tag_runs, title_elements, title_extent,
+};
 use super::shapes::{self, BoxF};
 use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
 };
+use crate::flowchart::Span;
 use crate::timeline::{Direction, Text, Timeline};
 
 const MARGIN: f32 = 16.0;
@@ -24,6 +28,9 @@ const HEAD: f32 = 10.0;
 /// Wrapped text and the size of the box around it.
 struct Block {
     lines: Vec<String>,
+    /// The wrapped lines as runs of text and formulas, when the text holds a formula (PlantUML
+    /// `<latex>` and `<math>` tags); `lines` is then empty.
+    runs: Option<Vec<Vec<Span>>>,
     w: f32,
     h: f32,
 }
@@ -35,6 +42,43 @@ struct Painter<'a, M> {
     /// The owner of what is drawn next: period `i` is `Owner::Node(i)`, the `n`th event in
     /// order `Owner::Edge(n)`, and the rest the diagram (WYSIWY-27).
     owner: Owner,
+    /// Whether `<latex>` and `<math>` tags in text are formulas (PlantUML).
+    tags: bool,
+    /// The formulas of this render, typeset once each.
+    formulas: Formulas,
+}
+
+/// `line` as words, each a run of spans: a formula is part of the word it touches and never
+/// breaks.
+fn words(line: &[Span]) -> Vec<Vec<Span>> {
+    let mut out: Vec<Vec<Span>> = Vec::new();
+    let mut cur: Vec<Span> = Vec::new();
+    for s in line {
+        if s.math {
+            cur.push(s.clone());
+            continue;
+        }
+        let mut buf = String::new();
+        for ch in s.text.chars() {
+            if ch.is_whitespace() {
+                if !buf.is_empty() {
+                    cur.push(Span::plain(std::mem::take(&mut buf)));
+                }
+                if !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                }
+            } else {
+                buf.push(ch);
+            }
+        }
+        if !buf.is_empty() {
+            cur.push(Span::plain(buf));
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
 }
 
 impl<M: TextMetrics> Painter<'_, M> {
@@ -65,14 +109,62 @@ impl<M: TextMetrics> Painter<'_, M> {
         out
     }
 
+    /// The runs of `text`, one list per line, when some line holds a formula.
+    fn runs(&self, text: &Text) -> Option<Vec<Vec<Span>>> {
+        let joined = text.join("\n");
+        tag_runs(&joined, self.tags)
+    }
+
+    /// `runs` broken at spaces to fit `max`, as `wrap` does text; a formula is one piece.
+    fn wrap_runs(&self, runs: &[Vec<Span>], max: f32) -> Vec<Vec<Span>> {
+        let size = self.theme.font_size;
+        let width = |ws: &[Span]| -> f32 {
+            ws.iter()
+                .map(|s| span_width(self.metrics, &self.formulas, size, s))
+                .sum()
+        };
+        let space = self.metrics.styled_width(" ", size, TextStyle::default());
+        let mut out = Vec::new();
+        for line in runs {
+            let mut cur: Vec<Span> = Vec::new();
+            let mut cur_w = 0.0;
+            for word in words(line) {
+                let w = width(&word);
+                if !cur.is_empty() && cur_w + space + w > max {
+                    out.push(std::mem::take(&mut cur));
+                    cur_w = 0.0;
+                }
+                if !cur.is_empty() {
+                    cur.push(Span::plain(" "));
+                    cur_w += space;
+                }
+                cur.extend(word);
+                cur_w += w;
+            }
+            out.push(cur);
+        }
+        out
+    }
+
     /// `text` wrapped into a box at least `min` wide.
     fn block(&self, text: &Text, min: f32) -> Block {
+        if let Some(runs) = self.runs(text) {
+            let lines = self.wrap_runs(&runs, MAX_W - 2.0 * PAD);
+            let (w, h) = block_size(self.metrics, &self.formulas, self.theme, &lines);
+            return Block {
+                lines: Vec::new(),
+                runs: Some(lines),
+                w: (w + 2.0 * PAD).max(min),
+                h: h + 2.0 * PAD,
+            };
+        }
         let lines = self.wrap(text, MAX_W - 2.0 * PAD);
         let w = lines.iter().map(|l| self.width(l)).fold(0.0, f32::max) + 2.0 * PAD;
         Block {
             h: lines.len() as f32 * self.theme.line_height + 2.0 * PAD,
             w: w.max(min),
             lines,
+            runs: None,
         }
     }
 
@@ -101,14 +193,33 @@ impl<M: TextMetrics> Painter<'_, M> {
         });
     }
 
-    /// A filled box with `lines` centered in it.
-    fn boxed(&mut self, b: BoxF, lines: &[String], fill: Color, stroke: Option<Color>) {
+    /// A filled box with the text of `block` centered in it.
+    fn boxed(&mut self, b: BoxF, block: &Block, fill: Color, stroke: Option<Color>) {
         let stroke = stroke.map(|color| Stroke {
             width: 1.0,
             color,
             dash: None,
         });
         self.path(shapes::rounded(b, 4.0), Some(fill), stroke);
+        if let Some(runs) = &block.runs {
+            let center = Pt::new(b.x + b.w / 2.0, b.y + b.h / 2.0);
+            let primitives = draw_lines(
+                self.metrics,
+                &self.formulas,
+                self.theme,
+                runs,
+                center,
+                ink(fill),
+            );
+            let owner = self.owner;
+            self.elements.extend(
+                primitives
+                    .into_iter()
+                    .map(|primitive| Element { owner, primitive }),
+            );
+            return;
+        }
+        let lines = &block.lines;
         let lh = self.theme.line_height;
         let top = b.y + (b.h - lines.len() as f32 * lh) / 2.0;
         for (i, l) in lines.iter().enumerate() {
@@ -175,6 +286,8 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
         theme,
         elements: Vec::new(),
         owner: Owner::Diagram,
+        tags: timeline.tags,
+        formulas: Formulas::default(),
     };
     let lh = theme.line_height;
     // The index of each period's first event, in event order.
@@ -191,7 +304,10 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty());
-    let title_h = if title.is_some() { lh + 16.0 } else { 0.0 };
+    let title_h = title.map_or(0.0, |t| {
+        let h = title_extent(metrics, &p.formulas, theme, t, timeline.tags).map_or(lh, |e| e.1);
+        h + 16.0
+    });
     let top = MARGIN + title_h;
     let named = timeline.has_named_sections();
     // Each period: its section, color, label block, and event blocks.
@@ -284,7 +400,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 h: section_h,
             };
             let fill = scale_color(theme, section_color(s));
-            p.boxed(b, &block.lines, fill, None);
+            p.boxed(b, block, fill, None);
         }
         let mut bottom = events_y;
         // Connectors behind everything else, then the arrow.
@@ -311,7 +427,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 h: period_h,
             };
             p.owner = Owner::Node(i);
-            p.boxed(b, &label.lines, fill, None);
+            p.boxed(b, label, fill, None);
             let mut y = events_y;
             for (j, e) in events.iter().enumerate() {
                 let b = BoxF {
@@ -321,7 +437,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                     h: e.h,
                 };
                 p.owner = Owner::Edge(first_event[i] + j);
-                p.boxed(b, &e.lines, event_fill, event_stroke(*k));
+                p.boxed(b, e, event_fill, event_stroke(*k));
                 y += e.h + GAP;
             }
             p.owner = Owner::Diagram;
@@ -375,7 +491,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 w: section_w,
                 h: y1 - y0,
             };
-            p.boxed(b, &block.lines, scale_color(theme, section_color(s)), None);
+            p.boxed(b, block, scale_color(theme, section_color(s)), None);
         }
         let mut right = events_x;
         for (i, (_, k, _, events)) in periods.iter().enumerate() {
@@ -399,7 +515,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                 h: row_h[i],
             };
             p.owner = Owner::Node(i);
-            p.boxed(b, &label.lines, fill, None);
+            p.boxed(b, label, fill, None);
             let mut x = events_x;
             for (j, e) in events.iter().enumerate() {
                 let b = BoxF {
@@ -409,7 +525,7 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
                     h: e.h,
                 };
                 p.owner = Owner::Edge(first_event[i] + j);
-                p.boxed(b, &e.lines, event_fill, event_stroke(*k));
+                p.boxed(b, e, event_fill, event_stroke(*k));
                 x += e.w + GAP;
             }
             p.owner = Owner::Diagram;
@@ -420,11 +536,26 @@ pub fn timeline(timeline: &Timeline, metrics: &impl TextMetrics, theme: &Theme) 
     }
     let width = width.max(
         title.map_or(0.0, |t| {
-            metrics.styled_width(t, theme.font_size * 1.2, TextStyle::default())
+            title_extent(metrics, &p.formulas, theme, t, timeline.tags).map_or_else(
+                || metrics.styled_width(t, theme.font_size * 1.2, TextStyle::default()),
+                |e| e.0,
+            )
         }) + 2.0 * MARGIN,
     );
+    let formula_title = title.and_then(|t| {
+        title_elements(
+            metrics,
+            &p.formulas,
+            theme,
+            t,
+            timeline.tags,
+            (width / 2.0, MARGIN),
+        )
+    });
     let mut elements = p.elements;
-    if let Some(t) = title {
+    if let Some(drawn) = formula_title {
+        elements.splice(0..0, drawn);
+    } else if let Some(t) = title {
         elements.insert(
             0,
             Element {
@@ -490,6 +621,8 @@ mod tests {
             theme: &Theme::LIGHT,
             elements: Vec::new(),
             owner: Owner::Diagram,
+            tags: false,
+            formulas: Formulas::default(),
         };
         let block = p.block(&vec!["abcdefghij".into()], MIN_W);
         assert!(block.w >= 200.0 + 2.0 * PAD);

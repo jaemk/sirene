@@ -2,6 +2,7 @@
 
 use unicode_width::UnicodeWidthChar;
 
+use super::mathtext::{Rows, tag_rows};
 use super::{Charset, Options, width};
 use crate::gantt::time::DAY;
 use crate::gantt::{Gantt, Time};
@@ -43,17 +44,46 @@ fn place(line: &mut String, at: usize, text: &str) {
     line.push_str(text);
 }
 
+/// A row's label as lines (more than one for a formula), the line the chart cells are on, and
+/// the cells; a section name has none.
+struct Labeled {
+    label: Vec<String>,
+    base: usize,
+    cells: Option<Cells>,
+}
+
+/// `text` as label lines and the line its baseline is on: the rows of its formulas, or the text.
+fn label_rows(rows: &Rows, gantt: &Gantt, text: &str) -> (Vec<String>, usize) {
+    tag_rows(rows, text, gantt.tags).unwrap_or_else(|| (vec![text.to_owned()], 0))
+}
+
+/// `label` with `prefix` on its baseline line and the same width of spaces on the others.
+fn prefixed(prefix: &str, label: (Vec<String>, usize)) -> (Vec<String>, usize) {
+    let (lines, base) = label;
+    let blank = " ".repeat(width(prefix) as usize);
+    let lines = lines
+        .into_iter()
+        .enumerate()
+        .map(|(i, l)| format!("{}{l}", if i == base { prefix } else { &blank }))
+        .collect();
+    (lines, base)
+}
+
 /// Renders `gantt` as text (MGANTT-6).
 pub fn render(gantt: &Gantt, options: &Options) -> String {
     let unicode = options.charset == Charset::Unicode;
     let g = |u: &str, a: &str| if unicode { u.to_owned() } else { a.to_owned() };
+    let formulas = Rows::new(options.charset);
     let title = gantt
         .title
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty());
+    let title_rows = title.map(|t| label_rows(&formulas, gantt, t).0);
     let Some((t0, t1)) = gantt.range() else {
-        return title.map_or_else(String::new, |t| format!("{t}\n"));
+        return title_rows.map_or_else(String::new, |r| {
+            r.iter().map(|l| format!("{l}\n")).collect::<String>()
+        });
     };
     let span = (t1 - t0) as f64;
     let col = |t: Time| {
@@ -83,7 +113,8 @@ pub fn render(gantt: &Gantt, options: &Options) -> String {
         base[c] = g("│", "|");
     }
     // Rows: a label and the chart cells, if any.
-    let mut rows: Vec<(String, Option<Cells>)> = Vec::new();
+    let mut rows: Vec<Labeled> = Vec::new();
+    let plain = |s: String| (vec![s], 0);
     let mut last_section = None;
     for row in gantt.rows() {
         let section = &gantt.sections[row.section];
@@ -93,7 +124,12 @@ pub fn render(gantt: &Gantt, options: &Options) -> String {
             && first
             && let Some(name) = &section.name
         {
-            rows.push((name.clone(), None));
+            let (label, base) = label_rows(&formulas, gantt, name);
+            rows.push(Labeled {
+                label,
+                base,
+                cells: None,
+            });
         }
         let mut cells = base.clone();
         for &i in &row.tasks {
@@ -141,22 +177,33 @@ pub fn render(gantt: &Gantt, options: &Options) -> String {
             } else {
                 String::new()
             };
-            rows.push((label, Some(cells)));
+            let (label, base) = plain(label);
+            rows.push(Labeled {
+                label,
+                base,
+                cells: Some(cells),
+            });
         } else {
             let t = &section.tasks[row.tasks[0]];
             let marker = if t.tags.crit { "! " } else { "  " };
             let indent = if section.name.is_some() { marker } else { "" };
-            let label = if section.name.is_none() && t.tags.crit {
-                format!("! {}", t.name)
+            let prefix = if section.name.is_none() && t.tags.crit {
+                "! "
             } else {
-                format!("{indent}{}", t.name)
+                indent
             };
-            rows.push((label, Some(cells)));
+            let (label, base) = prefixed(prefix, label_rows(&formulas, gantt, &t.name));
+            rows.push(Labeled {
+                label,
+                base,
+                cells: Some(cells),
+            });
         }
     }
     let name_w = rows
         .iter()
-        .map(|(l, _)| width(l) as usize)
+        .flat_map(|r| &r.label)
+        .map(|l| width(l) as usize)
         .max()
         .unwrap_or(0);
     let x = name_w + 2;
@@ -199,24 +246,31 @@ pub fn render(gantt: &Gantt, options: &Options) -> String {
         lines.push(rule(&g("┴", "+")));
     }
     lines.extend(vert_lines);
-    for (label, cells) in rows {
-        let pad = name_w - width(&label) as usize;
-        let mut line = format!("{label}{}", " ".repeat(pad));
-        if let Some(cells) = cells {
-            line.push_str("  ");
-            line.push_str(&cells.concat());
+    for Labeled { label, base, cells } in rows {
+        for (i, text) in label.iter().enumerate() {
+            let pad = name_w - width(text) as usize;
+            let mut line = format!("{text}{}", " ".repeat(pad));
+            if i == base
+                && let Some(cells) = &cells
+            {
+                line.push_str("  ");
+                line.push_str(&cells.concat());
+            }
+            lines.push(line);
         }
-        lines.push(line);
     }
     lines.push(rule(&g("┬", "+")));
     lines.push(labels);
     let mut out = String::new();
     let total = lines.iter().map(|l| width(l.trim_end())).max().unwrap_or(0);
-    if let Some(t) = title {
-        let pad = (total - width(t)).max(0) / 2;
-        out.push_str(&" ".repeat(pad as usize));
-        out.push_str(t);
-        out.push_str("\n\n");
+    if let Some(rows) = title_rows {
+        for t in rows {
+            let pad = (total - width(&t)).max(0) / 2;
+            out.push_str(&" ".repeat(pad as usize));
+            out.push_str(t.trim_end());
+            out.push('\n');
+        }
+        out.push('\n');
     }
     for l in lines {
         out.push_str(l.trim_end());
