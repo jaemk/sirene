@@ -153,8 +153,8 @@ impl Lower {
 
     /// Reports each `$$...$$` formula in `text` that does not typeset (LEMB-4, LEMB-5). `token`
     /// is the source text it came from, when it has one.
-    fn check_math(&mut self, token: Option<&SyntaxToken>, text: &Text, fallback: TextRange) {
-        let found = formula::check_text(token, text, fallback, Delim::Dollar);
+    fn check_math(&mut self, token: Option<&SyntaxToken>, text: &[String], fallback: TextRange) {
+        let found = formula::check_text(token, text, fallback, Delim::DollarRaw);
         self.diagnostics.extend(found);
     }
 
@@ -381,6 +381,11 @@ impl Lower {
                 return;
             }
             self.stack.push(Open::Block(kind, range));
+            // A `rect` label is a color, not text.
+            if kind != BlockKind::Rect {
+                let source = token(stmt, TEXT);
+                self.check_math(source.as_ref(), std::slice::from_ref(&label), range);
+            }
             self.seq.events.push(Event::Start(kind, label));
             return;
         }
@@ -422,6 +427,8 @@ impl Lower {
                 };
                 match self.stack.last() {
                     Some(Open::Block(k, _)) if *k == owner => {
+                        let source = token(stmt, TEXT);
+                        self.check_math(source.as_ref(), std::slice::from_ref(&label), range);
                         self.seq.events.push(Event::Divider(label));
                     }
                     _ => self.error(
@@ -487,7 +494,7 @@ impl Lower {
             }
         }
         self.seq.title = self.title;
-        self.seq.math = Some(Delim::Dollar);
+        self.seq.math = Some(Delim::DollarRaw);
         (self.seq, self.diagnostics)
     }
 }

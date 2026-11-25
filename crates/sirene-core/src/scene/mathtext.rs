@@ -347,6 +347,21 @@ mod tests {
         assert!(!scene.elements.is_empty());
     }
 
+    /// A Mermaid sequence's block labels and section titles share the render's cache: each
+    /// formula is typeset once to check it and once to draw it, however often a pass sizes it.
+    #[test]
+    fn sequence_block_labels_typeset_each_formula_once_per_render() {
+        let src = "sequenceDiagram\n    participant A\n    participant B\n    alt $$a_1$$\n        A->>B: $$c_3$$\n    else $$b_2$$\n        B->>A: no\n    end\n";
+        crate::equation::count::reset();
+        let lowered = crate::diagram::lower(src);
+        assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+        assert_eq!(crate::equation::count::get(), 3, "lowering checks each");
+        crate::equation::count::reset();
+        let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+        assert_eq!(crate::equation::count::get(), 3, "drawing sets each");
+        assert!(!scene.elements.is_empty());
+    }
+
     /// The left of the ink of `prims` (a clipped path counts inside its clip), `None` with none.
     fn left_of(prims: impl IntoIterator<Item = Primitive>) -> Option<f32> {
         super::super::equation::ink(&prims.into_iter().collect::<Vec<_>>()).map(|b| b.0)

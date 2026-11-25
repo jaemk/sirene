@@ -61,6 +61,9 @@ pub enum Delim {
     /// Mermaid's `$$...$$`, typeset in display style.
     #[default]
     Dollar,
+    /// Mermaid's `$$...$$` in a sequence diagram: as [`Delim::Dollar`], but `\\` is kept, as
+    /// Mermaid passes sequence text to KaTeX unchanged (so `\\` is a TeX row break).
+    DollarRaw,
     /// PlantUML's tags, typeset in text style: `<latex>...</latex>` is TeX and
     /// `<math>...</math>` is AsciiMath, tags in any case.
     Latex,
@@ -71,7 +74,7 @@ impl Delim {
     /// its delimiters.
     pub(crate) fn lens(self, formula: &str) -> (usize, usize) {
         match self {
-            Delim::Dollar => (2, 2),
+            Delim::Dollar | Delim::DollarRaw => (2, 2),
             Delim::Latex if self.asciimath(formula) => ("<math>".len(), "</math>".len()),
             Delim::Latex => ("<latex>".len(), "</latex>".len()),
         }
@@ -98,7 +101,7 @@ impl Delim {
     /// The byte ranges of the formulas in one line, delimiters included.
     pub(crate) fn ranges(self, line: &str) -> Vec<std::ops::Range<usize>> {
         match self {
-            Delim::Dollar => formulas(line),
+            Delim::Dollar | Delim::DollarRaw => formulas(line),
             Delim::Latex => crate::plantuml::creole::latex_tags(line),
         }
     }
@@ -113,7 +116,7 @@ impl Delim {
     #[cfg(feature = "math")]
     pub(crate) fn style(self) -> crate::math::MathStyle {
         match self {
-            Delim::Dollar => crate::math::MathStyle::Display,
+            Delim::Dollar | Delim::DollarRaw => crate::math::MathStyle::Display,
             Delim::Latex => crate::math::MathStyle::Text,
         }
     }
@@ -122,7 +125,7 @@ impl Delim {
     pub(crate) fn source(self, body: &str) -> String {
         match self {
             Delim::Dollar => body.replace("\\\\", "\\"),
-            Delim::Latex => body.to_owned(),
+            Delim::DollarRaw | Delim::Latex => body.to_owned(),
         }
     }
 }
@@ -194,6 +197,8 @@ pub struct Span {
     pub italic: bool,
     /// Whether the span is a `$$...$$` formula (see [`Span::formula`]).
     pub math: bool,
+    /// Whether a formula span keeps `\\` as written ([`Delim::DollarRaw`]).
+    pub raw: bool,
 }
 
 impl Span {
@@ -218,7 +223,11 @@ impl Span {
             return None;
         }
         Some(if self.text.starts_with("$$") {
-            Delim::Dollar
+            if self.raw {
+                Delim::DollarRaw
+            } else {
+                Delim::Dollar
+            }
         } else {
             Delim::Latex
         })
@@ -280,6 +289,7 @@ pub(crate) fn math_line(line: &str, delim: Delim) -> Vec<Span> {
         spans.push(Span {
             text: line[r.clone()].to_owned(),
             math: true,
+            raw: delim == Delim::DollarRaw,
             ..Span::default()
         });
         at = r.end;
@@ -379,6 +389,7 @@ fn markdown_spans(line: &str) -> Vec<Span> {
                 bold,
                 italic,
                 math: false,
+                raw: false,
             }),
         }
     }

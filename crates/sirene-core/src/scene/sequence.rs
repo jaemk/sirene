@@ -121,10 +121,26 @@ impl<M: TextMetrics> Painter<'_, M> {
         mathtext::source_runs(&[text.to_owned()], delim)
     }
 
+    /// The runs of the one line `text` of a block's label or divider when the diagram reads
+    /// formulas (Mermaid's `$$` or PlantUML's tags) and it has one. A group's title and the
+    /// diagram's title use `runs1`: Mermaid does not typeset those.
+    fn runs_block(&self, text: &str) -> Option<Vec<Vec<Span>>> {
+        mathtext::source_runs(&[text.to_owned()], self.math?)
+    }
+
     /// The width and height of the one line `text`, in bold when `bold` and it is text: a line
     /// with a formula is as tall as the formula needs (LEMB-4).
     fn size1(&self, text: &str, bold: bool) -> (f32, f32) {
-        match self.runs1(text) {
+        self.size_of(self.runs1(text), text, bold)
+    }
+
+    /// [`Painter::size1`] for a block's label or divider.
+    fn size_block(&self, text: &str) -> (f32, f32) {
+        self.size_of(self.runs_block(text), text, false)
+    }
+
+    fn size_of(&self, runs: Option<Vec<Vec<Span>>>, text: &str, bold: bool) -> (f32, f32) {
+        match runs {
             Some(runs) => mathtext::block_size(self.metrics, &self.formulas, self.theme, &runs),
             None if bold => (self.bold_width(text), self.theme.line_height),
             None => (self.width(text), self.theme.line_height),
@@ -133,7 +149,18 @@ impl<M: TextMetrics> Painter<'_, M> {
 
     /// Draws the one line `text` centered on `center`: formulas as paths on a common baseline.
     fn draw1(&mut self, text: &str, center: Pt, bold: bool) {
-        if let Some(runs) = self.runs1(text) {
+        let runs = self.runs1(text);
+        self.draw_runs(runs, text, center, bold);
+    }
+
+    /// [`Painter::draw1`] for a block's label or divider.
+    fn draw_block(&mut self, text: &str, center: Pt) {
+        let runs = self.runs_block(text);
+        self.draw_runs(runs, text, center, false);
+    }
+
+    fn draw_runs(&mut self, runs: Option<Vec<Vec<Span>>>, text: &str, center: Pt, bold: bool) {
+        if let Some(runs) = runs {
             let (m, f, t) = (self.metrics, &self.formulas, self.theme);
             for primitive in mathtext::draw_lines(m, f, t, &runs, center, t.text) {
                 self.elements.push(Element {
@@ -485,7 +512,7 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
     let tab_h = lh + 4.0;
     // A frame's tab is as tall as its tallest formula needs.
     let tab_height = |p: &Painter<_>, name: &str, after: &str| {
-        tab_h.max(p.size1(name, true).1.max(p.size1(after, false).1) + 4.0)
+        tab_h.max(p.size1(name, true).1.max(p.size_block(after).1) + 4.0)
     };
     let sizes = Sizes {
         headers: headers.clone(),
@@ -501,12 +528,12 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
                 Event::Start(BlockKind::Rect, _) => (0.0, 0.0),
                 Event::Start(kind, label) => {
                     let (name, after) = kind.tab(label);
-                    let w = tab_w(&p, &name) + 2.0 * TAB_PAD + p.size1(&after, false).0;
+                    let w = tab_w(&p, &name) + 2.0 * TAB_PAD + p.size_block(&after).0;
                     (w, tab_height(&p, &name, &after))
                 }
                 Event::Divider(label) if label.is_empty() => (0.0, 0.0),
                 Event::Divider(label) => {
-                    let (w, h) = p.size1(&bracketed(label), false);
+                    let (w, h) = p.size_block(&bracketed(label));
                     (w + 4.0 * TAB_PAD, h.max(lh))
                 }
                 Event::Ref { text, .. } => {
@@ -666,9 +693,9 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
         let tw = tab_w(&p, &name);
         let th = tab_height(&p, &name, &text);
         p.tab(b, &name, tw, th);
-        let lw = p.size1(&text, false).0;
+        let lw = p.size_block(&text).0;
         let center = Pt::new(b.x + tw + TAB_PAD + lw / 2.0, b.y + th / 2.0);
-        p.draw1(&text, center, false);
+        p.draw_block(&text, center);
         for &(k, y) in &f.dividers {
             p.path(
                 line(Pt::new(b.x, y), Pt::new(b.right(), y)),
@@ -677,8 +704,8 @@ pub fn sequence(seq: &Sequence, metrics: &impl TextMetrics, theme: &Theme) -> Sc
             );
             if let Event::Divider(label) = &seq.events[k] {
                 let text = bracketed(label);
-                let h = p.size1(&text, false).1.max(lh);
-                p.draw1(&text, Pt::new(b.x + b.w / 2.0, y + h / 2.0 + 2.0), false);
+                let h = p.size_block(&text).1.max(lh);
+                p.draw_block(&text, Pt::new(b.x + b.w / 2.0, y + h / 2.0 + 2.0));
             }
         }
     }
