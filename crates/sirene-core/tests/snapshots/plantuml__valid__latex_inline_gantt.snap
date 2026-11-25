@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startgantt\ntitle Area <latex>\\int_0^1 x^2\\,dx</latex> over time\nProject starts 2026-01-05\n-- Phase <math>a_1</math> --\n[Solve <latex>\\frac{a}{b}</latex>] lasts 3 days\nthen [Check <latex>x^2</latex> plain] lasts 2 days\n-- Release --\n[Ship] starts at [Check <latex>x^2</latex> plain]'s end and lasts 2 days\n@endgantt\n"
+---
+
+                         Area int_0^1 x^2 dx over time
+
+Phase a_1
+         a
+  Solve ---        ██████████████████████████
+         b
+  Check x^2 plain                            █████████████████
+Release
+  Ship                                                        █████████████████
+                   ┬───┬────┬───┬───┬───┬────┬───┬───┬────┬───┬───┬───┬────┬───┬
+                   2026-01-05   2026-01-06   2026-01-08   2026-01-09  2026-01-11

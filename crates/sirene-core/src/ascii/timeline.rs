@@ -1,6 +1,7 @@
 //! Timelines as text (TIMELI-4).
 
 use super::canvas::{Canvas, Line, glyph};
+use super::mathtext::{Rows, tag_rows};
 use super::{Options, draw_box, draw_lines, width};
 use crate::layout::Rect;
 use crate::timeline::{Direction, Text, Timeline};
@@ -27,6 +28,15 @@ fn wrap(text: &Text) -> Vec<String> {
     out
 }
 
+/// `text` as the rows of its formulas, when `tags` says `<latex>` and `<math>` tags are formulas
+/// and it holds one (not wrapped: a formula is rows, not words); else wrapped as `wrap` does.
+fn wrap_tags(text: &Text, tags: bool, rows: &Rows) -> Vec<String> {
+    match tag_rows(rows, &text.join("\n"), tags) {
+        Some((rows, _)) => rows,
+        None => wrap(text),
+    }
+}
+
 /// The width of a box around `lines`: the text, a space each side, and the borders.
 fn box_w(lines: &[String]) -> i32 {
     lines.iter().map(|l| width(l)).max().unwrap_or(0) + 4
@@ -45,6 +55,9 @@ fn boxed(canvas: &mut Canvas, r: Rect, lines: &[String]) {
 
 /// Renders `timeline` as text (TIMELI-4).
 pub fn render(timeline: &Timeline, options: &Options) -> String {
+    let formulas = Rows::new(options.charset);
+    let tags = timeline.tags;
+    let wrap = |text: &Text| wrap_tags(text, tags, &formulas);
     let periods: Vec<(usize, Vec<String>, Vec<Vec<String>>)> = timeline
         .periods()
         .map(|(s, p)| (s, wrap(&p.label), p.events.iter().map(wrap).collect()))
@@ -214,8 +227,15 @@ pub fn render(timeline: &Timeline, options: &Options) -> String {
         .filter(|t| !t.is_empty())
     {
         Some(t) => {
-            let pad = (right + 1 - width(t)).max(0) / 2;
-            format!("{}{t}\n\n{body}", " ".repeat(pad as usize))
+            let rows = tag_rows(&formulas, t, tags).map_or_else(|| vec![t.to_owned()], |r| r.0);
+            let mut out = String::new();
+            for row in rows {
+                let pad = (right + 1 - width(&row)).max(0) / 2;
+                out.push_str(&" ".repeat(pad as usize));
+                out.push_str(row.trim_end());
+                out.push('\n');
+            }
+            format!("{out}\n{body}")
         }
         None => body,
     }

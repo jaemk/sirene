@@ -90,27 +90,43 @@ its formulas in the text renderer, the first on the border.
   delays. Each is one line of runs; its row is as tall as its tallest formula (a group's
   title row, a frame's tab, a divider, a separator, a delay), and in the text renderer as many
   rows as that, the first on the border or rule. The lowering checks each on its own line;
-- JSON and YAML keys and values (they are rows of compartments, read as a class's are).
+- JSON and YAML keys and values (they are rows of compartments, read as a class's are);
+- the plain strings of three kinds that keep their text as strings: the Gantt title, section
+  names, and task names; the chronology title and event text; and the timing title.
+  `Gantt::tags`, `Timeline::tags`, and `Timing::tags` (set by the PlantUML lowering) say the tags
+  are formulas, and Mermaid's Gantt and timeline draw them as text. A Gantt row is as tall as its
+  tallest name (never under the plain row), a chronology box wraps its text by words with a
+  formula as one piece, and the title is as tall as its formulas. In the text renderer a Gantt
+  name is as many lines as its formula, the bar on the baseline line; a chronology text with a
+  formula is its rows, not wrapped. Each text is checked on its own line (a title in the whole
+  source, as a graph's is), and a Gantt task name ends at the first `]`, so a formula in one
+  cannot hold a `]`.
 
 Not drawn: headers, footers, captions, and legends (the parser skips them, a legend is not
-drawn at all, so there is nothing to set a formula in), participant names only given as ids (an
-id has no tags), and the kinds that keep their text as plain strings with their own painters:
-mindmap, Gantt, timing, chronology, and DOT (DOT labels are Graphviz's, not Creole). Tags there
+drawn at all, so there is nothing to set a formula in, and none is added), participant names
+only given as ids (an id has no tags), and the kinds that keep their text as plain strings with
+their own painters, in the positions not listed above: mindmap (its painter is not read yet),
+the timing diagram's signal names, state labels, notes, constraints, highlights, messages, and
+change notes (the bands and cells have fixed heights, and the text renderer's cells one row, so
+each needs its own row model), the chronology's date labels (dates), and DOT (`@startdot` is
+Graphviz's language, which has no tags, so its labels are Graphviz's, not Creole). Tags there
 are text with no diagnostic. In the text renderer an end label is placed beside the line's
 first or last cell and is not reserved room by the layout, so a wide one is clipped at the
 drawing's edge, as a text one is.
 Tests: `latex_inline_*` and `math_inline_*` fixtures,
 `crates/sirene-core/tests/plantuml_math.rs`, and
 `crates/sirene-core/tests/plantuml_math_titles.rs` (titles, group and frame text, JSON and
-YAML), with `plantuml_titles_and_frame_labels_typeset_each_formula_once_per_render` in
-`scene/mathtext.rs` for the typeset-once count.
+YAML), and `crates/sirene-core/tests/plantuml_math_plain.rs` (Gantt, chronology, timing), with
+`plantuml_titles_and_frame_labels_typeset_each_formula_once_per_render` and
+`plain_string_kinds_typeset_each_formula_once_per_render` in `scene/mathtext.rs` for the
+typeset-once count.
 
 ## PCREO-4 Open questions
 
 - Creole beyond the inline `<latex>` and `<math>` tags (PCREO-1) is not read. The scene and
   the ASCII renderer carry formula runs (`flowchart::Span`) but not other rich text spans, so
   the rest starts with a text-run model in the display list (DISPLA).
-- Formula tags in headers, footers, captions, and legends (none is drawn), and in mindmap,
-  Gantt, timing, chronology, and DOT text (each keeps plain strings and has its own painter)
-  are left: each needs its position drawn from `Span` runs, one painter at a time. Title
+- Formula tags in headers, footers, captions, and legends (none is drawn), in mindmap text, in
+  the timing diagram's text other than its title, and in DOT labels are left (PCREO-3 says
+  why): each needs its position drawn from `Span` runs, one painter at a time. Title
   formulas are set at one size (1.2 times the text), not mixed with bold text.

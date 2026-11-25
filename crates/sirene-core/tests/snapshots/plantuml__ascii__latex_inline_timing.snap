@@ -1,0 +1,17 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startuml\ntitle Request <latex>\\frac{1}{2}</latex> handling\nrobust \"Web Browser\" as WB\nconcise \"Web User\" as WU\n\n@0\nWU is Idle\nWB is Idle\n\n@100\nWU is Waiting\nWB is Processing\n@enduml\n"
+---
+                                         1
+                                Request --- handling
+                                         2
+
+Web Browser       Idle  -------------------------------------------------------+
+            Processing                                                         +-----
+
+Web User                +------------------------------------------------------+----+
+                        |                         Idle                         |Wait|
+                        +------------------------------------------------------+----+
+
+                        +----------+----------+----------+----------+----------+-----
+                        0         20         40         60         80         100

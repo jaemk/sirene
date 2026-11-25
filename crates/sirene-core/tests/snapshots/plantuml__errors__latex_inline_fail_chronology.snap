@@ -1,0 +1,16 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startchronology\ntitle Release <latex>\\foo</latex>\n[Freeze <latex>a + \\qux{x}</latex>] happens on 2024-01-15\n[Ship <latex>x^2</latex>] happens on 2024-02-01\n@endchronology\n"
+---
+2:22: error: Undefined control sequence: \foo
+3:20: error: Undefined control sequence: \qux
+
+             Release <latex>\foo</latex>
+
+┌───────────────────────────────────┐ ┌────────────┐
+│            2024-01-15             │ │ 2024-02-01 │
+└─────────────────┬─────────────────┘ └──────┬─────┘
+──────────────────┼──────────────────────────┼───────►
+┌─────────────────┴─────────────────┐ ┌──────┴─────┐
+│ Freeze <latex>a + \qux{x}</latex> │ │  Ship x^2  │
+└───────────────────────────────────┘ └────────────┘

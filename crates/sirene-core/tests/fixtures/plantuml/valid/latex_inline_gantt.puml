@@ -1,0 +1,9 @@
+@startgantt
+title Area <latex>\int_0^1 x^2\,dx</latex> over time
+Project starts 2026-01-05
+-- Phase <math>a_1</math> --
+[Solve <latex>\frac{a}{b}</latex>] lasts 3 days
+then [Check <latex>x^2</latex> plain] lasts 2 days
+-- Release --
+[Ship] starts at [Check <latex>x^2</latex> plain]'s end and lasts 2 days
+@endgantt

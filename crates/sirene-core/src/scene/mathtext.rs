@@ -12,8 +12,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use super::{Color, Primitive, Pt, TextMetrics, TextStyle, Theme};
-use crate::flowchart::{Delim, Span};
+use super::{Color, Element, Owner, Primitive, Pt, TextMetrics, TextStyle, Theme};
+use crate::flowchart::{Delim, Label, Span};
 
 /// The text style of a span.
 pub(super) fn style_of(s: &Span) -> TextStyle {
@@ -73,6 +73,79 @@ pub(super) fn source_runs(lines: &[String], delim: Delim) -> Option<Vec<Vec<Span
         return None;
     }
     Some(lines.iter().map(|l| formula::runs(l, delim)).collect())
+}
+
+/// The runs of `text`, the plain string of a painter that keeps its text as strings (Gantt,
+/// timing, chronology; PCREO-3), when `tags` says `<latex>` and `<math>` tags are formulas and it
+/// holds one; else `None` and the painter draws the string as it always has.
+pub(super) fn tag_runs(text: &str, tags: bool) -> Option<Vec<Vec<Span>>> {
+    if !tags {
+        return None;
+    }
+    let label = Label {
+        text: text.to_owned(),
+        markdown: false,
+        delim: Delim::Latex,
+    };
+    label.has_formula().then(|| label.runs())
+}
+
+/// `theme` at font size `size`: the formulas of a text drawn at another size than the theme's.
+pub(super) fn sized(theme: &Theme, size: f32) -> Theme {
+    Theme {
+        font_size: size,
+        ..*theme
+    }
+}
+
+/// The width and height of the title `text` (1.2 times the text size) when it holds a formula,
+/// else `None` (the painter sets its title as text).
+pub(super) fn title_extent(
+    metrics: &(impl TextMetrics + ?Sized),
+    formulas: &Formulas,
+    theme: &Theme,
+    text: &str,
+    tags: bool,
+) -> Option<(f32, f32)> {
+    let runs = tag_runs(text, tags)?;
+    Some(block_size(
+        metrics,
+        formulas,
+        &sized(theme, theme.font_size * 1.2),
+        &runs,
+    ))
+}
+
+/// The elements of the title `text` centered on `cx` with its top at `top`, when it holds a
+/// formula (see [`title_extent`]).
+pub(super) fn title_elements(
+    metrics: &(impl TextMetrics + ?Sized),
+    formulas: &Formulas,
+    theme: &Theme,
+    text: &str,
+    tags: bool,
+    (cx, top): (f32, f32),
+) -> Option<Vec<Element>> {
+    let runs = tag_runs(text, tags)?;
+    let big = sized(theme, theme.font_size * 1.2);
+    let (_, h) = block_size(metrics, formulas, &big, &runs);
+    let primitives = draw_lines(
+        metrics,
+        formulas,
+        &big,
+        &runs,
+        Pt::new(cx, top + h / 2.0),
+        theme.text,
+    );
+    Some(
+        primitives
+            .into_iter()
+            .map(|primitive| Element {
+                owner: Owner::Diagram,
+                primitive,
+            })
+            .collect(),
+    )
 }
 
 /// The size of `lines` of runs: the widest line and the lines' heights added up.
@@ -593,6 +666,54 @@ mod tests {
             let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
             assert_eq!(crate::equation::count::get(), formulas, "drawing sets each");
             assert!(!scene.elements.is_empty());
+        }
+    }
+
+    /// The plain strings of a Gantt chart, a chronology, and a timing diagram (PCREO-3): each
+    /// formula is typeset once to check it when lowering and once to draw it, in the scene and
+    /// as text, however often a pass measures it (a Gantt name is sized for its row and for its
+    /// bar, a chronology event is wrapped and measured).
+    #[test]
+    fn plain_string_kinds_typeset_each_formula_once_per_render() {
+        let sources = [
+            (
+                "@startgantt\ntitle <latex>t_1</latex>\nProject starts 2026-01-05\n-- <math>s_1</math> --\n[<latex>\\frac{a}{b}</latex> one] lasts 3 days\nthen [<latex>x^2</latex> two] lasts 2 days\n@endgantt\n",
+                4,
+            ),
+            (
+                "@startchronology\ntitle <latex>t_1</latex>\n[A <latex>\\frac{a}{b}</latex> b c d e f g h i j k l m n o p q r s t u v w] happens on 2024-01-15\n[B <math>x^2</math>] happens on 2024-02-01\n@endchronology\n",
+                3,
+            ),
+            (
+                "@startuml\ntitle <latex>t_1</latex>\nrobust \"B\" as B\n@0\nB is Idle\n@enduml\n",
+                1,
+            ),
+        ];
+        for (src, formulas) in sources {
+            crate::equation::count::reset();
+            let lowered = crate::diagram::lower(src);
+            assert!(lowered.diagnostics.is_empty(), "{:?}", lowered.diagnostics);
+            assert_eq!(
+                crate::equation::count::get(),
+                formulas,
+                "{src}: lowering checks each"
+            );
+            crate::equation::count::reset();
+            let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
+            assert_eq!(
+                crate::equation::count::get(),
+                formulas,
+                "{src}: drawing sets each"
+            );
+            assert!(!scene.elements.is_empty());
+            crate::equation::count::reset();
+            let rows = lowered.diagram.ascii(&crate::ascii::Options::default());
+            assert!(rows.is_ok());
+            assert_eq!(
+                crate::equation::count::get(),
+                formulas,
+                "{src}: the text renderer sets each"
+            );
         }
     }
 

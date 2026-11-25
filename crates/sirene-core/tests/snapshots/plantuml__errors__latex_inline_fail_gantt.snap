@@ -1,0 +1,15 @@
+---
+source: crates/sirene-core/tests/plantuml.rs
+expression: "@startgantt\ntitle Plan <latex>\\foo</latex>\nProject starts 2026-01-05\n-- Phase <latex>\\qux{x}</latex> --\n[Solve <latex>a + \\baz</latex>] lasts 3 days\n[Fine <latex>x^2</latex>] lasts 2 days\n@endgantt\n"
+---
+2:19: error: Undefined control sequence: \foo
+4:17: error: Undefined control sequence: \qux
+5:19: error: Undefined control sequence: \baz
+
+                                       Plan <latex>\foo</latex>
+
+Phase <latex>\qux{x}</latex>
+  Solve <latex>a + \baz</latex>  ████████████████████████████████████████████████████████████
+  Fine x^2                       ████████████████████████████████████████
+                                 ┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬────┬
+                                 2026-01-05     2026-01-05     2026-01-06     2026-01-07     2026-01-08

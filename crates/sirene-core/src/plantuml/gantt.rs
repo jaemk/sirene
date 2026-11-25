@@ -69,6 +69,10 @@ struct Lower {
     marked: usize,
     /// Days left to step through when skipping closed days.
     budget: Cell<i64>,
+    root: SyntaxNode,
+    /// The title and section names, with the ranges they may be written in, for the formulas
+    /// in them (PCREO-3).
+    texts: Vec<(String, Vec<TextRange>)>,
 }
 
 /// A `[name]` at the start of `s`, and the rest.
@@ -181,6 +185,7 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Gantt, Vec<Diagnostic>) {
     let mut l = Lower {
         g: Gantt {
             today_marker: TodayMarker::Off,
+            tags: true,
             ..Gantt::default()
         },
         d: Vec::new(),
@@ -193,6 +198,8 @@ pub(crate) fn lower(root: &SyntaxNode) -> (Gantt, Vec<Diagnostic>) {
         weekdays: [false; 7],
         marked: 0,
         budget: Cell::new(STEP_BUDGET),
+        root: root.clone(),
+        texts: Vec::new(),
     };
     l.g.sections.push(Section::default());
     let mut cursor = Cursor::new(lines::read(root));
@@ -233,6 +240,10 @@ impl Lower {
             Common::No => {}
             Common::Done => return,
             Common::Title(title) => {
+                // A title has no range of its own, so its formulas are looked for in the whole
+                // source.
+                self.texts
+                    .push((title.clone(), vec![self.root.text_range()]));
                 self.g.title = Some(title);
                 return;
             }
@@ -241,6 +252,7 @@ impl Lower {
             }
         }
         if let Some(name) = t.strip_prefix("--").and_then(|r| r.strip_suffix("--")) {
+            self.texts.push((name.trim().to_owned(), vec![line.range]));
             self.g.sections.push(Section {
                 name: Some(name.trim().to_owned()),
                 tasks: Vec::new(),
@@ -845,6 +857,7 @@ impl Lower {
             let Some((start, end)) = placed[i] else {
                 continue;
             };
+            self.texts.push((task.name.clone(), vec![task.range]));
             self.g.sections[task.section].tasks.push(gantt::Task {
                 name: task.name.clone(),
                 id: None,
@@ -877,6 +890,8 @@ impl Lower {
             self.g.now = t;
             self.g.today_marker = TodayMarker::Default;
         }
+        let texts = std::mem::take(&mut self.texts);
+        self.d.extend(super::creole::check_texts(&self.root, texts));
         (self.g, self.d)
     }
 }

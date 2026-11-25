@@ -210,9 +210,47 @@ impl Block {
     }
 }
 
+/// The rows of `text`, a plain string of a painter that keeps its text as strings (Gantt,
+/// timing, chronology; PCREO-3), and the row its first line's baseline is on, when `tags` says
+/// `<latex>` and `<math>` tags are formulas and it holds one; else `None` and the painter draws
+/// the string as it always has. Without the `math` feature the tags are text.
+#[cfg(feature = "math")]
+pub(super) fn tag_rows(rows: &Rows, text: &str, tags: bool) -> Option<(Vec<String>, usize)> {
+    if !tags {
+        return None;
+    }
+    let label = Label {
+        text: text.to_owned(),
+        markdown: false,
+        delim: Delim::Latex,
+    };
+    if !label.has_formula() {
+        return None;
+    }
+    let mut out: Vec<String> = Vec::new();
+    let mut base = None;
+    for line in label.runs() {
+        let (lines, b) = line_rows_base(rows, &line);
+        base.get_or_insert(out.len() + b);
+        out.extend(lines);
+    }
+    Some((out, base.unwrap_or(0)))
+}
+
+#[cfg(not(feature = "math"))]
+pub(super) fn tag_rows(_: &Rows, _: &str, _: bool) -> Option<(Vec<String>, usize)> {
+    None
+}
+
 /// One line as rows: the blocks side by side on a common baseline.
 #[cfg(feature = "math")]
 fn line_rows(cache: &Rows, line: &[Span]) -> Vec<String> {
+    line_rows_base(cache, line).0
+}
+
+/// One line as rows, and the row its baseline is on.
+#[cfg(feature = "math")]
+fn line_rows_base(cache: &Rows, line: &[Span]) -> (Vec<String>, usize) {
     let blocks: Vec<Rc<Block>> = line.iter().map(|s| cache.block(s)).collect();
     let above = blocks.iter().map(|b| b.base).max().unwrap_or(0);
     let below = blocks
@@ -220,7 +258,7 @@ fn line_rows(cache: &Rows, line: &[Span]) -> Vec<String> {
         .map(|b| b.rows.len().saturating_sub(b.base + 1))
         .max()
         .unwrap_or(0);
-    (0..above + below + 1)
+    let rows = (0..above + below + 1)
         .map(|k| {
             let mut row = String::new();
             for b in &blocks {
@@ -234,7 +272,8 @@ fn line_rows(cache: &Rows, line: &[Span]) -> Vec<String> {
             }
             row
         })
-        .collect()
+        .collect();
+    (rows, above)
 }
 
 #[cfg(feature = "math")]

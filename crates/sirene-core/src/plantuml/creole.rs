@@ -154,6 +154,29 @@ pub(crate) fn mark_labels(chart: &mut Flowchart, root: &SyntaxNode) -> Vec<Diagn
     diagnose(found, root)
 }
 
+/// A diagnostic for each formula of `texts` that does not typeset (and without the `math`
+/// feature, for each formula), for a kind that keeps its text as plain strings: each text comes
+/// with the source ranges it may be written in, and its formulas are found there as written,
+/// each taking a place of its own in order.
+pub(crate) fn check_texts(
+    root: &SyntaxNode,
+    texts: impl IntoIterator<Item = (String, Vec<TextRange>)>,
+) -> Vec<Diagnostic> {
+    let found = texts
+        .into_iter()
+        .map(|(text, at)| {
+            let label = Label {
+                text,
+                markdown: false,
+                delim: Delim::Latex,
+            };
+            (label, at)
+        })
+        .filter(|(label, _)| label.has_formula())
+        .collect();
+    diagnose(found, root)
+}
+
 /// Calls `f` with every label of `chart` and the source ranges it may be written in.
 fn each_label(chart: &mut Flowchart, mut f: impl FnMut(&mut Label, &[TextRange])) {
     for n in &mut chart.nodes {

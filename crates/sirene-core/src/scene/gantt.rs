@@ -1,11 +1,15 @@
 //! Gantt chart to scene (MGANTT-5).
 
 use super::git::{branch_color, ink, luminance};
+use super::mathtext::{
+    Formulas, block_size, draw_lines, sized, tag_runs, title_elements, title_extent,
+};
 use super::shapes::{self, BoxF};
 use super::style::parse_color;
 use super::{
     Color, Element, Owner, Primitive, Pt, Scene, Segment, Stroke, TextMetrics, TextStyle, Theme,
 };
+use crate::flowchart::Span;
 use crate::gantt::time::DAY;
 use crate::gantt::{Gantt, Tags, Time, TodayMarker};
 
@@ -29,11 +33,38 @@ struct Painter<'a, M> {
     right: f32,
     /// The owner of what is drawn next.
     owner: Owner,
+    /// Whether `<latex>` and `<math>` tags in text are formulas (PlantUML).
+    tags: bool,
+    /// The formulas of this render, typeset once each.
+    formulas: Formulas,
 }
 
 impl<M: TextMetrics> Painter<'_, M> {
+    /// The runs of `text` when it holds a formula.
+    fn runs(&self, text: &str) -> Option<Vec<Vec<Span>>> {
+        tag_runs(text, self.tags)
+    }
+
     fn width(&self, text: &str, size: f32) -> f32 {
-        self.metrics.width(text, size)
+        match self.runs(text) {
+            Some(runs) => {
+                let theme = sized(self.theme, size);
+                block_size(self.metrics, &self.formulas, &theme, &runs).0
+            }
+            None => self.metrics.width(text, size),
+        }
+    }
+
+    /// The height a row needs for `text` at `size` when it holds a formula (the text's lines
+    /// and a pixel above and below), else 0: a plain name fits the row as it always has.
+    fn height(&self, text: &str, size: f32) -> f32 {
+        match self.runs(text) {
+            Some(runs) => {
+                let theme = sized(self.theme, size);
+                block_size(self.metrics, &self.formulas, &theme, &runs).1 + 2.0
+            }
+            None => 0.0,
+        }
     }
 
     fn path(&mut self, segments: Vec<Segment>, fill: Option<Color>, stroke: Option<Stroke>) {
@@ -64,6 +95,18 @@ impl<M: TextMetrics> Painter<'_, M> {
     fn text_at(&mut self, text: &str, x: f32, y: f32, size: f32, color: Color) {
         let w = self.width(text, size);
         self.right = self.right.max(x + w);
+        if let Some(runs) = self.runs(text) {
+            let theme = sized(self.theme, size);
+            let center = Pt::new(x + w / 2.0, y);
+            let primitives = draw_lines(self.metrics, &self.formulas, &theme, &runs, center, color);
+            let owner = self.owner;
+            self.elements.extend(
+                primitives
+                    .into_iter()
+                    .map(|primitive| Element { owner, primitive }),
+            );
+            return;
+        }
         self.elements.push(Element {
             owner: self.owner,
             primitive: Primitive::Text {
@@ -165,6 +208,8 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         elements: Vec::new(),
         right: 0.0,
         owner: Owner::Diagram,
+        tags: gantt.tags,
+        formulas: Formulas::default(),
     };
     let fs = theme.font_size;
     let small = fs * 0.85;
@@ -174,8 +219,24 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         .as_deref()
         .map(str::trim)
         .filter(|t| !t.is_empty());
-    let title_h = if title.is_some() { lh + 16.0 } else { 0.0 };
+    let title_h = title.map_or(0.0, |t| {
+        let h = title_extent(metrics, &p.formulas, theme, t, gantt.tags).map_or(lh, |e| e.1);
+        h + 16.0
+    });
     let rows = gantt.rows();
+    // A row is as tall as the tallest formula in a name, and never under `ROW`.
+    let row = {
+        let task_names = gantt
+            .tasks()
+            .filter(|t| !t.tags.vert)
+            .map(|t| p.height(&t.name, small));
+        let section_names = gantt
+            .sections
+            .iter()
+            .filter_map(|s| s.name.as_deref())
+            .map(|n| p.height(n, fs));
+        task_names.chain(section_names).fold(ROW, f32::max)
+    };
     let left_w = gantt
         .sections
         .iter()
@@ -198,7 +259,7 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         y += LABEL_H;
     }
     let rows_top = y;
-    let rows_bottom = rows_top + rows.len() as f32 * ROW;
+    let rows_bottom = rows_top + rows.len() as f32 * row;
     let bottom_axis_y = rows_bottom;
     let height = bottom_axis_y + LABEL_H + MARGIN;
     p.right = x1;
@@ -215,9 +276,9 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
         let n = rows[r..].iter().take_while(|row| row.section == s).count();
         let band = BoxF {
             x: MARGIN,
-            y: rows_top + r as f32 * ROW,
+            y: rows_top + r as f32 * row,
             w: x1 - MARGIN,
-            h: n as f32 * ROW,
+            h: n as f32 * row,
         };
         let fill = branch_color(theme, s % 4)
             .with_alpha(0x24)
@@ -280,12 +341,12 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
             Some(first)
         })
         .collect();
-    for (r, row) in rows.iter().enumerate() {
-        let section = &gantt.sections[row.section];
-        let cy = rows_top + (r as f32 + 0.5) * ROW;
-        for &i in &row.tasks {
+    for (r, grow) in rows.iter().enumerate() {
+        let section = &gantt.sections[grow.section];
+        let cy = rows_top + (r as f32 + 0.5) * row;
+        for &i in &grow.tasks {
             let task = &section.tasks[i];
-            p.owner = Owner::Node(firsts[row.section] + i);
+            p.owner = Owner::Node(firsts[grow.section] + i);
             let (fill, line) = task_colors(theme, task.tags);
             let stroke = Stroke {
                 width: 1.5,
@@ -356,9 +417,18 @@ pub fn gantt(gantt: &Gantt, metrics: &impl TextMetrics, theme: &Theme) -> Scene 
 /// The scene, as wide as what was drawn, with the title centered above.
 fn finish<M: TextMetrics>(p: Painter<'_, M>, title: Option<&str>, height: f32) -> Scene {
     let size = p.theme.font_size * 1.2;
-    let width = (p.right + MARGIN).max(title.map_or(0.0, |t| p.width(t, size)) + 2.0 * MARGIN);
+    let formula_w = title
+        .and_then(|t| title_extent(p.metrics, &p.formulas, p.theme, t, p.tags))
+        .map(|e| e.0);
+    let title_w = formula_w.or_else(|| title.map(|t| p.width(t, size)));
+    let width = (p.right + MARGIN).max(title_w.unwrap_or(0.0) + 2.0 * MARGIN);
+    let at = (width / 2.0, MARGIN);
+    let formula_title =
+        title.and_then(|t| title_elements(p.metrics, &p.formulas, p.theme, t, p.tags, at));
     let mut elements = p.elements;
-    if let Some(t) = title {
+    if let Some(drawn) = formula_title {
+        elements.splice(0..0, drawn);
+    } else if let Some(t) = title {
         elements.insert(
             0,
             Element {
