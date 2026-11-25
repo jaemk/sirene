@@ -33,11 +33,14 @@ through their values; concise signals are bands with slanted ends and the state 
 in a box for rectangle signals. Undefined spans are grey, hidden spans empty. Messages are
 arrows between signal centers, constraints two-headed arrows under their signal (or under the
 axis), highlights shaded spans with their caption above, and notes boxes above or below their
-signal. The axis has a tick and label per tick unless hidden.
+signal. The axis has a tick and label per tick unless hidden. When a `Timing` reads formulas
+(`Timing::tags`, set by PlantUML), a label with one is a formula block set in the label's text
+color, and its row (name, level, band, lane, gap, note) is as tall as the formula.
 
 ## TIMING-5 Text
 
 The text drawing (ASCIIR-1) has the same rows on a 60-column axis: level lines joined by
 vertical steps, concise bands as boxes sharing borders, undefined spans dotted or `/`, messages
 as dotted vertical lines with an arrowhead into the target signal, constraints as `<-- label -->`
-spans, and highlights as a double rule over their span.
+spans, and highlights as a double rule over their span. A label with a formula is as many rows
+as the formula, around its baseline row, and its lane grows to fit.
