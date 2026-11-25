@@ -94,7 +94,7 @@ in `crates/sirene/tests/cli.rs` and `arguments` in `crates/sirene/src/main.rs`.
 ## CLI-9 Directories
 
 `sirene svg DIR` and `sirene png DIR` render every diagram file under DIR (by `Lang::of_path`:
-`.mmd`, `.mermaid`, `.dot`, `.gv`, `.puml`, `.plantuml`, `.pu`, and `.iuml`, in any case), recursing
+`.mmd`, `.mermaid`, `.dot`, `.gv`, `.puml`, `.plantuml`, `.pu`, and `.iuml`, in any case; `.tex` and `.latex` files are not picked up, LEMB-3), recursing
 into subdirectories but skipping hidden entries and symlinked directories, in path order. Scanning
 does not resolve unrelated symlinks; an unresolvable diagram-file symlink is reported. Each is
 written as `.svg` or `.png` beside it, or with `-o OUTDIR` to the same relative path under OUTDIR
@@ -159,6 +159,16 @@ a change. `sirene ascii FILE.md` prints the blocks instead (CLI-2). Tests: `mark
 `crates/sirene/tests/cli.rs`, and
 the unit tests in `crates/sirene/src/markdown.rs`.
 
+A Markdown file's formulas (MARKDO-5) are blocks like the diagrams: N counts every diagram block
+and formula in source order, whether it is drawn or not, and `--link` adds links after diagram
+blocks only. Without the `math` feature the formulas are skipped with one warning per file
+(`math support is off in this build; K formulas not drawn`). Tests:
+`markdown_formulas_are_blocks_beside_the_diagrams`, `markdown_links_follow_diagram_blocks_only`,
+`markdown_ascii_prints_each_block`, and `markdown_check_positions_errors_in_the_file` in
+`crates/sirene/tests/latex.rs`, and `formulas_are_skipped_once_without_math` in
+`crates/sirene/src/markdown.rs`. A `.tex` file is one formula (LEMB-3); test:
+`a_tex_file_is_one_equation` in `crates/sirene/tests/latex.rs`.
+
 Image paths encode literal URI syntax (`#`, `?`, `%`, `:`, and `&`), ASCII controls, and Unix
 filename backslashes as percent escapes, keeping directory separators, so a file named
 `guide#v2-1.svg` is linked as `guide%23v2-1.svg` rather than as a fragment. Test:
@@ -167,7 +177,7 @@ filename backslashes as percent escapes, keeping directory separators, so a file
 
 ## CLI-13 `--lang`
 
-`--lang mermaid|dot|plantuml`, a global option given before or after the command, reads every diagram
+`--lang mermaid|dot|plantuml|latex` (`tex` is an alias of `latex`), a global option given before or after the command, reads every diagram
 `check`, `ascii`, `svg`, and `png` read (files, directory entries, Markdown blocks, and stdin)
 as that language. Without it, a file's extension or a block's info string picks the language,
 and other sources are detected (LANGS-1, DOT-5). Tests: `forced_languages` in

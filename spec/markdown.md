@@ -1,7 +1,8 @@
 # Markdown
 
-Diagram code blocks in Markdown files, for `sirene check` (CLI-11), rendering (CLI-12), and the
-editor (WYSIWY-20). Tests: the unit tests in `crates/sirene-core/src/markdown.rs`.
+Diagram code blocks and formulas in Markdown files, for `sirene check` (CLI-11), rendering
+(CLI-12), and the editor (WYSIWY-20). Tests: the unit tests in
+`crates/sirene-core/src/markdown.rs` and `crates/sirene-core/tests/markdown_math.rs`.
 
 ## MARKDO-1 Diagram blocks
 
@@ -56,3 +57,30 @@ block left open at the end of the Markdown is closed first, in its blockquote or
 any fence line in the code, so the new block is found with exactly that code. The editor adds
 the block of a Markdown file with none with it, and Save As to a Markdown file writes one
 (WYSIWY-20).
+
+## MARKDO-5 Formulas
+
+`sirene_core::markdown::parts` returns the diagram blocks (MARKDO-1) and the formulas of a
+Markdown text as `Part::Diagram(Block)` and `Part::Math(MathBlock)`, in source order, with byte
+ranges (`Part::range`) that are in bounds, on character boundaries, ordered, and not
+overlapping. `mermaid_blocks` still returns the diagram blocks alone. A `MathBlock` has its
+`kind`, its `source`, the line of its first source line, and `position`, which maps a line and
+column of `source` back to the Markdown, as `Block::position` does. `MathBlock::lower` lowers it
+to an equation (LEMB-3):
+
+| Kind | Found as | Style |
+|---|---|---|
+| `Fenced` | a fenced block whose info word is `math`, `latex`, or `tex`; the code is read as a TeX file (a wrapper is allowed) | display |
+| `Display` | `$$...$$` with a non-blank body, in a paragraph (not across a blank line) | display |
+| `Inline` | `$...$` on one line, by GitHub's rules (LEMB-3) | text |
+
+Formulas are read in paragraphs at the top level, in blockquotes, and in list items, found as
+MARKDO-1 finds fences. Not read: any other fenced block (a diagram fence too), an indented code
+block, and a code span (a code span in the body does not close the formula). A backslash escapes
+the ASCII punctuation after it, so `\$` is not a delimiter. `Lang::of_info("latex")` stays
+`None`, so `mermaid_blocks` never returns these fences.
+
+Numbering: a file's diagram blocks and formulas form one list in source order, and the CLI
+numbers it from 1 for output names (`STEM-N.svg`), `ascii` block names, and `--link` lines
+(CLI-12). A formula counts whether it is drawn or not. Without the `math` feature the CLI skips
+the formulas with one warning per file. Tests: `crates/sirene-core/tests/markdown_math.rs`.

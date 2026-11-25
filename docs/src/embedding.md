@@ -85,7 +85,7 @@ for (const d of r.diagnostics) {
 | Option | Values |
 | --- | --- |
 | `format` | `svg` (default), `ascii` |
-| `lang` | `detect` (default, from the source's header), `mermaid`, `plantuml` or `puml`, `dot` or `graphviz` |
+| `lang` | `detect` (default, from the source's header), `mermaid`, `plantuml` or `puml`, `dot` or `graphviz`, `latex` or `tex` (one formula) |
 | `theme` | `dark` (default), `light`; a diagram's own `theme` setting applies over it |
 
 `render` is synchronous. A source that crashes the module returns `ok: false` and the next call
