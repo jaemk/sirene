@@ -215,6 +215,40 @@ fn edge_to_titled_cluster_clears_the_title() {
     }
 }
 
+#[test]
+fn ports_fit_a_narrow_cluster_border() {
+    let g = Graph {
+        nodes: vec![node(3, 3); 2],
+        clusters: vec![cluster(None, Some(Direction::BottomTop))],
+        edges: (0..2)
+            .map(|n| EdgeSpec {
+                to: Item::Cluster(0),
+                ..edge(n, n)
+            })
+            .collect(),
+        ..Graph::default()
+    };
+    let config = Config {
+        vertical: Spacing {
+            port_inset: 10,
+            ..SPACING
+        },
+        ..CONFIG
+    };
+    let l = layout(&g, &config).unwrap();
+    let cluster = l.clusters[0];
+    let ends: Vec<_> = l
+        .edges
+        .iter()
+        .map(|route| *route.as_ref().unwrap().points.last().unwrap())
+        .collect();
+    assert!(
+        ends.iter().all(|&end| cluster.on_border(end)),
+        "{ends:?} outside {cluster:?}"
+    );
+    assert!(ends[0].x < ends[1].x, "{ends:?}");
+}
+
 /// An edge between a cluster and one of its descendants has no route.
 #[test]
 fn edge_to_own_descendant_is_unroutable() {
