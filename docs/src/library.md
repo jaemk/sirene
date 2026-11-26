@@ -6,7 +6,7 @@ reference: [docs.rs/sirene-core](https://docs.rs/sirene-core).
 
 ```toml
 [dependencies]
-sirene-core = { version = "0.6", features = ["png"] }  # `png` only for PNG output
+sirene-core = { version = "0.8", features = ["png"] }  # `png` only for PNG output
 ```
 
 ```rust
