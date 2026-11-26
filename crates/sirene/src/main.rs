@@ -11,7 +11,7 @@
 )]
 
 use std::collections::HashMap;
-use std::io::{IsTerminal, Write};
+use std::io::{IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, Instant, SystemTime};
@@ -653,9 +653,8 @@ fn read(file: Option<PathBuf>) -> Result<(String, String)> {
 /// Reads the source named on the command line as text, or as bytes when it is a package: forced
 /// or named as Visio, or starting with the ZIP magic (VISIO-12).
 fn read_source(file: Option<PathBuf>) -> Result<(String, Source)> {
-    use std::io::BufRead;
     let named = lang(file.as_deref().and_then(Lang::of_path));
-    let (name, context, mut reader): (String, String, Box<dyn BufRead>) =
+    let (name, context, reader): (String, String, Box<dyn Read>) =
         match file.filter(|f| f.as_os_str() != "-") {
             Some(path) => {
                 let name = path.display().to_string();
@@ -663,7 +662,7 @@ fn read_source(file: Option<PathBuf>) -> Result<(String, Source)> {
                 let context = format!("cannot read {name}");
                 let f = std::fs::File::open(&path)
                     .map_err(|e| Error::with_source(context.clone(), e))?;
-                (name, context, Box::new(std::io::BufReader::new(f)))
+                (name, context, Box::new(f))
             }
             None => {
                 log::debug!("reading <stdin>");
@@ -674,20 +673,18 @@ fn read_source(file: Option<PathBuf>) -> Result<(String, Source)> {
                 )
             }
         };
-    let package = match named {
-        Some(Lang::Visio) => true,
-        Some(_) => false,
-        None => reader
-            .fill_buf()
-            .map_err(|e| Error::with_source(context.clone(), e))?
-            .starts_with(b"PK\x03\x04"),
-    };
-    let source = if package {
-        source::read_bytes(reader).map(Source::Bytes)
+    read_diagram_source(reader, named)
+        .map(|source| (name, source))
+        .map_err(|e| e.context(context))
+}
+
+fn read_diagram_source(reader: impl Read, named: Option<Lang>) -> Result<Source> {
+    let bytes = source::read_bytes(reader)?;
+    if named == Some(Lang::Visio) || (named.is_none() && bytes.starts_with(b"PK\x03\x04")) {
+        Ok(Source::Bytes(bytes))
     } else {
-        source::read_text(reader).map(Source::Text)
-    };
-    source.map(|s| (name, s)).map_err(|e| e.context(context))
+        source::text(bytes).map(Source::Text)
+    }
 }
 
 /// Reads the file at `path` as UTF-8 text, with an error naming it.
@@ -1314,6 +1311,13 @@ fn render_one(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detects_package_magic_across_short_reads() {
+        let reader = (&b"PK"[..]).chain(&b"\x03\x04rest of package"[..]);
+        let input = read_diagram_source(reader, None).unwrap();
+        assert!(matches!(input, Source::Bytes(bytes) if bytes == b"PK\x03\x04rest of package"));
+    }
 
     fn parse(args: &[&str]) -> Cli {
         Cli::try_parse_from(std::iter::once("sirene").chain(args.iter().copied())).unwrap()
