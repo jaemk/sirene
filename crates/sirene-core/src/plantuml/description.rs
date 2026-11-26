@@ -392,7 +392,8 @@ impl Lower {
                     if let Some(c) = self.container() {
                         self.chart.subgraphs[c].members.push(id.clone());
                     }
-                    self.containers.insert(id, i);
+                    self.containers.insert(id.clone(), i);
+                    self.last = Some(id);
                     self.chart.subgraphs[i]
                         .styles
                         .extend(decor.fill.map(|value| Style {
@@ -863,6 +864,18 @@ mod tests {
         let last = g.edges.last().unwrap();
         assert_eq!((last.from.as_str(), last.to.as_str()), ("FE", "Net"));
         assert_eq!(last.end, Some(Arrow::Point));
+    }
+
+    #[test]
+    fn notes_attach_to_unnamed_containers() {
+        let (g, d) =
+            lower_src("cloud {\n  note left : inside\n}\n[A]\nnode #pink {\n}\nnote right : after");
+        assert!(d.is_empty(), "{d:?}");
+        assert_eq!(g.subgraphs.len(), 2);
+        assert_eq!(g.notes.len(), 2);
+        for (note, container) in g.notes.iter().zip(&g.subgraphs) {
+            assert_eq!(note.target, container.id);
+        }
     }
 
     #[test]

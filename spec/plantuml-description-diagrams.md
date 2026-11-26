@@ -71,7 +71,8 @@ PlantUML draws it.
 
 Notes follow PCLS-8: `note left|right|top|bottom of X : text` or a block to `end note`, where
 `X` may be a short form such as `(Use)`; a note after a declaration with no `of`;
-`note "text" as N`; and `note on link`. A note may be on a container.
+`note "text" as N`; and `note on link`. Notes can attach to containers, including unnamed
+containers when the note has no `of` and the container was the last declaration.
 
 ## PDSC-7 Diagnostics
 
