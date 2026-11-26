@@ -35,7 +35,7 @@ Or from GitHub: each release after 0.6.0 attaches `sirene-wasm-X.Y.Z.tar.gz`. Bo
 
 | File | |
 | --- | --- |
-| `sirene.wasm` | the module (about 2.7 MB, 0.9 MB gzipped); SVG and ASCII output |
+| `sirene.wasm` | the module (about 4.3 MB, 1.5 MB gzipped); SVG and ASCII output |
 | `sirene-wasm.js` | the loader: a plain script that sets `window.SireneWasm` |
 | `LICENSE-MIT`, `LICENSE-APACHE`, `THIRD-PARTY-NOTICES` | licenses |
 
