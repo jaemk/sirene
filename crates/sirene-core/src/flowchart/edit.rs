@@ -619,15 +619,16 @@ pub fn set_direction(src: &str, subgraph: Option<&str>, dir: Direction) -> Optio
                 None => {
                     let header = child(&block, SUBGRAPH_HEADER)?;
                     let end = usize::from(header.text_range().end());
-                    // Before the header line's ending, `\r\n` or `\n`.
-                    let at = src[end..].find('\n').map_or(src.len(), |i| end + i);
-                    let at = if src[..at].ends_with('\r') {
-                        at - 1
+                    let rest = &src[end..];
+                    let separator = crate::lines::ws_len(rest);
+                    if rest[separator..].starts_with(';') {
+                        let at = end + separator + 1;
+                        (at..at, format!(" direction {text};"))
                     } else {
-                        at
-                    };
-                    let indent = doc.body_indent(&block);
-                    (at..at, format!("{}{indent}direction {text}", doc.newline))
+                        let at = end + crate::lines::line_len(rest);
+                        let indent = doc.body_indent(&block);
+                        (at..at, format!("{}{indent}direction {text}", doc.newline))
+                    }
                 }
             }
         }

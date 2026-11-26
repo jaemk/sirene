@@ -183,10 +183,11 @@ node's moves the dragged node into it instead.
 
 Edits that steer the layout without positions, as source edits (WYSIWY-8) and actions (GUISHE-5):
 
-- `set_direction`: replaces the header's direction, or adds one after `flowchart`/`graph`; for a
-  subgraph, replaces its last `direction` statement or adds one after its `subgraph` line,
-  indented like its statements. Written as `TD`, `BT`, `LR`, or `RL`; no edit when it already
-  reads so.
+- `set_direction`: replaces the header's direction or adds one after `flowchart`/`graph`. For a
+  subgraph, it replaces the last `direction` statement or adds one after the subgraph header.
+  It uses semicolons for a semicolon-terminated header and the body's indentation after a
+  newline-terminated header. Directions are written as `TD`, `BT`, `LR`, or `RL`. The edit is
+  skipped when the statement already gives the requested direction.
 - `keep_together`: appends `A ~~~ B`, an invisible edge.
 - `group`: appends `subgraph groupN [TITLE]` with a bare mention of each node and `end`, at the
   end of the subgraph the nodes share (so it nests there) or of the document. `groupN` is the
