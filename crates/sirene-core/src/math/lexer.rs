@@ -228,7 +228,9 @@ fn verb(rest: &str, offset: usize) -> Option<(TokenKind<'_>, usize)> {
     };
     let delimiter = after_star.chars().next()?;
     // Unstarred, the delimiter is not `*` and not a letter, or it would be part of a name.
-    if !star && (delimiter == '*' || delimiter.is_ascii_alphabetic()) {
+    if is_line_terminator(delimiter)
+        || (!star && (delimiter == '*' || delimiter.is_ascii_alphabetic()))
+    {
         return None;
     }
     let body_start = after_star.strip_prefix(delimiter)?;
@@ -409,6 +411,21 @@ mod tests {
         );
         // A letter cannot delimit an unstarred `\verb`: it reads as a longer name.
         assert_eq!(kinds("\\verbatim"), [ControlWord("verbatim")]);
+    }
+
+    #[test]
+    fn a_line_terminator_cannot_delimit_verb() {
+        for command in ["\\verb", "\\verb*"] {
+            for separator in ['\n', '\r', '\u{2028}', '\u{2029}'] {
+                let src = format!("{command}{separator}text{separator}");
+                let mut lexer = Lexer::new(&src).unwrap();
+                assert_eq!(
+                    lexer.next_token().unwrap().kind,
+                    ControlWord("verb"),
+                    "{src:?}"
+                );
+            }
+        }
     }
 
     #[test]
