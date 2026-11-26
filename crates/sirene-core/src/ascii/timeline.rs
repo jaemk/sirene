@@ -125,10 +125,12 @@ pub fn render(timeline: &Timeline, options: &Options) -> String {
         for (i, (_, label, events)) in periods.iter().enumerate() {
             let center = col_x[i] + col_w[i] / 2;
             boxes.push((Rect::new(col_x[i], section_h, col_w[i], period_h), label));
-            // Joined in the gaps only: the period to the first event across the arrow, then
-            // each event to the next.
-            let mut y = axis + 1;
             let mut above = axis - 1;
+            if events.is_empty() {
+                vlines.push((center, above, axis));
+            }
+            // Join the period to the first event across the arrow, then each event to the next.
+            let mut y = axis + 1;
             for e in events {
                 vlines.push((center, above, y));
                 boxes.push((Rect::new(col_x[i], y, col_w[i], box_h(e)), e));
@@ -184,6 +186,9 @@ pub fn render(timeline: &Timeline, options: &Options) -> String {
             let mid = row_y[i] + row_h[i] / 2;
             let mut x = events_x;
             let mut left = period_x + period_w - 1;
+            if events.is_empty() {
+                hlines.push((left, axis, mid));
+            }
             for e in events {
                 hlines.push((left, x, mid));
                 boxes.push((Rect::new(x, mid - box_h(e) / 2, box_w(e), box_h(e)), e));
@@ -250,6 +255,21 @@ mod tests {
         let long = vec!["one two three four five six seven eight".to_owned()];
         assert_eq!(wrap(&long), ["one two three four five", "six seven eight"]);
         assert_eq!(wrap(&vec!["a".to_owned(), "b".to_owned()]), ["a", "b"]);
+    }
+
+    #[test]
+    fn periods_without_events_connect_to_the_axis() {
+        for (src, unicode, ascii) in [
+            ("timeline LR\nA\n", "└─┬─┘\n──┴", "+-+-+\n--+"),
+            ("timeline TD\nA\n", "│ A ├─┤", "| A +-+"),
+        ] {
+            let (timeline, diagnostics) = crate::timeline::parse(src).lower();
+            assert!(diagnostics.is_empty());
+            for (options, connection) in [(Options::UNICODE, unicode), (Options::ASCII, ascii)] {
+                let rendered = render(&timeline, &options);
+                assert!(rendered.contains(connection), "{rendered}");
+            }
+        }
     }
 
     #[test]
