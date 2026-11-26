@@ -307,7 +307,7 @@ mod tests {
         let crate::diagram::Diagram::Gantt(g) = diagram else {
             panic!("not a gantt");
         };
-        let out = render(&g, &Options::default());
+        let out = render(&g, &Options::UNICODE);
         assert!(out.contains('·'), "{out}");
     }
 }

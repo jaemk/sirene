@@ -16,7 +16,7 @@
 
 use std::cell::{Cell, RefCell};
 
-use sirene_core::ascii::{Charset, Options};
+use sirene_core::ascii::Options;
 use sirene_core::diagnostic::{LineIndex, Severity};
 use sirene_core::diagram::{self, Lang, Lowered};
 use sirene_core::scene::Theme;
@@ -174,12 +174,8 @@ pub fn draw_page(
     };
     let drawn = match format {
         FORMAT_SVG => lowered.svg(&theme).map(String::into_bytes),
-        FORMAT_ASCII => lowered
-            .ascii(&Options {
-                charset: Charset::Ascii,
-            })
-            .map(String::into_bytes),
-        FORMAT_TEXT => lowered.ascii(&Options::default()).map(String::into_bytes),
+        FORMAT_ASCII => lowered.ascii(&Options::ASCII).map(String::into_bytes),
+        FORMAT_TEXT => lowered.ascii(&Options::UNICODE).map(String::into_bytes),
         #[cfg(feature = "png")]
         FORMAT_PNG => lowered.png(&theme, sirene_core::scene::png::Quality::Draft, None),
         _ => {

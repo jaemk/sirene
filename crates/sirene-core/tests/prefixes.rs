@@ -74,7 +74,7 @@ fn edits_draw(name: &str, src: &str, lang: Option<Lang>) {
         let run = std::panic::catch_unwind(|| {
             let lowered = diagram::lower_as(text, lang);
             let s = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
-            lowered.diagram.ascii(&Options::default()).unwrap();
+            lowered.diagram.ascii(&Options::UNICODE).unwrap();
             svg::write(&s)
         });
         let doc = run.unwrap_or_else(|_| panic!("{name} {what}:\n{text}"));

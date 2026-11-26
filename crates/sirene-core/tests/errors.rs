@@ -36,7 +36,7 @@ fn invalid_flowchart_returns_errors_from_every_rendering_boundary() {
             .contains("missing")
     );
     assert!(
-        ascii::render(&chart, &Options::default())
+        ascii::render(&chart, &Options::UNICODE)
             .unwrap_err()
             .report()
             .contains("missing")
@@ -48,7 +48,7 @@ fn invalid_flowchart_returns_errors_from_every_rendering_boundary() {
             .contains("missing")
     );
     let diagram = Diagram::Graph(chart);
-    assert!(diagram.ascii(&Options::default()).is_err());
+    assert!(diagram.ascii(&Options::UNICODE).is_err());
     assert!(diagram.scene(&Approx, &Theme::LIGHT).is_err());
 }
 
@@ -63,7 +63,7 @@ fn collapsed_subgraph_does_not_hide_invalid_endpoints() {
     chart.subgraphs[0].members.push("missing".into());
     chart.edges[0].from = "missing".into();
     for error in [
-        ascii::render(&chart, &Options::default()).unwrap_err(),
+        ascii::render(&chart, &Options::UNICODE).unwrap_err(),
         scene::flowchart(&chart, &Approx, &Theme::LIGHT).unwrap_err(),
     ] {
         assert!(error.report().contains("unknown edge endpoint `missing`"));

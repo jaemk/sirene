@@ -502,7 +502,8 @@ impl Lowered {
         self.diagram.scene(metrics, &self.theme.apply(theme))
     }
 
-    /// The drawing as text, as `sirene text` prints it (`sirene ascii` with `Charset::Ascii`).
+    /// The drawing as text, as `sirene ascii` prints it with the default options, or `sirene text`
+    /// with `Options::UNICODE`.
     pub fn ascii(&self, options: &Options) -> crate::Result<String> {
         self.diagram.ascii(options)
     }

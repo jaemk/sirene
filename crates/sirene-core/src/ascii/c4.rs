@@ -140,7 +140,7 @@ mod tests {
         let Diagram::C4(c) = diagram::lower(src).diagram else {
             panic!("not a C4 diagram")
         };
-        super::render(&c, &super::Options::default())
+        super::render(&c, &super::Options::UNICODE)
     }
 
     #[test]

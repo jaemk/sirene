@@ -244,7 +244,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let out = render(&chart, &Options::default());
+        let out = render(&chart, &Options::UNICODE);
         assert!(out.lines().nth(1).unwrap().ends_with("Edge ●│"), "{out}");
     }
 
@@ -270,7 +270,7 @@ mod tests {
             points: vec![at("Alpha", 0.1), at("Beta", 0.15), at("Center", 0.5)],
             ..Default::default()
         };
-        let out = render(&chart, &Options::default());
+        let out = render(&chart, &Options::UNICODE);
         let row = out.lines().nth(3).unwrap();
         // Alpha has Beta's point on its right and the border on its left.
         assert!(row.contains("1 ● Beta"), "{out}");
@@ -290,7 +290,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let out = render(&chart, &Options::default());
+        let out = render(&chart, &Options::UNICODE);
         let labels: String = out.lines().skip(14).collect();
         assert_eq!(labels, format!("{low}{high}"), "{out}");
         assert!(out.lines().all(|line| width(line) <= 43), "{out}");
@@ -322,7 +322,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let out = render(&chart, &Options::default());
+        let out = render(&chart, &Options::UNICODE);
         assert!(out.len() < 100_000, "output grew to {} bytes", out.len());
         assert_eq!(out.chars().filter(|&ch| ch == 'x').count(), 5_000);
     }

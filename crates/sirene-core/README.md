@@ -7,6 +7,7 @@ without the `sirene` CLI, with the same output.
 
 ```rust
 use std::path::Path;
+use sirene_core::ascii::Options;
 use sirene_core::diagram::{self, Lang};
 use sirene_core::scene::Theme;
 # fn main() -> sirene_core::Result<()> {
@@ -26,8 +27,8 @@ for d in &lowered.diagnostics {
     eprintln!("{line}:{col}: {}", d.message);
 }
 
-// What `sirene text`, `sirene svg`, and `sirene png` write.
-let text = lowered.ascii(&Default::default())?;
+// What `sirene ascii`, `sirene svg`, and `sirene png` write (`Options::UNICODE` is `sirene text`).
+let text = lowered.ascii(&Options::default())?;
 assert!(text.contains("Start"));
 let svg = lowered.svg(&Theme::LIGHT)?;
 assert!(svg.starts_with("<svg"));

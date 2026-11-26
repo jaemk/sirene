@@ -309,8 +309,8 @@ fn every_kind_takes_decorations() {
         );
         assert!(whole.width >= own.width, "{name}");
         assert!(whole.elements.len() > own.elements.len(), "{name}");
-        let rows = lowered.diagram.ascii(&Options::default()).unwrap();
-        let rows_own = d.diagram.ascii(&Options::default()).unwrap();
+        let rows = lowered.diagram.ascii(&Options::UNICODE).unwrap();
+        let rows_own = d.diagram.ascii(&Options::UNICODE).unwrap();
         assert!(
             rows.lines().count() > rows_own.lines().count() + 6,
             "{name}:\n{rows}"

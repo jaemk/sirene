@@ -42,7 +42,7 @@ fn names() -> Vec<String> {
 fn draw() {
     let lowered = diagram::lower("flowchart TD\n  a --> b --> c\n  a --> c\n");
     lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
-    lowered.diagram.ascii(&Options::default()).unwrap();
+    lowered.diagram.ascii(&Options::UNICODE).unwrap();
 }
 
 #[test]

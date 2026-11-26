@@ -451,7 +451,7 @@ mod tests {
         crate::equation::count::reset();
         let text = lowered
             .diagram
-            .ascii(&crate::ascii::Options::default())
+            .ascii(&crate::ascii::Options::UNICODE)
             .unwrap();
         assert_eq!(crate::equation::count::get(), 4, "text sets each");
         assert!(!text.contains("<latex>"), "{text}");
@@ -543,7 +543,7 @@ mod tests {
             );
             assert!(!scene.elements.is_empty(), "{kind}");
             crate::equation::count::reset();
-            let options = crate::ascii::Options::default();
+            let options = crate::ascii::Options::UNICODE;
             let text = lowered.diagram.ascii(&options).unwrap();
             assert_eq!(crate::equation::count::get(), n, "{kind}: text sets each");
             assert!(!text.contains("$$"), "{kind}:\n{text}");
@@ -718,7 +718,7 @@ mod tests {
             );
             assert!(!scene.elements.is_empty());
             crate::equation::count::reset();
-            let rows = lowered.diagram.ascii(&crate::ascii::Options::default());
+            let rows = lowered.diagram.ascii(&crate::ascii::Options::UNICODE);
             assert!(rows.is_ok());
             assert_eq!(
                 crate::equation::count::get(),

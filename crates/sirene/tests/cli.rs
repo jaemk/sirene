@@ -574,7 +574,7 @@ fn output_matches_the_library() {
         };
         assert_eq!(
             out(&["text", file]),
-            lowered.ascii(&Options::default()).unwrap().into_bytes(),
+            lowered.ascii(&Options::UNICODE).unwrap().into_bytes(),
             "{name}"
         );
         assert_eq!(

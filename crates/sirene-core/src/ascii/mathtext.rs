@@ -385,7 +385,7 @@ mod tests {
         }
         let chart = crate::flowchart::parse(&src).lower().flowchart;
         crate::equation::count::reset();
-        let out = super::super::render(&chart, &super::super::Options::default()).unwrap();
+        let out = super::super::render(&chart, &super::super::Options::UNICODE).unwrap();
         assert_eq!(crate::equation::count::get(), n);
         assert!(!out.contains("$$"), "{out}");
     }
@@ -393,7 +393,7 @@ mod tests {
     /// Lowers `src`, renders it as text, and returns the text and how many formulas were set.
     fn counted(src: &str) -> (String, usize) {
         use crate::diagram::{self, Diagram};
-        let options = super::super::Options::default();
+        let options = super::super::Options::UNICODE;
         // Lowering checks the formulas of some kinds; the render sets them.
         let lowered = diagram::lower(src);
         crate::equation::count::reset();
@@ -427,7 +427,7 @@ mod tests {
             let chart = crate::flowchart::parse(&format!("flowchart TD\n    {src}\n"))
                 .lower()
                 .flowchart;
-            let out = super::super::render(&chart, &super::super::Options::default()).unwrap();
+            let out = super::super::render(&chart, &super::super::Options::UNICODE).unwrap();
             assert!(
                 !out.contains('$') && !out.contains("phantom"),
                 "{src}: {out}"

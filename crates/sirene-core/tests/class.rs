@@ -341,7 +341,7 @@ fn drawing() {
             if *f == Theme::LIGHT.background)
     });
     assert!(hollow);
-    let out = ascii::render(&c, &Options::default()).unwrap();
+    let out = ascii::render(&c, &Options::UNICODE).unwrap();
     for want in ["◆", "◇", "△", "1", "many"] {
         assert!(out.contains(want), "{want}:\n{out}");
     }

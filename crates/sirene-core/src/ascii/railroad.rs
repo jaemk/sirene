@@ -216,7 +216,7 @@ mod tests {
     fn text(src: &str) -> String {
         let (chart, d) = crate::railroad::parse(src).lower();
         assert!(d.is_empty(), "{d:?}");
-        render(&chart, &Options::default())
+        render(&chart, &Options::UNICODE)
     }
 
     #[test]
@@ -271,6 +271,6 @@ mod tests {
              \x20     └───◄───┘\n"
         );
         let (chart, _) = crate::railroad::parse("railroad-beta\n").lower();
-        assert_eq!(render(&chart, &Options::default()), "");
+        assert_eq!(render(&chart, &Options::UNICODE), "");
     }
 }
