@@ -84,7 +84,7 @@
         function (s) {
           var source = editor.value;
           var svg = s.render(source, { format: "svg", lang: lang(), theme: "dark" });
-          var text = s.render(source, { format: "ascii", lang: lang() });
+          var text = s.render(source, { format: "text", lang: lang() });
           if (svg.ok) {
             if (url) URL.revokeObjectURL(url);
             url = URL.createObjectURL(new Blob([svg.output], { type: "image/svg+xml" }));
