@@ -12,10 +12,10 @@ playground draws Mermaid, PlantUML, or DOT as you type, with the same renderer.
 </p>
 
 ```
-$ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
-┌───────┐    ╱─────╲       ┌──────┐
-│ Start ├───►│ Ok? ├──yes─►│ Done │
-└───────┘    ╲─────╱       └──────┘
+$ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii --charset ascii
++-------+    /-----\       +------+
+| Start +--->| Ok? +--yes->| Done |
++-------+    \-----/       +------+
 ```
 
 * Two-way editing: the source sits beside a live drawing. Drag, connect, restyle, or relabel a
