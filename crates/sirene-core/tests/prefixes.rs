@@ -131,6 +131,39 @@ fn fixture_prefixes_draw() {
     }
 }
 
+/// A source with CRLF line endings draws as it does with LF.
+#[test]
+fn crlf_draws_as_lf() {
+    let mut paths = Vec::new();
+    fixtures(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures"),
+        &mut paths,
+    );
+    paths.sort();
+    let mut checked = 0;
+    for path in &paths {
+        let src = std::fs::read_to_string(path).unwrap();
+        if src.contains('\r') || !path.components().any(|c| c.as_os_str() == "valid") {
+            continue;
+        }
+        let lang = Lang::of_path(path);
+        let draw = |src: &str| {
+            diagram::lower_as(src, lang)
+                .diagram
+                .ascii(&Options::UNICODE)
+        };
+        let crlf = src.replace('\n', "\r\n");
+        assert_eq!(
+            draw(&src).unwrap(),
+            draw(&crlf).unwrap(),
+            "{}",
+            path.display()
+        );
+        checked += 1;
+    }
+    assert!(checked > 200, "{checked}");
+}
+
 #[test]
 fn example_and_guide_prefixes_draw() {
     let sources = examples_and_guide();
