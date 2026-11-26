@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*", "xtask", "wasm"]
 
 [workspace.package]
-version = "0.8.0"
+version = "0.8.1-dev"
 edition = "2024"
 rust-version = "1.92"
 license = "MIT OR Apache-2.0"
@@ -27,5 +27,5 @@ codegen-units = 1
 strip = true
 
 [workspace.dependencies]
-sirene-core = { path = "crates/sirene-core", version = "0.8.0" }
-sirene-gui = { path = "crates/sirene-gui", version = "0.8.0" }
+sirene-core = { path = "crates/sirene-core", version = "0.8.1-dev" }
+sirene-gui = { path = "crates/sirene-gui", version = "0.8.1-dev" }
