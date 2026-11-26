@@ -11,6 +11,7 @@ sirene-core = { version = "0.6", features = ["png"] }  # `png` only for PNG outp
 
 ```rust
 use std::path::Path;
+use sirene_core::ascii::Options;
 use sirene_core::diagram::{self, Lang};
 use sirene_core::scene::Theme;
 
@@ -26,8 +27,8 @@ fn main() -> sirene_core::Result<()> {
         eprintln!("{line}:{col}: {}", d.message);
     }
 
-    // What `sirene ascii`, `sirene svg`, and `sirene png` write.
-    println!("{}", lowered.ascii(&Default::default())?);
+    // What `sirene ascii`, `sirene svg`, and `sirene png` write (`Options::UNICODE` is `sirene text`).
+    println!("{}", lowered.ascii(&Options::default())?);
     let svg: String = lowered.svg(&Theme::LIGHT)?;
     let png: Vec<u8> = lowered.png(&Theme::DARK, sirene_core::scene::png::Quality::Fine, None)?;
 

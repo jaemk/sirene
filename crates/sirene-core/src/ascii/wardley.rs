@@ -217,7 +217,7 @@ mod tests {
     fn draw(src: &str) -> String {
         let (map, d) = crate::wardley::parse(src).lower();
         assert!(d.is_empty(), "{d:?}");
-        render(&map, &Options::default())
+        render(&map, &Options::UNICODE)
     }
 
     #[test]

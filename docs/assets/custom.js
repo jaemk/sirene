@@ -10,7 +10,7 @@
     a.textContent = "<- sirene home";
     scroll.insertBefore(a, scroll.firstChild);
   }
-  // The drawing / `sirene ascii` tabs samples.py adds below each diagram block.
+  // The drawing / `sirene text` tabs samples.py adds below each diagram block.
   function sampleTabs() {
     document.querySelectorAll(".sirene-sample").forEach(function (sample) {
       var views = sample.querySelectorAll(".sirene-view");
@@ -84,7 +84,7 @@
         function (s) {
           var source = editor.value;
           var svg = s.render(source, { format: "svg", lang: lang(), theme: "dark" });
-          var text = s.render(source, { format: "ascii", lang: lang() });
+          var text = s.render(source, { format: "text", lang: lang() });
           if (svg.ok) {
             if (url) URL.revokeObjectURL(url);
             url = URL.createObjectURL(new Blob([svg.output], { type: "image/svg+xml" }));
@@ -175,7 +175,7 @@
     "flowchart LR",
     "  edit[Edit the source] --> draw{{sirene draws it}}",
     "  draw --> svg([SVG])",
-    "  draw --> ascii([sirene ascii])",
+    "  draw --> ascii([sirene text])",
   ].join("\n");
 
   var LANGS = [
@@ -215,7 +215,7 @@
     var bar = element("div", "sirene-sample-bar");
     bar.setAttribute("role", "tablist");
     bar.setAttribute("aria-label", "Output");
-    [["drawing", "drawing"], ["ascii", "sirene ascii"]].forEach(function (v, i) {
+    [["drawing", "drawing"], ["ascii", "sirene text"]].forEach(function (v, i) {
       var b = element("button", "sirene-view" + (i === 0 ? " is-active" : ""), v[1]);
       b.type = "button";
       b.setAttribute("role", "tab");

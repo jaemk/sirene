@@ -2,15 +2,16 @@
 
 ```
 sirene [FILE...]              open each FILE in the editor, or a new document
-sirene ascii [FILE|-]         print a diagram, or a Markdown file's diagrams, as text
+sirene ascii [FILE|-]         print a diagram, or a Markdown file's diagrams, as ASCII text
+sirene text [FILE|-]          the same, with box-drawing characters
 sirene svg [FILE|DIR|-]       print or write SVG
 sirene png [FILE|DIR|-]       write PNG
 sirene check [FILE|DIR|-]...  print diagnostics only
 sirene update                 replace sirene with the latest release
 ```
 
-`svg`, `png`, `ascii`, and `check` never open a window, and work in a build without the GUI. With
-`-`, they read stdin; `svg`, `png`, and `ascii` also read stdin with no FILE.
+`svg`, `png`, `ascii`, `text`, and `check` never open a window, and work in a build without the GUI.
+With `-`, they read stdin; `svg`, `png`, `ascii`, and `text` also read stdin with no FILE.
 
 ## Languages
 
@@ -29,7 +30,7 @@ A `.tex` or `.latex` file (or `--lang latex`, also spelled `tex`) is one formula
 [LaTeX formulas](#latex-formulas). Directories do not pick up `.tex` files.
 
 A `.vsdx` file (or `--lang visio`) is a [Visio drawing](visio.md): `svg` and `png` write each
-page, or one with `--page N`; `ascii` is refused.
+page, or one with `--page N`; `ascii` and `text` are refused.
 
 ## Opening files
 
@@ -44,17 +45,23 @@ error: no file or command named 'acsii'; did you mean 'sirene ascii'? (to open a
 
 This exits with status 2, and no window opens.
 
-## `sirene ascii`
+## `sirene ascii` and `sirene text`
 
-Prints the diagram with box-drawing characters. `--charset ascii` uses only ASCII
-(`+`, `-`, `|`, `>`), including in formulas (`\/` for a radical, `alpha`, `<=`), and writes
-stereotypes as `<<interface>>` rather than `«interface»`. The default `unicode` keeps formulas to
-characters monospace fonts draw one cell wide; `--charset unicode-math` draws them with the full
-math glyphs (radical sign, sum sign, superscript digits), which some fonts draw wider than a cell. A Markdown file prints each diagram block, with a blank line between
-them.
+`ascii` prints the diagram with printable ASCII only (`+`, `-`, `|`, `>`), which lines up in any
+font. `text` prints it with box-drawing characters (`┌`, `─`, `►`), which most terminals draw
+well. They take the same options, and `--charset ascii|unicode|unicode-math` overrides the
+default of either, so `ascii --charset unicode` is `text`.
+
+| Charset | |
+|---|---|
+| `ascii` | printable ASCII only, including formulas (`\/` for a radical, `alpha`, `<=`); stereotypes are written `<<interface>>` rather than `«interface»` |
+| `unicode` | box-drawing characters; formulas keep to characters monospace fonts draw one cell wide |
+| `unicode-math` | as `unicode`, with the full math glyphs in formulas (radical sign, sum sign, superscript digits), which some fonts draw wider than a cell |
+
+A Markdown file prints each diagram block, with a blank line between them.
 
 ```
-$ printf 'flowchart TD\n  A --> B\n' | sirene ascii --charset ascii
+$ printf 'flowchart TD\n  A --> B\n' | sirene ascii
 +---+
 | A |
 +-+-+
@@ -63,13 +70,23 @@ $ printf 'flowchart TD\n  A --> B\n' | sirene ascii --charset ascii
 +---+
 | B |
 +---+
+
+$ printf 'flowchart TD\n  A --> B\n' | sirene text
+┌───┐
+│ A │
+└─┬─┘
+  │
+  ▼
+┌───┐
+│ B │
+└───┘
 ```
 
 `--width N` exits 1 with an error when a drawing is wider than N columns, still printing it,
 e.g. to keep drawings in a README within 80 columns:
 
 ```
-$ sirene ascii --width 80 README.md
+$ sirene text --width 80 README.md
 ```
 
 `--markdown` reads stdin, or a file of any name, as Markdown; `sirene check --markdown` does the
@@ -234,9 +251,9 @@ Markdown input, the limit applies to the whole file, not each diagram block.
 ```
 $ printf 'flowchart TD\n  A -->\n' | sirene ascii
 <stdin>:2:8: error: expected a node after the edge
-┌───┐
-│ A │
-└───┘
++---+
+| A |
++---+
 ```
 
 ## Verbose output

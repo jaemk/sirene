@@ -51,7 +51,7 @@ fn phases(src: &str, lang: Option<Lang>, with_png: bool) -> String {
     log::set_max_level(log::LevelFilter::Trace);
     let lowered = diagram::lower_as(src, lang);
     let _ = lowered.diagram.scene(&Approx, &Theme::LIGHT);
-    let _ = lowered.diagram.ascii(&Options::default());
+    let _ = lowered.diagram.ascii(&Options::UNICODE);
     if with_png {
         png(&lowered, Duration::ZERO);
     }
@@ -397,7 +397,7 @@ fn main() {
                 let _ = black_box(lowered.diagram.scene(&Approx, &Theme::LIGHT));
             });
             let ascii = time(budget, || {
-                let _ = black_box(lowered.diagram.ascii(&Options::default()));
+                let _ = black_box(lowered.diagram.ascii(&Options::UNICODE));
             });
             let mut row = vec![lower, scene, ascii];
             if args.png {
@@ -467,10 +467,7 @@ fn main() {
 
 /// Cells in the text drawing: its rows by its widest row.
 fn area(lowered: &diagram::Lowered) -> usize {
-    let text = lowered
-        .diagram
-        .ascii(&Options::default())
-        .unwrap_or_default();
+    let text = lowered.diagram.ascii(&Options::UNICODE).unwrap_or_default();
     let rows = text.lines().count();
     let cols = text.lines().map(|l| l.chars().count()).max().unwrap_or(0);
     rows * cols

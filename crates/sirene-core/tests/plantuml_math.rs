@@ -1168,7 +1168,7 @@ mod math {
                     "{name}"
                 );
             }
-            let rows = d.ascii(&Options::default()).unwrap();
+            let rows = d.ascii(&Options::UNICODE).unwrap();
             assert!(
                 !rows.contains("latex>") || name == "latex_inline_literal",
                 "{name}: {rows}"

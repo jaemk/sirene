@@ -16,16 +16,19 @@
 
 use std::cell::{Cell, RefCell};
 
+use sirene_core::ascii::Options;
 use sirene_core::diagnostic::{LineIndex, Severity};
 use sirene_core::diagram::{self, Lang, Lowered};
 use sirene_core::scene::Theme;
 
 /// `render`'s `format`: an SVG document.
 pub const FORMAT_SVG: u32 = 0;
-/// `render`'s `format`: the `sirene ascii` text.
+/// `render`'s `format`: the `sirene ascii` drawing, printable ASCII only.
 pub const FORMAT_ASCII: u32 = 1;
 /// `render`'s `format`: a PNG image (feature `png`).
 pub const FORMAT_PNG: u32 = 2;
+/// `render`'s `format`: the `sirene text` drawing, with box-drawing characters.
+pub const FORMAT_TEXT: u32 = 3;
 
 /// `render`'s `lang`: detect the language from the source, as `sirene` does for stdin.
 pub const LANG_DETECT: u32 = 0;
@@ -171,7 +174,8 @@ pub fn draw_page(
     };
     let drawn = match format {
         FORMAT_SVG => lowered.svg(&theme).map(String::into_bytes),
-        FORMAT_ASCII => lowered.ascii(&Default::default()).map(String::into_bytes),
+        FORMAT_ASCII => lowered.ascii(&Options::ASCII).map(String::into_bytes),
+        FORMAT_TEXT => lowered.ascii(&Options::UNICODE).map(String::into_bytes),
         #[cfg(feature = "png")]
         FORMAT_PNG => lowered.png(&theme, sirene_core::scene::png::Quality::Draft, None),
         _ => {
@@ -243,6 +247,9 @@ mod tests {
         let (ascii, _) = draw(src, FORMAT_ASCII, LANG_MERMAID, THEME_LIGHT);
         let ascii = text(ascii);
         assert!(ascii.contains('a') && ascii.contains('b'), "{ascii}");
+        assert!(ascii.is_ascii(), "{ascii}");
+        let (boxed, _) = draw(src, FORMAT_TEXT, LANG_MERMAID, THEME_LIGHT);
+        assert!(text(boxed).contains('\u{250c}'));
     }
 
     #[test]
@@ -274,6 +281,8 @@ mod tests {
         }
         let (ascii, _) = draw(&pkg, FORMAT_ASCII, LANG_DETECT, THEME_LIGHT);
         assert_eq!(ascii.unwrap_err(), "a Visio drawing has no text form");
+        let (boxed, _) = draw(&pkg, FORMAT_TEXT, LANG_DETECT, THEME_LIGHT);
+        assert_eq!(boxed.unwrap_err(), "a Visio drawing has no text form");
         let (svg, diagnostics) = draw(b"PK\x03\x04 junk", FORMAT_SVG, LANG_DETECT, THEME_LIGHT);
         assert!(svg.is_ok());
         assert!(

@@ -728,7 +728,7 @@ fn latex_formula() {
         }
         let ascii = diagram::lower(&src)
             .diagram
-            .ascii(&Options::default())
+            .ascii(&Options::UNICODE)
             .unwrap();
         assert!(ascii.ends_with('\n') && ascii.trim().len() > 3, "{name}");
     }
@@ -742,7 +742,7 @@ fn latex_formula() {
     let frac = equation("@startlatex\n\\frac{a}{b}\n@endlatex\n").0;
     let rows = diagram::lower(&format!("@startlatex\n{frac}\n@endlatex\n"))
         .diagram
-        .ascii(&Options::default())
+        .ascii(&Options::UNICODE)
         .unwrap();
     assert_eq!(rows.lines().count(), 3, "{rows}");
 }
@@ -770,7 +770,7 @@ fn latex_error_span() {
         panic!("{e:?}")
     };
     assert_eq!(text, "a + \\foo{x} + b");
-    let ascii = lowered.diagram.ascii(&Options::default()).unwrap();
+    let ascii = lowered.diagram.ascii(&Options::UNICODE).unwrap();
     assert_eq!(ascii, "a + \\foo{x} + b\n");
 }
 
@@ -793,7 +793,7 @@ fn latex_unclosed_and_empty() {
     assert!(d.is_empty(), "{d:?}");
     let lowered = diagram::lower("@startlatex\n@endlatex\n");
     lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
-    assert_eq!(lowered.diagram.ascii(&Options::default()).unwrap(), "\n");
+    assert_eq!(lowered.diagram.ascii(&Options::UNICODE).unwrap(), "\n");
 }
 
 /// PCREO-2: `@startmath` is one AsciiMath formula, drawn as the formula its TeX translation
@@ -834,7 +834,7 @@ fn math_formula() {
         }
         let ascii = diagram::lower(&src)
             .diagram
-            .ascii(&Options::default())
+            .ascii(&Options::UNICODE)
             .unwrap();
         assert!(ascii.ends_with('\n') && ascii.trim().len() > 3, "{name}");
     }
@@ -861,7 +861,7 @@ fn math_formula() {
     // A fraction is three rows of text.
     let rows = diagram::lower("@startmath\na/b\n@endmath\n")
         .diagram
-        .ascii(&Options::default())
+        .ascii(&Options::UNICODE)
         .unwrap();
     assert_eq!(rows.lines().count(), 3, "{rows}");
 }
@@ -889,7 +889,7 @@ fn math_error_span() {
         panic!("{e:?}")
     };
     assert_eq!(text, "a + x^1^2 + c");
-    let ascii = lowered.diagram.ascii(&Options::default()).unwrap();
+    let ascii = lowered.diagram.ascii(&Options::UNICODE).unwrap();
     assert_eq!(ascii, "a + x^1^2 + c\n");
 }
 
@@ -911,7 +911,7 @@ fn math_unclosed_and_empty() {
     assert!(d.is_empty(), "{d:?}");
     let lowered = diagram::lower("@startmath\n@endmath\n");
     lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
-    assert_eq!(lowered.diagram.ascii(&Options::default()).unwrap(), "\n");
+    assert_eq!(lowered.diagram.ascii(&Options::UNICODE).unwrap(), "\n");
     // `@endlatex` does not end a `@startmath` document.
     let (source, _) = equation("@startmath\nx\n@endlatex\n");
     assert_eq!(source, "x");
@@ -929,7 +929,7 @@ fn math_without_math_support() {
     let lowered = diagram::lower(src);
     let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
     assert_eq!(scene.elements.len(), 1);
-    assert_eq!(lowered.diagram.ascii(&Options::default()).unwrap(), "a/b\n");
+    assert_eq!(lowered.diagram.ascii(&Options::UNICODE).unwrap(), "a/b\n");
 }
 
 /// With math support off the document draws its source as text, with one warning.
@@ -945,7 +945,7 @@ fn latex_without_math_support() {
     let scene = lowered.diagram.scene(&Approx, &Theme::LIGHT).unwrap();
     assert_eq!(scene.elements.len(), 1);
     assert_eq!(
-        lowered.diagram.ascii(&Options::default()).unwrap(),
+        lowered.diagram.ascii(&Options::UNICODE).unwrap(),
         "\\frac{a}{b}\n"
     );
 }

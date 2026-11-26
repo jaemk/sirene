@@ -264,7 +264,7 @@ mod tests {
                 .collect(),
             ..XyChart::default()
         };
-        let rendered = render(&chart, &Options::default());
+        let rendered = render(&chart, &Options::UNICODE);
         assert_eq!(rendered.matches(&long_label).count(), 1);
         assert_eq!(rendered.matches("point").count(), 1000);
         assert!(rendered.contains("series999:"));

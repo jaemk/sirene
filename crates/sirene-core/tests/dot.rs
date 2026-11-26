@@ -377,7 +377,7 @@ fn html_tables() {
     );
     let rows: Vec<_> = c.edges.iter().map(|e| e.rows).collect();
     assert_eq!(rows, [[None, Some(2)], [None, Some(3)], [Some(1), None]]);
-    let out = ascii::render(&c, &Options::default()).unwrap();
+    let out = ascii::render(&c, &Options::UNICODE).unwrap();
     let line = |text: &str| out.lines().find(|l| l.contains(text)).unwrap();
     for field in ["name", "pk id"] {
         assert!(line(field).contains('►'), "{field}\n{out}");
@@ -402,7 +402,7 @@ fn blank_labels_and_lengths() {
         let lowered = diagram::lower(src);
         let c = lowered.diagram.into_graph();
         assert_eq!(c.title, None, "{src}");
-        let out = ascii::render(&c, &Options::default()).unwrap();
+        let out = ascii::render(&c, &Options::UNICODE).unwrap();
         assert!(out.starts_with('╭'), "{src}\n{out}");
     }
     let c = chart(
@@ -418,7 +418,7 @@ fn blank_labels_and_lengths() {
 fn ranks() {
     let c = chart("digraph { a -> b; a -> c; { rank=same; b; c } b -> c }");
     assert_eq!(c.same_rank, [vec!["b".to_owned(), "c".to_owned()]]);
-    let draw = |src: &str| ascii::render(&chart(src), &Options::default()).unwrap();
+    let draw = |src: &str| ascii::render(&chart(src), &Options::UNICODE).unwrap();
     // b and c side by side, the edge between them straight.
     let out = draw("digraph { a -> b; a -> c; { rank=same; b; c } b -> c }");
     assert!(out.contains("( b ├──►( c )"), "{out}");
@@ -495,7 +495,7 @@ fn compound_edges() {
     let c = chart(&src("compound=yes;", "ltail=cluster_p, lhead=cluster_q"));
     assert_eq!(ends(&c), ("cluster_p".into(), "cluster_q".into()));
     // The route runs from border to border.
-    let out = ascii::render(&c, &Options::default()).unwrap();
+    let out = ascii::render(&c, &Options::UNICODE).unwrap();
     assert!(out.contains("└───────┬───────┘"), "{out}");
     assert!(out.contains("▼\n    ┌───────┐"), "{out}");
     let messages = |src: &str| -> Vec<String> {
@@ -533,7 +533,7 @@ fn ordering() {
             ("b".to_owned(), EdgeOrder::In)
         ]
     );
-    let draw = |src: &str| ascii::render(&chart(src), &Options::default()).unwrap();
+    let draw = |src: &str| ascii::render(&chart(src), &Options::UNICODE).unwrap();
     let before = |out: &str, x: &str, y: &str| {
         out.find(&format!("( {x} )")).unwrap() < out.find(&format!("( {y} )")).unwrap()
     };
@@ -579,7 +579,7 @@ fn ports() {
     // A node's port beats the attribute.
     let c = chart("digraph { a:e -> b [tailport=w] }");
     assert_eq!(c.edges[0].ports, [Some(East), None]);
-    let draw = |src: &str| ascii::render(&chart(src), &Options::default()).unwrap();
+    let draw = |src: &str| ascii::render(&chart(src), &Options::UNICODE).unwrap();
     // a's ports run west to east, whichever way b and c lie: ports in the order the edges
     // take anyway change nothing, and the other order swaps the ends.
     for (dir, first, last) in [
@@ -638,7 +638,7 @@ fn record_ports() {
     assert_eq!(c.edges[1].ports, [None, Some(Compass::West)]);
     // Each edge reaches the box on its field's line.
     for dir in ["LR", "RL"] {
-        let out = ascii::render(&chart(&src(dir)), &Options::default()).unwrap();
+        let out = ascii::render(&chart(&src(dir)), &Options::UNICODE).unwrap();
         let line = |text: &str| out.lines().find(|l| l.contains(text)).unwrap();
         for field in ["head", "two", "three"] {
             assert!(line(field).contains(['►', '◄']), "{dir} {field}\n{out}");
@@ -694,7 +694,7 @@ fn record_ports() {
 fn groups() {
     let c = chart("digraph { a [group=g]; b [group=h]; c [group=g]; d [group=\"\"] }");
     assert_eq!(c.groups, [vec!["a", "c"], vec!["b"]]);
-    let draw = |src: &str| ascii::render(&chart(src), &Options::default()).unwrap();
+    let draw = |src: &str| ascii::render(&chart(src), &Options::UNICODE).unwrap();
     // Whether the column through the middle of `lower` runs straight up to `upper`'s box.
     let straight = |out: &str, upper: &str, lower: &str| {
         let lines: Vec<Vec<char>> = out.lines().map(|l| l.chars().collect()).collect();
@@ -734,7 +734,7 @@ fn end_ranks() {
         c.end_ranks[1],
         (RankEnd::Sink, vec!["d".into(), "e".into()])
     );
-    let draw = |src: &str| ascii::render(&chart(src), &Options::default()).unwrap();
+    let draw = |src: &str| ascii::render(&chart(src), &Options::UNICODE).unwrap();
     let row = |out: &str, node: &str| {
         let i = out.find(&format!("( {node} )")).unwrap();
         out[..i].matches('\n').count()
@@ -758,7 +758,7 @@ fn end_ranks() {
 /// labeled one goes up to its label above the rank; between clusters it passes their borders.
 #[test]
 fn flat_edges() {
-    let draw = |src: &str| ascii::render(&chart(src), &Options::default()).unwrap();
+    let draw = |src: &str| ascii::render(&chart(src), &Options::UNICODE).unwrap();
     let out = draw("digraph { {rank=same; a; b; c} a -> c }");
     let lines: Vec<&str> = out.lines().collect();
     assert_eq!(lines[1], "( a )   ( b )   ( c )", "{out}");
@@ -818,7 +818,7 @@ fn limits() {
     );
     let c = lowered.diagram.into_graph();
     assert_eq!(c.nodes.len(), 2);
-    assert!(!ascii::render(&c, &Options::default()).unwrap().is_empty());
+    assert!(!ascii::render(&c, &Options::UNICODE).unwrap().is_empty());
 
     // No edge is drawn across a subgraph that was skipped.
     let src = format!(

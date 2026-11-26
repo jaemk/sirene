@@ -344,8 +344,8 @@ fn drawing() {
     assert!(pos("a").y > pos("b").y);
     assert!(pos("main").y > pos("a").y, "branch names below");
     // ASCII flips rows for bottom to top.
-    let down = tb.ascii(&Options::default()).unwrap();
-    let up = bt.ascii(&Options::default()).unwrap();
+    let down = tb.ascii(&Options::UNICODE).unwrap();
+    let up = bt.ascii(&Options::UNICODE).unwrap();
     let lines = |s: &str| s.lines().map(str::to_owned).collect::<Vec<_>>();
     assert_eq!(lines(&down)[0], "main");
     assert_eq!(lines(&up).last().map(String::as_str), Some("main"));

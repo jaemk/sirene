@@ -518,7 +518,7 @@ mod tests {
         assert_eq!(crate::equation::count::get(), 5, "drawing sets each once");
         assert!(!scene.elements.is_empty());
         crate::equation::count::reset();
-        let options = crate::ascii::Options::default();
+        let options = crate::ascii::Options::UNICODE;
         let text = lowered.diagram.ascii(&options).unwrap();
         assert_eq!(crate::equation::count::get(), 5, "text sets each once");
         assert!(!text.contains("latex>"), "{text}");

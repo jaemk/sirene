@@ -75,18 +75,30 @@ use mathtext::Rows;
 pub enum Charset {
     /// Box-drawing characters. Formulas use only characters that common monospace fonts draw in
     /// one cell (see `math::glyphs`), with `^2` and `_i` scripts and `\/` radicals.
-    #[default]
     Unicode,
     /// Only printable ASCII.
+    #[default]
     Ascii,
     /// As `Unicode`, and formulas also use mathematical symbols, Unicode super- and subscripts, and
     /// bracket pieces, which some fonts draw wider than one cell.
     UnicodeMath,
 }
 
+/// Text rendering options. The default draws printable ASCII, as `sirene ascii` does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Options {
     pub charset: Charset,
+}
+
+impl Options {
+    /// Printable ASCII only (the default).
+    pub const ASCII: Options = Options {
+        charset: Charset::Ascii,
+    };
+    /// Box-drawing characters, as `sirene text` prints.
+    pub const UNICODE: Options = Options {
+        charset: Charset::Unicode,
+    };
 }
 
 /// Spacing in cells (ASCIIR-8).

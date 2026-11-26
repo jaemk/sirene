@@ -8,7 +8,7 @@
 //   // r.ok, r.output (a string, or a Uint8Array for "png"), r.error, r.diagnostics, r.pages
 //   sirene.renderAll(); // replaces each diagram block on the page with its drawing
 (function (root) {
-  var FORMATS = { svg: 0, ascii: 1, png: 2 };
+  var FORMATS = { svg: 0, ascii: 1, png: 2, text: 3 };
   var LANGS = { detect: 0, mermaid: 1, dot: 2, graphviz: 2, plantuml: 3, puml: 3, latex: 4, tex: 4, visio: 5, vsdx: 5 };
   var THEMES = { light: 0, dark: 1 };
 

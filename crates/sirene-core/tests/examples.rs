@@ -46,7 +46,7 @@ fn examples_render_cleanly() {
         assert!(
             !lowered
                 .diagram
-                .ascii(&Options::default())
+                .ascii(&Options::UNICODE)
                 .unwrap()
                 .trim()
                 .is_empty(),

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """mdBook preprocessor: draws each `mermaid`, `plantuml`, `puml`, `dot`, or `graphviz` code block
-with sirene and adds the drawing and the `sirene ascii` text below it, as on the landing page.
+with sirene and adds the drawing and the `sirene text` output below it, as on the landing page.
 The page redraws them in the browser when the block is edited (assets/custom.js).
 
 The sirene binary is $SIRENE, else target/release/sirene or target/debug/sirene in the
@@ -56,7 +56,7 @@ def run(binary, args, source, where):
 
 def sample(binary, lang, source, where):
     svg = run(binary, ["svg", "--theme", "dark", "--lang", lang], source, where)
-    ascii_text = run(binary, ["ascii", "--lang", lang], source, where).rstrip("\n")
+    ascii_text = run(binary, ["text", "--lang", lang], source, where).rstrip("\n")
     data = base64.b64encode(svg.encode()).decode()
     # One line, so Markdown keeps the whole block as raw HTML (a blank line would end it).
     text = html.escape(ascii_text, quote=False).replace("\n", "&#10;")
@@ -66,7 +66,7 @@ def sample(binary, lang, source, where):
         '<button class="sirene-view is-active" type="button" role="tab" aria-selected="true" '
         'data-view="drawing">drawing</button>'
         '<button class="sirene-view" type="button" role="tab" aria-selected="false" '
-        'data-view="ascii">sirene ascii</button>'
+        'data-view="ascii">sirene text</button>'
         "</div>"
         '<div class="sirene-pane sirene-drawing" data-pane="drawing">'
         f'<img alt="the drawing of the {lang} source above" src="data:image/svg+xml;base64,{data}">'

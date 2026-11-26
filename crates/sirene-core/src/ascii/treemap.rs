@@ -173,7 +173,7 @@ mod tests {
                 items,
                 ..Treemap::default()
             },
-            &Options::default(),
+            &Options::UNICODE,
         );
         assert!(out.contains(&long_name));
         assert_eq!(out.matches("short").count(), 1_000);

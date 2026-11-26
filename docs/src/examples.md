@@ -1,7 +1,7 @@
 # Examples
 
 The diagrams in [`examples/`](https://github.com/jaemk/sirene/tree/main/examples), drawn by
-`sirene svg --theme dark` and `sirene ascii` when this site was built. Open one in the editor with
+`sirene svg --theme dark` and `sirene text` when this site was built. Open one in the editor with
 `sirene examples/architecture.mmd`.
 
 ## Architecture

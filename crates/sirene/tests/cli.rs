@@ -12,7 +12,7 @@ fn sirene() -> Command {
 fn logging_environment_and_verbose_precedence() {
     let source = "flowchart TD\nA --> B\n";
     sirene()
-        .arg("ascii")
+        .arg("text")
         .env("SIRENE_LOG", "debug")
         .write_stdin(source)
         .assert()
@@ -20,7 +20,7 @@ fn logging_environment_and_verbose_precedence() {
         .stdout(AB)
         .stderr(predicate::str::contains("DEBUG sirene: sirene "));
     sirene()
-        .arg("ascii")
+        .arg("text")
         .env("RUST_LOG", "sirene=debug")
         .write_stdin(source)
         .assert()
@@ -29,7 +29,7 @@ fn logging_environment_and_verbose_precedence() {
         .stderr(predicate::str::contains("reading <stdin>"));
     for quiet in ["", "off"] {
         sirene()
-            .arg("ascii")
+            .arg("text")
             .env("SIRENE_LOG", quiet)
             .env("RUST_LOG", "trace")
             .write_stdin(source)
@@ -39,7 +39,7 @@ fn logging_environment_and_verbose_precedence() {
             .stderr("");
     }
     sirene()
-        .args(["-v", "ascii"])
+        .args(["-v", "text"])
         .env("SIRENE_LOG", "off,sirene_core=off")
         .write_stdin(source)
         .assert()
@@ -48,14 +48,14 @@ fn logging_environment_and_verbose_precedence() {
         .stderr(predicate::str::contains("reading <stdin>"))
         .stderr(predicate::str::contains("sirene_core").not());
     sirene()
-        .args(["ascii", "-vv"])
+        .args(["text", "-vv"])
         .write_stdin(source)
         .assert()
         .success()
         .stdout(AB)
         .stderr(predicate::str::contains("TRACE sirene: lowering"));
     sirene()
-        .arg("ascii")
+        .arg("text")
         .env("SIRENE_LOG", "off,sirene_core::flowchart=debug")
         .write_stdin(source)
         .assert()
@@ -70,7 +70,7 @@ fn logging_environment_and_verbose_precedence() {
 fn phase_timings_follow_their_target() {
     let source = "flowchart TD\nA --> B\n";
     sirene()
-        .arg("ascii")
+        .arg("text")
         .env("SIRENE_LOG", "off,sirene_core::profile=trace")
         .write_stdin(source)
         .assert()
@@ -84,7 +84,7 @@ fn phase_timings_follow_their_target() {
         ))
         .stderr(predicate::str::contains("reading <stdin>").not());
     sirene()
-        .arg("ascii")
+        .arg("text")
         .env("SIRENE_LOG", "trace,sirene_core::profile=off")
         .write_stdin(source)
         .assert()
@@ -229,7 +229,7 @@ fn prints_help() {
 /// alone; without it nothing extra is printed.
 #[test]
 fn verbose_reports_each_step() {
-    for args in [["-v", "ascii"], ["ascii", "--verbose"]] {
+    for args in [["-v", "text"], ["text", "--verbose"]] {
         let out = sirene()
             .args(args)
             .write_stdin("flowchart TD\nA --> B\n")
@@ -279,7 +279,7 @@ fn verbose_reports_each_step() {
     }
 
     sirene()
-        .args(["-v", "ascii", "missing.mmd"])
+        .args(["-v", "text", "missing.mmd"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("reading missing.mmd"))
@@ -308,14 +308,14 @@ const AB: &str = "\
 #[test]
 fn ascii_reads_stdin() {
     sirene()
-        .arg("ascii")
+        .arg("text")
         .write_stdin("flowchart TD\nA --> B\n")
         .assert()
         .success()
         .stdout(AB)
         .stderr("");
     sirene()
-        .args(["ascii", "-"])
+        .args(["text", "-"])
         .write_stdin("flowchart TD\nA --> B\n")
         .assert()
         .success()
@@ -331,6 +331,16 @@ fn readme_example() {
         .assert()
         .success()
         .stdout(concat!(
+            "+-------+    /-----\\       +------+\n",
+            "| Start +--->| Ok? +--yes->| Done |\n",
+            "+-------+    \\-----/       +------+\n",
+        ));
+    sirene()
+        .arg("text")
+        .write_stdin("flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n")
+        .assert()
+        .success()
+        .stdout(concat!(
             "┌───────┐    ╱─────╲       ┌──────┐\n",
             "│ Start ├───►│ Ok? ├──yes─►│ Done │\n",
             "└───────┘    ╲─────╱       └──────┘\n",
@@ -340,10 +350,37 @@ fn readme_example() {
 #[test]
 fn ascii_reads_a_file() {
     sirene()
-        .args(["ascii", &fixture("accessibility")])
+        .args(["text", &fixture("accessibility")])
         .assert()
         .success()
         .stdout("┌───┐    ┌───┐\n│ A ├───►│ B │\n└───┘    └───┘\n");
+}
+
+/// `ascii` draws plain ASCII and `text` box-drawing characters; `--charset` overrides either.
+#[test]
+fn ascii_and_text_default_charsets() {
+    let ascii = "+---+    +---+\n| A +--->| B |\n+---+    +---+\n";
+    let unicode = "┌───┐    ┌───┐\n│ A ├───►│ B │\n└───┘    └───┘\n";
+    let source = "flowchart LR\nA --> B\n";
+    for (args, want) in [
+        (&["ascii"][..], ascii),
+        (&["ascii", "--charset", "unicode"], unicode),
+        (&["text"], unicode),
+        (&["text", "--charset", "ascii"], ascii),
+    ] {
+        sirene()
+            .args(args)
+            .write_stdin(source)
+            .assert()
+            .success()
+            .stdout(want)
+            .stderr("");
+    }
+    sirene()
+        .args(["text", "--charset", "ebcdic"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("ebcdic"));
 }
 
 #[test]
@@ -404,7 +441,7 @@ fn ascii_reports_warnings() {
 #[test]
 fn ascii_reports_errors_and_still_renders() {
     sirene()
-        .arg("ascii")
+        .arg("text")
         .write_stdin("flowchart TD\nA --> B\nlinkStyle 5 color:red\n")
         .assert()
         .failure()
@@ -536,8 +573,8 @@ fn output_matches_the_library() {
             output.stdout
         };
         assert_eq!(
-            out(&["ascii", file]),
-            lowered.ascii(&Options::default()).unwrap().into_bytes(),
+            out(&["text", file]),
+            lowered.ascii(&Options::UNICODE).unwrap().into_bytes(),
             "{name}"
         );
         assert_eq!(
@@ -825,7 +862,7 @@ fn directories() {
         .assert()
         .failure()
         .stderr(format!(
-            "error: {} is a directory; ascii reads one file\n",
+            "error: {} is a directory; ascii and text read one file\n",
             dir.display()
         ));
 
@@ -2138,7 +2175,7 @@ fn xy_charts() {
 #[test]
 fn quadrant_charts() {
     sirene()
-        .arg("ascii")
+        .arg("text")
         .write_stdin("quadrantChart\n  quadrant-1 Do\n  A: [0.75, 0.75]\n")
         .assert()
         .success()

@@ -55,7 +55,7 @@ mod tests {
         .lower();
         assert!(d.is_empty(), "{d:?}");
         assert_eq!(
-            render(&view, &Options::default()),
+            render(&view, &Options::UNICODE),
             "/\n├── src/\n│   ├── a.ts   entry\n│   └── b/\n│       └── c\n└── README.md\n"
         );
         let ascii = Options {

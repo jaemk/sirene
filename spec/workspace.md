@@ -131,7 +131,7 @@ most 64 MiB (`source::MAX_INPUT`), naming UTF-16 or the first invalid byte other
 and the editor read files and stdin through it. `diagram::lower_as` reads a source, with
 `Lang::of_path` picking DOT or PlantUML from a file extension. `Lowered::ascii`, `Lowered::svg`,
 and `Lowered::png` (feature `png`) apply the diagram's own theme settings over the given theme
-and return what `sirene ascii`, `sirene svg`, and `sirene png` write for the same file and
+and return what `sirene text`, `sirene svg`, and `sirene png` write for the same file and
 options; the CLI calls them. `markdown::mermaid_blocks` finds a Markdown file's diagram blocks,
 each lowered with `lower_as(&block.code, Some(block.lang))`. Choosing output paths and
 Markdown image links stay in the CLI.
@@ -174,7 +174,7 @@ the job.
 
 The docs site (`.github/workflows/pages.yml`) serves the module as `wasm/sirene.wasm`.
 `docs/assets/custom.js` fetches it on first use: an `edit` button on each sample `samples.py`
-draws swaps the code block for an editor and redraws the drawing and `sirene ascii` text as it
+draws swaps the code block for an editor and redraws the drawing and `sirene text` output as it
 changes, showing the first diagnostics; the playground page does the same for Mermaid,
 PlantUML, or DOT, keeping the language and source in the URL fragment (`#lang:base64url`).
 

@@ -34,7 +34,9 @@ for (const [name, lang, src] of sources) {
   const errors = svg.diagnostics.filter((d) => d.severity === "error");
   check(name, "diagnostics", errors.length === 0, JSON.stringify(errors));
   const ascii = sirene.render(src, { format: "ascii", lang });
-  check(name, "ascii", ascii.ok && ascii.output.length > 0, ascii.error);
+  check(name, "ascii", ascii.ok && ascii.output.length > 0 && /^[\x20-\x7e\n]*$/.test(ascii.output), ascii.error);
+  const boxed = sirene.render(src, { format: "text", lang });
+  check(name, "text", boxed.ok && boxed.output.length > 0, boxed.error);
   const png = sirene.render(src, { format: "png", lang, theme: "dark" });
   const sig = png.ok && Buffer.from(png.output.subarray(0, 4)).toString("latin1");
   check(name, "png", sig === "\x89PNG", png.error);
@@ -51,6 +53,7 @@ for (const options of [{ lang: "visio" }, {}]) {
 }
 check("vsdx", "page range", !sirene.render(vsdx, { format: "svg", page: 5 }).ok, "drew page 5");
 check("vsdx", "ascii", !sirene.render(vsdx, { format: "ascii" }).ok, "drew text");
+check("vsdx", "text", !sirene.render(vsdx, { format: "text" }).ok, "drew text");
 
 // Diagnostics carry their 1-based line and column.
 const bad = sirene.render("flowchart LR\n  a --> \n", { format: "svg" });

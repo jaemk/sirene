@@ -158,7 +158,7 @@ fn scale(c: &mut Criterion) {
                 b.iter(|| l.diagram.scene(&Approx, &Theme::LIGHT).unwrap());
             });
             group.bench_with_input(BenchmarkId::new("ascii", n), &lowered, |b, l| {
-                b.iter(|| l.diagram.ascii(&Options::default()).unwrap());
+                b.iter(|| l.diagram.ascii(&Options::UNICODE).unwrap());
             });
         }
         group.finish();

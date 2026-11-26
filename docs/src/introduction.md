@@ -7,7 +7,7 @@ renderer is a [Rust library](library.md) and, compiled to WebAssembly, a
 [JavaScript library](embedding.md) for web pages and Node.
 
 ```
-$ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
+$ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene text
 ┌───────┐    ╱─────╲       ┌──────┐
 │ Start ├───►│ Ok? ├──yes─►│ Done │
 └───────┘    ╲─────╱       └──────┘
@@ -15,7 +15,7 @@ $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
 
 - `sirene FILE` opens an editor window: the source on the left, a live drawing on the right.
   Edits on either side are written to the source as ordinary text edits.
-- `sirene svg`, `sirene png`, and `sirene ascii` render a diagram file, a Markdown file's
+- `sirene svg`, `sirene png`, `sirene ascii`, and `sirene text` render a diagram file, a Markdown file's
   diagram blocks, or stdin without opening a window, and can watch files for changes.
   `svg` and `png` also render directories of diagrams and watch for new files.
 - The parser keeps every byte of the source, so the editor never reformats a file. Diagnostics

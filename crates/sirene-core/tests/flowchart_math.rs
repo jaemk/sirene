@@ -511,7 +511,7 @@ mod no_math {
         let chart = flowchart::parse("flowchart TD\n  A[\"`**b** $$a*b*c$$`\"]\n")
             .lower()
             .flowchart;
-        let out = ascii::render(&chart, &Options::default()).unwrap();
+        let out = ascii::render(&chart, &Options::UNICODE).unwrap();
         assert!(out.contains("$$a*b*c$$"), "{out}");
     }
 }

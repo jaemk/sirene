@@ -171,7 +171,7 @@ mod tests {
         let Diagram::Block(b) = diagram::lower(src).diagram else {
             panic!("not a block diagram")
         };
-        super::render(&b, &super::Options::default())
+        super::render(&b, &super::Options::UNICODE)
     }
 
     #[test]

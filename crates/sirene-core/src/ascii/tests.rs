@@ -2,11 +2,7 @@ use super::*;
 use crate::flowchart;
 
 fn draw(src: &str) -> String {
-    render(
-        &flowchart::parse(src).lower().flowchart,
-        &Options::default(),
-    )
-    .unwrap()
+    render(&flowchart::parse(src).lower().flowchart, &Options::UNICODE).unwrap()
 }
 
 fn draw_ascii(src: &str) -> String {
@@ -58,11 +54,11 @@ fn blank_titles() {
         .flowchart;
     for blank in ["", " ", "\t \n"] {
         c.title = Some(blank.into());
-        assert_eq!(render(&c, &Options::default()).unwrap(), plain, "{blank:?}");
+        assert_eq!(render(&c, &Options::UNICODE).unwrap(), plain, "{blank:?}");
     }
     c.title = Some("  T  ".into());
     assert_eq!(
-        render(&c, &Options::default()).unwrap(),
+        render(&c, &Options::UNICODE).unwrap(),
         format!("      T\n\n{plain}")
     );
 }
@@ -448,7 +444,20 @@ fn control_characters_become_spaces() {
     let mut chart = flowchart::parse("flowchart\nA\n").lower().flowchart;
     chart.nodes[0].label = Label::plain("a\tb");
     assert_eq!(
-        render(&chart, &Options::default()).unwrap(),
+        render(&chart, &Options::UNICODE).unwrap(),
         "┌─────┐\n│ a b │\n└─────┘\n"
     );
+}
+
+/// The default options draw printable ASCII, as `sirene ascii` does; `UNICODE` draws box-drawing
+/// characters, as `sirene text` does.
+#[test]
+fn default_options_are_ascii() {
+    assert_eq!(Options::default(), Options::ASCII);
+    assert_eq!(Charset::default(), Charset::Ascii);
+    let lowered = crate::diagram::lower("flowchart LR\n  A --> B\n");
+    let plain = lowered.ascii(&Options::default()).unwrap();
+    assert!(plain.is_ascii(), "{plain}");
+    let boxed = lowered.ascii(&Options::UNICODE).unwrap();
+    assert!(boxed.contains('\u{250c}'), "{boxed}");
 }

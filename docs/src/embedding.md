@@ -173,13 +173,18 @@ module and the `.wasm` as a URL or an asset; pass its bytes, or a `fetch` of it,
 
 ### Text output
 
-`format: "ascii"` gives what `sirene ascii` prints:
+`format: "ascii"` gives what `sirene ascii` prints, and `format: "text"` what `sirene text` prints:
 
 ```js
 console.log(sirene.render("flowchart LR\n  A --> B\n", { format: "ascii" }).output);
+console.log(sirene.render("flowchart LR\n  A --> B\n", { format: "text" }).output);
 ```
 
 ```
++---+    +---+
+| A +--->| B |
++---+    +---+
+
 ┌───┐    ┌───┐
 │ A ├───►│ B │
 └───┘    └───┘
@@ -202,7 +207,7 @@ bytes.
 
 | Option | Values |
 | --- | --- |
-| `format` | `svg` (default), `ascii` |
+| `format` | `svg` (default), `ascii` (printable ASCII), `text` (box-drawing characters) |
 | `lang` | `detect` (default, from the source's header), `mermaid`, `plantuml` or `puml`, `dot` or `graphviz`, `latex` or `tex` (one formula), `visio` or `vsdx` (a `.vsdx` package, given as bytes; also detected by its `PK` magic) |
 | `page` | For a Visio drawing, the page to draw, from 0 (default 0) |
 | `theme` | `dark` (default), `light`; a diagram's own `theme` setting applies over it |
@@ -212,7 +217,7 @@ An unknown value for `format`, `lang`, or `theme` throws.
 | Result | |
 | --- | --- |
 | `ok` | `true` when a drawing was made, also when its source has mistakes |
-| `output` | the SVG document, or the text for `ascii`; `null` when `ok` is false |
+| `output` | the SVG document, or the text for `ascii` and `text`; `null` when `ok` is false |
 | `error` | why nothing was drawn; `null` when `ok` |
 | `diagnostics` | `[{ severity, line, column, message }]`, `severity` `"error"` or `"warning"`, `line` and `column` from 1 (both 1 for a Visio drawing) |
 | `pages` | the page count of a Visio drawing |
@@ -222,7 +227,7 @@ defaults to `light`.
 
 A source that crashes the module returns `ok: false` and the next call starts a fresh instance.
 `format: "png"` exists only in a module built with the `png` feature (`cargo build -p sirene-wasm
---features png`); the released module does not include it. `ascii` fails for a Visio drawing,
+--features png`); the released module does not include it. `ascii` and `text` fail for a Visio drawing,
 which has no text form.
 
 A page with a Content Security Policy needs `script-src 'wasm-unsafe-eval'` to compile the

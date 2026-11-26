@@ -247,7 +247,7 @@ fn drawing() {
         })
         .collect();
     assert!(texts.contains(&"has"), "{texts:?}");
-    let out = ascii::render(&c, &Options::default()).unwrap();
+    let out = ascii::render(&c, &Options::UNICODE).unwrap();
     for want in ["1", "*", "?", "+"] {
         assert!(out.contains(want), "{want}:\n{out}");
     }

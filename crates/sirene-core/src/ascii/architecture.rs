@@ -158,7 +158,7 @@ mod tests {
         let Diagram::Architecture(a) = diagram::lower(src).diagram else {
             panic!("not an architecture diagram")
         };
-        super::render(&a, &super::Options::default())
+        super::render(&a, &super::Options::UNICODE)
     }
 
     #[test]

@@ -13,15 +13,17 @@ playground draws Mermaid, PlantUML, or DOT as you type, with the same renderer.
 
 ```
 $ printf 'flowchart LR\n  A[Start] --> B{Ok?} -->|yes| C[Done]\n' | sirene ascii
-┌───────┐    ╱─────╲       ┌──────┐
-│ Start ├───►│ Ok? ├──yes─►│ Done │
-└───────┘    ╲─────╱       └──────┘
++-------+    /-----\       +------+
+| Start +--->| Ok? +--yes->| Done |
++-------+    \-----/       +------+
 ```
+
+`sirene text` draws the same with Unicode box-drawing characters.
 
 * Two-way editing: the source sits beside a live drawing. Drag, connect, restyle, or relabel a
   flowchart in the drawing, and each change is written back to the source as a text edit.
-* Three outputs: SVG and PNG for documents, box-drawing text for terminals, READMEs, and code
-  comments.
+* Three outputs: SVG and PNG for documents, text for terminals, READMEs, and code comments
+  (plain ASCII, or box-drawing characters with `sirene text`).
 * One binary: no browser, Node, or network needed to render. PNG text uses embedded fonts, so
   images are the same on every machine.
 * Scripts and CI: `sirene check` exits 1 on errors, `svg` and `png` render the diagram blocks in
@@ -57,7 +59,8 @@ for the details.
 ```
 sirene diagram.mmd           # open the editor; follows changes on disk
 sirene notes.md              # edit a Markdown file's mermaid blocks, one at a time
-sirene ascii diagram.mmd     # print it as text (--charset ascii for plain ASCII)
+sirene ascii diagram.mmd     # print it as plain ASCII text
+sirene text diagram.mmd      # print it with Unicode box-drawing characters
 sirene svg diagram.mmd       # print SVG (--theme light|dark, -o FILE)
 sirene png diagram.mmd       # write diagram.png (--quality, --scale, --theme, -o FILE)
 sirene png --watch docs/     # write a .png beside each diagram under docs/, again on each change
