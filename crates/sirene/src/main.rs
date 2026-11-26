@@ -123,23 +123,11 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
-    /// Print a diagram, or each diagram block of a Markdown file, as text.
-    Ascii {
-        /// Diagram or Markdown file to read; stdin when omitted or `-`.
-        file: Option<PathBuf>,
-        /// Read stdin or FILE as Markdown, whatever its name.
-        #[arg(long)]
-        markdown: bool,
-        /// Characters to draw with.
-        #[arg(long, value_enum, default_value_t = CharsetArg::Unicode)]
-        charset: CharsetArg,
-        /// Fail when a drawing is wider than N columns. It is still printed.
-        #[arg(long, value_name = "N")]
-        width: Option<usize>,
-        /// Print again each time FILE changes, until interrupted.
-        #[arg(short, long)]
-        watch: bool,
-    },
+    /// Print a diagram, or each diagram block of a Markdown file, as plain ASCII text.
+    Ascii(TextArgs),
+    /// Print a diagram, or each diagram block of a Markdown file, as text with box-drawing
+    /// characters (`ascii --charset unicode`).
+    Text(TextArgs),
     /// Print a diagram as SVG, or write one per diagram in a directory or Markdown file.
     Svg {
         /// Diagram file or directory to read; stdin when omitted or `-`. A directory's diagram
@@ -206,6 +194,25 @@ enum Command {
         #[arg(long, value_name = "VERSION")]
         to: Option<String>,
     },
+}
+
+/// The options of `ascii` and `text`, which differ only in the default charset.
+#[derive(Debug, clap::Args)]
+struct TextArgs {
+    /// Diagram or Markdown file to read; stdin when omitted or `-`.
+    file: Option<PathBuf>,
+    /// Read stdin or FILE as Markdown, whatever its name.
+    #[arg(long)]
+    markdown: bool,
+    /// Characters to draw with (default: ascii for `ascii`, unicode for `text`).
+    #[arg(long, value_enum)]
+    charset: Option<CharsetArg>,
+    /// Fail when a drawing is wider than N columns. It is still printed.
+    #[arg(long, value_name = "N")]
+    width: Option<usize>,
+    /// Print again each time FILE changes, until interrupted.
+    #[arg(short, long)]
+    watch: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -343,6 +350,53 @@ fn edits(a: &str, b: &str) -> usize {
     d[a.len()][b.len()]
 }
 
+/// `ascii` and `text`: print a diagram as text, drawn with `default` unless `--charset` says
+/// otherwise.
+fn print_text(args: TextArgs, default: CharsetArg) -> ExitCode {
+    let TextArgs {
+        file,
+        markdown,
+        charset,
+        width,
+        watch,
+    } = args;
+
+    let charset = match charset.unwrap_or(default) {
+        CharsetArg::Unicode => Charset::Unicode,
+        CharsetArg::Ascii => Charset::Ascii,
+        CharsetArg::UnicodeMath => Charset::UnicodeMath,
+    };
+    let stdin = PathBuf::from("-");
+    let md = if markdown {
+        Some(file.as_ref().unwrap_or(&stdin)).filter(|f| !f.is_dir())
+    } else {
+        markdown_file(&file)
+    };
+    if let Some(md) = md {
+        if watch && md.as_os_str() == "-" {
+            diagnostic!("error: --watch needs a FILE or directory, not stdin");
+            return ExitCode::FAILURE;
+        }
+        return markdown_blocks(md, watch, || markdown::print_ascii(md, charset, width));
+    }
+    let wide = std::cell::Cell::new(false);
+    let name = file
+        .as_deref()
+        .filter(|f| f.as_os_str() != "-")
+        .map_or_else(|| "<stdin>".to_owned(), |f| f.display().to_string());
+    let code = convert(file, None, None, watch, |l| {
+        let drawing = l.ascii(&Options { charset })?;
+        if too_wide(&name, &drawing, width) {
+            wide.set(true);
+        }
+        Ok(drawing.into_bytes())
+    });
+    if wide.get() && code == ExitCode::SUCCESS {
+        return ExitCode::FAILURE;
+    }
+    code
+}
+
 fn run(cli: Cli) -> ExitCode {
     if cli.command.is_none()
         && let Some((name, cmd)) = misspelled_command(&cli.files)
@@ -385,48 +439,8 @@ fn run(cli: Cli) -> ExitCode {
                 ExitCode::FAILURE
             }
         }
-        Some(Command::Ascii {
-            file,
-            markdown,
-            charset,
-            width,
-            watch,
-        }) => {
-            let charset = match charset {
-                CharsetArg::Unicode => Charset::Unicode,
-                CharsetArg::Ascii => Charset::Ascii,
-                CharsetArg::UnicodeMath => Charset::UnicodeMath,
-            };
-            let stdin = PathBuf::from("-");
-            let md = if markdown {
-                Some(file.as_ref().unwrap_or(&stdin)).filter(|f| !f.is_dir())
-            } else {
-                markdown_file(&file)
-            };
-            if let Some(md) = md {
-                if watch && md.as_os_str() == "-" {
-                    diagnostic!("error: --watch needs a FILE or directory, not stdin");
-                    return ExitCode::FAILURE;
-                }
-                return markdown_blocks(md, watch, || markdown::print_ascii(md, charset, width));
-            }
-            let wide = std::cell::Cell::new(false);
-            let name = file
-                .as_deref()
-                .filter(|f| f.as_os_str() != "-")
-                .map_or_else(|| "<stdin>".to_owned(), |f| f.display().to_string());
-            let code = convert(file, None, None, watch, |l| {
-                let drawing = l.ascii(&Options { charset })?;
-                if too_wide(&name, &drawing, width) {
-                    wide.set(true);
-                }
-                Ok(drawing.into_bytes())
-            });
-            if wide.get() && code == ExitCode::SUCCESS {
-                return ExitCode::FAILURE;
-            }
-            code
-        }
+        Some(Command::Ascii(args)) => print_text(args, CharsetArg::Ascii),
+        Some(Command::Text(args)) => print_text(args, CharsetArg::Unicode),
         Some(Command::Svg {
             file,
             watch,
@@ -758,7 +772,7 @@ fn convert(
     if let Some(d) = &dir {
         if ext.is_none() {
             diagnostic!(
-                "error: {} is a directory; ascii reads one file",
+                "error: {} is a directory; ascii and text read one file",
                 d.display()
             );
             return ExitCode::FAILURE;
@@ -1306,6 +1320,18 @@ mod tests {
     /// `--verbose` goes anywhere, and files and commands parse as before.
     #[test]
     fn arguments() {
+        assert!(matches!(parse(&["text"]).command, Some(Command::Text(_))));
+        assert!(matches!(
+            parse(&["text", "--charset", "ascii"]).command,
+            Some(Command::Text(TextArgs {
+                charset: Some(CharsetArg::Ascii),
+                ..
+            }))
+        ));
+        assert!(matches!(
+            parse(&["ascii"]).command,
+            Some(Command::Ascii(TextArgs { charset: None, .. }))
+        ));
         for args in [
             &["-v", "ascii"][..],
             &["ascii", "-v"],
@@ -1401,6 +1427,7 @@ mod tests {
         // Short names two edits from a command are new files.
         for ok in [
             &["pdf"][..],
+            &["test"],
             &["pu"],
             &["gv"],
             &["hello"],

@@ -5,7 +5,7 @@ authors = ["James Kominick"]
 language = "en"
 src = "src"
 
-# Draws each diagram block and adds its drawing and `sirene ascii` text; see samples.py.
+# Draws each diagram block and adds its drawing and `sirene text` output; see samples.py.
 [preprocessor.samples]
 command = "python3 samples.py"
 after = ["links"]

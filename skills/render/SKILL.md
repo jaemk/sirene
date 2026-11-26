@@ -29,13 +29,13 @@ Run these from the directory holding the diagram. None of them open a window. Ne
 
 ```sh
 sirene check diagram.mmd                     # diagnostics only; exit 1 on an error
-sirene ascii diagram.mmd                     # print as box-drawing text
-sirene ascii --charset ascii diagram.mmd     # print with ASCII characters only
+sirene ascii diagram.mmd                     # print as plain ASCII text
+sirene text diagram.mmd                      # print with box-drawing characters
 sirene png diagram.mmd -o diagram.png        # write a PNG
 sirene png diagram.mmd -o dark.png --theme dark --quality normal
 sirene svg diagram.mmd -o diagram.svg        # write an SVG (stdout without -o)
 sirene check notes.md docs                   # each diagram block, every diagram under docs/
-sirene ascii notes.md                        # print each diagram block as text
+sirene ascii notes.md                        # print each diagram block as text (or `text`)
 sirene png notes.md -o out                   # out/notes-1.png, ... one per diagram block
 sirene svg docs -o out                       # out/a.svg, ... one per diagram under docs/
 ```
@@ -64,7 +64,8 @@ To check how a diagram you wrote looks:
 1. Write it to a `.mmd`, `.puml`, or `.dot` file, or a diagram block in Markdown.
 2. `sirene check` it and fix the errors.
 3. Render a PNG to a scratch path (`-o`) and read the image; or `sirene ascii` it to see the
-   layout as text, which is also what to show the user in a terminal.
+   layout as text (`sirene text` for box-drawing characters, which is also what to show the user
+   in a terminal).
 4. Adjust direction (`flowchart LR` or `TD`, `rankdir`, `left to right direction`), grouping,
    and edge lengths (`-->` vs `--->`) until it reads well, then render the final output where
    the user wants it.

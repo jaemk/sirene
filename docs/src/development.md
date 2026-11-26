@@ -45,7 +45,7 @@ mdbook serve docs
 ```
 
 The `docs/samples.py` preprocessor (Python 3) draws each `mermaid`, `plantuml`, or `dot` code
-block with that build and adds the drawing and `sirene ascii` text below it. A block sirene
+block with that build and adds the drawing and `sirene text` output below it. A block sirene
 reports an error for fails the build; ```` ```mermaid no-render ```` leaves a block as source only.
 Untagged blocks are not drawn.
 

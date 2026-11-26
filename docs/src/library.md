@@ -1,7 +1,7 @@
 # Rust library
 
 [`sirene-core`](https://crates.io/crates/sirene-core) reads, lays out, and draws diagrams
-without the CLI, with the same output as `sirene ascii`, `sirene svg`, and `sirene png`. API
+without the CLI, with the same output as `sirene text`, `sirene svg`, and `sirene png`. API
 reference: [docs.rs/sirene-core](https://docs.rs/sirene-core).
 
 ```toml
@@ -26,7 +26,7 @@ fn main() -> sirene_core::Result<()> {
         eprintln!("{line}:{col}: {}", d.message);
     }
 
-    // What `sirene ascii`, `sirene svg`, and `sirene png` write.
+    // What `sirene text`, `sirene svg`, and `sirene png` write.
     println!("{}", lowered.ascii(&Default::default())?);
     let svg: String = lowered.svg(&Theme::LIGHT)?;
     let png: Vec<u8> = lowered.png(&Theme::DARK, sirene_core::scene::png::Quality::Fine, None)?;

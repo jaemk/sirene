@@ -1,7 +1,7 @@
 # Visio drawings
 
 sirene draws Microsoft Visio `.vsdx` drawings as SVG and PNG. A drawing is read-only: the editor
-opens it as a picture, and `sirene ascii` has no text form for it.
+opens it as a picture, and `sirene ascii` and `sirene text` have no text form for it.
 
 ```
 sirene svg plan.vsdx                 print or write the SVG of a one-page drawing

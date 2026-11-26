@@ -22,7 +22,7 @@ use sirene_core::scene::Theme;
 
 /// `render`'s `format`: an SVG document.
 pub const FORMAT_SVG: u32 = 0;
-/// `render`'s `format`: the `sirene ascii` text.
+/// `render`'s `format`: the `sirene text` drawing.
 pub const FORMAT_ASCII: u32 = 1;
 /// `render`'s `format`: a PNG image (feature `png`).
 pub const FORMAT_PNG: u32 = 2;

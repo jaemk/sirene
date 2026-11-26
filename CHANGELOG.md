@@ -6,6 +6,17 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `sirene text`: `sirene ascii` with box-drawing characters. It takes the same options.
+
+### Changed
+
+- `sirene ascii` draws plain ASCII by default (`--charset ascii`), where it drew box-drawing
+  characters. Use `sirene text`, or `sirene ascii --charset unicode`, for the old output.
+  `Options::default()`, `Lowered::ascii`, and the JavaScript `format: "ascii"` are unchanged.
+- The site's text tabs and the book's samples are labelled `sirene text`.
+
 ## [0.7.0] - 2026-11-25
 
 ### Added

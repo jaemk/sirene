@@ -56,7 +56,7 @@ jobs:
         run: |
           sirene=target/release/sirene
           "$sirene" svg --theme dark docs/landing/hero.mmd -o docs/landing/hero.svg
-          "$sirene" ascii docs/landing/hero.mmd > docs/landing/hero.txt
+          "$sirene" text docs/landing/hero.mmd > docs/landing/hero.txt
       - name: Install mdBook
         run: |
           mkdir -p "$HOME/.local/bin"

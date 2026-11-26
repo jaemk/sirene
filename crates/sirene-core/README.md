@@ -26,7 +26,7 @@ for d in &lowered.diagnostics {
     eprintln!("{line}:{col}: {}", d.message);
 }
 
-// What `sirene ascii`, `sirene svg`, and `sirene png` write.
+// What `sirene text`, `sirene svg`, and `sirene png` write.
 let text = lowered.ascii(&Default::default())?;
 assert!(text.contains("Start"));
 let svg = lowered.svg(&Theme::LIGHT)?;

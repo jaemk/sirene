@@ -173,7 +173,7 @@ module and the `.wasm` as a URL or an asset; pass its bytes, or a `fetch` of it,
 
 ### Text output
 
-`format: "ascii"` gives what `sirene ascii` prints:
+`format: "ascii"` gives what `sirene text` prints (box-drawing characters):
 
 ```js
 console.log(sirene.render("flowchart LR\n  A --> B\n", { format: "ascii" }).output);

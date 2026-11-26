@@ -13,16 +13,18 @@ subcommand is taken as a mistyped command: `error: no file or command named 'NAM
 'sirene CMD'? (to open a new file with that name, use './NAME')`, exit 2, and no window opens.
 Tests: `suggests_a_misspelled_command`, and `misspelled_commands` in `main.rs`.
 
-## CLI-2 `sirene ascii`
+## CLI-2 `sirene ascii` and `sirene text`
 
-`sirene ascii [FILE]` reads a diagram from FILE, or from stdin when FILE is omitted or `-`,
-and prints it to stdout with the ASCII renderer (`ascii-renderer.md`). A Markdown FILE prints
+`sirene ascii [FILE]` and `sirene text [FILE]` read a diagram from FILE, or from stdin when FILE
+is omitted or `-`, and print it to stdout with the ASCII renderer (`ascii-renderer.md`). A Markdown FILE prints
 each of its diagram blocks (MARKDO-1), a blank line between them, with diagnostics at positions
 in the Markdown file; one with none prints `NAME: no diagram blocks` to stderr and nothing to
 stdout. Tests: `markdown_ascii` in `crates/sirene/tests/cli.rs`.
 
-`--charset unicode|ascii` picks the character set; the default is `unicode`. `--width N` fails
-a drawing wider than N columns (CLI-14).
+`--charset ascii|unicode|unicode-math` picks the character set. The default is `ascii` for
+`sirene ascii` and `unicode` for `sirene text`, so `ascii --charset unicode` is `text`. The
+library's `Options::default()` stays `unicode`. `--width N` fails a drawing wider than N columns
+(CLI-14). Tests: `ascii_and_text_default_charsets`, `readme_example`.
 
 ## CLI-3 Diagnostics
 
@@ -112,7 +114,7 @@ These are errors that render nothing: a DIR with no diagrams (`error: no .mmd, .
 .pu, .iuml, or .vsdx files in DIR`), a DIR that
 cannot be listed (`error: cannot read DIR: REASON`), an OUTDIR that exists and is not a directory
 (`error: OUTDIR is not a directory; a DIR renders into one`), and a directory given to
-`sirene ascii` (`error: DIR is a directory; ascii reads one file`). Tests: `directories`,
+`sirene ascii` and `sirene text` (`error: DIR is a directory; ascii and text read one file`). Tests: `directories`,
 `directory_output_collisions`, and `unreadable_directory` in `crates/sirene/tests/cli.rs`.
 
 ## CLI-10 Watching
