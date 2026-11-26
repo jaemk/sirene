@@ -47,11 +47,12 @@ title by the diagram. Tests: `drawing`.
 
 ## MPKT-4 ASCII
 
-The RFC layout: two columns per bit, a ruler of bit positions on two lines (tens over units,
-mirrored when descending) when `show_bits` is on, each row's first bit number at its left, and
-each field's part a box across its bits. A label wraps at spaces to fit the box, and a word wider
-than the box breaks anywhere, so a one-bit flag reads down the box (`U`, `R`, `G`). A row is as
-tall as its tallest label, and each label is centered in its box. The title is centered above.
+The RFC layout uses two columns per bit, or three if a one-bit box contains a double-width
+character. When `show_bits` is on, a two-line ruler shows bit positions with tens above units,
+mirrored when descending. Each row shows its first bit number at the left, and each field's
+part has a box across its bits. A label wraps at spaces to fit the box's display width. A word
+wider than the box breaks anywhere, so a one-bit flag reads down the box (`U`, `R`, `G`). A row
+is as tall as its tallest label, and each label is centered in its box. The title is centered above.
 Tests: `snapshots`, `ascii_charset_snapshots`, and the renderer's unit tests.
 
 ## MPKT-5 Not drawn
