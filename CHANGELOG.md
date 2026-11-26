@@ -9,6 +9,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - `sirene text`: `sirene ascii` with box-drawing characters. It takes the same options.
+- `--lang` also takes `graphviz`, `puml`, `tex`, and `vsdx`, the names Markdown blocks and the
+  JavaScript API use.
 - The JavaScript `format: "text"` (and `FORMAT_TEXT` in `sirene-wasm`), the box-drawing text.
 
 ### Changed

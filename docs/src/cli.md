@@ -19,8 +19,8 @@ A diagram's language comes from its file extension (`.mmd` and `.mermaid` Mermai
 `.gv` [Graphviz DOT](dot.md), `.puml`, `.plantuml`, `.pu`, and `.iuml` [PlantUML](plantuml.md))
 or its Markdown block's name (`mermaid`, `dot`, `graphviz`, `plantuml`, `puml`). Stdin and other
 files are DOT when they start with a DOT graph header, PlantUML when they have an `@start` line,
-and Mermaid otherwise. `--lang mermaid|dot|plantuml|latex`, before or after the command, reads
-every diagram as that language:
+and Mermaid otherwise. `--lang mermaid|dot|plantuml|latex|visio`, before or after the command, reads
+every diagram as that language (`graphviz`, `puml`, `tex`, and `vsdx` also work):
 
 ```
 printf 'digraph { a -> b }\n' | sirene ascii --lang dot

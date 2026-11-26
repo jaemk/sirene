@@ -47,8 +47,10 @@ struct Cli {
 enum LangArg {
     Mermaid,
     /// Graphviz DOT.
+    #[value(alias = "graphviz")]
     Dot,
     /// PlantUML.
+    #[value(alias = "puml")]
     Plantuml,
     /// One TeX formula (`.tex`, `.latex`).
     #[value(alias = "tex")]
@@ -1320,6 +1322,15 @@ mod tests {
     /// `--verbose` goes anywhere, and files and commands parse as before.
     #[test]
     fn arguments() {
+        // `--lang` takes the names Markdown blocks and the JavaScript API use.
+        for name in [
+            "dot", "graphviz", "plantuml", "puml", "latex", "tex", "visio", "vsdx",
+        ] {
+            assert!(
+                Cli::try_parse_from(["sirene", "--lang", name, "ascii"]).is_ok(),
+                "{name}"
+            );
+        }
         assert!(matches!(parse(&["text"]).command, Some(Command::Text(_))));
         assert!(matches!(
             parse(&["text", "--charset", "ascii"]).command,
