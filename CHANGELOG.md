@@ -6,6 +6,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-26
+
 ### Added
 
 - `sirene text`: `sirene ascii` with box-drawing characters. It takes the same options.
