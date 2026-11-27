@@ -6,6 +6,22 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-26
+
+### Fixed
+
+- Detect Visio packages from stdin when the ZIP signature arrives across multiple reads.
+- Connect timeline periods without events to the axis in both text orientations.
+- Wrap packet labels by display width so double-width characters fit inside field borders.
+- Insert direction edits inside semicolon-separated flowchart subgraphs.
+- Attach PlantUML notes without `of` to the last declaration when it is an unnamed container.
+- Keep edge ports on narrow cluster borders by reducing the inset to fit.
+- Reject line terminators as `\verb` and `\verb*` delimiters in LaTeX formulas.
+- Give scalars in mixed Mermaid use case JSON arrays indexed paths alongside objects and arrays.
+- Validate binary, decimal, and hexadecimal digits in ABNF railroad terminals by their prefix.
+- Match explicit CLI log filters on module boundaries so `sirene=debug` only enables the CLI
+  and its submodules.
+
 ## [0.8.0] - 2026-11-26
 
 ### Added

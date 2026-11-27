@@ -43,10 +43,11 @@ Every element is owned by the diagram. Tests:
 ## TIMELI-4 ASCII
 
 The same boxes drawn with box characters, with text wrapped at 24 columns: for `LR` the periods
-in a row of boxes, an arrow (`►`, `>` in ASCII) under them with `┼` where each period meets it,
-and each period's events in boxes stacked below; section boxes above. For `TD` the periods in a
-column with an arrow (`▼`, `v`) down their left, and each period's events in boxes to its right;
-section boxes to the left. Tests: `snapshots`, `ascii_charset_snapshots`.
+in a row of boxes, an arrow (`►`, `>` in ASCII) under them with `┼` where a period connects to
+its events and `┴` where a period has no events. Event boxes stack below the arrow and section
+boxes sit above the periods. For `TD` the periods in a column connect to a vertical arrow
+(`▼`, `v`), with section boxes to the left and event boxes to the right. Tests: `snapshots`,
+`ascii_charset_snapshots`, `periods_without_events_connect_to_the_axis`.
 
 ## TIMELI-5 Not drawn
 

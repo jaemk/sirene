@@ -1421,7 +1421,7 @@ impl<'a, 'b> Placer<'a, 'b> {
 
     /// Offset from the anchor of port `k` of `n` spread across a side `width` wide.
     fn spread(&self, width: i32, k: i32, n: i32) -> i32 {
-        let inset = self.sp.port_inset;
+        let inset = self.sp.port_inset.min((width - n).max(0) / 2);
         let usable = width - 2 * inset;
         inset + ((2 * k + 1) * usable) / (2 * n) - width / 2
     }

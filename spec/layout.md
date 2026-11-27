@@ -81,8 +81,9 @@ side (west or east across a top-down rank, north or south across a left-right on
 before or after the ends without one. An end anchored to a line of a node (a record port)
 joins that line's middle when the node's container runs left-right or right-left, kept on the
 side; the anchor is ignored across a top-down rank. A node grows along the rank when its ports
-would not fit. An edge reaching a node inside a cluster, or the cluster itself, crosses the cluster border
-at its own port on the corresponding side.
+would not fit. An edge reaching a node inside a cluster, or the cluster itself, crosses the
+cluster border at its own port on the corresponding side. A narrow cluster side reduces the
+requested port inset to make room for its ports.
 
 ## LAYOUT-8 Routes
 

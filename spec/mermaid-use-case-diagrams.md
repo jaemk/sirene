@@ -62,10 +62,12 @@ two use cases, a generalization two actors or two use cases, and a JSON table ta
 
 A note is a flowchart note beside its actor or use case; a note for anything else is a warning.
 A JSON table is a rectangle titled by its id, with one two-column row per leaf of its strict JSON
-object: nested keys as `a.b` and `items[0].name`, a list of values with the key on its first row
-only, `{}` and `[]` for empty ones, JSON spelling for `null`, booleans, and numbers, and the last
-value of a repeated key in its first place. A `\u` surrogate pair is one character; a lone
-surrogate is U+FFFD. Invalid JSON and tables that exceed their storage limits produce a warning.
+object. Nested keys appear as `a.b` and `items[0].name`. An array of scalars shows its key on its
+first row only. If an array contains an object or another array, every element gets an indexed
+path. Empty objects and arrays are shown as `{}` and `[]`. Scalars keep the JSON spelling of
+`null`, booleans, and numbers, and repeated keys keep their first position and last value. A `\u`
+surrogate pair is one character. A lone surrogate becomes U+FFFD. Invalid JSON and tables that
+exceed their storage limits produce a warning.
 The parser reads at most as many values as fit in 16 MiB of value slots. Flattened rows have a
 separate 16 MiB budget that counts each row and its key and value bytes, including repeated paths.
 Tests include `notes_tables_boundaries` and the unit tests in `usecase/json.rs`.

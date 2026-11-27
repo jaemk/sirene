@@ -298,9 +298,10 @@ impl Rows {
             }
             Value::Array(items) if items.is_empty() => self.push(true, "[]"),
             Value::Array(items) => {
+                let indexed = items.iter().any(|item| scalar(item).is_none());
                 for (i, item) in items.iter().enumerate() {
-                    match scalar(item) {
-                        // A list of values puts the key on its first row only.
+                    match scalar(item).filter(|_| !indexed) {
+                        // An array of scalars puts the key on its first row only.
                         Some(s) => self.push(i == 0, s)?,
                         None => self.descend("", &format!("[{i}]"), item)?,
                     }
@@ -367,6 +368,22 @@ mod tests {
             ]
         );
         assert_eq!(pairs(r#"{"s": "a\"b\u0041\n"}"#), [p("s", "a\"bA\n")]);
+    }
+
+    #[test]
+    fn indexes_every_item_in_mixed_arrays() {
+        assert_eq!(
+            pairs(r#"{"items": [{"name": "Book"}, true, [1, 2], null], "tags": ["a", "b"]}"#),
+            [
+                p("items[0].name", "Book"),
+                p("items[1]", "true"),
+                p("items[2]", "1"),
+                p("", "2"),
+                p("items[3]", "null"),
+                p("tags", "a"),
+                p("", "b"),
+            ]
+        );
     }
 
     #[test]

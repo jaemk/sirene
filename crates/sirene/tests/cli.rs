@@ -26,7 +26,8 @@ fn logging_environment_and_verbose_precedence() {
         .assert()
         .success()
         .stdout(AB)
-        .stderr(predicate::str::contains("reading <stdin>"));
+        .stderr(predicate::str::contains("reading <stdin>"))
+        .stderr(predicate::str::contains("DEBUG sirene_core").not());
     for quiet in ["", "off"] {
         sirene()
             .arg("text")

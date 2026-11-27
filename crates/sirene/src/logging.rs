@@ -85,7 +85,9 @@ impl Filter {
                         Some("sirene" | "sirene_core" | "sirene_gui")
                     )
                 } else {
-                    target.starts_with(&d.target)
+                    target.strip_prefix(&d.target).is_some_and(|suffix| {
+                        suffix.is_empty() || suffix.starts_with("::") || d.target.ends_with("::")
+                    })
                 }
             })
             .max_by_key(|(i, d)| (d.target.len(), *i))
@@ -222,6 +224,16 @@ mod tests {
         let filter = Filter::parse("debug,sirene_plugin=info").unwrap();
         assert!(filter.enabled("sirene_plugin::module", Level::Info));
         assert!(!filter.enabled("sirene_plugin::module", Level::Debug));
+    }
+
+    #[test]
+    fn explicit_targets_match_module_boundaries() {
+        let filter = Filter::parse("debug,sirene=off,sirene_core::flowchart::=trace").unwrap();
+        assert!(!filter.enabled("sirene::update", Level::Error));
+        assert!(filter.enabled("sirene_core", Level::Debug));
+        assert!(filter.enabled("sirene_gui::viewer", Level::Debug));
+        assert!(!filter.enabled("sirene_core::flowchart", Level::Trace));
+        assert!(filter.enabled("sirene_core::flowchart::parser", Level::Trace));
     }
 
     #[test]

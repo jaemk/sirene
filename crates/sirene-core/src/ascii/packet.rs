@@ -1,35 +1,38 @@
-//! Packet diagrams as text (MPKT-4): the RFC style, two columns per bit, with a bit ruler on top
-//! and each row's first bit at its left.
+//! Packet diagrams as text (MPKT-4): the RFC style, with a bit ruler on top and each row's
+//! first bit at its left.
+
+use unicode_width::UnicodeWidthChar;
 
 use super::canvas::{Canvas, Line};
 use super::{Options, width};
 use crate::packet::{Block, Packet};
 
 /// `s` in lines at most `max` wide: broken at spaces, and a longer word broken anywhere.
-fn wrap(s: &str, max: usize) -> Vec<String> {
+fn wrap(s: &str, max: i32) -> Vec<String> {
     let max = max.max(1);
     let mut out: Vec<String> = Vec::new();
     let mut line = String::new();
-    let mut line_len = 0;
+    let mut line_width = 0;
     for word in s.split_whitespace() {
-        let word_len = word.chars().count();
-        if !line.is_empty() && line_len + 1 + word_len <= max {
+        let word_width = width(word);
+        if !line.is_empty() && line_width + 1 + word_width <= max {
             line.push(' ');
             line.push_str(word);
-            line_len += 1 + word_len;
+            line_width += 1 + word_width;
             continue;
         }
         if !line.is_empty() {
             out.push(std::mem::take(&mut line));
-            line_len = 0;
+            line_width = 0;
         }
         for ch in word.chars() {
-            if line_len == max {
+            let char_width = ch.width().unwrap_or(0) as i32;
+            if !line.is_empty() && line_width + char_width > max {
                 out.push(std::mem::take(&mut line));
-                line_len = 0;
+                line_width = 0;
             }
             line.push(ch);
-            line_len += 1;
+            line_width += char_width;
         }
     }
     if !line.is_empty() || out.is_empty() {
@@ -48,12 +51,23 @@ fn span(packet: &Packet, b: &Block) -> (i32, i32) {
 pub fn render(packet: &Packet, options: &Options) -> String {
     let per = packet.bits_per_row.max(1) as i32;
     let rows = packet.rows();
+    // A one-bit box normally has one interior column. Widen the grid if it needs two.
+    let bit_width = if rows
+        .iter()
+        .flatten()
+        .any(|b| b.bits() == 1 && b.label.chars().any(|ch| ch.width() == Some(2)))
+    {
+        3
+    } else {
+        2
+    };
+    let grid_width = bit_width * per + 1;
     // Each block's label lines, and each row's height inside its borders.
     let labels: Vec<Vec<Vec<String>>> = rows
         .iter()
         .map(|row| {
             row.iter()
-                .map(|b| wrap(&b.label, (2 * b.bits() - 1) as usize))
+                .map(|b| wrap(&b.label, bit_width * b.bits() as i32 - 1))
                 .collect()
         })
         .collect();
@@ -68,13 +82,13 @@ pub fn render(packet: &Packet, options: &Options) -> String {
     let ruler = if packet.show_bits { 2 } else { 0 };
     let total_h = ruler + 1 + heights.iter().map(|h| h + 1).sum::<i32>();
     let mut canvas = Canvas::new(
-        gutter + 2 * per + 1,
+        gutter + grid_width,
         if rows.is_empty() { 0 } else { total_h },
     );
     if packet.show_bits && !rows.is_empty() {
         for c in 0..per {
             let bit = if packet.descending { per - 1 - c } else { c };
-            let x = gutter + 2 * c + 1;
+            let x = gutter + bit_width * c + bit_width / 2;
             if bit % 10 == 0 {
                 canvas.text(x, 0, &(bit / 10 % 10).to_string());
             }
@@ -90,7 +104,7 @@ pub fn render(packet: &Packet, options: &Options) -> String {
         }
         for (b, lines) in row.iter().zip(ls) {
             let (lo, hi) = span(packet, b);
-            let (x0, x1) = (gutter + 2 * lo, gutter + 2 * (hi + 1));
+            let (x0, x1) = (gutter + bit_width * lo, gutter + bit_width * (hi + 1));
             canvas.hline(x0, x1, y, Line::Light);
             canvas.hline(x0, x1, bottom, Line::Light);
             canvas.vline(x0, y, bottom, Line::Light);
@@ -111,7 +125,7 @@ pub fn render(packet: &Packet, options: &Options) -> String {
         .filter(|t| !t.is_empty())
     {
         Some(t) => {
-            let pad = (gutter + (2 * per + 1 - width(t)).max(0) / 2) as usize;
+            let pad = (gutter + (grid_width - width(t)).max(0) / 2) as usize;
             format!("{}{t}\n\n{body}", " ".repeat(pad))
         }
         None => body,
@@ -136,9 +150,20 @@ mod tests {
     fn wrapping_long_unicode_words_preserves_characters_and_word_boundaries() {
         let word = "é界".repeat(20_000);
         let lines = wrap(&format!("{word} end"), 3);
-        assert!(lines.iter().all(|line| line.chars().count() <= 3));
+        assert!(lines.iter().all(|line| width(line) <= 3));
         assert_eq!(lines[..lines.len() - 1].concat(), word);
         assert_eq!(lines.last().unwrap(), "end");
+    }
+
+    #[test]
+    fn wide_label_fits_inside_a_single_bit() {
+        let src = "---\nconfig:\n  packet:\n    bitsPerRow: 1\n---\npacket\n0: \"界A\"\n";
+        let (packet, diagnostics) = crate::packet::parse(src).lower();
+        assert!(diagnostics.is_empty());
+        assert_eq!(
+            render(&packet, &Options::ASCII),
+            "   0\n   0\n  +--+\n0 |界|\n  |A |\n  +--+\n"
+        );
     }
 
     #[test]

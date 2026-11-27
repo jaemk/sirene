@@ -54,10 +54,11 @@ disabled, with a way to leave without saving settings.
 Without verbosity flags or a nonempty logging environment variable, no additional log records
 are printed. Global `-v`/`--verbose` enables debug logging; repeated verbosity enables trace.
 `SIRENE_LOG` takes precedence over `RUST_LOG`. Configuration accepts comma-separated levels
-(`off`, `error`, `warn`, `info`, `debug`, `trace`) and `TARGET=LEVEL` directives. Target
-directives use module prefixes and the most specific matching prefix wins. Verbosity flags
-override the general environment level; explicit target directives remain effective. Invalid
-configuration produces an actionable startup error and exit status 2.
+(`off`, `error`, `warn`, `info`, `debug`, `trace`) and `TARGET=LEVEL` directives. A target
+matches that module and its `::` descendants. A target ending in `::` matches descendants only.
+The most specific matching prefix wins. Verbosity flags override the general environment level
+while retaining explicit target directives. Invalid configuration produces an actionable startup
+error and exit status 2.
 
 Verbose defaults cover sirene's own crates; dependency targets can be explicitly enabled in
 the environment. Log records include elapsed time, severity, target, and operation context,

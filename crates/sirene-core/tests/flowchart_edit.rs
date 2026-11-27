@@ -363,6 +363,22 @@ fn directions() {
 }
 
 #[test]
+fn direction_in_an_inline_subgraph() {
+    let src = "flowchart TD\n    subgraph s [Title] ; A --> B; end\n";
+    let out = applied(src, set_direction(src, Some("s"), Direction::LeftRight));
+    assert_eq!(
+        chart(&out).subgraph("s").unwrap().direction,
+        Some(Direction::LeftRight),
+        "{out}"
+    );
+    assert_eq!(
+        out,
+        "flowchart TD\n    subgraph s [Title] ; direction LR; A --> B; end\n"
+    );
+    assert_eq!(errors(&out), 0, "{out}");
+}
+
+#[test]
 fn class_styles() {
     let src = "flowchart TD\n    A --> B\n";
     // A new class gets a `classDef`; later properties go in it, replaced in place.
