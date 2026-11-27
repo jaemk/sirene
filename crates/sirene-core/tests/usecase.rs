@@ -246,7 +246,7 @@ fn notes_tables_boundaries() {
         .iter()
         .map(|r| r.cells.iter().map(String::as_str).collect())
         .collect();
-    assert_eq!(rows, [vec!["k", "1"], vec!["k[1].x", "null"]]);
+    assert_eq!(rows, [vec!["k[0]", "1"], vec!["k[1].x", "null"]]);
 }
 
 /// MUSE-7: `:::`, `class` with several classes, and `style` on nodes and boundaries.
