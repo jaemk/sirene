@@ -107,22 +107,29 @@ fn numval_len(s: &str) -> usize {
     let Some(body) = s.strip_prefix('%') else {
         return 0;
     };
-    if !body.starts_with(['x', 'X', 'd', 'D', 'b', 'B']) {
-        return 0;
-    }
-    let hex = |s: &str| s.find(|c: char| !c.is_ascii_hexdigit()).unwrap_or(s.len());
+    let radix = match body.as_bytes().first() {
+        Some(b'x' | b'X') => 16,
+        Some(b'd' | b'D') => 10,
+        Some(b'b' | b'B') => 2,
+        _ => return 0,
+    };
+    let digits = |s: &str| s.find(|c: char| !c.is_digit(radix)).unwrap_or(s.len());
     let mut n = 2;
-    let first = hex(&s[n..]);
+    let first = digits(&s[n..]);
     if first == 0 {
         return 0;
     }
     n += first;
     while s[n..].starts_with(['-', '.']) {
-        let more = hex(&s[n + 1..]);
+        let more = digits(&s[n + 1..]);
         if more == 0 {
             break;
         }
         n += 1 + more;
+    }
+    // An adjacent letter or digit cannot start a new term inside a numeric terminal.
+    if s.as_bytes().get(n).is_some_and(u8::is_ascii_alphanumeric) {
+        return 0;
     }
     n
 }
@@ -716,6 +723,21 @@ mod tests {
         assert_eq!(special_len("? any char ? ;"), Some(12));
         assert_eq!(special_len("? ?"), None);
         assert_eq!(special_len("? a ; ?"), None);
+    }
+
+    #[test]
+    fn abnf_numeric_terminals_use_their_declared_base() {
+        for terminal in ["%b102", "%B2", "%d6F", "%D65G", "%b10-12", "%d65.6A"] {
+            let src = format!("railroad-abnf-beta\nr = {terminal} ;\n");
+            let (_, diagnostics) = tree(&src, Notation::Abnf);
+            assert_eq!(diagnostics.len(), 1, "{terminal}: {diagnostics:?}");
+        }
+        for terminal in ["%B10.11", "%D65-90", "%xAf", "%X0D.0A"] {
+            let src = format!("railroad-abnf-beta\nr = {terminal} ;\n");
+            let (tree, diagnostics) = tree(&src, Notation::Abnf);
+            assert!(diagnostics.is_empty(), "{terminal}: {diagnostics:?}");
+            assert!(tree.contains("RR_NUMVAL@"), "{tree}");
+        }
     }
 
     #[test]

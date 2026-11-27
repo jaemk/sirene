@@ -18,9 +18,10 @@ drawn as one syntax diagram per rule (LANGS-2, LANGS-3, MCHART-1). Reference: Me
   comments. A `?` directly after an element is the optional operator; after whitespace it starts
   a special sequence if one closes.
 - ABNF: `"..."` strings without escapes, names of `[A-Za-z][A-Za-z0-9-]*`, `/`, `[ ]`, `( )`,
-  `*`, `n*`, `*m`, `n*m`, and `n` repeat prefixes, and `%x`, `%d`, `%b` numbers with ranges and
-  `.` concatenation. A `;` with text after it on its line, or where a rule may start, begins a
-  comment; otherwise it ends the rule.
+  `*`, `n*`, `*m`, `n*m`, and `n` repeat prefixes. Numeric terminals use hexadecimal (`%x`),
+  decimal (`%d`), or binary (`%b`) digits, including in ranges and `.` concatenations. A `;`
+  with text after it on its line, or where a rule may start, begins a comment. Elsewhere it ends
+  the rule.
 - PEG: strings in either quote, names, `/`, `( )`, one postfix `?`, `*`, or `+`, `&` and `!`
   predicates, `.`, and `#` comments.
 - `railroad-beta`: a rule's definition is one constructor call, `terminal`, `nonterminal`,
