@@ -3,28 +3,28 @@
 class Sirene < Formula
   desc "Mermaid diagram editor and viewer with terminal output"
   homepage "https://github.com/jaemk/sirene"
-  version "0.8.0"
+  version "0.8.1"
   license any_of: ["MIT", "Apache-2.0"]
 
   on_macos do
     on_arm do
-      url "https://github.com/jaemk/sirene/releases/download/v0.8.0/sirene-0.8.0-aarch64-apple-darwin.tar.gz"
-      sha256 "f706c4144b2f30e441d7248fd58e2dff35e4f375b1fab405309c888e35a39ae3"
+      url "https://github.com/jaemk/sirene/releases/download/v0.8.1/sirene-0.8.1-aarch64-apple-darwin.tar.gz"
+      sha256 "f0cf2a94eee599d2002e8d1c655d6362842069e19f74a9d0b7f8533ed9a411ef"
     end
     on_intel do
-      url "https://github.com/jaemk/sirene/releases/download/v0.8.0/sirene-0.8.0-x86_64-apple-darwin.tar.gz"
-      sha256 "2fcdd0e60431e5f6d5d2ad0c4a17623aeab0c9da77b066f88d385b1fdbca2332"
+      url "https://github.com/jaemk/sirene/releases/download/v0.8.1/sirene-0.8.1-x86_64-apple-darwin.tar.gz"
+      sha256 "9af0b07e2f63eea42ffbe41a3acf09ab474774ca375a2f1dc8b0ef10cc0082f5"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/jaemk/sirene/releases/download/v0.8.0/sirene-0.8.0-aarch64-unknown-linux-gnu.tar.gz"
-      sha256 "c5eeebe1c5ea7fb7eba4e9bf8ea9b441bc2e05bbc7c50eabd457fb8af14b2b2a"
+      url "https://github.com/jaemk/sirene/releases/download/v0.8.1/sirene-0.8.1-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "0cfb319face356218b118278f21f0fbd3180c3266d933446fa02d8dc89fc895d"
     end
     on_intel do
-      url "https://github.com/jaemk/sirene/releases/download/v0.8.0/sirene-0.8.0-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "ee914708e1fea236981359cded9900b70cd2ce61e4aa1f0eaa12c0465c5ca8de"
+      url "https://github.com/jaemk/sirene/releases/download/v0.8.1/sirene-0.8.1-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "ccac62206fa7597befb44a8862564b8d4015e61eeb9466c96eadbefd2eba03de"
     end
   end
 
